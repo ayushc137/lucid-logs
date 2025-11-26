@@ -4,6 +4,9 @@
 .vscode/
 *.swp
 *.swo
+*.log
+*.sqlite
+*.db
 
 # Go
 apps/backend/bin/
@@ -11,6 +14,12 @@ apps/backend/tmp/
 apps/backend/vendor/
 apps/backend/coverage.txt
 apps/backend/profile.out
+apps/backend/main
+apps/backend/api
+
+# Rust
+apps/rust_backend/target/
+**/*.rs.bk
 
 # Node/Svelte
 node_modules/
@@ -20,6 +29,7 @@ apps/frontend/build/
 
 # Docker
 .docker/
+deploy/data/
 
 # Env
 .env
