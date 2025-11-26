@@ -1,0 +1,27 @@
+# General
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+apps/backend/bin/
+apps/backend/tmp/
+apps/backend/vendor/
+apps/backend/coverage.txt
+apps/backend/profile.out
+
+# Node/Svelte
+node_modules/
+apps/frontend/node_modules/
+apps/frontend/.svelte-kit/
+apps/frontend/build/
+
+# Docker
+.docker/
+
+# Env
+.env
+.env.*
+!.env.example

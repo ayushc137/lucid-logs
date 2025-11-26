@@ -1,0 +1,345 @@
+basePath: /api/v1
+definitions:
+  model.AuthRequest:
+    properties:
+      password:
+        example: adminadmin
+        type: string
+      username:
+        example: admin@example.com
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  model.AuthResponse:
+    properties:
+      token:
+        type: string
+      user:
+        description: User ID
+        type: string
+    type: object
+  model.CreateTaskRequest:
+    properties:
+      description:
+        example: Capture high-level goals
+        type: string
+      end_date:
+        example: "2025-11-25T00:00:00Z"
+        format: date-time
+        type: string
+      negative_comments:
+        items:
+          type: string
+        type: array
+      note:
+        type: string
+      positive_comments:
+        items:
+          type: string
+        type: array
+      priority:
+        type: integer
+      source:
+        default: manual
+        enum:
+        - manual
+        type: string
+      start_date:
+        example: "2025-11-24T00:00:00Z"
+        format: date-time
+        type: string
+      title:
+        example: Plan tomorrow
+        type: string
+    required:
+    - end_date
+    - start_date
+    - title
+    type: object
+  model.Task:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        description: User ID
+        type: string
+      deleted_at:
+        description: Soft delete
+        type: string
+      description:
+        example: Capture high-level goals
+        type: string
+      end_date:
+        example: "2025-11-25T00:00:00Z"
+        format: date-time
+        type: string
+      id:
+        type: string
+      is_completed:
+        description: Status & Priority
+        example: false
+        type: boolean
+      negative_comments:
+        example:
+        - '["Got distracted"]'
+        items:
+          type: string
+        type: array
+      note:
+        description: Content
+        example: Focus on top priorities
+        type: string
+      planned:
+        description: Auto-calculated
+        example: true
+        type: boolean
+      positive_comments:
+        example:
+        - '["Felt great"'
+        - '"In flow"]'
+        items:
+          type: string
+        type: array
+      priority:
+        description: -ve = wishes, higher = higher priority
+        example: 1
+        type: integer
+      source:
+        default: manual
+        description: Metadata
+        enum:
+        - manual
+        example: manual
+        type: string
+      start_date:
+        description: Time tracking
+        example: "2025-11-24T00:00:00Z"
+        format: date-time
+        type: string
+      title:
+        example: Plan tomorrow
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        description: User ID
+        type: string
+    required:
+    - end_date
+    - start_date
+    - title
+    type: object
+  model.UpdateTaskRequest:
+    properties:
+      description:
+        type: string
+      end_date:
+        example: "2025-11-27T00:00:00Z"
+        format: date-time
+        type: string
+      is_completed:
+        type: boolean
+      negative_comments:
+        items:
+          type: string
+        type: array
+      note:
+        type: string
+      positive_comments:
+        items:
+          type: string
+        type: array
+      priority:
+        type: integer
+      start_date:
+        example: "2025-11-26T00:00:00Z"
+        format: date-time
+        type: string
+      title:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Backend for the Daily Journal Application
+  title: Daily Journal API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Login and receive a JWT
+      parameters:
+      - description: Credentials
+        in: body
+        name: creds
+        required: true
+        schema:
+          $ref: '#/definitions/model.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AuthResponse'
+      summary: Login to SurrealDB
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credentials
+        in: body
+        name: creds
+        required: true
+        schema:
+          $ref: '#/definitions/model.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AuthResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /health:
+    get:
+      description: Checks if the API is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health Check
+      tags:
+      - health
+  /tasks:
+    get:
+      parameters:
+      - default: 25
+        description: Number of tasks to return (max 100)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of tasks to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Task'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List all tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Create a detailed task with validation
+      parameters:
+      - description: Task content
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Task'
+      security:
+      - BearerAuth: []
+      summary: Create a new task
+      tags:
+      - tasks
+  /tasks/{id}:
+    delete:
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete a task
+      tags:
+      - tasks
+    get:
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Task'
+      security:
+      - BearerAuth: []
+      summary: Get a task by ID
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Task update
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Task'
+      security:
+      - BearerAuth: []
+      summary: Update a task
+      tags:
+      - tasks
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

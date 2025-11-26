@@ -1,0 +1,61 @@
+[package]
+name = "rust_backend"
+version = "0.1.0"
+edition = "2021"
+description = "Daily Journal Backend API - Rust/Axum implementation"
+
+[dependencies]
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+surrealdb = { version = "2", features = ["protocol-ws", "protocol-http"] }
+
+# Logging/Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Validation
+validator = { version = "0.20", features = ["derive"] }
+
+# JWT/Auth
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Environment
+dotenvy = "0.15"
+
+# File watching (for schema hot-reload in dev)
+notify = "8"
+
+# Cryptographically secure random generation
+rand = "0.9"
+base64ct = { version = "1.8", features = ["std"] }
+
+# OpenAPI documentation
+utoipa = { version = "5", features = ["axum_extras", "chrono"] }
+utoipa-scalar = { version = "0.3", features = ["axum"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+# Faster dev builds
+opt-level = 0
+debug = true

@@ -1,0 +1,25 @@
+{
+	"name": "Daily Journal Dev",
+	"image": "mcr.microsoft.com/devcontainers/go:1-1.23-bullseye",
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.23"
+		},
+		"ghcr.io/devcontainers-contrib/features/task:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"tamasfe.even-better-toml",
+				"redhat.vscode-yaml",
+				"42crunch.vscode-openapi"
+			]
+		}
+	},
+	"forwardPorts": [8080, 8000, 8001],
+	"postCreateCommand": "task init",
+	"remoteUser": "vscode"
+}
+

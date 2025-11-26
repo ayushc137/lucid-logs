@@ -1,0 +1,91 @@
+version: '3'
+
+dotenv: [".env"]
+
+env:
+  PATH: "{{.HOME}}/.cargo/bin:{{.HOME}}/go/bin:{{.PATH}}"
+
+vars:
+  BIN_DIR: bin
+
+tasks:
+  default:
+    desc: Show tasks
+    cmds:
+      - task --list
+
+  setup-env:
+    desc: Create .env file from example
+    cmds:
+      - cp -n env.example .env || true
+
+  tools:
+    desc: Install required dev tools locally (run once)
+    cmds:
+      - go install github.com/air-verse/air@v1.52.3
+      - go install github.com/swaggo/swag/cmd/swag@latest
+      - echo "Tools installed."
+
+  db:up:
+    desc: Start SurrealDB
+    cmds:
+      - docker compose -f deploy/docker-compose.yml up -d surrealdb 
+
+  db:down:
+    desc: Stop database containers
+    cmds:
+      - docker compose -f deploy/docker-compose.yml down
+
+  schema:apply:
+    desc: Apply db/schema.surql to the running DB
+    cmds:
+      - cat db/schema.surql | docker compose -f deploy/docker-compose.yml exec -T surrealdb /surreal sql --conn http://localhost:8000 --user ${DB_USER:-root} --pass ${DB_PASS:-root} --ns ${DB_NAMESPACE:-daily_journal} --db ${DB_DATABASE:-core}
+
+  backend:tidy:
+    desc: Run go mod tidy for the backend
+    dir: apps/backend
+    cmds:
+      - go mod tidy
+
+  backend:docs:
+    desc: Generate Swagger documentation
+    dir: apps/backend
+    cmds:
+      - go generate ./cmd/api
+
+  dev:local:
+    desc: Start backend locally (Air) while DB runs in Docker
+    deps: [setup-env, db:up]
+    dir: apps/backend
+    env:
+      DB_SCHEMA_PATH: "{{.DB_SCHEMA_PATH}}"
+      ADMIN_USERNAME: "{{.ADMIN_USERNAME}}"
+      ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
+      JWT_SECRET: "{{.JWT_SECRET}}"
+      DB_HOST: localhost
+      DB_PORT: "8000"
+      DB_USER: "{{.DB_USER}}"
+      DB_PASS: "{{.DB_PASS}}"
+      DB_NAMESPACE: "{{.DB_NAMESPACE}}"
+      DB_DATABASE: "{{.DB_DATABASE}}"
+    cmds:
+      - go generate ./cmd/api
+      - air
+
+  dev:docker:
+    desc: Start entire stack inside Docker
+    deps: [setup-env]
+    cmds:
+      - docker compose -f deploy/docker-compose.yml up --build
+
+  rust:tools:
+    desc: Install Rust dev tools
+    cmds:
+      - cargo install cargo-watch
+
+  rust:dev:
+    desc: Start Rust backend with auto-reload
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo watch -x run
