@@ -22,6 +22,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/tasks", get(list_tasks))
         .route("/tasks", post(create_task))
+        .route("/tasks/{id}", get(get_task))
         .route("/tasks/{id}", put(update_task))
         .route("/tasks/{id}", delete(delete_task))
 }
@@ -88,6 +89,41 @@ pub async fn list_tasks(
 
     let response = PaginatedResponse::new(tasks, total, params.limit, params.offset);
     Ok((StatusCode::OK, Json(ApiResponse::success(response))))
+}
+
+/// Get a task by ID
+#[utoipa::path(
+    get,
+    path = "/api/v1/tasks/{id}",
+    params(
+        ("id" = String, Path, description = "Task ID")
+    ),
+    responses(
+        (status = 200, description = "Task found", body = Task),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Task not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "tasks"
+)]
+pub async fn get_task(
+    State(state): State<AppState>,
+    auth_user: AuthenticatedUser,
+    Path(id): Path<String>,
+) -> Result<(StatusCode, Json<ApiResponse<Task>>), AppError> {
+    tracing::debug!(
+        task_id = %id,
+        user_id = %auth_user.user_id,
+        "getting task"
+    );
+
+    let task = state
+        .task_service
+        .get_task(&id, &auth_user.user_id)
+        .await?;
+
+    Ok((StatusCode::OK, Json(ApiResponse::success(task))))
 }
 
 /// Create a new task

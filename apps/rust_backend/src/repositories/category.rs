@@ -34,25 +34,35 @@ impl CategoryRepository {
         let CreateCategoryRequest { name, color } = req;
         let user_owned = user_id.to_string();
 
+        // Use INSERT instead of CREATE for better error handling
+        // INSERT returns the created record or throws constraint errors
         let sql = format!(
-            "CREATE {} SET
-                name = $name,
-                color = $color,
-                created_by = $user,
-                updated_by = $user
-             RETURN {}",
-            CATEGORIES_TABLE, CATEGORY_PROJECTION
+            "INSERT INTO {} (name, color, created_by, updated_by) VALUES ($name, $color, $user, $user)",
+            CATEGORIES_TABLE
         );
 
         tracing::debug!(name = %name, "creating category in database");
 
         let mut result = self
             .db
-            .query(sql)
-            .bind(("name", name))
+            .query(&sql)
+            .bind(("name", name.clone()))
             .bind(("color", color))
-            .bind(("user", user_owned))
+            .bind(("user", user_owned.clone()))
             .await?;
+
+        // Check for errors first
+        let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
+        if !errors.is_empty() {
+            let error_str = format!("{:?}", errors);
+            tracing::error!(?errors, "database create failed with errors");
+            if error_str.contains("idx_categories_user_name") {
+                return Err(AppError::BadRequest(
+                    "A category with this name already exists".to_string(),
+                ));
+            }
+            return Err(AppError::Internal);
+        }
 
         let created: Option<Category> = result.take(0)?;
 
@@ -62,20 +72,13 @@ impl CategoryRepository {
                 Ok(category)
             }
             None => {
-                // Check for unique constraint violation
-                let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
-                if !errors.is_empty() {
-                    let error_str = format!("{:?}", errors);
-                    if error_str.contains("idx_categories_user_name") {
-                        return Err(AppError::BadRequest(
-                            "A category with this name already exists".to_string(),
-                        ));
-                    }
-                    tracing::error!(?errors, "database create failed with errors");
-                } else {
-                    tracing::error!(
-                        "database create failed - no category returned and no errors reported"
-                    );
+                tracing::error!(
+                    "database create failed - no category returned and no errors reported"
+                );
+                // Try to fetch by name as fallback (in case INSERT worked but didn't return)
+                tracing::debug!("attempting fallback: fetching recently created category by name");
+                if let Ok(Some(cat)) = self.find_by_name(&name, &user_owned).await {
+                    return Ok(cat);
                 }
                 Err(AppError::Internal)
             }

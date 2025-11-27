@@ -100,6 +100,7 @@ use crate::utils::state::AppState;
         handlers::auth::register,
         // Task endpoints - the main CRUD operations
         handlers::task::list_tasks,
+        handlers::task::get_task,
         handlers::task::create_task,
         handlers::task::update_task,
         handlers::task::delete_task,
