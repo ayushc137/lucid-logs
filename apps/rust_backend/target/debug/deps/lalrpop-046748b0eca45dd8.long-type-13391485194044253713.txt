@@ -1,1 +1,0 @@
-<lrgrammar::alloc::raw_vec::RawVec<grammar::pattern::FieldPattern<parse_tree::TypeRef>> as Drop>::drop
