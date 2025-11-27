@@ -1,0 +1,53 @@
+services:
+  # Database: SurrealDB (Multi-model, Real-time)
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: daily_journal_db
+    ports:
+      - "${HOST_DB_PORT:-8000}:8000"
+    command: start --log debug --user ${DB_USER:-root} --pass ${DB_PASS:-root} memory
+    volumes:
+      - ../db:/schema:ro
+    healthcheck:
+      test: ["CMD", "/surreal", "is-ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - journal_net
+
+  # Backend: Go (Gin)
+  backend:
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: daily_journal_backend
+    restart: unless-stopped
+    volumes:
+      - ../apps/backend:/app
+      - go_mod_cache:/go/pkg/mod
+      - ../db:/schema:ro
+    ports:
+      - "${HOST_APP_PORT:-8080}:8080"
+    env_file:
+      - ../.env
+    environment:
+      # Server
+      HTTP_PORT: 8080
+      # Database (override host for container networking)
+      DB_HOST: surrealdb
+      DB_PORT: 8000
+      DB_SCHEMA_PATH: /schema/schema.surql
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+    networks:
+      - journal_net
+
+networks:
+  journal_net:
+    driver: bridge
+
+volumes:
+  go_mod_cache:

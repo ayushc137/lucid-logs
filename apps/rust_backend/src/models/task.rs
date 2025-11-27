@@ -6,6 +6,24 @@ use validator::Validate;
 
 pub const SOURCE_MANUAL: &str = "manual";
 
+/// Custom deserializer that converts null to empty string
+fn null_to_empty_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
+/// Custom deserializer that converts null to empty vec
+fn null_to_empty_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<Vec<String>> = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
 /// Custom deserializer for SurrealDB RecordId -> Option<String>
 fn deserialize_record_id<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
@@ -61,7 +79,7 @@ pub struct Task {
     pub title: String,
 
     /// Journal entry / detailed notes
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_empty_string")]
     #[schema(example = "Capture high-level goals")]
     pub journal: String,
 
@@ -94,17 +112,17 @@ pub struct Task {
     pub source: String,
 
     /// Additional notes
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_empty_string")]
     #[schema(example = "Focus on top priorities")]
     pub note: String,
 
     /// Positive comments about the task
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_empty_vec")]
     #[schema(example = json!(["Felt great", "In flow"]))]
     pub positives: Vec<String>,
 
     /// Negative comments or issues
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_empty_vec")]
     #[schema(example = json!(["Got distracted"]))]
     pub negatives: Vec<String>,
 

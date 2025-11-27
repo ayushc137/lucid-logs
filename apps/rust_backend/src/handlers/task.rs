@@ -1,7 +1,9 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
+    middleware,
+    routing::{delete, get, post, put},
+    Json, Router,
 };
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
@@ -10,10 +12,24 @@ use validator::Validate;
 use crate::{
     error::{ApiResponse, AppError, PaginatedResponse},
     models::task::{CreateTaskRequest, Task, UpdateTaskRequest},
-    repositories::TaskRepository,
-    utils::middleware::AuthenticatedUser,
+    utils::middleware::{auth_middleware, AuthenticatedUser},
     utils::state::AppState,
 };
+
+/// Create task routes (protected by auth middleware)
+/// Note: Auth middleware is applied via `protected_routes()` which requires AppState
+pub fn routes() -> Router<AppState> {
+    Router::new()
+        .route("/tasks", get(list_tasks))
+        .route("/tasks", post(create_task))
+        .route("/tasks/{id}", put(update_task))
+        .route("/tasks/{id}", delete(delete_task))
+}
+
+/// Create protected task routes with auth middleware applied
+pub fn protected_routes(state: AppState) -> Router<AppState> {
+    routes().layer(middleware::from_fn_with_state(state, auth_middleware))
+}
 
 #[derive(Debug, Deserialize, Validate, IntoParams, ToSchema)]
 pub struct PaginationParams {
@@ -63,9 +79,9 @@ pub async fn list_tasks(
         "listing tasks"
     );
 
-    let repo = TaskRepository::new(state.db.clone());
-    let (tasks, total) = repo
-        .find_by_user_paginated(&auth_user.user_id, params.limit, params.offset)
+    let (tasks, total) = state
+        .task_service
+        .list_tasks(&auth_user.user_id, params.limit, params.offset)
         .await?;
 
     tracing::info!(count = %tasks.len(), total = %total, "tasks listed successfully");
@@ -96,21 +112,14 @@ pub async fn create_task(
     // Validate request
     req.validate()?;
 
-    // Validate dates
-    if req.end_date.time_value() < req.start_date.time_value() {
-        return Err(AppError::BadRequest(
-            "end_date must be on or after start_date".to_string(),
-        ));
-    }
-
     tracing::debug!(
         user_id = %auth_user.user_id,
         title = %req.title,
         "creating task"
     );
 
-    let repo = TaskRepository::new(state.db.clone());
-    let task = repo.create(req, &auth_user.user_id).await?;
+    // Date validation is handled by service layer
+    let task = state.task_service.create_task(req, &auth_user.user_id).await?;
 
     tracing::info!(
         task_id = ?task.id,
@@ -147,23 +156,17 @@ pub async fn update_task(
     // Validate request fields
     req.validate()?;
 
-    // Validate dates if both are provided
-    if let (Some(start), Some(end)) = (&req.start_date, &req.end_date) {
-        if end.time_value() < start.time_value() {
-            return Err(AppError::BadRequest(
-                "end_date must be on or after start_date".to_string(),
-            ));
-        }
-    }
-
     tracing::debug!(
         task_id = %id,
         user_id = %auth_user.user_id,
         "updating task"
     );
 
-    let repo = TaskRepository::new(state.db.clone());
-    let task = repo.update(&id, req, &auth_user.user_id).await?;
+    // Date validation is handled by service layer
+    let task = state
+        .task_service
+        .update_task(&id, req, &auth_user.user_id)
+        .await?;
 
     tracing::info!(task_id = %id, "task updated successfully");
 
@@ -197,8 +200,10 @@ pub async fn delete_task(
         "deleting task"
     );
 
-    let repo = TaskRepository::new(state.db.clone());
-    repo.delete(&id, &auth_user.user_id).await?;
+    state
+        .task_service
+        .delete_task(&id, &auth_user.user_id)
+        .await?;
 
     tracing::info!(task_id = %id, "task deleted successfully");
 

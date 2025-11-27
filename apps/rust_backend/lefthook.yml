@@ -1,0 +1,96 @@
+# =============================================================================
+# Lefthook - Git Hooks Manager
+# =============================================================================
+# Install: https://github.com/evilmartians/lefthook
+#   brew install lefthook    # macOS
+#   cargo install lefthook   # or via cargo
+#   paru -S lefthook         # Arch Linux
+#
+# Setup (run once in rust_backend directory):
+#   lefthook install
+#
+# This will create .git/hooks/* that run these checks automatically.
+# =============================================================================
+
+# Pre-commit: Runs before each commit
+# If any check fails, the commit is aborted
+pre-commit:
+  parallel: true  # Run checks in parallel for speed
+  commands:
+    # Format check - ensures code is properly formatted
+    fmt-check:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+      fail_text: |
+        ❌ Code is not formatted!
+        Run: cargo fmt --all
+        Or:  task rust:fmt
+
+    # Clippy - Rust's linter (catches common mistakes)
+    clippy:
+      glob: "*.rs"
+      run: cargo clippy --all-targets --all-features -- -D warnings
+      fail_text: |
+        ❌ Clippy found issues!
+        Review the warnings above and fix them.
+
+    # Type check - faster than full build
+    check:
+      glob: "*.rs"
+      run: cargo check --all-targets
+      fail_text: |
+        ❌ Type check failed!
+        Fix the compilation errors above.
+
+    # Check for TODO/FIXME in staged files (optional warning)
+    todo-check:
+      glob: "*.rs"
+      run: |
+        if git diff --cached --name-only | xargs grep -l "TODO\|FIXME" 2>/dev/null; then
+          echo "⚠️  Warning: Found TODO/FIXME comments in staged files"
+        fi
+      # Don't fail on TODOs, just warn
+      fail_text: ""
+
+# Pre-push: Runs before pushing to remote
+# More thorough checks since push is less frequent
+pre-push:
+  parallel: false  # Run sequentially to see clear output
+  commands:
+    # Run tests before pushing
+    test:
+      run: cargo nextest run --no-fail-fast 2>/dev/null || cargo test
+      fail_text: |
+        ❌ Tests failed!
+        Fix the failing tests before pushing.
+
+    # Security audit
+    audit:
+      run: cargo audit 2>/dev/null || echo "⚠️  cargo-audit not installed, skipping"
+      fail_text: |
+        ❌ Security vulnerabilities found!
+        Run: cargo audit
+        Review and update affected dependencies.
+
+# Commit message: Validate commit message format
+commit-msg:
+  commands:
+    # Check commit message isn't empty or too short
+    validate:
+      run: |
+        MSG=$(cat {1})
+        if [ ${#MSG} -lt 10 ]; then
+          echo "❌ Commit message too short (min 10 chars)"
+          exit 1
+        fi
+      fail_text: "Commit message must be at least 10 characters"
+
+# =============================================================================
+# Skip hooks temporarily:
+#   git commit --no-verify -m "WIP"
+#   git push --no-verify
+#
+# Skip specific hook:
+#   LEFTHOOK_EXCLUDE=clippy git commit -m "message"
+# =============================================================================
+

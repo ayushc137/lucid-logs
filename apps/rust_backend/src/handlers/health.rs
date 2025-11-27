@@ -1,8 +1,13 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde_json::json;
 
 use crate::error::ApiResponse;
 use crate::utils::state::AppState;
+
+/// Create health routes
+pub fn routes() -> Router<AppState> {
+    Router::new().route("/health", get(health_check_v1))
+}
 
 /// Health check endpoint (basic)
 #[utoipa::path(

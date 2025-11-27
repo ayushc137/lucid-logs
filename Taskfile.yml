@@ -81,7 +81,14 @@ tasks:
   rust:tools:
     desc: Install Rust dev tools
     cmds:
-      - cargo install cargo-watch
+      - cargo install cargo-watch cargo-nextest cargo-audit cargo-deny cargo-machete cargo-expand bacon lefthook
+
+  rust:hooks:
+    desc: Install git pre-commit hooks (lefthook)
+    dir: apps/rust_backend
+    cmds:
+      - lefthook install
+      - echo "✅ Git hooks installed! Commits will now run fmt, clippy, and check."
 
   rust:dev:
     desc: Start Rust backend with auto-reload
@@ -89,3 +96,238 @@ tasks:
     deps: [db:up]
     cmds:
       - cargo watch -x run
+
+  rust:build:
+    desc: Build Rust backend
+    dir: apps/rust_backend
+    cmds:
+      - cargo build
+
+  rust:test:
+    desc: Run Rust tests with nextest
+    dir: apps/rust_backend
+    cmds:
+      - cargo nextest run
+
+  rust:test:watch:
+    desc: Run tests in watch mode
+    dir: apps/rust_backend
+    cmds:
+      - cargo watch -x 'nextest run'
+
+  rust:lint:
+    desc: Run clippy and format check
+    dir: apps/rust_backend
+    cmds:
+      - cargo clippy --all-targets --all-features -- -D warnings
+      - cargo fmt --all -- --check
+
+  rust:fmt:
+    desc: Format Rust code
+    dir: apps/rust_backend
+    cmds:
+      - cargo fmt --all
+
+  rust:audit:
+    desc: Run security audit
+    dir: apps/rust_backend
+    cmds:
+      - cargo audit
+      - cargo deny check
+
+  rust:machete:
+    desc: Find unused dependencies
+    dir: apps/rust_backend
+    cmds:
+      - cargo machete
+
+  rust:schema:
+    desc: Run schema CLI commands
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- {{.CLI_ARGS}}
+
+  rust:schema:migrate:
+    desc: Apply database migrations
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- migrate
+
+  rust:schema:status:
+    desc: Show database schema status
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- status
+
+  rust:bacon:
+    desc: Run bacon background checker
+    dir: apps/rust_backend
+    cmds:
+      - bacon
+
+  rust:doc:
+    desc: Generate and open documentation
+    dir: apps/rust_backend
+    cmds:
+      - cargo doc --open --no-deps
+
+  # ============================================
+  # Beginner-Friendly Commands
+  # ============================================
+
+  rust:check:
+    desc: Quick type check (faster than build, great for catching errors)
+    dir: apps/rust_backend
+    cmds:
+      - cargo check --all-targets
+
+  rust:check:watch:
+    desc: Continuously check code as you type (run in separate terminal)
+    dir: apps/rust_backend
+    cmds:
+      - cargo watch -x check
+
+  rust:clippy:explain:
+    desc: Run clippy and explain each warning/error in detail
+    dir: apps/rust_backend
+    cmds:
+      - cargo clippy --all-targets 2>&1 | head -100
+      - 'echo ""'
+      - 'echo "💡 Tip - To understand a specific lint, run:"'
+      - 'echo "   cargo clippy --explain LINT_NAME"'
+      - 'echo ""'
+      - 'echo "   Example: cargo clippy --explain needless_return"'
+
+  rust:explain:
+    desc: Explain a compiler error code (e.g., task rust:explain -- E0382)
+    dir: apps/rust_backend
+    cmds:
+      - rustc --explain {{.CLI_ARGS}}
+
+  rust:expand:
+    desc: Show macro expansion (helps understand derive macros)
+    dir: apps/rust_backend
+    cmds:
+      - 'echo "Usage - Expand a specific item:"'
+      - 'echo "  cargo expand models::task::Task"'
+      - 'echo ""'
+      - 'echo "Expanding entire lib..."'
+      - cargo expand --lib 2>/dev/null | head -200
+
+  rust:tree:
+    desc: Show dependency tree (understand what crates are used)
+    dir: apps/rust_backend
+    cmds:
+      - cargo tree --depth 1
+
+  rust:tree:full:
+    desc: Show full dependency tree
+    dir: apps/rust_backend
+    cmds:
+      - cargo tree
+
+  rust:outdated:
+    desc: Check for outdated dependencies
+    dir: apps/rust_backend
+    cmds:
+      - cargo install cargo-outdated 2>/dev/null || true
+      - cargo outdated
+
+  rust:bloat:
+    desc: Analyze binary size (what's making it big?)
+    dir: apps/rust_backend
+    cmds:
+      - cargo install cargo-bloat 2>/dev/null || true
+      - cargo bloat --release --crates
+
+  rust:new:handler:
+    desc: Show how to create a new handler
+    cmds:
+      - 'echo "📝 Creating a new handler:"'
+      - 'echo ""'
+      - 'echo "1. Add handler function in src/handlers/your_feature.rs"'
+      - 'echo "2. Export routes() function from the module"'
+      - 'echo "3. Merge routes in main.rs"'
+      - 'echo ""'
+      - 'echo "💡 Use VSCode snippet handler for boilerplate"'
+      - 'echo ""'
+      - 'echo "See docs/CODE_WALKTHROUGH.md for detailed guide"'
+
+  rust:new:service:
+    desc: Show how to create a new service
+    cmds:
+      - 'echo "📝 Creating a new service:"'
+      - 'echo ""'
+      - 'echo "1. Add trait to src/services/traits.rs"'
+      - 'echo "2. Create implementation in src/services/your_service.rs"'
+      - 'echo "3. Add to AppState in src/utils/state.rs"'
+      - 'echo "4. Wire up in main.rs"'
+      - 'echo ""'
+      - 'echo "💡 Use VSCode snippets service-trait and service-impl"'
+      - 'echo ""'
+      - 'echo "See CONTRIBUTING.md for detailed guide"'
+
+  rust:new:feature:
+    desc: Generate a new feature from template
+    dir: apps/rust_backend
+    cmds:
+      - |
+        echo "🚀 Feature Generator"
+        echo ""
+        read -p "Feature name (e.g., 'comment', 'tag'): " FEATURE_NAME
+        echo ""
+        echo "This will create:"
+        echo "  - src/handlers/${FEATURE_NAME}.rs"
+        echo "  - src/services/${FEATURE_NAME}.rs"
+        echo "  - src/repositories/${FEATURE_NAME}.rs"
+        echo "  - src/models/${FEATURE_NAME}.rs"
+        echo ""
+        read -p "Continue? (y/n): " CONFIRM
+        if [ "$CONFIRM" = "y" ]; then
+          cargo generate --path templates/feature --name "$FEATURE_NAME" 2>/dev/null || echo "Note: Install cargo-generate first: cargo install cargo-generate"
+        fi
+
+  rust:help:
+    desc: Show all Rust-related commands with descriptions
+    cmd: |
+      echo "🦀 Rust Development Commands"
+      echo "=============================="
+      echo ""
+      echo "📦 Building & Running:"
+      echo "  task rust:dev        - Start with hot reload"
+      echo "  task rust:build      - Build the project"
+      echo "  task rust:check      - Quick type check (fast!)"
+      echo ""
+      echo "🧪 Testing:"
+      echo "  task rust:test       - Run all tests"
+      echo "  task rust:test:watch - Run tests on file change"
+      echo ""
+      echo "🔍 Code Quality:"
+      echo "  task rust:lint       - Run clippy + format check"
+      echo "  task rust:fmt        - Auto-format code"
+      echo "  task rust:audit      - Security audit"
+      echo "  task rust:machete    - Find unused deps"
+      echo ""
+      echo "📚 Learning & Documentation:"
+      echo "  task rust:doc        - Generate & open docs"
+      echo "  task rust:explain    - Explain error code (e.g., E0382)"
+      echo "  task rust:expand     - Show macro expansion"
+      echo "  task rust:tree       - Show dependency tree"
+      echo ""
+      echo "🛠️  Code Generation:"
+      echo "  task rust:new:handler  - How to create a handler"
+      echo "  task rust:new:service  - How to create a service"
+      echo "  task rust:new:feature  - Generate feature from template"
+      echo ""
+      echo "💡 Background Tools:"
+      echo "  task rust:bacon      - Background checker"
+      echo "  task rust:check:watch - Continuous type checking"
+      echo ""
+      echo "📖 Documentation:"
+      echo "  apps/rust_backend/docs/RUST_FOR_BEGINNERS.md"
+      echo "  apps/rust_backend/docs/CODE_WALKTHROUGH.md"
+      echo "  apps/rust_backend/docs/RUST_CHEATSHEET.md"
+      echo "  apps/rust_backend/docs/TROUBLESHOOTING.md"

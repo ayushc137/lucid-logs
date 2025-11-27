@@ -1,10 +1,16 @@
-use axum::{extract::State, Json};
-use serde_json::json;
+use axum::{extract::State, routing::post, Json, Router};
 use validator::Validate;
 
 use crate::error::AppError;
-use crate::models::auth::{AuthRequest, AuthResponse, SurrealClaims};
+use crate::models::auth::{AuthRequest, AuthResponse};
 use crate::utils::state::AppState;
+
+/// Create auth routes
+pub fn routes() -> Router<AppState> {
+    Router::new()
+        .route("/auth/login", post(login))
+        .route("/auth/register", post(register))
+}
 
 /// User login
 ///
@@ -26,40 +32,9 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>, AppError> {
     req.validate()?;
 
-    tracing::debug!(username = %req.username, "login attempt");
+    let response = state.auth_service.login(req).await?;
 
-    // Sign in against SurrealDB's "account" access method
-    let token = state
-        .db
-        .signin(surrealdb::opt::auth::Record {
-            namespace: &state.settings.db.namespace,
-            database: &state.settings.db.database,
-            access: "account",
-            params: json!({
-                "user": req.username,
-                "pass": req.password,
-            }),
-        })
-        .await
-        .map_err(|e| {
-            tracing::warn!(username = %req.username, error = %e, "login failed");
-            AppError::Unauthorized("Invalid credentials".into())
-        })?;
-
-    let token_str = token.into_insecure_token();
-
-    // Parse the token to get the user ID
-    let claims = SurrealClaims::from_token(&token_str, &state.settings.jwt.secret).map_err(|e| {
-        tracing::error!(error = %e, "failed to verify auth token");
-        AppError::Internal
-    })?;
-
-    tracing::info!(user_id = %claims.id, "login successful");
-
-    Ok(Json(AuthResponse {
-        token: token_str,
-        user: claims.id,
-    }))
+    Ok(Json(response))
 }
 
 /// User registration
@@ -81,38 +56,7 @@ pub async fn register(
 ) -> Result<Json<AuthResponse>, AppError> {
     req.validate()?;
 
-    tracing::debug!(username = %req.username, "registration attempt");
+    let response = state.auth_service.register(req).await?;
 
-    // Sign up using SurrealDB's "account" access method
-    let token = state
-        .db
-        .signup(surrealdb::opt::auth::Record {
-            namespace: &state.settings.db.namespace,
-            database: &state.settings.db.database,
-            access: "account",
-            params: json!({
-                "user": req.username,
-                "pass": req.password,
-            }),
-        })
-        .await
-        .map_err(|e| {
-            tracing::error!(username = %req.username, error = %e, "registration failed");
-            AppError::BadRequest(format!("Registration failed: {}", e))
-        })?;
-
-    let token_str = token.into_insecure_token();
-
-    // Parse the token to get the user ID
-    let claims = SurrealClaims::from_token(&token_str, &state.settings.jwt.secret).map_err(|e| {
-        tracing::error!(error = %e, "failed to verify auth token");
-        AppError::Internal
-    })?;
-
-    tracing::info!(user_id = %claims.id, "user registered successfully");
-
-    Ok(Json(AuthResponse {
-        token: token_str,
-        user: claims.id,
-    }))
+    Ok(Json(response))
 }

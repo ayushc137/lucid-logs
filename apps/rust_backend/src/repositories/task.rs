@@ -1,15 +1,10 @@
-use crate::error::AppError;
-use crate::models::task::{CreateTaskRequest, Task, UpdateTaskRequest, SOURCE_MANUAL};
 use chrono::Utc;
-use serde::Deserialize;
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
 
-/// Helper struct for count queries
-#[derive(Debug, Deserialize)]
-struct CountResult {
-    count: i64,
-}
+use super::base::{ensure_record_id, CountResult};
+use crate::error::AppError;
+use crate::models::task::{CreateTaskRequest, Task, UpdateTaskRequest, SOURCE_MANUAL};
 
 /// Task projection fields for queries (matching Go implementation)
 const TASK_PROJECTION: &str = "id, title, journal, start_date, end_date, is_completed, priority, planned, source, note, positives, negatives, created_at, updated_at, deleted_at, created_by, updated_by";
@@ -154,7 +149,7 @@ impl TaskRepository {
 
     /// Get a task by ID (excludes soft-deleted, enforces ownership)
     pub async fn find_by_id(&self, id: &str, user_id: &str) -> Result<Task, AppError> {
-        let record_id = ensure_record_id(id);
+        let record_id = ensure_record_id(id, TASKS_TABLE);
         let sql = format!(
             "SELECT {} FROM {} WHERE id = type::thing($record) AND created_by = $user AND deleted_at = NONE",
             TASK_PROJECTION, TASKS_TABLE
@@ -215,7 +210,7 @@ impl TaskRepository {
         let now = Utc::now();
         existing.planned = (existing.start_date >= now) && (existing.start_date != existing.end_date);
 
-        let record_id = ensure_record_id(id);
+        let record_id = ensure_record_id(id, TASKS_TABLE);
         // Note: created_by is NOT updated - preserves original owner
         let sql = format!(
             "UPDATE type::thing($record) SET
@@ -261,7 +256,7 @@ impl TaskRepository {
 
     /// Soft-delete a task (sets deleted_at timestamp, enforces ownership)
     pub async fn delete(&self, id: &str, user_id: &str) -> Result<(), AppError> {
-        let record_id = ensure_record_id(id);
+        let record_id = ensure_record_id(id, TASKS_TABLE);
         let user_id_owned = user_id.to_string();
         let now = Utc::now().to_rfc3339();
 
@@ -289,11 +284,3 @@ impl TaskRepository {
     }
 }
 
-/// Ensure the ID has the table prefix for SurrealDB record IDs
-fn ensure_record_id(id: &str) -> String {
-    if id.contains(':') {
-        id.to_string()
-    } else {
-        format!("{}:{}", TASKS_TABLE, id)
-    }
-}

@@ -1,0 +1,45 @@
+# Rust formatting configuration
+# Run with: cargo fmt
+
+edition = "2021"
+
+# Line width
+max_width = 100
+
+# Imports
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+
+# Functions
+fn_params_layout = "Tall"
+fn_single_line = false
+
+# Structs
+struct_lit_single_line = true
+
+# Match
+match_block_trailing_comma = true
+
+# Comments
+wrap_comments = true
+comment_width = 80
+normalize_comments = true
+
+# Misc
+use_field_init_shorthand = true
+use_try_shorthand = true
+format_strings = false
+format_macro_matchers = true
+format_macro_bodies = true
+
+# Chains
+chain_width = 60
+
+# Control flow
+control_brace_style = "AlwaysSameLine"
+
+# Blank lines
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 0
+

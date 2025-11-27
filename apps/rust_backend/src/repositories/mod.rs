@@ -1,5 +1,6 @@
-pub mod task;
+pub mod base;
 pub mod schema;
+pub mod task;
 
-pub use task::TaskRepository;
 pub use schema::{init_schema, SchemaInitOptions};
+pub use task::TaskRepository;

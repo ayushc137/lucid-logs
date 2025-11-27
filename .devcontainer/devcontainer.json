@@ -1,25 +1,109 @@
 {
-	"name": "Daily Journal Dev",
-	"image": "mcr.microsoft.com/devcontainers/go:1-1.23-bullseye",
-	"features": {
-		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
-		"ghcr.io/devcontainers/features/go:1": {
-			"version": "1.23"
-		},
-		"ghcr.io/devcontainers-contrib/features/task:1": {}
-	},
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"golang.go",
-				"tamasfe.even-better-toml",
-				"redhat.vscode-yaml",
-				"42crunch.vscode-openapi"
-			]
-		}
-	},
-	"forwardPorts": [8080, 8000, 8001],
-	"postCreateCommand": "task init",
-	"remoteUser": "vscode"
-}
+  "name": "Daily Journal - Rust Backend",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
 
+  // Features to install in the container
+  "features": {
+    // Rust toolchain with common tools
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest",
+      "profile": "default"
+    },
+    // Docker-in-Docker for running containers
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
+    // Common utilities
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true
+    },
+    // GitHub CLI
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  // VS Code extensions to install
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Rust essentials
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb",
+        
+        // Developer experience
+        "usernamehw.errorlens",
+        "aaron-bond.better-comments",
+        "Gruntfuggly.todo-tree",
+        
+        // API testing
+        "humao.rest-client",
+        
+        // Docker
+        "ms-azuretools.vscode-docker",
+        
+        // Git
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        
+        // General
+        "EditorConfig.EditorConfig",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        // Use workspace settings from .vscode/settings.json
+        "rust-analyzer.cargo.features": "all",
+        "rust-analyzer.check.command": "clippy",
+        "editor.formatOnSave": true,
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        }
+      }
+    }
+  },
+
+  // Ports to forward from the container
+  "forwardPorts": [
+    8080,  // Backend API
+    8000   // SurrealDB
+  ],
+  "portsAttributes": {
+    "8080": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "SurrealDB",
+      "onAutoForward": "silent"
+    }
+  },
+
+  // Commands to run
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+
+  // Environment variables
+  "containerEnv": {
+    "RUST_BACKTRACE": "1",
+    "CARGO_HOME": "/workspace/.cargo",
+    "RUSTUP_HOME": "/workspace/.rustup"
+  },
+
+  // Mount points
+  "mounts": [
+    // Persist cargo cache between rebuilds
+    "source=devcontainer-cargo-cache,target=/workspace/.cargo,type=volume",
+    // Persist rustup between rebuilds
+    "source=devcontainer-rustup-cache,target=/workspace/.rustup,type=volume"
+  ],
+
+  // User configuration
+  "remoteUser": "vscode",
+
+  // Lifecycle hooks
+  "shutdownAction": "stopCompose"
+}
