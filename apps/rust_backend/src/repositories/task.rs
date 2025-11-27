@@ -1,27 +1,19 @@
-//! Task repository with SurrealDB graph relations
+//! Task repository with SurrealDB record links
 //!
-//! Uses graph traversal for category relationships:
-//! - task -[in_category]-> category
+//! Uses direct record links for category relationships:
+//! - task.category = categories:work123
 //!
-//! Query pattern: `->in_category->categories AS category`
+//! Query pattern: `SELECT *, category.* FROM tasks FETCH category`
 
 use chrono::Utc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::Surreal;
+use surrealdb::{engine::remote::ws::Client, Surreal};
 
 use super::base::{ensure_record_id, CountResult};
 use crate::error::AppError;
 use crate::models::task::{CreateTaskRequest, Task, UpdateTaskRequest, SOURCE_MANUAL};
 
-/// Task projection fields (without category - that comes from graph traversal)
-const TASK_PROJECTION: &str = "id, title, journal, start_date, end_date, completed, priority, source, note, positives, negatives, created_at, updated_at, deleted_at, created_by, updated_by";
-
-/// Graph traversal to get category
-const CATEGORY_TRAVERSAL: &str = "->in_category->categories[0] AS category";
-
-/// Table names
+/// Table name
 const TASKS_TABLE: &str = "tasks";
-const IN_CATEGORY_EDGE: &str = "in_category";
 
 #[derive(Clone)]
 pub struct TaskRepository {
@@ -33,7 +25,7 @@ impl TaskRepository {
         Self { db }
     }
 
-    /// Create a new task with optional category relation
+    /// Create a new task with optional category link
     pub async fn create(&self, req: CreateTaskRequest, user_id: &str) -> Result<Task, AppError> {
         let CreateTaskRequest {
             title,
@@ -59,31 +51,44 @@ impl TaskRepository {
         let end_iso = end_date.to_rfc3339();
         let user_owned = user_id.to_string();
 
-        // Create task
+        // Build category value - either a record link or NONE
+        let category_value = match &category_id {
+            Some(cat_id) if !cat_id.is_empty() => {
+                let cat_record = ensure_record_id(cat_id, "categories");
+                format!("type::thing('{}')", cat_record)
+            },
+            _ => "NONE".to_string(),
+        };
+
+        // Schemaless INSERT - just store whatever fields we want
         let create_sql = format!(
-            "CREATE {} SET
-                title = $title,
-                journal = $journal,
-                start_date = type::datetime($start_date),
-                end_date = type::datetime($end_date),
-                completed = false,
-                priority = $priority,
-                source = $source,
-                note = $note,
-                positives = $positives,
-                negatives = $negatives,
-                created_by = $user,
-                updated_by = $user
-             RETURN id",
-            TASKS_TABLE
+            "INSERT INTO {} {{
+                title: $title,
+                journal: $journal,
+                start_date: type::datetime($start_date),
+                end_date: type::datetime($end_date),
+                completed: false,
+                priority: $priority,
+                source: $source,
+                note: $note,
+                positives: $positives,
+                negatives: $negatives,
+                category: {},
+                created_by: $user,
+                updated_by: $user,
+                created_at: time::now(),
+                updated_at: time::now(),
+                deleted_at: NONE
+            }} RETURN id",
+            TASKS_TABLE, category_value
         );
 
-        tracing::debug!(title = %title, ?category_id, "creating task with graph relation");
+        tracing::debug!(title = %title, ?category_id, "creating task with record link");
 
         let mut result = self
             .db
             .query(&create_sql)
-            .bind(("title", title))
+            .bind(("title", title.clone()))
             .bind(("journal", journal))
             .bind(("start_date", start_iso))
             .bind(("end_date", end_iso))
@@ -92,8 +97,15 @@ impl TaskRepository {
             .bind(("note", note))
             .bind(("positives", positives))
             .bind(("negatives", negatives))
-            .bind(("user", user_owned.clone()))
+            .bind(("user", user_owned))
             .await?;
+
+        // Check for errors
+        let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
+        if !errors.is_empty() {
+            tracing::error!(?errors, "database create failed with errors");
+            return Err(AppError::Internal);
+        }
 
         #[derive(serde::Deserialize)]
         struct IdResult {
@@ -104,71 +116,20 @@ impl TaskRepository {
         let task_id = match created {
             Some(r) => r.id.to_string(),
             None => {
-                let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
-                if !errors.is_empty() {
-                    tracing::error!(?errors, "database create failed with errors");
-                }
+                tracing::error!(
+                    title = %title,
+                    "database create failed - no task returned and no errors reported"
+                );
                 return Err(AppError::Internal);
-            }
+            },
         };
-
-        // Create category relation if provided
-        if let Some(cat_id) = category_id {
-            if !cat_id.is_empty() {
-                let cat_record = ensure_record_id(&cat_id, "categories");
-                self.set_category_relation(&task_id, &cat_record, &user_owned)
-                    .await?;
-            }
-        }
 
         // Fetch and return the complete task with category
         self.find_by_id(&task_id, user_id).await
     }
 
-    /// Set or replace category relation for a task
-    async fn set_category_relation(
-        &self,
-        task_id: &str,
-        category_id: &str,
-        user_id: &str,
-    ) -> Result<(), AppError> {
-        let task_record = ensure_record_id(task_id, TASKS_TABLE);
-
-        // Delete existing relation (if any) and create new one
-        // Using transaction-like batch query
-        let sql = format!(
-            "DELETE {} WHERE in = type::thing($task);
-             RELATE type::thing($task) -> {} -> type::thing($category) 
-               SET assigned_by = $user;",
-            IN_CATEGORY_EDGE, IN_CATEGORY_EDGE
-        );
-
-        self.db
-            .query(&sql)
-            .bind(("task", task_record))
-            .bind(("category", category_id.to_string()))
-            .bind(("user", user_id.to_string()))
-            .await?;
-
-        Ok(())
-    }
-
-    /// Remove category relation from a task
-    async fn remove_category_relation(&self, task_id: &str) -> Result<(), AppError> {
-        let task_record = ensure_record_id(task_id, TASKS_TABLE);
-
-        let sql = format!("DELETE {} WHERE in = type::thing($task)", IN_CATEGORY_EDGE);
-
-        self.db
-            .query(&sql)
-            .bind(("task", task_record))
-            .await?;
-
-        Ok(())
-    }
-
     /// List tasks for a user with pagination (excludes soft-deleted)
-    /// Categories are populated via graph traversal
+    /// Categories are populated via FETCH
     pub async fn find_by_user_paginated(
         &self,
         user_id: &str,
@@ -183,10 +144,10 @@ impl TaskRepository {
             TASKS_TABLE
         );
 
-        // Items query with graph traversal for category
+        // Items query with FETCH to hydrate category
         let items_sql = format!(
-            "SELECT {}, {} FROM {} WHERE created_by = $user AND deleted_at = NONE ORDER BY start_date DESC LIMIT $limit START $offset",
-            TASK_PROJECTION, CATEGORY_TRAVERSAL, TASKS_TABLE
+            "SELECT * FROM {} WHERE created_by = $user AND deleted_at = NONE ORDER BY start_date DESC LIMIT $limit START $offset FETCH category",
+            TASKS_TABLE
         );
 
         let mut result = self
@@ -206,13 +167,13 @@ impl TaskRepository {
         Ok((tasks, total))
     }
 
-    /// Get a task by ID with category populated via graph traversal
+    /// Get a task by ID with category populated via FETCH
     pub async fn find_by_id(&self, id: &str, user_id: &str) -> Result<Task, AppError> {
         let record_id = ensure_record_id(id, TASKS_TABLE);
 
         let sql = format!(
-            "SELECT {}, {} FROM {} WHERE id = type::thing($record) AND created_by = $user AND deleted_at = NONE",
-            TASK_PROJECTION, CATEGORY_TRAVERSAL, TASKS_TABLE
+            "SELECT * FROM {} WHERE id = type::thing($record) AND created_by = $user AND deleted_at = NONE FETCH category",
+            TASKS_TABLE
         );
 
         let mut result = self
@@ -267,8 +228,26 @@ impl TaskRepository {
 
         let record_id = ensure_record_id(id, TASKS_TABLE);
 
+        // Build category update clause
+        let category_clause = match &req.category_id {
+            Some(cat_id) if cat_id.is_empty() => {
+                // Empty string = remove category
+                "category = NONE,".to_string()
+            },
+            Some(cat_id) => {
+                // Set new category
+                let cat_record = ensure_record_id(cat_id, "categories");
+                format!("category = type::thing('{}'),", cat_record)
+            },
+            None => {
+                // No change to category
+                String::new()
+            },
+        };
+
         // Update task fields
-        let sql = "UPDATE type::thing($record) SET
+        let sql = format!(
+            "UPDATE type::thing($record) SET
                 title = $title,
                 journal = $journal,
                 start_date = type::datetime($start_date),
@@ -279,9 +258,13 @@ impl TaskRepository {
                 note = $note,
                 positives = $positives,
                 negatives = $negatives,
-                updated_by = $updated_by
+                {}
+                updated_by = $updated_by,
+                updated_at = time::now()
              WHERE created_by = $user
-             RETURN id";
+             RETURN id",
+            category_clause
+        );
 
         let mut result = self
             .db
@@ -303,8 +286,8 @@ impl TaskRepository {
 
         #[derive(serde::Deserialize)]
         struct IdResult {
-            #[allow(dead_code)]
-            id: surrealdb::RecordId,
+            #[serde(rename = "id")]
+            _id: surrealdb::RecordId,
         }
 
         let updated: Option<IdResult> = result.take(0)?;
@@ -312,46 +295,32 @@ impl TaskRepository {
             return Err(AppError::NotFound);
         }
 
-        // Handle category relation update
-        if let Some(cat_id) = req.category_id {
-            if cat_id.is_empty() {
-                // Empty string = remove category
-                self.remove_category_relation(id).await?;
-            } else {
-                // Set new category
-                let cat_record = ensure_record_id(&cat_id, "categories");
-                self.set_category_relation(id, &cat_record, user_id).await?;
-            }
-        }
-        // If category_id is None, keep existing relation unchanged
-
         // Fetch and return updated task with category
         self.find_by_id(id, user_id).await
     }
 
-    /// Soft-delete a task and its relations
+    /// Soft-delete a task
     pub async fn delete(&self, id: &str, user_id: &str) -> Result<(), AppError> {
         let record_id = ensure_record_id(id, TASKS_TABLE);
         let user_id_owned = user_id.to_string();
         let now = Utc::now().to_rfc3339();
 
         // Soft delete the task
-        let sql = format!(
-            "UPDATE type::thing($record) SET deleted_at = type::datetime($now), updated_by = $user WHERE created_by = $user AND deleted_at = NONE RETURN id",
-        );
+        let sql =
+            "UPDATE type::thing($record) SET deleted_at = type::datetime($now), updated_by = $user, updated_at = time::now() WHERE created_by = $user AND deleted_at = NONE RETURN id";
 
         let mut result = self
             .db
-            .query(&sql)
-            .bind(("record", record_id.clone()))
+            .query(sql)
+            .bind(("record", record_id))
             .bind(("now", now))
             .bind(("user", user_id_owned))
             .await?;
 
         #[derive(serde::Deserialize)]
         struct IdResult {
-            #[allow(dead_code)]
-            id: surrealdb::RecordId,
+            #[serde(rename = "id")]
+            _id: surrealdb::RecordId,
         }
 
         let deleted: Option<IdResult> = result.take(0)?;
@@ -359,50 +328,7 @@ impl TaskRepository {
             return Err(AppError::NotFound);
         }
 
-        // Also remove any category relations for this task
-        self.remove_category_relation(id).await?;
-
-        tracing::info!(task_id = %id, "task and relations soft-deleted");
+        tracing::info!(task_id = %id, "task soft-deleted");
         Ok(())
-    }
-
-    /// Find all tasks in a specific category (graph query example)
-    #[allow(dead_code)]
-    pub async fn find_by_category(
-        &self,
-        category_id: &str,
-        user_id: &str,
-        limit: i64,
-        offset: i64,
-    ) -> Result<(Vec<Task>, i64), AppError> {
-        let cat_record = ensure_record_id(category_id, "categories");
-
-        // Use reverse graph traversal: category <-in_category<- tasks
-        let count_sql = format!(
-            "SELECT count() FROM {} WHERE id IN (SELECT in FROM {} WHERE out = type::thing($category)) AND created_by = $user AND deleted_at = NONE GROUP ALL",
-            TASKS_TABLE, IN_CATEGORY_EDGE
-        );
-
-        let items_sql = format!(
-            "SELECT {}, {} FROM {} WHERE id IN (SELECT in FROM {} WHERE out = type::thing($category)) AND created_by = $user AND deleted_at = NONE ORDER BY start_date DESC LIMIT $limit START $offset",
-            TASK_PROJECTION, CATEGORY_TRAVERSAL, TASKS_TABLE, IN_CATEGORY_EDGE
-        );
-
-        let mut result = self
-            .db
-            .query(count_sql)
-            .query(items_sql)
-            .bind(("category", cat_record))
-            .bind(("user", user_id.to_string()))
-            .bind(("limit", limit))
-            .bind(("offset", offset))
-            .await?;
-
-        let count_result: Option<CountResult> = result.take(0)?;
-        let total = count_result.map(|c| c.count).unwrap_or(0);
-
-        let tasks: Vec<Task> = result.take(1)?;
-
-        Ok((tasks, total))
     }
 }

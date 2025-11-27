@@ -34,7 +34,7 @@ pub async fn auth_middleware(
         Some(h) if !h.is_empty() => h,
         _ => {
             return unauthorized_response("Authorization header required");
-        }
+        },
     };
 
     const BEARER_PREFIX: &str = "Bearer ";
@@ -53,7 +53,7 @@ pub async fn auth_middleware(
         Err(e) => {
             tracing::warn!(error = %e, "token validation failed");
             return unauthorized_response("Invalid or expired token");
-        }
+        },
     };
 
     if claims.id.is_empty() {
@@ -61,9 +61,7 @@ pub async fn auth_middleware(
     }
 
     // Insert authenticated user into request extensions
-    let auth_user = AuthenticatedUser {
-        user_id: claims.id,
-    };
+    let auth_user = AuthenticatedUser { user_id: claims.id };
 
     req.extensions_mut().insert(auth_user);
 
@@ -88,7 +86,10 @@ pub mod extractors {
     {
         type Rejection = AppError;
 
-        async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        async fn from_request_parts(
+            parts: &mut Parts,
+            _state: &S,
+        ) -> Result<Self, Self::Rejection> {
             parts
                 .extensions
                 .get::<AuthenticatedUser>()

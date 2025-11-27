@@ -7,7 +7,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Standardized API error response (matching Go implementation)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ApiError {
     pub code: String,
     pub message: String,
@@ -16,8 +16,11 @@ pub struct ApiError {
 }
 
 /// Standardized API response wrapper
-#[derive(Debug, Serialize)]
-pub struct ApiResponse<T: Serialize> {
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ApiResponse<T>
+where
+    T: Serialize + ToSchema,
+{
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -25,8 +28,11 @@ pub struct ApiResponse<T: Serialize> {
 }
 
 /// Paginated response wrapper for list endpoints
-#[derive(Debug, Serialize)]
-pub struct PaginatedResponse<T: Serialize> {
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PaginatedResponse<T>
+where
+    T: Serialize + ToSchema,
+{
     pub items: Vec<T>,
     pub total: i64,
     pub limit: i64,
@@ -54,7 +60,10 @@ pub struct PaginatedCategoryResponse {
     pub has_more: bool,
 }
 
-impl<T: Serialize> PaginatedResponse<T> {
+impl<T> PaginatedResponse<T>
+where
+    T: Serialize + ToSchema,
+{
     pub fn new(items: Vec<T>, total: i64, limit: i64, offset: i64) -> Self {
         let has_more = offset + (items.len() as i64) < total;
         Self {
@@ -67,7 +76,10 @@ impl<T: Serialize> PaginatedResponse<T> {
     }
 }
 
-impl<T: Serialize> ApiResponse<T> {
+impl<T> ApiResponse<T>
+where
+    T: Serialize + ToSchema,
+{
     pub fn success(data: T) -> Self {
         Self {
             data: Some(data),
@@ -134,7 +146,7 @@ impl IntoResponse for AppError {
                     "An internal error occurred".to_string(),
                     None,
                 )
-            }
+            },
             AppError::Validation(e) => {
                 let details: Vec<ValidationErrorDetail> = e
                     .field_errors()
@@ -158,7 +170,7 @@ impl IntoResponse for AppError {
                     "Request validation failed".to_string(),
                     Some(serde_json::to_value(details).unwrap_or_default()),
                 )
-            }
+            },
             AppError::NotFound => (
                 StatusCode::NOT_FOUND,
                 "NOT_FOUND",
@@ -177,7 +189,7 @@ impl IntoResponse for AppError {
                     },
                     None,
                 )
-            }
+            },
             AppError::Internal => {
                 tracing::error!("internal server error");
                 (
@@ -186,11 +198,11 @@ impl IntoResponse for AppError {
                     "An internal error occurred".to_string(),
                     None,
                 )
-            }
+            },
             AppError::BadRequest(msg) => {
                 tracing::warn!(message = %msg, "bad request");
                 (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone(), None)
-            }
+            },
         };
 
         let body = if let Some(details) = details {
@@ -207,6 +219,12 @@ impl IntoResponse for AppError {
 struct ValidationErrorDetail {
     field: String,
     message: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct OperationMessage {
+    #[schema(example = "Task deleted")]
+    pub message: String,
 }
 
 /// Convert PascalCase field names to camelCase

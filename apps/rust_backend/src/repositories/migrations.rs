@@ -77,7 +77,8 @@ impl MigrationRunner {
 
         self.db.query(init_sql).await?;
 
-        let sql = "SELECT version, name, applied_at, checksum FROM _migrations ORDER BY version ASC";
+        let sql =
+            "SELECT version, name, applied_at, checksum FROM _migrations ORDER BY version ASC";
         let mut result = self.db.query(sql).await?;
         let migrations: Vec<MigrationRecord> = result.take(0)?;
         Ok(migrations)
@@ -106,7 +107,7 @@ impl MigrationRunner {
     }
 
     /// Read all migration files from the migrations directory
-    async fn read_migration_files(&self) -> Result<Vec<Migration>, AppError> {
+    pub async fn read_migration_files(&self) -> Result<Vec<Migration>, AppError> {
         let mut migrations = Vec::new();
 
         // Check if directory exists
@@ -210,7 +211,7 @@ impl MigrationRunner {
                         "migration applied successfully"
                     );
                     applied.push(record);
-                }
+                },
                 Err(e) => {
                     tracing::error!(
                         version = migration.version,
@@ -219,7 +220,7 @@ impl MigrationRunner {
                         "migration failed"
                     );
                     return Err(e);
-                }
+                },
             }
         }
 
@@ -243,7 +244,7 @@ impl MigrationRunner {
 
         // Execute the migration SQL
         match self.db.query(&sql).await {
-            Ok(_) => {}
+            Ok(_) => {},
             Err(e) => {
                 let err_msg = e.to_string().to_lowercase();
                 // Ignore "already exists" errors for idempotent migrations
@@ -254,7 +255,7 @@ impl MigrationRunner {
                     version = migration.version,
                     "migration contains already-existing definitions (idempotent)"
                 );
-            }
+            },
         }
 
         // Record the migration
@@ -280,94 +281,41 @@ impl MigrationRunner {
             checksum: Some(migration.checksum.clone()),
         })
     }
+}
 
-    /// Get migration status (applied vs pending)
-    pub async fn status(&self) -> Result<MigrationStatus, AppError> {
-        let applied = self.get_applied().await?;
-        let pending = self.get_pending().await?;
-
-        Ok(MigrationStatus {
-            applied,
-            pending: pending
-                .into_iter()
-                .map(|m| MigrationRecord {
-                    version: m.version,
-                    name: m.name,
-                    applied_at: None,
-                    checksum: Some(m.checksum),
-                })
-                .collect(),
-        })
-    }
-
-    /// Validate that applied migrations match their checksums
-    pub async fn validate(&self) -> Result<Vec<MigrationValidation>, AppError> {
-        let applied = self.get_applied().await?;
-        let files = self.read_migration_files().await?;
-
-        let mut validations = Vec::new();
-
-        for applied_migration in &applied {
-            let file_migration = files.iter().find(|f| f.version == applied_migration.version);
-
-            let validation = match file_migration {
-                None => MigrationValidation {
-                    version: applied_migration.version,
-                    name: applied_migration.name.clone(),
-                    status: ValidationStatus::MissingFile,
-                    message: "Migration file not found on disk".to_string(),
-                },
-                Some(file) => {
-                    if applied_migration.checksum.as_ref() == Some(&file.checksum) {
-                        MigrationValidation {
-                            version: applied_migration.version,
-                            name: applied_migration.name.clone(),
-                            status: ValidationStatus::Valid,
-                            message: "Checksum matches".to_string(),
-                        }
-                    } else {
-                        MigrationValidation {
-                            version: applied_migration.version,
-                            name: applied_migration.name.clone(),
-                            status: ValidationStatus::ChecksumMismatch,
-                            message: format!(
-                                "Checksum mismatch! Applied: {:?}, File: {}",
-                                applied_migration.checksum, file.checksum
-                            ),
-                        }
-                    }
-                }
-            };
-
-            validations.push(validation);
+/// Resolve the migrations directory path.
+///
+/// Priority:
+/// 1. Explicit path from `DB_MIGRATIONS_PATH`
+/// 2. Search upwards from CWD for `db/migrations`
+/// 3. Fallback to `db/migrations` relative to CWD
+pub fn resolve_migrations_dir(preferred: Option<&str>) -> PathBuf {
+    if let Some(path) = preferred {
+        if !path.trim().is_empty() {
+            return PathBuf::from(path);
         }
-
-        Ok(validations)
     }
-}
 
-/// Migration status report
-#[derive(Debug)]
-pub struct MigrationStatus {
-    pub applied: Vec<MigrationRecord>,
-    pub pending: Vec<MigrationRecord>,
-}
+    if let Ok(mut dir) = std::env::current_dir() {
+        loop {
+            let migrations_dir = dir.join("db").join("migrations");
+            if migrations_dir.is_dir() {
+                return migrations_dir;
+            }
 
-/// Migration validation result
-#[derive(Debug)]
-pub struct MigrationValidation {
-    pub version: i64,
-    pub name: String,
-    pub status: ValidationStatus,
-    pub message: String,
-}
+            let db_dir = dir.join("db");
+            if db_dir.is_dir() {
+                return db_dir.join("migrations");
+            }
 
-/// Validation status for a migration
-#[derive(Debug, PartialEq, Eq)]
-pub enum ValidationStatus {
-    Valid,
-    ChecksumMismatch,
-    MissingFile,
+            match dir.parent() {
+                Some(parent) if parent != dir => dir = parent.to_path_buf(),
+                _ => break,
+            }
+        }
+    }
+
+    PathBuf::from("db").join("migrations")
 }
 
 #[cfg(test)]
@@ -390,4 +338,3 @@ mod tests {
         assert_eq!(checksum1, checksum2);
     }
 }
-

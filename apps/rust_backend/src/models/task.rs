@@ -45,27 +45,6 @@ where
     }
 }
 
-/// Deserialize category from graph traversal result
-/// Graph queries return either a single object or an array
-fn deserialize_graph_category<'de, D>(deserializer: D) -> Result<Option<Category>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum CategoryResult {
-        Single(Category),
-        Array(Vec<Category>),
-        Null,
-    }
-
-    match Option::<CategoryResult>::deserialize(deserializer)? {
-        Some(CategoryResult::Single(cat)) => Ok(Some(cat)),
-        Some(CategoryResult::Array(cats)) => Ok(cats.into_iter().next()),
-        Some(CategoryResult::Null) | None => Ok(None),
-    }
-}
-
 /// Task model representing a daily task or event
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[schema(example = json!({
@@ -146,16 +125,11 @@ pub struct Task {
     #[schema(example = json!(["Got distracted"]))]
     pub negatives: Vec<String>,
 
-    /// Category (populated via graph traversal ->in_category->categories)
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_graph_category"
-    )]
+    /// Category (populated via FETCH category)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub category: Option<Category>,
 
     // === System-managed fields (read-only, set by DB) ===
-
     /// Creation timestamp (system-managed, read-only)
     #[serde(default = "Utc::now")]
     #[schema(value_type = String, format = DateTime, read_only = true)]
@@ -172,16 +146,14 @@ pub struct Task {
     pub deleted_at: Option<DateTime<Utc>>,
 
     /// User ID who created the task (system-managed, read-only, hidden from API)
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_serializing, rename = "created_by")]
     #[schema(example = "user:xyz789", read_only = true)]
-    #[allow(dead_code)] // Used for DB serialization/authorization, not exposed to API
-    pub created_by: String,
+    pub _created_by: String,
 
     /// User ID who last updated the task (system-managed, read-only, hidden from API)
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_serializing, rename = "updated_by")]
     #[schema(example = "user:xyz789", read_only = true)]
-    #[allow(dead_code)] // Used for DB serialization, not exposed to API
-    pub updated_by: String,
+    pub _updated_by: String,
 }
 
 fn default_source() -> String {
@@ -224,7 +196,9 @@ impl<'de> Deserialize<'de> for DateTimeInput {
 
         // Try common datetime format without timezone
         if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S") {
-            return Ok(DateTimeInput(DateTime::from_naive_utc_and_offset(naive, Utc)));
+            return Ok(DateTimeInput(DateTime::from_naive_utc_and_offset(
+                naive, Utc,
+            )));
         }
 
         Err(serde::de::Error::custom(format!(
@@ -308,7 +282,7 @@ pub struct CreateTaskRequest {
     #[schema(example = json!(["Some distractions"]))]
     pub negatives: Option<Vec<String>>,
 
-    /// Category ID to link via graph relation (optional)
+    /// Category ID to link (optional)
     #[serde(default)]
     #[schema(example = "categories:work123")]
     pub category_id: Option<String>,

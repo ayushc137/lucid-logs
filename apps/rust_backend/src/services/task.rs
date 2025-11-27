@@ -31,7 +31,9 @@ impl TaskService for TaskServiceImpl {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<Task>, i64), AppError> {
-        self.repo.find_by_user_paginated(user_id, limit, offset).await
+        self.repo
+            .find_by_user_paginated(user_id, limit, offset)
+            .await
     }
 
     async fn create_task(&self, req: CreateTaskRequest, user_id: &str) -> Result<Task, AppError> {
@@ -71,4 +73,3 @@ impl TaskService for TaskServiceImpl {
         self.repo.find_by_id(id, user_id).await
     }
 }
-

@@ -5,13 +5,14 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::Deserialize;
-use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
 use crate::{
-    error::{ApiResponse, AppError, PaginatedResponse},
-    models::task::{CreateTaskRequest, Task, UpdateTaskRequest},
+    error::{ApiResponse, AppError, OperationMessage, PaginatedResponse},
+    models::{
+        pagination::PaginationParams,
+        task::{CreateTaskRequest, Task, UpdateTaskRequest},
+    },
     utils::middleware::{auth_middleware, AuthenticatedUser},
     utils::state::AppState,
 };
@@ -30,25 +31,6 @@ pub fn routes() -> Router<AppState> {
 /// Create protected task routes with auth middleware applied
 pub fn protected_routes(state: AppState) -> Router<AppState> {
     routes().layer(middleware::from_fn_with_state(state, auth_middleware))
-}
-
-#[derive(Debug, Deserialize, Validate, IntoParams, ToSchema)]
-pub struct PaginationParams {
-    /// Number of items to return (1-100)
-    #[serde(default = "default_limit")]
-    #[validate(range(min = 1, max = 100, message = "limit must be between 1 and 100"))]
-    #[param(example = 25, minimum = 1, maximum = 100)]
-    pub limit: i64,
-
-    /// Number of items to skip (0-100000)
-    #[serde(default)]
-    #[validate(range(min = 0, max = 100000, message = "offset must be between 0 and 100000"))]
-    #[param(example = 0, minimum = 0, maximum = 100000)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    25
 }
 
 /// List all tasks with pagination
@@ -118,10 +100,7 @@ pub async fn get_task(
         "getting task"
     );
 
-    let task = state
-        .task_service
-        .get_task(&id, &auth_user.user_id)
-        .await?;
+    let task = state.task_service.get_task(&id, &auth_user.user_id).await?;
 
     Ok((StatusCode::OK, Json(ApiResponse::success(task))))
 }
@@ -155,7 +134,10 @@ pub async fn create_task(
     );
 
     // Date validation is handled by service layer
-    let task = state.task_service.create_task(req, &auth_user.user_id).await?;
+    let task = state
+        .task_service
+        .create_task(req, &auth_user.user_id)
+        .await?;
 
     tracing::info!(
         task_id = ?task.id,
@@ -217,7 +199,7 @@ pub async fn update_task(
         ("id" = String, Path, description = "Task ID")
     ),
     responses(
-        (status = 204, description = "Task deleted successfully"),
+        (status = 200, description = "Task deleted successfully", body = crate::error::ApiResponse<crate::error::OperationMessage>),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
         (status = 500, description = "Internal server error")
@@ -229,7 +211,7 @@ pub async fn delete_task(
     State(state): State<AppState>,
     auth_user: AuthenticatedUser,
     Path(id): Path<String>,
-) -> Result<StatusCode, AppError> {
+) -> Result<(StatusCode, Json<ApiResponse<OperationMessage>>), AppError> {
     tracing::debug!(
         task_id = %id,
         user_id = %auth_user.user_id,
@@ -243,5 +225,9 @@ pub async fn delete_task(
 
     tracing::info!(task_id = %id, "task deleted successfully");
 
-    Ok(StatusCode::NO_CONTENT)
+    let body = ApiResponse::success(OperationMessage {
+        message: "Task deleted".to_string(),
+    });
+
+    Ok((StatusCode::OK, Json(body)))
 }

@@ -44,5 +44,4 @@ pub mod utils;
 // Re-export commonly used types for convenience
 pub use config::Settings;
 pub use error::{ApiError, ApiResponse, AppError};
-pub use utils::state::{AppState, AppStateBuilder};
-
+pub use utils::state::AppState;

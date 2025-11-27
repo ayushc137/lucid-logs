@@ -58,13 +58,13 @@ use utoipa_scalar::{Scalar, Servable};
 // ============================================================================
 // Each `mod xyz;` tells Rust to include code from xyz.rs or xyz/mod.rs
 
-mod config;       // Configuration loading (from env vars)
-mod error;        // Error types and API response wrappers
-mod handlers;     // HTTP request handlers (the API endpoints)
-mod models;       // Data structures (entities, DTOs)
+mod config; // Configuration loading (from env vars)
+mod error; // Error types and API response wrappers
+mod handlers; // HTTP request handlers (the API endpoints)
+mod models; // Data structures (entities, DTOs)
 mod repositories; // Database access layer
-mod services;     // Business logic layer
-mod utils;        // Utilities (middleware, state)
+mod services; // Business logic layer
+mod utils; // Utilities (middleware, state)
 
 // ============================================================================
 // INTERNAL IMPORTS
@@ -72,7 +72,9 @@ mod utils;        // Utilities (middleware, state)
 // `crate::` means "from this project's root"
 
 use crate::config::Settings;
-use crate::repositories::{init_schema, SchemaInitOptions};
+use crate::repositories::{
+    init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions,
+};
 use crate::services::{AuthServiceImpl, CategoryServiceImpl, TaskServiceImpl};
 use crate::utils::state::AppState;
 
@@ -120,13 +122,12 @@ use crate::utils::state::AppState;
             models::task::Task,
             models::task::CreateTaskRequest,
             models::task::UpdateTaskRequest,
-            handlers::task::PaginationParams,
+            models::pagination::PaginationParams,
             error::PaginatedTaskResponse,
             // Category types
             models::category::Category,
             models::category::CreateCategoryRequest,
             models::category::UpdateCategoryRequest,
-            handlers::category::CategoryPaginationParams,
             error::PaginatedCategoryResponse,
         )
     ),
@@ -201,8 +202,8 @@ async fn main() -> anyhow::Result<()> {
     // The `let _ =` pattern ignores the Result - we don't care if .env is missing
     // because env vars might be set directly (common in production/Docker).
 
-    let _ = dotenvy::dotenv();  // Loads .env file into environment
-    let settings = Settings::new()?;  // Parse env vars into typed Settings struct
+    let _ = dotenvy::dotenv(); // Loads .env file into environment
+    let settings = Settings::new()?; // Parse env vars into typed Settings struct
 
     // ========================================================================
     // STEP 2: INITIALIZE LOGGING (TRACING)
@@ -227,11 +228,9 @@ async fn main() -> anyhow::Result<()> {
     // Build and initialize the tracing subscriber
     // .with() adds "layers" that process log events
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::new(
-                std::env::var("RUST_LOG").unwrap_or_else(|_| log_level.into()),
-            ),
-        )
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| log_level.into()),
+        ))
         .with(tracing_subscriber::fmt::layer().with_target(true))
         .init();
 
@@ -240,7 +239,11 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  Environment: {}", settings.app.env);
     tracing::info!("  Server port: {}", settings.server.port);
     tracing::info!("  Database URL: {}:{}", settings.db.host, settings.db.port);
-    tracing::info!("  Database NS/DB: {}/{}", settings.db.namespace, settings.db.database);
+    tracing::info!(
+        "  Database NS/DB: {}/{}",
+        settings.db.namespace,
+        settings.db.database
+    );
 
     // ========================================================================
     // STEP 3: CONNECT TO DATABASE
@@ -273,20 +276,20 @@ async fn main() -> anyhow::Result<()> {
         Ok(Ok(db)) => {
             tracing::info!("Connected to SurrealDB successfully");
             db
-        }
+        },
         // Connection failed (but didn't timeout)
         Ok(Err(e)) => {
             tracing::error!("Failed to connect to SurrealDB: {}", e);
             tracing::error!("Make sure SurrealDB is running on {}", db_url);
             tracing::error!("You can start it with: task db:up");
-            return Err(e.into());  // Early return with error
-        }
+            return Err(e.into()); // Early return with error
+        },
         // Connection timed out
         Err(_) => {
             tracing::error!("Connection to SurrealDB timed out after 10 seconds");
             tracing::error!("Make sure SurrealDB is accessible at {}", db_url);
-            anyhow::bail!("Database connection timeout");  // Macro for returning error
-        }
+            anyhow::bail!("Database connection timeout"); // Macro for returning error
+        },
     };
 
     // ========================================================================
@@ -299,7 +302,7 @@ async fn main() -> anyhow::Result<()> {
         username: &settings.db.user,
         password: &settings.db.pass,
     })
-    .await?;  // <-- If this fails, main() returns the error
+    .await?; // <-- If this fails, main() returns the error
 
     // Select which namespace and database to use
     db.use_ns(&settings.db.namespace)
@@ -310,6 +313,36 @@ async fn main() -> anyhow::Result<()> {
         settings.db.namespace,
         settings.db.database
     );
+
+    // ========================================================================
+    // STEP 4B: RUN DATABASE MIGRATIONS
+    // ========================================================================
+    let migrations_dir = resolve_migrations_dir(settings.db.migrations_path.as_deref());
+    tracing::info!(
+        path = %migrations_dir.display(),
+        "checking for pending database migrations"
+    );
+    let migration_runner =
+        MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
+    match migration_runner.run_pending().await {
+        Ok(applied) if applied.is_empty() => {
+            tracing::info!("No pending migrations to apply");
+        },
+        Ok(applied) => {
+            for migration in &applied {
+                tracing::info!(
+                    version = migration.version,
+                    name = %migration.name,
+                    "migration applied"
+                );
+            }
+            tracing::info!(count = applied.len(), "finished applying migrations");
+        },
+        Err(e) => {
+            tracing::error!(error = %e, "failed to run migrations");
+            return Err(e.into());
+        },
+    }
 
     // Initialize schema (creates tables, indexes, etc.)
     let schema_opts = SchemaInitOptions::from(&settings);
@@ -335,7 +368,7 @@ async fn main() -> anyhow::Result<()> {
     // - Arc lets us share without copying the entire service
     // - When the last reference is dropped, the service is cleaned up
 
-    let settings = Arc::new(settings);  // Wrap in Arc for sharing
+    let settings = Arc::new(settings); // Wrap in Arc for sharing
 
     // Create services - these are the concrete implementations
     // In tests, we'd use MockTaskService, MockCategoryService, and MockAuthService instead
@@ -344,7 +377,13 @@ async fn main() -> anyhow::Result<()> {
     let auth_service = Arc::new(AuthServiceImpl::new(db.clone(), settings.clone()));
 
     // Bundle everything into AppState
-    let app_state = AppState::new(db, settings.clone(), task_service, category_service, auth_service);
+    let app_state = AppState::new(
+        db,
+        settings.clone(),
+        task_service,
+        category_service,
+        auth_service,
+    );
 
     // ========================================================================
     // STEP 6: BUILD THE ROUTER
@@ -428,7 +467,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     tracing::info!("Server shut down gracefully");
-    Ok(())  // Everything worked!
+    Ok(()) // Everything worked!
 }
 
 // ============================================================================
@@ -459,7 +498,10 @@ fn build_cors_layer(settings: &Settings) -> CorsLayer {
             .filter_map(|o| o.parse().ok())
             .collect();
 
-        tracing::info!("CORS: restricting to {} configured origin(s)", origins.len());
+        tracing::info!(
+            "CORS: restricting to {} configured origin(s)",
+            origins.len()
+        );
         cors.allow_origin(AllowOrigin::list(origins))
             .allow_methods([
                 axum::http::Method::GET,

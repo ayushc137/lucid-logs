@@ -95,6 +95,8 @@ tasks:
     dir: apps/rust_backend
     deps: [db:up]
     cmds:
+      - task: db:up
+      - fuser -k 8080/tcp 2>/dev/null || true  # Kill anything on port 8080
       - cargo watch -x run
 
   rust:build:

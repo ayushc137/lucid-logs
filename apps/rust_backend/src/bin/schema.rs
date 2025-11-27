@@ -40,7 +40,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rust_backend::config::Settings;
-use rust_backend::repositories::{init_schema, MigrationRunner, SchemaInitOptions};
+use rust_backend::repositories::{
+    init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions,
+};
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::Surreal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -145,33 +147,33 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Migrate { dry_run } => {
             run_migrate(&db, &settings, dry_run).await?;
-        }
+        },
 
         Commands::Status => {
             run_status(&db, &settings).await?;
-        }
+        },
 
         Commands::Validate => {
             run_validate(&db, &settings).await?;
-        }
+        },
 
         Commands::Apply => {
             tracing::info!("Applying consolidated schema.surql...");
             let opts = SchemaInitOptions::from(&settings);
             init_schema(&db, opts).await?;
             tracing::info!("Schema applied successfully");
-        }
+        },
 
         Commands::Seed => {
             tracing::info!("Seeding database...");
             let opts = SchemaInitOptions::from(&settings);
             init_schema(&db, opts).await?;
             tracing::info!("Database seeded successfully");
-        }
+        },
 
         Commands::Reset { force } => {
             run_reset(&db, &settings, force).await?;
-        }
+        },
 
         Commands::New { .. } => unreachable!(), // Handled above
     }
@@ -180,7 +182,7 @@ async fn main() -> Result<()> {
 }
 
 async fn run_migrate(db: &Surreal<Client>, settings: &Settings, dry_run: bool) -> Result<()> {
-    let migrations_dir = resolve_migrations_dir()?;
+    let migrations_dir = resolve_migrations_dir(settings.db.migrations_path.as_deref());
     let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
 
     let pending = runner.get_pending().await?;
@@ -214,18 +216,19 @@ async fn run_migrate(db: &Surreal<Client>, settings: &Settings, dry_run: bool) -
 }
 
 async fn run_status(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
-    let migrations_dir = resolve_migrations_dir()?;
+    let migrations_dir = resolve_migrations_dir(settings.db.migrations_path.as_deref());
     let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
 
-    let status = runner.status().await?;
+    let applied = runner.get_applied().await?;
+    let pending = runner.get_pending().await?;
 
     println!("\n=== Migration Status ===\n");
 
-    if status.applied.is_empty() {
+    if applied.is_empty() {
         println!("📭 No migrations applied yet\n");
     } else {
         println!("✅ Applied migrations:");
-        for m in &status.applied {
+        for m in &applied {
             println!(
                 "  {:03}_{} (applied: {:?})",
                 m.version,
@@ -236,11 +239,11 @@ async fn run_status(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
         println!();
     }
 
-    if status.pending.is_empty() {
+    if pending.is_empty() {
         println!("📭 No pending migrations\n");
     } else {
         println!("⏳ Pending migrations:");
-        for m in &status.pending {
+        for m in &pending {
             println!("  {:03}_{}", m.version, m.name);
         }
         println!();
@@ -252,23 +255,36 @@ async fn run_status(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
     let mut result = db.query("SELECT count() FROM user GROUP ALL").await?;
     let count: Option<serde_json::Value> = result.take(0)?;
     if let Some(count) = count {
-        println!("  Users: {}", count.get("count").unwrap_or(&serde_json::json!(0)));
+        println!(
+            "  Users: {}",
+            count.get("count").unwrap_or(&serde_json::json!(0))
+        );
     } else {
         println!("  Users: 0");
     }
 
-    let mut result = db.query("SELECT count() FROM categories WHERE deleted_at = NONE GROUP ALL").await?;
+    let mut result = db
+        .query("SELECT count() FROM categories WHERE deleted_at = NONE GROUP ALL")
+        .await?;
     let count: Option<serde_json::Value> = result.take(0)?;
     if let Some(count) = count {
-        println!("  Categories: {}", count.get("count").unwrap_or(&serde_json::json!(0)));
+        println!(
+            "  Categories: {}",
+            count.get("count").unwrap_or(&serde_json::json!(0))
+        );
     } else {
         println!("  Categories: 0");
     }
 
-    let mut result = db.query("SELECT count() FROM tasks WHERE deleted_at = NONE GROUP ALL").await?;
+    let mut result = db
+        .query("SELECT count() FROM tasks WHERE deleted_at = NONE GROUP ALL")
+        .await?;
     let count: Option<serde_json::Value> = result.take(0)?;
     if let Some(count) = count {
-        println!("  Tasks: {}", count.get("count").unwrap_or(&serde_json::json!(0)));
+        println!(
+            "  Tasks: {}",
+            count.get("count").unwrap_or(&serde_json::json!(0))
+        );
     } else {
         println!("  Tasks: 0");
     }
@@ -279,34 +295,52 @@ async fn run_status(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
 }
 
 async fn run_validate(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
-    let migrations_dir = resolve_migrations_dir()?;
+    let migrations_dir = resolve_migrations_dir(settings.db.migrations_path.as_deref());
     let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
 
-    let validations = runner.validate().await?;
+    let applied = runner.get_applied().await?;
+    let files = runner.read_migration_files().await?;
 
     println!("\n=== Migration Validation ===\n");
 
-    if validations.is_empty() {
+    if applied.is_empty() {
         println!("📭 No migrations to validate\n");
         return Ok(());
     }
 
     let mut has_issues = false;
 
-    for v in &validations {
-        let status_icon = match v.status {
-            rust_backend::repositories::migrations::ValidationStatus::Valid => "✅",
-            rust_backend::repositories::migrations::ValidationStatus::ChecksumMismatch => {
-                has_issues = true;
-                "❌"
-            }
-            rust_backend::repositories::migrations::ValidationStatus::MissingFile => {
-                has_issues = true;
-                "⚠️"
-            }
-        };
+    for applied_migration in &applied {
+        let maybe_file = files
+            .iter()
+            .find(|file| file.version == applied_migration.version);
 
-        println!("{} {:03}_{}: {}", status_icon, v.version, v.name, v.message);
+        match maybe_file {
+            None => {
+                has_issues = true;
+                println!(
+                    "⚠️ {:03}_{}: Migration file not found on disk",
+                    applied_migration.version, applied_migration.name
+                );
+            },
+            Some(file) => {
+                if applied_migration.checksum.as_deref() == Some(&file.checksum) {
+                    println!(
+                        "✅ {:03}_{}: Checksum matches",
+                        applied_migration.version, applied_migration.name
+                    );
+                } else {
+                    has_issues = true;
+                    println!(
+                        "❌ {:03}_{}: Checksum mismatch! Applied: {:?}, File: {}",
+                        applied_migration.version,
+                        applied_migration.name,
+                        applied_migration.checksum,
+                        file.checksum
+                    );
+                }
+            },
+        }
     }
 
     println!();
@@ -346,7 +380,7 @@ async fn run_reset(db: &Surreal<Client>, settings: &Settings, force: bool) -> Re
         .await?;
 
     // Apply migrations
-    let migrations_dir = resolve_migrations_dir()?;
+    let migrations_dir = resolve_migrations_dir(settings.db.migrations_path.as_deref());
     let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
     runner.run_pending().await?;
 
@@ -360,8 +394,8 @@ async fn run_reset(db: &Surreal<Client>, settings: &Settings, force: bool) -> Re
     Ok(())
 }
 
-async fn create_new_migration(name: &str, _settings: &Settings) -> Result<()> {
-    let migrations_dir = resolve_migrations_dir()?;
+async fn create_new_migration(name: &str, settings: &Settings) -> Result<()> {
+    let migrations_dir = resolve_migrations_dir(settings.db.migrations_path.as_deref());
 
     // Find the next version number
     let mut max_version: i64 = -1;
@@ -422,37 +456,4 @@ async fn create_new_migration(name: &str, _settings: &Settings) -> Result<()> {
     println!("   Then run: task rust:migrate\n");
 
     Ok(())
-}
-
-/// Resolve the migrations directory path
-fn resolve_migrations_dir() -> Result<std::path::PathBuf> {
-    // Search upwards from current directory for db/migrations/
-    if let Ok(cwd) = std::env::current_dir() {
-        let mut dir = cwd.clone();
-
-        loop {
-            let candidate = dir.join("db").join("migrations");
-            if candidate.is_dir() {
-                return Ok(candidate);
-            }
-
-            // Also check if db/ exists (for creating migrations/)
-            let db_dir = dir.join("db");
-            if db_dir.is_dir() {
-                return Ok(db_dir.join("migrations"));
-            }
-
-            if let Some(parent) = dir.parent() {
-                if parent == dir {
-                    break;
-                }
-                dir = parent.to_path_buf();
-            } else {
-                break;
-            }
-        }
-    }
-
-    // Default to current directory
-    Ok(std::path::PathBuf::from("db/migrations"))
 }

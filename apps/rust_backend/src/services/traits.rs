@@ -237,7 +237,6 @@ pub trait TaskService: Send + Sync {
     /// # Returns
     /// * `Ok(Task)` - The requested task
     /// * `Err(AppError::NotFound)` - Task doesn't exist or not owned by user
-    #[allow(dead_code)]
     async fn get_task(&self, id: &str, user_id: &str) -> Result<Task, AppError>;
 }
 
@@ -325,7 +324,5 @@ pub trait CategoryService: Send + Sync {
     /// # Returns
     /// * `Ok(Category)` - The requested category
     /// * `Err(AppError::NotFound)` - Category doesn't exist or not owned by user
-    #[allow(dead_code)]
     async fn get_category(&self, id: &str, user_id: &str) -> Result<Category, AppError>;
 }
-

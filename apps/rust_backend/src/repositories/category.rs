@@ -37,7 +37,15 @@ impl CategoryRepository {
         // Use INSERT instead of CREATE for better error handling
         // INSERT returns the created record or throws constraint errors
         let sql = format!(
-            "INSERT INTO {} (name, color, created_by, updated_by) VALUES ($name, $color, $user, $user)",
+            "INSERT INTO {} {{
+                name: $name,
+                color: $color,
+                created_by: $user,
+                updated_by: $user,
+                created_at: time::now(),
+                updated_at: time::now(),
+                deleted_at: NONE
+            }} RETURN *",
             CATEGORIES_TABLE
         );
 
@@ -70,7 +78,7 @@ impl CategoryRepository {
             Some(category) => {
                 tracing::debug!(category_id = ?category.id, "category created successfully");
                 Ok(category)
-            }
+            },
             None => {
                 tracing::error!(
                     "database create failed - no category returned and no errors reported"
@@ -81,7 +89,7 @@ impl CategoryRepository {
                     return Ok(cat);
                 }
                 Err(AppError::Internal)
-            }
+            },
         }
     }
 
@@ -200,7 +208,7 @@ impl CategoryRepository {
                     }
                 }
                 Err(AppError::NotFound)
-            }
+            },
         }
     }
 
@@ -234,8 +242,11 @@ impl CategoryRepository {
     }
 
     /// Find a category by name for a specific user (excludes soft-deleted)
-    #[allow(dead_code)]
-    pub async fn find_by_name(&self, name: &str, user_id: &str) -> Result<Option<Category>, AppError> {
+    pub async fn find_by_name(
+        &self,
+        name: &str,
+        user_id: &str,
+    ) -> Result<Option<Category>, AppError> {
         let sql = format!(
             "SELECT {} FROM {} WHERE name = $name AND created_by = $user AND deleted_at = NONE",
             CATEGORY_PROJECTION, CATEGORIES_TABLE
@@ -252,4 +263,3 @@ impl CategoryRepository {
         Ok(categories.into_iter().next())
     }
 }
-

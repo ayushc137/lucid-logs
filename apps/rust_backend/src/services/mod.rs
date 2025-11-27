@@ -7,4 +7,3 @@ pub use auth::AuthServiceImpl;
 pub use category::CategoryServiceImpl;
 pub use task::TaskServiceImpl;
 pub use traits::{AuthService, CategoryService, TaskService};
-

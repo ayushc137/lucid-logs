@@ -7,13 +7,14 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::Deserialize;
-use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
 use crate::{
-    error::{ApiResponse, AppError, PaginatedResponse},
-    models::category::{Category, CreateCategoryRequest, UpdateCategoryRequest},
+    error::{ApiResponse, AppError, OperationMessage, PaginatedResponse},
+    models::{
+        category::{Category, CreateCategoryRequest, UpdateCategoryRequest},
+        pagination::PaginationParams,
+    },
     utils::middleware::{auth_middleware, AuthenticatedUser},
     utils::state::AppState,
 };
@@ -33,30 +34,11 @@ pub fn protected_routes(state: AppState) -> Router<AppState> {
     routes().layer(middleware::from_fn_with_state(state, auth_middleware))
 }
 
-#[derive(Debug, Deserialize, Validate, IntoParams, ToSchema)]
-pub struct CategoryPaginationParams {
-    /// Number of items to return (1-100)
-    #[serde(default = "default_limit")]
-    #[validate(range(min = 1, max = 100, message = "limit must be between 1 and 100"))]
-    #[param(example = 50, minimum = 1, maximum = 100)]
-    pub limit: i64,
-
-    /// Number of items to skip (0-100000)
-    #[serde(default)]
-    #[validate(range(min = 0, max = 100000, message = "offset must be between 0 and 100000"))]
-    #[param(example = 0, minimum = 0, maximum = 100000)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    50
-}
-
 /// List all categories with pagination
 #[utoipa::path(
     get,
     path = "/api/v1/categories",
-    params(CategoryPaginationParams),
+    params(PaginationParams),
     responses(
         (status = 200, description = "List of categories with pagination metadata", body = crate::error::PaginatedCategoryResponse),
         (status = 400, description = "Invalid pagination parameters"),
@@ -69,7 +51,7 @@ fn default_limit() -> i64 {
 pub async fn list_categories(
     State(state): State<AppState>,
     auth_user: AuthenticatedUser,
-    Query(params): Query<CategoryPaginationParams>,
+    Query(params): Query<PaginationParams>,
 ) -> Result<(StatusCode, Json<ApiResponse<PaginatedResponse<Category>>>), AppError> {
     // Validate pagination params
     params.validate()?;
@@ -219,7 +201,7 @@ pub async fn update_category(
         ("id" = String, Path, description = "Category ID")
     ),
     responses(
-        (status = 204, description = "Category deleted successfully"),
+        (status = 200, description = "Category deleted successfully", body = crate::error::ApiResponse<crate::error::OperationMessage>),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Category not found"),
         (status = 500, description = "Internal server error")
@@ -231,7 +213,7 @@ pub async fn delete_category(
     State(state): State<AppState>,
     auth_user: AuthenticatedUser,
     Path(id): Path<String>,
-) -> Result<StatusCode, AppError> {
+) -> Result<(StatusCode, Json<ApiResponse<OperationMessage>>), AppError> {
     tracing::debug!(
         category_id = %id,
         user_id = %auth_user.user_id,
@@ -245,6 +227,9 @@ pub async fn delete_category(
 
     tracing::info!(category_id = %id, "category deleted successfully");
 
-    Ok(StatusCode::NO_CONTENT)
-}
+    let body = ApiResponse::success(OperationMessage {
+        message: "Category deleted".to_string(),
+    });
 
+    Ok((StatusCode::OK, Json(body)))
+}

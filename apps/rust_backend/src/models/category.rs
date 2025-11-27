@@ -54,7 +54,6 @@ pub struct Category {
     pub color: String,
 
     // === System-managed fields (read-only, set by DB) ===
-
     /// Creation timestamp (system-managed, read-only)
     #[serde(default = "Utc::now")]
     #[schema(value_type = String, format = DateTime, read_only = true)]
@@ -71,16 +70,14 @@ pub struct Category {
     pub deleted_at: Option<DateTime<Utc>>,
 
     /// User ID who created the category (system-managed, read-only, hidden from API)
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_serializing, rename = "created_by")]
     #[schema(example = "user:xyz789", read_only = true)]
-    #[allow(dead_code)]
-    pub created_by: String,
+    pub _created_by: String,
 
     /// User ID who last updated the category (system-managed, read-only, hidden from API)
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_serializing, rename = "updated_by")]
     #[schema(example = "user:xyz789", read_only = true)]
-    #[allow(dead_code)]
-    pub updated_by: String,
+    pub _updated_by: String,
 }
 
 /// Request payload for creating a new category
@@ -91,12 +88,20 @@ pub struct Category {
 }))]
 pub struct CreateCategoryRequest {
     /// Category name (required, unique per user)
-    #[validate(length(min = 1, max = 100, message = "Name must be between 1 and 100 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Name must be between 1 and 100 characters"
+    ))]
     #[schema(example = "Work")]
     pub name: String,
 
     /// Color for the category (required, hex format recommended)
-    #[validate(length(min = 1, max = 50, message = "Color must be between 1 and 50 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 50,
+        message = "Color must be between 1 and 50 characters"
+    ))]
     #[schema(example = "#3B82F6")]
     pub color: String,
 }
@@ -144,4 +149,3 @@ fn validate_optional_color(color: &str) -> Result<(), validator::ValidationError
     }
     Ok(())
 }
-

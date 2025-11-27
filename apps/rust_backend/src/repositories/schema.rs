@@ -133,7 +133,7 @@ async fn apply_schema(
     match db.query(&schema).await {
         Ok(_) => {
             tracing::info!(path = %schema_path.display(), "surreal schema applied");
-        }
+        },
         Err(e) => {
             let err_msg = e.to_string().to_lowercase();
             if err_msg.contains("already exists") {
@@ -145,7 +145,7 @@ async fn apply_schema(
                 tracing::error!(path = %schema_path.display(), error = %e, "failed to apply schema");
                 return Err(e.into());
             }
-        }
+        },
     }
 
     Ok(())
@@ -154,10 +154,10 @@ async fn apply_schema(
 /// Simple user struct for deserialization
 #[derive(Debug, Deserialize)]
 struct UserRecord {
-    #[allow(dead_code)]
-    id: Option<String>,
-    #[allow(dead_code)]
-    email: Option<String>,
+    #[serde(rename = "id")]
+    _id: Option<String>,
+    #[serde(rename = "email")]
+    _email: Option<String>,
 }
 
 /// Seed an admin user if configured (matching Go implementation)
@@ -204,7 +204,7 @@ async fn seed_admin_user(
     {
         Ok(_) => {
             tracing::info!(username = %username_owned, "admin user created for initial access");
-        }
+        },
         Err(e) => {
             let err_msg = e.to_string().to_lowercase();
             // Ignore duplicate key errors (user already exists)
@@ -214,7 +214,7 @@ async fn seed_admin_user(
                 tracing::error!(error = %e, "failed to seed admin user");
                 return Err(e.into());
             }
-        }
+        },
     }
 
     Ok(())
@@ -260,25 +260,24 @@ fn start_schema_watcher(db: Surreal<Client>, schema_path: PathBuf, opts: SchemaI
             Ok(Ok(w)) => {
                 tracing::info!(path = %watcher_schema_path_arc.display(), "schema file watcher started");
                 w
-            }
+            },
             Ok(Err(e)) => {
                 tracing::warn!(error = %e, "schema watcher disabled");
                 return;
-            }
+            },
             Err(e) => {
                 tracing::warn!(error = %e, "schema watcher task failed");
                 return;
-            }
+            },
         };
 
         // Process events asynchronously
         while let Some(event) = rx.recv().await {
             // Only react to write/create events on our schema file
-            let is_schema_change = event.paths.iter().any(|p| {
-                p.canonicalize()
-                    .unwrap_or_else(|_| p.clone())
-                    == *schema_path_arc
-            });
+            let is_schema_change = event
+                .paths
+                .iter()
+                .any(|p| p.canonicalize().unwrap_or_else(|_| p.clone()) == *schema_path_arc);
 
             if !is_schema_change {
                 continue;
@@ -317,10 +316,10 @@ fn start_schema_watcher(db: Surreal<Client>, schema_path: PathBuf, opts: SchemaI
                 match apply_schema_and_seed(&db_clone, &path_clone, &opts_clone).await {
                     Ok(_) => {
                         tracing::info!(path = %path_clone.display(), "schema reload applied");
-                    }
+                    },
                     Err(e) => {
                         tracing::error!(error = %e, "failed to reload schema");
-                    }
+                    },
                 }
             });
         }

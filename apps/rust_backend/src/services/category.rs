@@ -31,7 +31,9 @@ impl CategoryService for CategoryServiceImpl {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<Category>, i64), AppError> {
-        self.repo.find_by_user_paginated(user_id, limit, offset).await
+        self.repo
+            .find_by_user_paginated(user_id, limit, offset)
+            .await
     }
 
     async fn create_category(
@@ -60,4 +62,3 @@ impl CategoryService for CategoryServiceImpl {
         self.repo.find_by_id(id, user_id).await
     }
 }
-

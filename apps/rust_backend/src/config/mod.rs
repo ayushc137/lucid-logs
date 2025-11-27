@@ -30,6 +30,7 @@ pub struct DatabaseSettings {
     pub namespace: String,
     pub database: String,
     pub schema_path: Option<String>,
+    pub migrations_path: Option<String>,
 }
 
 impl DatabaseSettings {
@@ -79,6 +80,7 @@ impl Settings {
         let db_namespace = env::var("DB_NAMESPACE").unwrap_or_else(|_| "daily_journal".into());
         let db_database = env::var("DB_DATABASE").unwrap_or_else(|_| "core".into());
         let db_schema_path = env::var("DB_SCHEMA_PATH").ok();
+        let db_migrations_path = env::var("DB_MIGRATIONS_PATH").ok();
 
         // JWT settings - REQUIRE in production, generate with CSPRNG in dev
         let jwt_secret = match env::var("JWT_SECRET") {
@@ -94,7 +96,7 @@ impl Settings {
                     "[SECURITY] JWT_SECRET not set; generated ephemeral secret (tokens won't persist across restarts)"
                 );
                 secret
-            }
+            },
         };
 
         // Admin settings - warn in production if using defaults
@@ -115,12 +117,17 @@ impl Settings {
                     );
                     ("admin@example.com".into(), "adminadmin".into())
                 }
-            }
+            },
         };
 
         // CORS settings
-        let cors_origins = env::var("CORS_ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| if is_prod { String::new() } else { "*".into() });
+        let cors_origins = env::var("CORS_ALLOWED_ORIGINS").unwrap_or_else(|_| {
+            if is_prod {
+                String::new()
+            } else {
+                "*".into()
+            }
+        });
         let allowed_origins: Vec<String> = if cors_origins.is_empty() || cors_origins == "*" {
             vec![]
         } else {
@@ -148,6 +155,7 @@ impl Settings {
                 namespace: db_namespace,
                 database: db_database,
                 schema_path: db_schema_path,
+                migrations_path: db_migrations_path,
             },
             jwt: JwtSettings { secret: jwt_secret },
             admin: AdminSettings {
@@ -161,7 +169,6 @@ impl Settings {
     pub fn is_development(&self) -> bool {
         matches!(self.app.env.as_str(), "development" | "dev")
     }
-
 }
 
 /// Generate a cryptographically secure secret using OS RNG
