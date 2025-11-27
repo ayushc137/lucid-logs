@@ -4,6 +4,8 @@ use surrealdb::RecordId;
 use utoipa::ToSchema;
 use validator::Validate;
 
+use super::category::Category;
+
 pub const SOURCE_MANUAL: &str = "manual";
 
 /// Custom deserializer that converts null to empty string
@@ -43,6 +45,27 @@ where
     }
 }
 
+/// Deserialize category from graph traversal result
+/// Graph queries return either a single object or an array
+fn deserialize_graph_category<'de, D>(deserializer: D) -> Result<Option<Category>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum CategoryResult {
+        Single(Category),
+        Array(Vec<Category>),
+        Null,
+    }
+
+    match Option::<CategoryResult>::deserialize(deserializer)? {
+        Some(CategoryResult::Single(cat)) => Ok(Some(cat)),
+        Some(CategoryResult::Array(cats)) => Ok(cats.into_iter().next()),
+        Some(CategoryResult::Null) | None => Ok(None),
+    }
+}
+
 /// Task model representing a daily task or event
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[schema(example = json!({
@@ -51,17 +74,19 @@ where
     "journal": "Capture high-level goals",
     "start_date": "2025-11-24T09:00:00Z",
     "end_date": "2025-11-25T17:00:00Z",
-    "is_completed": false,
+    "completed": false,
     "priority": 1,
-    "planned": true,
     "source": "manual",
     "note": "Focus on top priorities",
     "positives": ["Felt great", "In flow"],
     "negatives": ["Got distracted"],
+    "category": {
+        "id": "categories:work123",
+        "name": "Work",
+        "color": "#3B82F6"
+    },
     "created_at": "2025-11-24T10:00:00Z",
-    "updated_at": "2025-11-24T10:00:00Z",
-    "created_by": "user:xyz789",
-    "updated_by": "user:xyz789"
+    "updated_at": "2025-11-24T10:00:00Z"
 }))]
 pub struct Task {
     /// Task ID (SurrealDB record ID like "tasks:abc123")
@@ -94,17 +119,12 @@ pub struct Task {
     /// Whether the task is completed
     #[serde(default)]
     #[schema(example = false)]
-    pub is_completed: bool,
+    pub completed: bool,
 
     /// Priority level (negative = wishes, higher = higher priority)
     #[serde(default)]
     #[schema(example = 1)]
     pub priority: i32,
-
-    /// Whether the task is planned for the future (auto-calculated)
-    #[serde(default)]
-    #[schema(example = true)]
-    pub planned: bool,
 
     /// Source of the task (default: "manual")
     #[serde(default = "default_source")]
@@ -125,6 +145,14 @@ pub struct Task {
     #[serde(default, deserialize_with = "null_to_empty_vec")]
     #[schema(example = json!(["Got distracted"]))]
     pub negatives: Vec<String>,
+
+    /// Category (populated via graph traversal ->in_category->categories)
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_graph_category"
+    )]
+    pub category: Option<Category>,
 
     // === System-managed fields (read-only, set by DB) ===
 
@@ -232,7 +260,8 @@ impl DateTimeInput {
     "source": "manual",
     "note": "Focus on top priorities",
     "positives": ["Great progress"],
-    "negatives": ["Some distractions"]
+    "negatives": ["Some distractions"],
+    "category_id": "categories:work123"
 }))]
 pub struct CreateTaskRequest {
     /// Task title (required)
@@ -278,14 +307,20 @@ pub struct CreateTaskRequest {
     #[serde(default)]
     #[schema(example = json!(["Some distractions"]))]
     pub negatives: Option<Vec<String>>,
+
+    /// Category ID to link via graph relation (optional)
+    #[serde(default)]
+    #[schema(example = "categories:work123")]
+    pub category_id: Option<String>,
 }
 
 /// Request payload for updating an existing task
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(example = json!({
     "title": "Updated task title",
-    "is_completed": true,
-    "priority": 2
+    "completed": true,
+    "priority": 2,
+    "category_id": "categories:personal456"
 }))]
 pub struct UpdateTaskRequest {
     /// New title (optional, but if provided must be non-empty)
@@ -307,7 +342,7 @@ pub struct UpdateTaskRequest {
 
     /// Mark as completed
     #[schema(example = true)]
-    pub is_completed: Option<bool>,
+    pub completed: Option<bool>,
 
     /// New priority level (-100 to 100)
     #[validate(custom(function = "validate_optional_priority"))]
@@ -323,6 +358,10 @@ pub struct UpdateTaskRequest {
 
     /// Updated negative comments
     pub negatives: Option<Vec<String>>,
+
+    /// Category ID to link (use null or empty string to remove)
+    #[schema(example = "categories:personal456")]
+    pub category_id: Option<String>,
 }
 
 /// Validate that optional title is non-empty if provided

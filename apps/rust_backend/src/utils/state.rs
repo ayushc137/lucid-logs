@@ -24,7 +24,7 @@
 //! - Cloning just increments reference counts - very fast!
 
 use crate::config::Settings;
-use crate::services::{AuthService, TaskService};
+use crate::services::{AuthService, CategoryService, TaskService};
 use std::sync::Arc;
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
@@ -102,6 +102,12 @@ pub struct AppState {
     /// In tests: `Arc<MockTaskService>`
     pub task_service: Arc<dyn TaskService>,
 
+    /// Category management service
+    ///
+    /// Handles CRUD operations for user-owned categories.
+    /// Categories can be attached to tasks for organization.
+    pub category_service: Arc<dyn CategoryService>,
+
     /// Authentication service
     ///
     /// Handles login, registration, and token management.
@@ -115,12 +121,14 @@ impl AppState {
         db: Surreal<Client>,
         settings: Arc<Settings>,
         task_service: Arc<dyn TaskService>,
+        category_service: Arc<dyn CategoryService>,
         auth_service: Arc<dyn AuthService>,
     ) -> Self {
         Self {
             db,
             settings,
             task_service,
+            category_service,
             auth_service,
         }
     }
@@ -133,6 +141,7 @@ pub struct AppStateBuilder {
     db: Option<Surreal<Client>>,
     settings: Option<Arc<Settings>>,
     task_service: Option<Arc<dyn TaskService>>,
+    category_service: Option<Arc<dyn CategoryService>>,
     auth_service: Option<Arc<dyn AuthService>>,
 }
 
@@ -143,6 +152,7 @@ impl AppStateBuilder {
             db: None,
             settings: None,
             task_service: None,
+            category_service: None,
             auth_service: None,
         }
     }
@@ -162,6 +172,11 @@ impl AppStateBuilder {
         self
     }
 
+    pub fn category_service(mut self, service: Arc<dyn CategoryService>) -> Self {
+        self.category_service = Some(service);
+        self
+    }
+
     pub fn auth_service(mut self, service: Arc<dyn AuthService>) -> Self {
         self.auth_service = Some(service);
         self
@@ -172,6 +187,7 @@ impl AppStateBuilder {
             db: self.db.ok_or("db is required")?,
             settings: self.settings.ok_or("settings is required")?,
             task_service: self.task_service.ok_or("task_service is required")?,
+            category_service: self.category_service.ok_or("category_service is required")?,
             auth_service: self.auth_service.ok_or("auth_service is required")?,
         })
     }

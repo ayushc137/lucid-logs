@@ -1,31 +1,46 @@
 //! Schema CLI - Database schema management tool
 //!
 //! Provides commands for managing the SurrealDB schema:
-//! - `migrate` - Apply schema migrations
-//! - `seed` - Seed initial data
+//! - `migrate` - Apply pending migrations
+//! - `status` - Show migration status
+//! - `validate` - Validate applied migrations against files
+//! - `seed` - Seed initial data (admin user)
 //! - `reset` - Reset database (drop and recreate)
-//! - `status` - Show current schema status
 //!
 //! # Usage
 //!
 //! ```bash
-//! # Apply migrations
+//! # Apply pending migrations
 //! cargo run --bin schema -- migrate
 //!
-//! # Seed data
+//! # Show migration status
+//! cargo run --bin schema -- status
+//!
+//! # Validate migrations
+//! cargo run --bin schema -- validate
+//!
+//! # Seed initial data
 //! cargo run --bin schema -- seed
 //!
 //! # Reset database (DESTRUCTIVE!)
 //! cargo run --bin schema -- reset --force
-//!
-//! # Check status
-//! cargo run --bin schema -- status
 //! ```
+//!
+//! # Migration Strategy
+//!
+//! ## Development
+//! - Edit `db/schema.surql` for quick iteration
+//! - Schema is auto-applied on server startup with hot-reload
+//!
+//! ## Production
+//! - Create versioned migrations in `db/migrations/`
+//! - Run `schema migrate` before deploying
+//! - Never modify already-applied migrations!
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rust_backend::config::Settings;
-use rust_backend::repositories::{init_schema, SchemaInitOptions};
+use rust_backend::repositories::{init_schema, MigrationRunner, SchemaInitOptions};
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::Surreal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -44,10 +59,23 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Apply schema migrations to the database
-    Migrate,
+    /// Apply pending migrations from db/migrations/
+    Migrate {
+        /// Dry run - show what would be applied without applying
+        #[arg(long)]
+        dry_run: bool,
+    },
 
-    /// Seed initial data (admin user, sample data)
+    /// Show migration status (applied vs pending)
+    Status,
+
+    /// Validate applied migrations against their files (checksum verification)
+    Validate,
+
+    /// Apply the consolidated schema.surql (development mode)
+    Apply,
+
+    /// Seed initial data (admin user)
     Seed,
 
     /// Reset the database (DESTRUCTIVE - drops all data)
@@ -57,8 +85,11 @@ enum Commands {
         force: bool,
     },
 
-    /// Show current schema/migration status
-    Status,
+    /// Create a new migration file
+    New {
+        /// Name of the migration (e.g., "add_field")
+        name: String,
+    },
 }
 
 #[tokio::main]
@@ -69,7 +100,8 @@ async fn main() -> Result<()> {
     let log_level = if cli.verbose { "debug" } else { "info" };
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| format!("schema={},rust_backend=info", log_level)),
+            std::env::var("RUST_LOG")
+                .unwrap_or_else(|_| format!("schema={},rust_backend=info", log_level)),
         ))
         .with(tracing_subscriber::fmt::layer().with_target(false))
         .init();
@@ -77,6 +109,11 @@ async fn main() -> Result<()> {
     // Load configuration
     let _ = dotenvy::dotenv();
     let settings = Settings::new()?;
+
+    // Handle "new" command before connecting to DB
+    if let Commands::New { name } = cli.command {
+        return create_new_migration(&name, &settings).await;
+    }
 
     tracing::info!(
         "Connecting to SurrealDB at {}:{}",
@@ -106,11 +143,23 @@ async fn main() -> Result<()> {
     );
 
     match cli.command {
-        Commands::Migrate => {
-            tracing::info!("Applying schema migrations...");
+        Commands::Migrate { dry_run } => {
+            run_migrate(&db, &settings, dry_run).await?;
+        }
+
+        Commands::Status => {
+            run_status(&db, &settings).await?;
+        }
+
+        Commands::Validate => {
+            run_validate(&db, &settings).await?;
+        }
+
+        Commands::Apply => {
+            tracing::info!("Applying consolidated schema.surql...");
             let opts = SchemaInitOptions::from(&settings);
             init_schema(&db, opts).await?;
-            tracing::info!("Schema migrations applied successfully");
+            tracing::info!("Schema applied successfully");
         }
 
         Commands::Seed => {
@@ -121,59 +170,289 @@ async fn main() -> Result<()> {
         }
 
         Commands::Reset { force } => {
-            if !force {
-                tracing::error!("Reset requires --force flag. This will DELETE ALL DATA!");
-                std::process::exit(1);
-            }
-
-            tracing::warn!("Resetting database - this will DELETE ALL DATA!");
-
-            // Remove all data from the database using raw query
-            let remove_query = format!("REMOVE DATABASE IF EXISTS {}", settings.db.database);
-            db.query(&remove_query).await?;
-
-            tracing::info!("Database cleared");
-
-            // Recreate namespace and database
-            db.use_ns(&settings.db.namespace)
-                .use_db(&settings.db.database)
-                .await?;
-
-            // Reapply schema
-            let opts = SchemaInitOptions::from(&settings);
-            init_schema(&db, opts).await?;
-
-            tracing::info!("Database reset complete");
+            run_reset(&db, &settings, force).await?;
         }
 
-        Commands::Status => {
-            tracing::info!("Checking schema status...");
-
-            // Query for tables
-            let mut result = db.query("INFO FOR DB").await?;
-            let info: Option<serde_json::Value> = result.take(0)?;
-
-            if let Some(info) = info {
-                println!("\n=== Database Info ===");
-                println!("{}", serde_json::to_string_pretty(&info)?);
-            }
-
-            // Check user count
-            let mut result = db.query("SELECT count() FROM user GROUP ALL").await?;
-            let count: Option<serde_json::Value> = result.take(0)?;
-            if let Some(count) = count {
-                println!("\nUser count: {}", count);
-            }
-
-            // Check task count
-            let mut result = db.query("SELECT count() FROM tasks GROUP ALL").await?;
-            let count: Option<serde_json::Value> = result.take(0)?;
-            if let Some(count) = count {
-                println!("Task count: {}", count);
-            }
-        }
+        Commands::New { .. } => unreachable!(), // Handled above
     }
 
     Ok(())
 }
 
+async fn run_migrate(db: &Surreal<Client>, settings: &Settings, dry_run: bool) -> Result<()> {
+    let migrations_dir = resolve_migrations_dir()?;
+    let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
+
+    let pending = runner.get_pending().await?;
+
+    if pending.is_empty() {
+        println!("\n✅ No pending migrations\n");
+        return Ok(());
+    }
+
+    println!("\n📦 Pending migrations:");
+    for migration in &pending {
+        println!("  {:03}_{}", migration.version, migration.name);
+    }
+    println!();
+
+    if dry_run {
+        println!("🔍 Dry run - no migrations applied\n");
+        return Ok(());
+    }
+
+    tracing::info!("Applying {} pending migration(s)...", pending.len());
+    let applied = runner.run_pending().await?;
+
+    println!("\n✅ Applied {} migration(s):", applied.len());
+    for migration in &applied {
+        println!("  {:03}_{}", migration.version, migration.name);
+    }
+    println!();
+
+    Ok(())
+}
+
+async fn run_status(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
+    let migrations_dir = resolve_migrations_dir()?;
+    let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
+
+    let status = runner.status().await?;
+
+    println!("\n=== Migration Status ===\n");
+
+    if status.applied.is_empty() {
+        println!("📭 No migrations applied yet\n");
+    } else {
+        println!("✅ Applied migrations:");
+        for m in &status.applied {
+            println!(
+                "  {:03}_{} (applied: {:?})",
+                m.version,
+                m.name,
+                m.applied_at.as_deref().unwrap_or("unknown")
+            );
+        }
+        println!();
+    }
+
+    if status.pending.is_empty() {
+        println!("📭 No pending migrations\n");
+    } else {
+        println!("⏳ Pending migrations:");
+        for m in &status.pending {
+            println!("  {:03}_{}", m.version, m.name);
+        }
+        println!();
+    }
+
+    // Also show table counts
+    println!("=== Data Summary ===\n");
+
+    let mut result = db.query("SELECT count() FROM user GROUP ALL").await?;
+    let count: Option<serde_json::Value> = result.take(0)?;
+    if let Some(count) = count {
+        println!("  Users: {}", count.get("count").unwrap_or(&serde_json::json!(0)));
+    } else {
+        println!("  Users: 0");
+    }
+
+    let mut result = db.query("SELECT count() FROM categories WHERE deleted_at = NONE GROUP ALL").await?;
+    let count: Option<serde_json::Value> = result.take(0)?;
+    if let Some(count) = count {
+        println!("  Categories: {}", count.get("count").unwrap_or(&serde_json::json!(0)));
+    } else {
+        println!("  Categories: 0");
+    }
+
+    let mut result = db.query("SELECT count() FROM tasks WHERE deleted_at = NONE GROUP ALL").await?;
+    let count: Option<serde_json::Value> = result.take(0)?;
+    if let Some(count) = count {
+        println!("  Tasks: {}", count.get("count").unwrap_or(&serde_json::json!(0)));
+    } else {
+        println!("  Tasks: 0");
+    }
+
+    println!();
+
+    Ok(())
+}
+
+async fn run_validate(db: &Surreal<Client>, settings: &Settings) -> Result<()> {
+    let migrations_dir = resolve_migrations_dir()?;
+    let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
+
+    let validations = runner.validate().await?;
+
+    println!("\n=== Migration Validation ===\n");
+
+    if validations.is_empty() {
+        println!("📭 No migrations to validate\n");
+        return Ok(());
+    }
+
+    let mut has_issues = false;
+
+    for v in &validations {
+        let status_icon = match v.status {
+            rust_backend::repositories::migrations::ValidationStatus::Valid => "✅",
+            rust_backend::repositories::migrations::ValidationStatus::ChecksumMismatch => {
+                has_issues = true;
+                "❌"
+            }
+            rust_backend::repositories::migrations::ValidationStatus::MissingFile => {
+                has_issues = true;
+                "⚠️"
+            }
+        };
+
+        println!("{} {:03}_{}: {}", status_icon, v.version, v.name, v.message);
+    }
+
+    println!();
+
+    if has_issues {
+        println!("⚠️  Some migrations have validation issues!");
+        println!("   - ChecksumMismatch: Migration file was modified after being applied");
+        println!("   - MissingFile: Migration was applied but file no longer exists");
+        println!();
+        std::process::exit(1);
+    } else {
+        println!("✅ All migrations validated successfully\n");
+    }
+
+    Ok(())
+}
+
+async fn run_reset(db: &Surreal<Client>, settings: &Settings, force: bool) -> Result<()> {
+    if !force {
+        tracing::error!("Reset requires --force flag. This will DELETE ALL DATA!");
+        println!("\n⚠️  This will DELETE ALL DATA in the database!");
+        println!("   Run with --force to confirm.\n");
+        std::process::exit(1);
+    }
+
+    tracing::warn!("Resetting database - this will DELETE ALL DATA!");
+
+    // Remove all data from the database
+    let remove_query = format!("REMOVE DATABASE IF EXISTS {}", settings.db.database);
+    db.query(&remove_query).await?;
+
+    tracing::info!("Database cleared");
+
+    // Recreate namespace and database
+    db.use_ns(&settings.db.namespace)
+        .use_db(&settings.db.database)
+        .await?;
+
+    // Apply migrations
+    let migrations_dir = resolve_migrations_dir()?;
+    let runner = MigrationRunner::new(db.clone(), &migrations_dir, settings.jwt.secret.clone());
+    runner.run_pending().await?;
+
+    // Seed admin user
+    let opts = SchemaInitOptions::from(settings);
+    init_schema(db, opts).await?;
+
+    println!("\n✅ Database reset complete\n");
+    tracing::info!("Database reset complete");
+
+    Ok(())
+}
+
+async fn create_new_migration(name: &str, _settings: &Settings) -> Result<()> {
+    let migrations_dir = resolve_migrations_dir()?;
+
+    // Find the next version number
+    let mut max_version: i64 = -1;
+
+    if migrations_dir.exists() {
+        let mut entries = tokio::fs::read_dir(&migrations_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "surql") {
+                if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
+                    if let Some(version_str) = filename.split('_').next() {
+                        if let Ok(version) = version_str.parse::<i64>() {
+                            max_version = max_version.max(version);
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        tokio::fs::create_dir_all(&migrations_dir).await?;
+    }
+
+    let next_version = max_version + 1;
+    let filename = format!("{:03}_{}.surql", next_version, name);
+    let filepath = migrations_dir.join(&filename);
+
+    // Create migration file template
+    let template = format!(
+        r#"-- Migration: {:03}_{}
+-- Description: TODO: Add description
+-- Created: {}
+
+-- TODO: Add your migration SQL here
+-- 
+-- Examples:
+-- 
+-- Add a new table:
+-- DEFINE TABLE new_table SCHEMAFULL;
+-- DEFINE FIELD name ON new_table TYPE string;
+-- 
+-- Add a new field to existing table:
+-- DEFINE FIELD new_field ON existing_table TYPE option<string>;
+-- 
+-- Add an index:
+-- DEFINE INDEX idx_name ON TABLE table_name COLUMNS field_name;
+-- 
+-- Note: SurrealDB schema changes are mostly idempotent with "IF NOT EXISTS"
+"#,
+        next_version,
+        name,
+        chrono::Utc::now().format("%Y-%m-%d")
+    );
+
+    tokio::fs::write(&filepath, template).await?;
+
+    println!("\n✅ Created migration: {}\n", filepath.display());
+    println!("   Edit the file and add your migration SQL.");
+    println!("   Then run: task rust:migrate\n");
+
+    Ok(())
+}
+
+/// Resolve the migrations directory path
+fn resolve_migrations_dir() -> Result<std::path::PathBuf> {
+    // Search upwards from current directory for db/migrations/
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut dir = cwd.clone();
+
+        loop {
+            let candidate = dir.join("db").join("migrations");
+            if candidate.is_dir() {
+                return Ok(candidate);
+            }
+
+            // Also check if db/ exists (for creating migrations/)
+            let db_dir = dir.join("db");
+            if db_dir.is_dir() {
+                return Ok(db_dir.join("migrations"));
+            }
+
+            if let Some(parent) = dir.parent() {
+                if parent == dir {
+                    break;
+                }
+                dir = parent.to_path_buf();
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Default to current directory
+    Ok(std::path::PathBuf::from("db/migrations"))
+}

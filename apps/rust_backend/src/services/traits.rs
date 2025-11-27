@@ -66,6 +66,7 @@ use async_trait::async_trait;
 
 use crate::error::AppError;
 use crate::models::auth::{AuthRequest, AuthResponse};
+use crate::models::category::{Category, CreateCategoryRequest, UpdateCategoryRequest};
 use crate::models::task::{CreateTaskRequest, Task, UpdateTaskRequest};
 
 // ============================================================================
@@ -236,7 +237,95 @@ pub trait TaskService: Send + Sync {
     /// # Returns
     /// * `Ok(Task)` - The requested task
     /// * `Err(AppError::NotFound)` - Task doesn't exist or not owned by user
-    #[allow(dead_code)] // Available for future use
+    #[allow(dead_code)]
     async fn get_task(&self, id: &str, user_id: &str) -> Result<Task, AppError>;
+}
+
+// ============================================================================
+// CATEGORY SERVICE
+// ============================================================================
+
+/// Category management service trait
+///
+/// Defines the contract for category-related business logic.
+/// Categories are user-specific and can be attached to tasks.
+///
+/// # Implementations
+///
+/// - [`CategoryServiceImpl`](super::CategoryServiceImpl) - Production implementation
+/// - `MockCategoryService` - Test implementation
+#[async_trait]
+pub trait CategoryService: Send + Sync {
+    /// List categories for a user with pagination
+    ///
+    /// # Arguments
+    /// * `user_id` - The owner's user ID (for authorization)
+    /// * `limit` - Maximum number of categories to return
+    /// * `offset` - Number of categories to skip (for pagination)
+    ///
+    /// # Returns
+    /// A tuple of `(categories, total_count)` where:
+    /// - `categories` - The paginated list of categories
+    /// - `total_count` - Total number of categories (for pagination UI)
+    async fn list_categories(
+        &self,
+        user_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<Category>, i64), AppError>;
+
+    /// Create a new category
+    ///
+    /// # Arguments
+    /// * `req` - Category creation request with name and color
+    /// * `user_id` - The creator's user ID
+    ///
+    /// # Business Rules
+    /// - Category name must be unique per user
+    /// - Name and color are required
+    ///
+    /// # Returns
+    /// The created category with generated ID and timestamps
+    async fn create_category(
+        &self,
+        req: CreateCategoryRequest,
+        user_id: &str,
+    ) -> Result<Category, AppError>;
+
+    /// Update an existing category
+    ///
+    /// # Arguments
+    /// * `id` - The category ID to update
+    /// * `req` - Fields to update (only provided fields are changed)
+    /// * `user_id` - The requesting user's ID (must be the owner)
+    ///
+    /// # Returns
+    /// * `Ok(Category)` - The updated category
+    /// * `Err(AppError::NotFound)` - Category doesn't exist or not owned by user
+    async fn update_category(
+        &self,
+        id: &str,
+        req: UpdateCategoryRequest,
+        user_id: &str,
+    ) -> Result<Category, AppError>;
+
+    /// Delete a category (soft delete)
+    ///
+    /// # Arguments
+    /// * `id` - The category ID to delete
+    /// * `user_id` - The requesting user's ID (must be the owner)
+    async fn delete_category(&self, id: &str, user_id: &str) -> Result<(), AppError>;
+
+    /// Get a category by ID
+    ///
+    /// # Arguments
+    /// * `id` - The category ID
+    /// * `user_id` - The requesting user's ID (must be the owner)
+    ///
+    /// # Returns
+    /// * `Ok(Category)` - The requested category
+    /// * `Err(AppError::NotFound)` - Category doesn't exist or not owned by user
+    #[allow(dead_code)]
+    async fn get_category(&self, id: &str, user_id: &str) -> Result<Category, AppError>;
 }
 

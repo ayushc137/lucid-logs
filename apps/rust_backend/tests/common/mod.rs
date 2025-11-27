@@ -82,9 +82,8 @@ impl TaskService for MockTaskService {
             journal: req.journal,
             start_date: req.start_date.time_value(),
             end_date: req.end_date.time_value(),
-            is_completed: false,
+            completed: false,
             priority: req.priority,
-            planned: false,
             source: req.source.unwrap_or_else(|| "manual".to_string()),
             note: req.note.unwrap_or_default(),
             positives: req.positives.unwrap_or_default(),
@@ -122,8 +121,8 @@ impl TaskService for MockTaskService {
         if let Some(journal) = req.journal {
             task.journal = journal;
         }
-        if let Some(is_completed) = req.is_completed {
-            task.is_completed = is_completed;
+        if let Some(completed) = req.completed {
+            task.completed = completed;
         }
         if let Some(priority) = req.priority {
             task.priority = priority;
@@ -262,9 +261,8 @@ pub mod fixtures {
             journal: "Test journal".to_string(),
             start_date: now,
             end_date: now + Duration::hours(1),
-            is_completed: false,
+            completed: false,
             priority: 1,
-            planned: false,
             source: "manual".to_string(),
             note: String::new(),
             positives: vec![],

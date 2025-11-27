@@ -44,6 +44,16 @@ pub struct PaginatedTaskResponse {
     pub has_more: bool,
 }
 
+/// Concrete paginated response for categories (for OpenAPI schema)
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PaginatedCategoryResponse {
+    pub items: Vec<crate::models::category::Category>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+    pub has_more: bool,
+}
+
 impl<T: Serialize> PaginatedResponse<T> {
     pub fn new(items: Vec<T>, total: i64, limit: i64, offset: i64) -> Self {
         let has_more = offset + (items.len() as i64) < total;

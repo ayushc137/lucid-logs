@@ -73,7 +73,7 @@ mod utils;        // Utilities (middleware, state)
 
 use crate::config::Settings;
 use crate::repositories::{init_schema, SchemaInitOptions};
-use crate::services::{AuthServiceImpl, TaskServiceImpl};
+use crate::services::{AuthServiceImpl, CategoryServiceImpl, TaskServiceImpl};
 use crate::utils::state::AppState;
 
 // ============================================================================
@@ -103,6 +103,12 @@ use crate::utils::state::AppState;
         handlers::task::create_task,
         handlers::task::update_task,
         handlers::task::delete_task,
+        // Category endpoints - user-owned categories for task organization
+        handlers::category::list_categories,
+        handlers::category::create_category,
+        handlers::category::get_category,
+        handlers::category::update_category,
+        handlers::category::delete_category,
     ),
     components(
         schemas(
@@ -115,12 +121,19 @@ use crate::utils::state::AppState;
             models::task::UpdateTaskRequest,
             handlers::task::PaginationParams,
             error::PaginatedTaskResponse,
+            // Category types
+            models::category::Category,
+            models::category::CreateCategoryRequest,
+            models::category::UpdateCategoryRequest,
+            handlers::category::CategoryPaginationParams,
+            error::PaginatedCategoryResponse,
         )
     ),
     tags(
         (name = "health", description = "Health check endpoints"),
         (name = "auth", description = "Authentication endpoints"),
-        (name = "tasks", description = "Task management endpoints")
+        (name = "tasks", description = "Task management endpoints"),
+        (name = "categories", description = "Category management endpoints")
     ),
     info(
         title = "Daily Journal API",
@@ -324,12 +337,13 @@ async fn main() -> anyhow::Result<()> {
     let settings = Arc::new(settings);  // Wrap in Arc for sharing
 
     // Create services - these are the concrete implementations
-    // In tests, we'd use MockTaskService and MockAuthService instead
+    // In tests, we'd use MockTaskService, MockCategoryService, and MockAuthService instead
     let task_service = Arc::new(TaskServiceImpl::new(db.clone()));
+    let category_service = Arc::new(CategoryServiceImpl::new(db.clone()));
     let auth_service = Arc::new(AuthServiceImpl::new(db.clone(), settings.clone()));
 
     // Bundle everything into AppState
-    let app_state = AppState::new(db, settings.clone(), task_service, auth_service);
+    let app_state = AppState::new(db, settings.clone(), task_service, category_service, auth_service);
 
     // ========================================================================
     // STEP 6: BUILD THE ROUTER
@@ -368,7 +382,8 @@ async fn main() -> anyhow::Result<()> {
     let api_v1 = Router::new()
         .merge(handlers::health::routes())     // /api/v1/health
         .merge(handlers::auth::routes())       // /api/v1/auth/*
-        .merge(handlers::task::protected_routes(app_state.clone())); // /api/v1/tasks/*
+        .merge(handlers::task::protected_routes(app_state.clone())) // /api/v1/tasks/*
+        .merge(handlers::category::protected_routes(app_state.clone())); // /api/v1/categories/*
 
     // Combine everything into the main application router
     let app = Router::new()

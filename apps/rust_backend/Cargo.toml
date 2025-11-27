@@ -58,6 +58,9 @@ notify = "8"
 rand = "0.9"
 base64ct = { version = "1.8", features = ["std"] }
 
+# Hashing for migration checksums
+sha2 = "0.10"
+
 # OpenAPI documentation
 utoipa = { version = "5", features = ["axum_extras", "chrono"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }

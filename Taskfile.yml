@@ -141,6 +141,10 @@ tasks:
     cmds:
       - cargo machete
 
+  # ============================================
+  # Database & Migration Commands
+  # ============================================
+
   rust:schema:
     desc: Run schema CLI commands
     dir: apps/rust_backend
@@ -148,19 +152,53 @@ tasks:
     cmds:
       - cargo run --bin schema -- {{.CLI_ARGS}}
 
-  rust:schema:migrate:
-    desc: Apply database migrations
+  rust:migrate:
+    desc: Apply pending database migrations
     dir: apps/rust_backend
     deps: [db:up]
     cmds:
       - cargo run --bin schema -- migrate
 
-  rust:schema:status:
-    desc: Show database schema status
+  rust:migrate:status:
+    desc: Show migration status (applied vs pending)
     dir: apps/rust_backend
     deps: [db:up]
     cmds:
       - cargo run --bin schema -- status
+
+  rust:migrate:validate:
+    desc: Validate applied migrations against files
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- validate
+
+  rust:migrate:new:
+    desc: Create a new migration file (usage - task rust:migrate:new -- add_tags)
+    dir: apps/rust_backend
+    cmds:
+      - cargo run --bin schema -- new {{.CLI_ARGS}}
+
+  rust:migrate:dry-run:
+    desc: Show pending migrations without applying
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- migrate --dry-run
+
+  rust:schema:apply:
+    desc: Apply consolidated schema.surql (development)
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- apply
+
+  rust:schema:reset:
+    desc: Reset database (DESTRUCTIVE!)
+    dir: apps/rust_backend
+    deps: [db:up]
+    cmds:
+      - cargo run --bin schema -- reset --force
 
   rust:bacon:
     desc: Run bacon background checker
@@ -301,6 +339,15 @@ tasks:
         echo "  task rust:dev        - Start with hot reload"
         echo "  task rust:build      - Build the project"
         echo "  task rust:check      - Quick type check (fast!)"
+        echo ""
+        echo "🗄️  Database & Migrations:"
+        echo "  task rust:migrate           - Apply pending migrations"
+        echo "  task rust:migrate:status    - Show migration status"
+        echo "  task rust:migrate:validate  - Validate checksums"
+        echo "  task rust:migrate:new       - Create new migration"
+        echo "  task rust:migrate:dry-run   - Preview migrations"
+        echo "  task rust:schema:apply      - Apply schema.surql (dev)"
+        echo "  task rust:schema:reset      - Reset database (DESTRUCTIVE)"
         echo ""
         echo "🧪 Testing:"
         echo "  task rust:test       - Run all tests"
