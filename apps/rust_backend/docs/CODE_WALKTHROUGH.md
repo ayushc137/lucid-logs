@@ -44,7 +44,6 @@ When the server starts, we set up everything:
 ### 1.1 Load Configuration
 
 ```rust
-// Line 84-87
 let _ = dotenvy::dotenv();           // Load .env file
 let settings = Settings::new()?;     // Parse into typed config
 ```
@@ -52,7 +51,6 @@ let settings = Settings::new()?;     // Parse into typed config
 ### 1.2 Connect to Database
 
 ```rust
-// Lines 117-138
 let db: Surreal<Client> = match tokio::time::timeout(
     std::time::Duration::from_secs(10),
     Surreal::new::<Ws>(&db_url),
@@ -62,10 +60,17 @@ let db: Surreal<Client> = match tokio::time::timeout(
 ### 1.3 Create Services (Dependency Injection)
 
 ```rust
-// Lines 169-173
 let task_service = Arc::new(TaskServiceImpl::new(db.clone()));
+let category_service = Arc::new(CategoryServiceImpl::new(db.clone()));
 let auth_service = Arc::new(AuthServiceImpl::new(db.clone(), settings.clone()));
-let app_state = AppState::new(db, settings.clone(), task_service, auth_service);
+
+let app_state = AppState::new(
+    db,
+    settings.clone(),
+    task_service,
+    category_service,
+    auth_service,
+);
 ```
 
 **Why Arc?** Multiple request handlers need to access these services concurrently. `Arc` provides thread-safe shared ownership.
@@ -73,14 +78,14 @@ let app_state = AppState::new(db, settings.clone(), task_service, auth_service);
 ### 1.4 Build Router
 
 ```rust
-// Lines 192-213
 let api_v1 = Router::new()
-    .merge(handlers::health::routes())
-    .merge(handlers::auth::routes())
-    .merge(handlers::task::protected_routes(app_state.clone()));
+    .merge(health_routes())
+    .merge(auth_routes())
+    .merge(task_protected_routes(app_state.clone()))
+    .merge(category_protected_routes(app_state.clone()));
 
 let app = Router::new()
-    .route("/health", get(handlers::health::health_check))
+    .route("/health", get(features::health::health_check))
     .nest("/api/v1", api_v1)
     .with_state(app_state)
     .layer(TraceLayer::new_for_http())
@@ -111,14 +116,14 @@ Content-Type: application/json
 
 ## Step 3: Router Matches the Route
 
-📁 **File**: `src/handlers/task.rs`
+📁 **File**: `src/features/tasks/handler.rs`
 
 ```rust
-// Lines 21-27
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/tasks", get(list_tasks))
         .route("/tasks", post(create_task))    // ← This matches!
+        .route("/tasks/{id}", get(get_task))
         .route("/tasks/{id}", put(update_task))
         .route("/tasks/{id}", delete(delete_task))
 }
@@ -130,37 +135,46 @@ The path `/api/v1/tasks` with method `POST` routes to `create_task`.
 
 ## Step 4: Middleware Runs First
 
-📁 **File**: `src/utils/middleware.rs`
+📁 **File**: `src/core/middleware.rs`
 
 Before the handler, auth middleware validates the JWT:
 
 ```rust
 pub async fn auth_middleware(
     State(state): State<AppState>,
-    mut req: Request,
+    mut req: Request<Body>,
     next: Next,
-) -> Result<Response, AppError> {
+) -> Response {
     // 1. Extract Authorization header
     let auth_header = req.headers()
-        .get(AUTHORIZATION)
+        .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| AppError::Unauthorized("Missing authorization header".into()))?;
+        .map(|s| s.trim().to_string());
+
+    let auth_header = match auth_header {
+        Some(h) if !h.is_empty() => h,
+        _ => return unauthorized_response("Authorization header required"),
+    };
 
     // 2. Parse "Bearer <token>"
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or_else(|| AppError::Unauthorized("Invalid authorization format".into()))?;
+    const BEARER_PREFIX: &str = "Bearer ";
+    if !auth_header.starts_with(BEARER_PREFIX) {
+        return unauthorized_response("Authorization header must start with 'Bearer '");
+    }
 
-    // 3. Verify JWT and extract claims
-    let claims = verify_jwt(token, &state.settings.jwt.secret)?;
+    let token = auth_header[BEARER_PREFIX.len()..].trim();
+
+    // 3. Verify JWT and extract claims using SurrealClaims
+    let claims = match SurrealClaims::from_token(token, &state.settings.jwt.secret) {
+        Ok(claims) => claims,
+        Err(e) => return unauthorized_response("Invalid or expired token"),
+    };
 
     // 4. Inject authenticated user into request extensions
-    req.extensions_mut().insert(AuthenticatedUser {
-        user_id: claims.sub,
-    });
+    req.extensions_mut().insert(AuthenticatedUser { user_id: claims.id });
 
     // 5. Continue to the handler
-    Ok(next.run(req).await)
+    next.run(req).await
 }
 ```
 
@@ -170,7 +184,7 @@ If authentication fails, an error response is returned immediately.
 
 ## Step 5: Handler Receives Request
 
-📁 **File**: `src/handlers/task.rs` (lines 107-130)
+📁 **File**: `src/features/tasks/handler.rs`
 
 ```rust
 #[utoipa::path(...)]  // OpenAPI documentation
@@ -194,20 +208,22 @@ pub async fn create_task(
 ### 5.1 Validate Request
 
 ```rust
-// Line 113
 req.validate()?;
 ```
 
-📁 **File**: `src/models/task.rs`
+📁 **File**: `src/features/tasks/model.rs`
 
 ```rust
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct CreateTaskRequest {
-    #[validate(length(min = 1, max = 255, message = "title must be 1-255 characters"))]
+    #[validate(length(min = 1, message = "Title is required"))]
     pub title: String,
 
-    #[validate(length(min = 1, max = 100, message = "journal must be 1-100 characters"))]
+    #[serde(default)]
     pub journal: String,
+
+    pub start_date: DateTimeInput,
+    pub end_date: DateTimeInput,
     // ...
 }
 ```
@@ -217,7 +233,6 @@ If validation fails, `?` returns early with `AppError::Validation`.
 ### 5.2 Call Service
 
 ```rust
-// Lines 122-123
 let task = state.task_service
     .create_task(req, &auth_user.user_id)
     .await?;
@@ -229,7 +244,7 @@ The handler delegates business logic to the service layer.
 
 ## Step 6: Service Processes Business Logic
 
-📁 **File**: `src/services/task.rs`
+📁 **File**: `src/features/tasks/service.rs`
 
 ```rust
 #[async_trait]
@@ -240,9 +255,9 @@ impl TaskService for TaskServiceImpl {
         user_id: &str,
     ) -> Result<Task, AppError> {
         // Business logic validation
-        if req.start_date.0 >= req.end_date.0 {
+        if req.end_date.time_value() < req.start_date.time_value() {
             return Err(AppError::BadRequest(
-                "start_date must be before end_date".into()
+                "end_date must be on or after start_date".to_string()
             ));
         }
 
@@ -261,7 +276,7 @@ impl TaskService for TaskServiceImpl {
 
 ## Step 7: Repository Interacts with Database
 
-📁 **File**: `src/repositories/task.rs`
+📁 **File**: `src/features/tasks/repository.rs`
 
 ```rust
 impl TaskRepository {
@@ -270,35 +285,52 @@ impl TaskRepository {
         req: CreateTaskRequest,
         user_id: &str,
     ) -> Result<Task, AppError> {
-        let now = Utc::now();
-        
-        // Build the task record
-        let task_data = serde_json::json!({
-            "title": req.title,
-            "journal": req.journal,
-            "start_date": req.start_date.0,
-            "end_date": req.end_date.0,
-            "completed": false,
-            "priority": req.priority,
-            "created_at": now,
-            "updated_at": now,
-            "created_by": user_id,
-            "updated_by": user_id,
-        });
+        // Build INSERT query with type-safe bindings
+        let create_sql = format!(
+            r#"
+            INSERT INTO tasks {{
+                title: $title,
+                journal: $journal,
+                start_date: type::datetime($start_date),
+                end_date: type::datetime($end_date),
+                completed: false,
+                priority: $priority,
+                source: $source,
+                category: {category_sql},
+                created_by: $user,
+                updated_by: $user,
+                created_at: time::now(),
+                updated_at: time::now()
+            }} RETURN id
+            "#
+        );
 
-        // Insert into SurrealDB
-        let result: Option<Task> = self.db
-            .create(TABLE)
-            .content(task_data)
+        let mut result = self.db
+            .query(&create_sql)
+            .bind(("title", req.title))
+            .bind(("journal", req.journal))
+            .bind(("start_date", req.start_date.time_value().to_rfc3339()))
+            .bind(("end_date", req.end_date.time_value().to_rfc3339()))
+            .bind(("priority", req.priority))
+            .bind(("user", user_id.to_string()))
             .await?;
 
-        result.ok_or(AppError::Internal)
+        // Extract created task ID and fetch full record
+        let created: Option<IdResult> = result.take(0)?;
+        let task_id = match created {
+            Some(r) => TaskId::new(r.id_string()),
+            None => return Err(AppError::Internal),
+        };
+
+        // Return complete task with category populated
+        self.find_by_id(&task_id.full_id(), user_id).await
     }
 }
 ```
 
 **Repository responsibilities:**
-- Database queries
+- Database queries using centralized query registry
+- Type-safe record IDs (`TaskId`, `CategoryId`)
 - Data mapping (DB format ↔ Domain models)
 - No business logic!
 
@@ -323,10 +355,10 @@ Same `Task` passes through (no transformation needed here).
 Ok((StatusCode::CREATED, Json(ApiResponse::success(task))))
 ```
 
-📁 **File**: `src/error/mod.rs`
+📁 **File**: `src/core/error.rs`
 
 ```rust
-impl<T: Serialize> ApiResponse<T> {
+impl<T: Serialize + ToSchema> ApiResponse<T> {
     pub fn success(data: T) -> Self {
         Self {
             data: Some(data),
@@ -387,7 +419,7 @@ Handler
       AppError::into_response()
 ```
 
-📁 **File**: `src/error/mod.rs` (lines 152-157)
+📁 **File**: `src/core/error.rs`
 
 ```rust
 AppError::NotFound => (
@@ -420,13 +452,17 @@ Content-Type: application/json
 | File | Purpose |
 |------|---------|
 | `src/main.rs` | App bootstrap, router setup |
-| `src/handlers/*.rs` | HTTP layer (parsing, responses) |
-| `src/services/*.rs` | Business logic |
-| `src/repositories/*.rs` | Database operations |
-| `src/models/*.rs` | Data structures (DTOs, entities) |
-| `src/error/mod.rs` | Error types and API response wrappers |
-| `src/utils/middleware.rs` | Auth middleware |
-| `src/utils/state.rs` | Shared application state |
+| `src/state.rs` | Shared application state (AppState) |
+| `src/core/config.rs` | Configuration management |
+| `src/core/error.rs` | Error types and API response wrappers |
+| `src/core/middleware.rs` | Auth middleware |
+| `src/core/db/migrations.rs` | Database migration runner |
+| `src/features/*/handler.rs` | HTTP layer (parsing, responses) |
+| `src/features/*/service.rs` | Business logic |
+| `src/features/*/repository.rs` | Database operations |
+| `src/features/*/model.rs` | Data structures (DTOs, entities) |
+| `src/shared/db/types.rs` | Type-safe record IDs |
+| `src/shared/db/queries.rs` | Centralized SQL query registry |
 
 ---
 

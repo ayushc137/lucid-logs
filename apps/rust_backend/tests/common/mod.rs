@@ -5,15 +5,20 @@
 //! - Test fixtures and factories
 //! - Database setup/teardown helpers
 
+#![allow(clippy::unwrap_used)]
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::{Duration, Utc};
 use parking_lot::Mutex;
 
-use rust_backend::error::AppError;
-use rust_backend::models::auth::{AuthRequest, AuthResponse};
-use rust_backend::models::task::{CreateTaskRequest, Task, UpdateTaskRequest};
-use rust_backend::services::{AuthService, TaskService};
+use rust_backend::features::auth::model::{AuthRequest, AuthResponse};
+use rust_backend::features::tasks::model::{CreateTaskRequest, DateTimeInput, Task, UpdateTaskRequest};
+use rust_backend::{AuthService, TaskService};
+
+// Re-export AppError from the crate
+pub use rust_backend::core::error::AppError;
 
 /// Mock implementation of TaskService for testing
 #[derive(Default)]
@@ -27,6 +32,7 @@ impl MockTaskService {
         Self::default()
     }
 
+    #[allow(dead_code)]
     pub fn with_tasks(tasks: Vec<Task>) -> Self {
         Self {
             tasks: Arc::new(Mutex::new(tasks)),
@@ -34,6 +40,7 @@ impl MockTaskService {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_should_fail(&self, fail: bool) {
         *self.should_fail.lock() = fail;
     }
@@ -54,7 +61,7 @@ impl TaskService for MockTaskService {
         let tasks = self.tasks.lock();
         let filtered: Vec<_> = tasks
             .iter()
-            .filter(|t| t.created_by == user_id)
+            .filter(|t| t._created_by == user_id)
             .cloned()
             .collect();
 
@@ -62,11 +69,7 @@ impl TaskService for MockTaskService {
         let offset = offset as usize;
         let limit = limit as usize;
 
-        let paginated = filtered
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let paginated = filtered.into_iter().skip(offset).take(limit).collect();
 
         Ok((paginated, total))
     }
@@ -88,11 +91,12 @@ impl TaskService for MockTaskService {
             note: req.note.unwrap_or_default(),
             positives: req.positives.unwrap_or_default(),
             negatives: req.negatives.unwrap_or_default(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            category: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
             deleted_at: None,
-            created_by: user_id.to_string(),
-            updated_by: user_id.to_string(),
+            _created_by: user_id.to_string(),
+            _updated_by: user_id.to_string(),
         };
 
         self.tasks.lock().push(task.clone());
@@ -112,7 +116,7 @@ impl TaskService for MockTaskService {
         let mut tasks = self.tasks.lock();
         let task = tasks
             .iter_mut()
-            .find(|t| t.id.as_deref() == Some(id) && t.created_by == user_id)
+            .find(|t| t.id.as_deref() == Some(id) && t._created_by == user_id)
             .ok_or(AppError::NotFound)?;
 
         if let Some(title) = req.title {
@@ -128,8 +132,8 @@ impl TaskService for MockTaskService {
             task.priority = priority;
         }
 
-        task.updated_at = chrono::Utc::now();
-        task.updated_by = user_id.to_string();
+        task.updated_at = Utc::now();
+        task._updated_by = user_id.to_string();
 
         Ok(task.clone())
     }
@@ -142,7 +146,7 @@ impl TaskService for MockTaskService {
         let mut tasks = self.tasks.lock();
         let pos = tasks
             .iter()
-            .position(|t| t.id.as_deref() == Some(id) && t.created_by == user_id)
+            .position(|t| t.id.as_deref() == Some(id) && t._created_by == user_id)
             .ok_or(AppError::NotFound)?;
 
         tasks.remove(pos);
@@ -157,7 +161,7 @@ impl TaskService for MockTaskService {
         let tasks = self.tasks.lock();
         tasks
             .iter()
-            .find(|t| t.id.as_deref() == Some(id) && t.created_by == user_id)
+            .find(|t| t.id.as_deref() == Some(id) && t._created_by == user_id)
             .cloned()
             .ok_or(AppError::NotFound)
     }
@@ -175,9 +179,13 @@ impl MockAuthService {
         Self::default()
     }
 
+    #[allow(dead_code)]
     pub fn with_user(username: &str, password: &str) -> Self {
         let service = Self::new();
-        service.users.lock().push((username.to_string(), password.to_string()));
+        service
+            .users
+            .lock()
+            .push((username.to_string(), password.to_string()));
         service
     }
 }
@@ -190,7 +198,9 @@ impl AuthService for MockAuthService {
         }
 
         let users = self.users.lock();
-        let valid = users.iter().any(|(u, p)| u == &req.username && p == &req.password);
+        let valid = users
+            .iter()
+            .any(|(u, p)| u == &req.username && p == &req.password);
 
         if valid {
             Ok(AuthResponse {
@@ -233,10 +243,10 @@ fn uuid_v4() -> String {
 
 /// Test fixture builder for creating test data
 pub mod fixtures {
-    use chrono::{Duration, Utc};
-    use rust_backend::models::task::{CreateTaskRequest, DateTimeInput, Task};
+    use super::*;
 
     /// Create a sample CreateTaskRequest for testing
+    #[allow(dead_code)]
     pub fn create_task_request(title: &str) -> CreateTaskRequest {
         let now = Utc::now();
         CreateTaskRequest {
@@ -249,10 +259,12 @@ pub mod fixtures {
             note: None,
             positives: None,
             negatives: None,
+            category_id: None,
         }
     }
 
     /// Create a sample Task for testing
+    #[allow(dead_code)]
     pub fn task(id: &str, title: &str, user_id: &str) -> Task {
         let now = Utc::now();
         Task {
@@ -267,12 +279,12 @@ pub mod fixtures {
             note: String::new(),
             positives: vec![],
             negatives: vec![],
+            category: None,
             created_at: now,
             updated_at: now,
             deleted_at: None,
-            created_by: user_id.to_string(),
-            updated_by: user_id.to_string(),
+            _created_by: user_id.to_string(),
+            _updated_by: user_id.to_string(),
         }
     }
 }
-

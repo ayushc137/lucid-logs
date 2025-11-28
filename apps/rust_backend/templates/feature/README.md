@@ -1,68 +1,68 @@
 # {{feature_name_pascal}} Feature Template
 
-This template was generated for the `{{feature_name}}` feature.
+This template was generated for the `{{feature_name}}` feature using the new **feature-based (vertical slice)** architecture.
 
 ## Generated Files
 
 ```
-src/
-├── handlers/{{feature_name}}.rs     # HTTP endpoints
-├── models/{{feature_name}}.rs       # Entity and DTOs
-├── services/{{feature_name}}.rs     # Business logic
-└── repositories/{{feature_name}}.rs # Database operations
+src/features/{{feature_name}}/
+├── mod.rs           # Module exports
+├── handler.rs       # HTTP endpoints
+├── model.rs         # Entity and DTOs
+├── service.rs       # Business logic + trait
+└── repository.rs    # Database operations
 ```
 
 ## Integration Steps
 
 After generating, you need to integrate the feature:
 
-### 1. Add to Module Exports
+### 1. Register the Feature Module
 
-**`src/handlers/mod.rs`**:
+**`src/features/mod.rs`**:
 ```rust
 pub mod {{feature_name}};
+
+// Add to re-exports
+pub use {{feature_name}}::{protected_routes as {{feature_name}}_protected_routes, routes as {{feature_name}}_routes};
+pub use {{feature_name}}::{{{feature_name_pascal}}Service, {{feature_name_pascal}}ServiceImpl};
 ```
 
-**`src/models/mod.rs`**:
+### 2. Update AppState
+
+In `src/state.rs`:
 ```rust
-pub mod {{feature_name}};
-```
+use crate::features::{{feature_name_pascal}}Service;
 
-**`src/services/mod.rs`**:
-```rust
-pub mod {{feature_name}};
-pub use {{feature_name}}::{{feature_name_pascal}}ServiceImpl;
-```
-
-**`src/repositories/mod.rs`**:
-```rust
-pub mod {{feature_name}};
-pub use {{feature_name}}::{{feature_name_pascal}}Repository;
-```
-
-### 2. Add Service Trait
-
-In `src/services/traits.rs`, add the trait (or copy from the generated service file):
-```rust
-#[async_trait]
-pub trait {{feature_name_pascal}}Service: Send + Sync {
-    // ... methods
-}
-```
-
-### 3. Update AppState
-
-In `src/utils/state.rs`:
-```rust
 pub struct AppState {
     // ... existing fields
     pub {{feature_name}}_service: Arc<dyn {{feature_name_pascal}}Service>,
 }
+
+impl AppState {
+    pub fn new(
+        // ... existing params
+        {{feature_name}}_service: Arc<dyn {{feature_name_pascal}}Service>,
+    ) -> Self {
+        Self {
+            // ... existing fields
+            {{feature_name}}_service,
+        }
+    }
+}
 ```
 
-### 4. Wire Up in main.rs
+### 3. Wire Up in main.rs
 
 ```rust
+use crate::features::{
+    // ... existing imports
+    {{feature_name}}_protected_routes,
+    {{feature_name_pascal}}ServiceImpl,
+};
+
+// In main():
+
 // Create service
 let {{feature_name}}_service = Arc::new({{feature_name_pascal}}ServiceImpl::new(db.clone()));
 
@@ -71,35 +71,46 @@ let app_state = AppState::new(
     db,
     settings.clone(),
     task_service,
+    category_service,
     auth_service,
     {{feature_name}}_service,  // Add here
 );
 
 // Add routes
 let api_v1 = Router::new()
-    .merge(handlers::health::routes())
-    .merge(handlers::auth::routes())
-    .merge(handlers::task::protected_routes(app_state.clone()))
-    .merge(handlers::{{feature_name}}::protected_routes(app_state.clone()));  // Add here
+    .merge(health_routes())
+    .merge(auth_routes())
+    .merge(task_protected_routes(app_state.clone()))
+    .merge(category_protected_routes(app_state.clone()))
+    .merge({{feature_name}}_protected_routes(app_state.clone()));  // Add here
 ```
 
-### 5. Add Database Schema
+### 4. Add Database Schema
 
-Create migration in `db/migrations/` or add to `db/schema.surql`:
+Create migration in `db/migrations/` (e.g., `005_{{feature_name}}.surql`):
 ```surql
-DEFINE TABLE {{table_name}} SCHEMAFULL;
+-- Migration: 005_{{feature_name}}
+-- Description: {{feature_name_pascal}} table and indexes
+
+DEFINE TABLE {{table_name}} SCHEMAFULL
+  PERMISSIONS
+    FOR select WHERE $auth = NONE OR created_by = $auth.id
+    FOR create WHERE $auth != NONE
+    FOR update WHERE $auth = NONE OR created_by = $auth.id
+    FOR delete WHERE $auth = NONE OR created_by = $auth.id;
+
 DEFINE FIELD name ON {{table_name}} TYPE string;
 DEFINE FIELD description ON {{table_name}} TYPE option<string>;
-DEFINE FIELD created_at ON {{table_name}} TYPE datetime;
-DEFINE FIELD updated_at ON {{table_name}} TYPE datetime;
+DEFINE FIELD created_at ON {{table_name}} TYPE datetime VALUE time::now();
+DEFINE FIELD updated_at ON {{table_name}} TYPE datetime VALUE time::now();
 DEFINE FIELD deleted_at ON {{table_name}} TYPE option<datetime>;
 DEFINE FIELD created_by ON {{table_name}} TYPE string;
 DEFINE FIELD updated_by ON {{table_name}} TYPE string;
 
-DEFINE INDEX {{table_name}}_owner ON {{table_name}} FIELDS created_by;
+DEFINE INDEX idx_{{table_name}}_owner ON TABLE {{table_name}} COLUMNS created_by;
 ```
 
-### 6. Update OpenAPI
+### 5. Update OpenAPI Documentation
 
 In `main.rs`, add to the `ApiDoc` struct:
 ```rust
@@ -107,18 +118,18 @@ In `main.rs`, add to the `ApiDoc` struct:
 #[openapi(
     paths(
         // ... existing paths
-        handlers::{{feature_name}}::list_{{feature_name}}s,
-        handlers::{{feature_name}}::get_{{feature_name}},
-        handlers::{{feature_name}}::create_{{feature_name}},
-        handlers::{{feature_name}}::update_{{feature_name}},
-        handlers::{{feature_name}}::delete_{{feature_name}},
+        features::{{feature_name}}::handler::list_{{feature_name}}s,
+        features::{{feature_name}}::handler::get_{{feature_name}},
+        features::{{feature_name}}::handler::create_{{feature_name}},
+        features::{{feature_name}}::handler::update_{{feature_name}},
+        features::{{feature_name}}::handler::delete_{{feature_name}},
     ),
     components(
         schemas(
             // ... existing schemas
-            models::{{feature_name}}::{{feature_name_pascal}},
-            models::{{feature_name}}::Create{{feature_name_pascal}}Request,
-            models::{{feature_name}}::Update{{feature_name_pascal}}Request,
+            features::{{feature_name}}::model::{{feature_name_pascal}},
+            features::{{feature_name}}::model::Create{{feature_name_pascal}}Request,
+            features::{{feature_name}}::model::Update{{feature_name_pascal}}Request,
         )
     ),
     // ... rest
@@ -135,4 +146,3 @@ Add tests in `tests/integration/{{feature_name}}_tests.rs`:
 ## Customization
 
 The generated code includes `todo!()` macros where you need to fill in implementation details. Remove these as you implement each method.
-

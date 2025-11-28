@@ -39,9 +39,8 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use rust_backend::config::Settings;
-use rust_backend::repositories::{
-    init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions,
+use rust_backend::core::{
+    init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions, Settings,
 };
 use surrealdb::engine::remote::ws::{Client, Ws};
 use surrealdb::Surreal;

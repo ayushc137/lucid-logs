@@ -138,9 +138,9 @@ debug = true
 unsafe_code = "forbid"
 
 [lints.clippy]
-all = "deny"
-pedantic = "warn"
-nursery = "warn"
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
 # Allow some pedantic lints that are too noisy
 module_name_repetitions = "allow"
 must_use_candidate = "allow"

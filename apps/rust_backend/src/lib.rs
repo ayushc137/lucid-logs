@@ -3,45 +3,47 @@
 //! This library exposes the core modules for use in integration tests
 //! and other binaries (like the schema CLI).
 //!
-//! # Architecture
+//! # Architecture (Feature-Based / Vertical Slices)
 //!
 //! ```text
-//! handlers/   - HTTP route handlers (each exports routes())
-//! services/   - Business logic (async traits for DI)
-//! repositories/ - Data access layer
-//! models/     - Domain models and DTOs
-//! config/     - Application configuration
-//! error/      - Error types and handling
-//! utils/      - Shared utilities (state, middleware)
+//! src/
+//! ├── core/           - Shared infrastructure (config, error, db, middleware)
+//! ├── features/       - Feature modules (vertical slices)
+//! │   ├── auth/       - Authentication (handler, model, service)
+//! │   ├── tasks/      - Task management (handler, model, repository, service)
+//! │   ├── categories/ - Category management (handler, model, repository, service)
+//! │   └── health/     - Health checks (handler)
+//! ├── shared/         - Shared types (pagination, repository utilities)
+//! └── state.rs        - Application state (AppState)
 //! ```
 //!
-//! # Example: Using services in tests
+//! # Adding a New Feature
 //!
-//! ```ignore
-//! use rust_backend::services::{TaskService, TaskServiceImpl};
-//! use rust_backend::config::Settings;
-//!
-//! #[tokio::test]
-//! async fn test_task_service() {
-//!     let settings = Settings::new().unwrap();
-//!     // ... setup mock or real services
-//! }
-//! ```
+//! 1. Create a new directory: `features/my_feature/`
+//! 2. Add files: `mod.rs`, `handler.rs`, `model.rs`, `service.rs`, `repository.rs` (if needed)
+//! 3. Export from `features/mod.rs`
+//! 4. Register routes in `main.rs`
 
 #![deny(clippy::all)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 
-pub mod config;
-pub mod error;
-pub mod handlers;
-pub mod models;
-pub mod repositories;
-pub mod services;
-pub mod utils;
+pub mod core;
+pub mod features;
+pub mod shared;
+pub mod state;
 
-// Re-export commonly used types for convenience
-pub use config::Settings;
-pub use error::{ApiError, ApiResponse, AppError};
-pub use utils::state::AppState;
+// Re-export commonly used types for convenience (from core)
+pub use core::{init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions, Settings};
+
+// Re-export shared utilities
+pub use shared::{category_queries, task_queries, CategoryId, TaskId};
+pub use state::AppState;
+
+// Re-export feature types
+pub use features::{
+    auth::{AuthService, AuthServiceImpl},
+    categories::{Category, CategoryService, CategoryServiceImpl},
+    tasks::{TaskService, TaskServiceImpl},
+};

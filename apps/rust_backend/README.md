@@ -16,24 +16,52 @@ A high-performance backend built with Axum, following industry best practices.
 
 ## Project Structure
 
+The codebase follows a **feature-based (vertical slice) architecture**:
+
 ```
 src/
 ├── bin/
-│   └── schema.rs       # Database schema CLI
-├── config/             # Configuration management
-├── error/              # Error types and handling
-├── handlers/           # HTTP request handlers (each exports routes())
-├── models/             # Data models and DTOs
-├── repositories/       # Database access layer
-├── services/           # Business logic (async traits for DI)
-├── utils/              # Utilities and middleware
-├── lib.rs              # Library exports for tests
-└── main.rs             # Application entry point
+│   └── schema.rs           # Database schema CLI
+├── core/                   # Shared infrastructure
+│   ├── config.rs           # Configuration management
+│   ├── error.rs            # Error types and API response wrappers
+│   ├── middleware.rs       # Auth middleware
+│   ├── db/                 # Database utilities
+│   │   ├── migrations.rs   # Migration runner
+│   │   └── schema.rs       # Schema initialization
+│   └── mod.rs
+├── features/               # Feature modules (vertical slices)
+│   ├── auth/               # Authentication feature
+│   │   ├── handler.rs      # HTTP handlers
+│   │   ├── model.rs        # DTOs and domain models
+│   │   └── service.rs      # Business logic
+│   ├── categories/         # Category management
+│   │   ├── handler.rs
+│   │   ├── model.rs
+│   │   ├── repository.rs   # Database operations
+│   │   └── service.rs
+│   ├── tasks/              # Task management
+│   │   ├── handler.rs
+│   │   ├── model.rs
+│   │   ├── repository.rs
+│   │   └── service.rs
+│   └── health/             # Health checks
+│       └── handler.rs
+├── shared/                 # Cross-feature utilities
+│   ├── db/                 # Database types and queries
+│   │   ├── types.rs        # Type-safe record IDs (TaskId, CategoryId)
+│   │   ├── queries.rs      # Centralized SQL query registry
+│   │   └── result.rs       # Common result types
+│   ├── pagination.rs       # Pagination parameters
+│   └── repository.rs       # Repository utilities
+├── state.rs                # Application state (AppState)
+├── lib.rs                  # Library exports for tests
+└── main.rs                 # Application entry point
 
 tests/
-├── common/             # Shared test utilities, mocks
-├── integration/        # API integration tests
-└── fixtures/           # Test data
+├── common/                 # Shared test utilities, mocks
+├── integration/            # API integration tests
+└── unit/                   # Unit tests
 ```
 
 ## Setup
@@ -106,10 +134,20 @@ task rust:schema -- reset --force
 - `POST /api/v1/auth/register` - User registration
 
 ### Protected (requires JWT)
+
+**Tasks**
 - `GET /api/v1/tasks` - List tasks (with pagination)
+- `GET /api/v1/tasks/{id}` - Get task by ID
 - `POST /api/v1/tasks` - Create task
 - `PUT /api/v1/tasks/{id}` - Update task
-- `DELETE /api/v1/tasks/{id}` - Delete task
+- `DELETE /api/v1/tasks/{id}` - Delete task (soft delete)
+
+**Categories**
+- `GET /api/v1/categories` - List categories (with pagination)
+- `GET /api/v1/categories/{id}` - Get category by ID
+- `POST /api/v1/categories` - Create category
+- `PUT /api/v1/categories/{id}` - Update category
+- `DELETE /api/v1/categories/{id}` - Delete category (soft delete)
 
 ### Documentation
 - `GET /docs` - Scalar API documentation UI
@@ -128,48 +166,82 @@ Key variables:
 
 ## Architecture Patterns
 
-### Modular Routes
+### Feature-Based Structure
 
-Each handler module exports a `routes()` function:
+Each feature is a self-contained module with handler, model, service, and repository:
 
 ```rust
-// handlers/my_feature.rs
+// features/my_feature/handler.rs
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/my-feature", get(list_items))
+        .route("/my-feature", post(create_item))
+}
+
+pub fn protected_routes(state: AppState) -> Router<AppState> {
+    routes().layer(middleware::from_fn_with_state(state, auth_middleware))
 }
 ```
 
 ### Service Layer with DI
 
-Business logic is encapsulated in services with trait-based DI:
+Business logic is encapsulated in services with trait-based dependency injection:
 
 ```rust
-// Define trait
+// features/my_feature/service.rs
+
+// Define trait for testability
 #[async_trait]
 pub trait MyService: Send + Sync {
-    async fn do_thing(&self) -> Result<(), AppError>;
+    async fn do_thing(&self) -> Result<MyItem, AppError>;
 }
 
-// Implement
-pub struct MyServiceImpl { /* ... */ }
+// Production implementation
+pub struct MyServiceImpl {
+    repo: MyRepository,
+}
 
 #[async_trait]
 impl MyService for MyServiceImpl {
-    async fn do_thing(&self) -> Result<(), AppError> { /* ... */ }
+    async fn do_thing(&self) -> Result<MyItem, AppError> {
+        // Business logic + repository calls
+        self.repo.create(/* ... */).await
+    }
 }
 
-// Wire up via AppState
-let service = Arc::new(MyServiceImpl::new());
-let state = AppState::new(/* ... */, service);
+// Wire up via AppState in main.rs
+let service = Arc::new(MyServiceImpl::new(db.clone()));
+let state = AppState::new(db, settings, service, /* ... */);
 ```
 
-### Generic Repository
+### Type-Safe Database IDs
 
-Use the base repository trait for consistent CRUD operations:
+Use the type-safe ID wrappers from `shared/db/types.rs`:
 
 ```rust
-use crate::repositories::base::{Repository, ensure_record_id};
+use crate::shared::{TaskId, CategoryId};
+
+// Type-safe ID creation
+let task_id = TaskId::new("abc123");
+assert_eq!(task_id.full_id(), "tasks:abc123");
+
+// Use in queries
+db.query("SELECT * FROM type::thing($id)")
+    .bind(("id", task_id.full_id()))
+    .await?;
+```
+
+### Centralized Query Registry
+
+SQL queries are defined in `shared/db/queries.rs` for maintainability:
+
+```rust
+use crate::shared::task_queries;
+
+db.query(task_queries::SELECT_BY_ID)
+    .bind(("id", task_id.full_id()))
+    .bind(("user", user_id))
+    .await?;
 ```
 
 ## Testing

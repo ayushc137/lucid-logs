@@ -1,12 +1,7 @@
 //! Health endpoint integration tests
 
-use axum::{
-    body::Body,
-    http::{Request, StatusCode},
-    Router,
-};
+use axum::http::StatusCode;
 use pretty_assertions::assert_eq;
-use tower::ServiceExt;
 
 // Note: Full integration tests would require database setup
 // These are placeholder tests demonstrating the structure
