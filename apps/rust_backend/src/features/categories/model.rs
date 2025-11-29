@@ -149,4 +149,3 @@ fn validate_optional_color(color: &str) -> Result<(), validator::ValidationError
     }
     Ok(())
 }
-

@@ -10,4 +10,3 @@ pub mod service;
 pub use handler::protected_routes;
 pub use model::Category;
 pub use service::{CategoryService, CategoryServiceImpl};
-

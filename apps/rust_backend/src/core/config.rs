@@ -193,4 +193,3 @@ pub enum ConfigError {
     #[error("Missing required configuration: {0}")]
     MissingRequired(String),
 }
-

@@ -64,4 +64,3 @@ pub async fn health_check_v1(State(state): State<AppState>) -> impl IntoResponse
 
     (StatusCode::OK, Json(ApiResponse::success(data)))
 }
-

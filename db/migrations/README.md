@@ -86,20 +86,22 @@ task rust:schema:reset
 
 ## Query Patterns
 
-All queries are centralized in `src/shared/db/queries.rs` for:
-- **Maintainability**: Single source of truth
-- **Consistency**: Reuse common patterns
-- **Optimization**: Easy to review and tune
+Repositories use SurrealDB's fluent builders plus schema-defined functions:
 
 ```rust
-// Use centralized queries
-use crate::shared::db::task_queries;
-
-db.query(task_queries::LIST_BY_USER)
-    .bind(("user", user_id))
-    .bind(("limit", 25))
-    .bind(("offset", 0))
+// Fluent builder for mutations
+let created: Vec<Task> = db
+    .create("tasks")
+    .content(task_payload)
     .await?;
+
+// Server-side function for reusable logic
+let mut result = db
+    .query("RETURN fn::task::count_for_user($user)")
+    .bind(("user", user_id.to_string()))
+    .await?;
+
+let total: i64 = result.take(0)?;
 ```
 
 ## Adding New Tables
@@ -182,7 +184,7 @@ assert_eq!(category_id.full_id(), "categories:work");
 - ✅ Add composite indexes for common query patterns
 - ✅ Use `DEFINE ... IF NOT EXISTS` for idempotency
 - ✅ Test on fresh database before deploying
-- ✅ Centralize queries in `shared/db/queries.rs`
+- ✅ Reuse SurrealDB functions + builder helpers to avoid duplicated SQL
 
 ### DON'T:
 - ❌ Modify applied migrations

@@ -95,4 +95,3 @@ where
             .ok_or_else(|| AppError::Unauthorized("Authentication required".into()))
     }
 }
-

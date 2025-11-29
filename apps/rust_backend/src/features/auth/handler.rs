@@ -62,4 +62,3 @@ pub async fn register(
 
     Ok(Json(response))
 }
-

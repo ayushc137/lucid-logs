@@ -329,4 +329,3 @@ fn start_schema_watcher(db: Surreal<Client>, schema_path: PathBuf, opts: SchemaI
         }
     });
 }
-

@@ -27,4 +27,3 @@ pub use tasks::protected_routes as task_protected_routes;
 pub use auth::{AuthService, AuthServiceImpl};
 pub use categories::{CategoryService, CategoryServiceImpl};
 pub use tasks::{TaskService, TaskServiceImpl};
-

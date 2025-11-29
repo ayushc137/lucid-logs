@@ -9,4 +9,3 @@ pub mod service;
 pub use handler::routes;
 pub use model::SurrealClaims;
 pub use service::{AuthService, AuthServiceImpl};
-

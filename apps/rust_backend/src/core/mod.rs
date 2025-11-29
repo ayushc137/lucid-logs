@@ -14,4 +14,3 @@ pub mod middleware;
 // Re-export commonly used types
 pub use config::Settings;
 pub use db::{init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions};
-

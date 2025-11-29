@@ -37,17 +37,6 @@ use surrealdb::sql::Thing;
 // TABLE NAME CONSTANTS
 // =============================================================================
 
-/// Table name constants for type safety and consistency
-#[allow(dead_code)]
-pub struct TableName;
-
-#[allow(dead_code)]
-impl TableName {
-    pub const TASKS: &'static str = "tasks";
-    pub const CATEGORIES: &'static str = "categories";
-    pub const USERS: &'static str = "user";
-    pub const MIGRATIONS: &'static str = "_migrations";
-}
 
 // =============================================================================
 // GENERIC RECORD ID
@@ -172,9 +161,16 @@ macro_rules! define_record_id {
                 format!("{}:{}", $table, self.0)
             }
 
-            /// Convert to a SurrealDB Thing for use in queries
+            /// Convert to a SurrealDB Thing for use in raw queries
             pub fn as_thing(&self) -> Thing {
                 Thing::from(($table, self.0.as_str()))
+            }
+
+            /// Convert to a tuple for use with fluent builders (select, update, delete)
+            ///
+            /// SurrealDB 2.x fluent API accepts `(table, id)` tuples
+            pub fn as_key(&self) -> (&'static str, &str) {
+                ($table, &self.0)
             }
 
             /// Convert to generic RecordId
@@ -272,5 +268,3 @@ define_record_id! {
     /// ```
     UserId => "user"
 }
-
-

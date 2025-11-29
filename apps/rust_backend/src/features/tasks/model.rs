@@ -357,4 +357,3 @@ fn validate_optional_priority(priority: i32) -> Result<(), validator::Validation
     }
     Ok(())
 }
-

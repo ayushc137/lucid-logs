@@ -222,4 +222,3 @@ fn to_json_field(field: &str) -> String {
         None => String::new(),
     }
 }
-

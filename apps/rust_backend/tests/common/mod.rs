@@ -14,7 +14,9 @@ use chrono::{Duration, Utc};
 use parking_lot::Mutex;
 
 use rust_backend::features::auth::model::{AuthRequest, AuthResponse};
-use rust_backend::features::tasks::model::{CreateTaskRequest, DateTimeInput, Task, UpdateTaskRequest};
+use rust_backend::features::tasks::model::{
+    CreateTaskRequest, DateTimeInput, Task, UpdateTaskRequest,
+};
 use rust_backend::{AuthService, TaskService};
 
 // Re-export AppError from the crate

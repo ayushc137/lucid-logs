@@ -28,8 +28,8 @@ use crate::core::{
     init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions, Settings,
 };
 use crate::features::{
-    auth_routes, category_protected_routes, health_routes, task_protected_routes,
-    AuthServiceImpl, CategoryServiceImpl, TaskServiceImpl,
+    auth_routes, category_protected_routes, health_routes, task_protected_routes, AuthServiceImpl,
+    CategoryServiceImpl, TaskServiceImpl,
 };
 use crate::state::AppState;
 

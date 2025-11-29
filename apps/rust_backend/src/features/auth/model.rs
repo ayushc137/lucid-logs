@@ -104,4 +104,3 @@ pub enum AuthError {
     #[error("Invalid or expired token: {0}")]
     InvalidToken(String),
 }
-

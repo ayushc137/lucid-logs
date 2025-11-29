@@ -27,4 +27,3 @@ async fn test_health_endpoint_returns_200() {
     let expected_code = StatusCode::OK;
     assert_eq!(expected_code.as_u16(), 200);
 }
-

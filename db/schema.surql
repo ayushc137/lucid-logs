@@ -100,22 +100,33 @@ DEFINE INDEX IF NOT EXISTS idx_tasks_status ON TABLE tasks COLUMNS completed;
 -- DATABASE FUNCTIONS (Reusable Query Logic)
 -- -----------------------------------------------------------------------------
 -- 
--- Define custom functions for complex, reusable queries.
--- These run server-side for better performance.
+-- Server-side functions for complex, reusable queries.
+-- Only functions that are actively used by the Rust backend are defined here.
+--
+-- Benefits:
+--   - Run server-side for better performance
+--   - Single source of truth for business logic
+--   - Reusable across different clients
+--
+-- Naming Convention:
+--   fn::<table>::<action>  e.g., fn::task::with_category
 
 -- Get a task with its category populated
+-- Used by: TaskRepository::fetch_task_with_category()
 -- Usage: RETURN fn::task::with_category(tasks:abc123)
 DEFINE FUNCTION IF NOT EXISTS fn::task::with_category($id: record<tasks>) {
     RETURN SELECT *, category.* FROM $id FETCH category
 };
 
 -- Get task count for a user (excludes soft-deleted)
+-- Used by: TaskRepository::find_by_user_paginated()
 -- Usage: RETURN fn::task::count_for_user("user:xyz")
 DEFINE FUNCTION IF NOT EXISTS fn::task::count_for_user($user_id: string) {
     RETURN (SELECT count() FROM tasks WHERE created_by = $user_id AND deleted_at = NONE GROUP ALL)[0].count OR 0
 };
 
 -- Get category count for a user (excludes soft-deleted)
+-- Used by: CategoryRepository::find_by_user_paginated()
 -- Usage: RETURN fn::category::count_for_user("user:xyz")
 DEFINE FUNCTION IF NOT EXISTS fn::category::count_for_user($user_id: string) {
     RETURN (SELECT count() FROM categories WHERE created_by = $user_id AND deleted_at = NONE GROUP ALL)[0].count OR 0

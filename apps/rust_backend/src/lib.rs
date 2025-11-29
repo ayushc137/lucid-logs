@@ -38,7 +38,7 @@ pub mod state;
 pub use core::{init_schema, resolve_migrations_dir, MigrationRunner, SchemaInitOptions, Settings};
 
 // Re-export shared utilities
-pub use shared::{category_queries, task_queries, CategoryId, TaskId};
+pub use shared::{CategoryId, TaskId};
 pub use state::AppState;
 
 // Re-export feature types

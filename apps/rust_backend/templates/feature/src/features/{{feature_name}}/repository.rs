@@ -1,74 +1,81 @@
 //! {{feature_name_pascal}} repository for database operations
 //!
-//! Uses the centralized query patterns and type-safe ID wrappers
+//! Uses SurrealDB's fluent builder patterns and type-safe ID wrappers
 //! for maintainable and safe database operations.
 //!
 //! # Extending This Repository
 //!
-//! 1. Add queries to `shared/db/queries.rs` under a new `{{feature_name}}` module
-//! 2. Add a type-safe ID wrapper in `shared/db/types.rs` if needed
-//! 3. Update this repository to use those queries
+//! 1. Add any reusable SurrealDB functions you need (e.g. `fn::{{feature_name}}::count_for_user`)
+//! 2. Add a type-safe ID wrapper in `shared/db/types.rs` if the table will be reused elsewhere
+//! 3. Prefer the builder API for mutations; reserve raw SQL for complex reads
 
-use chrono::Utc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::Surreal;
+use chrono::{DateTime, Utc};
+use serde::Serialize;
+use surrealdb::{engine::remote::ws::Client, sql::Thing, Surreal};
 
 use super::model::{Create{{feature_name_pascal}}Request, {{feature_name_pascal}}, Update{{feature_name_pascal}}Request};
 use crate::core::error::AppError;
-use crate::shared::db::{CountResult, IdResult};
 
 /// Database table name
 const TABLE: &str = "{{table_name}}";
+const COUNT_BY_USER_FN: &str = "RETURN fn::{{feature_name}}::count_for_user($user)";
+const LIST_BY_USER_QUERY: &str = r#"
+    SELECT * FROM {{table_name}}
+    WHERE created_by = $user AND deleted_at = NONE
+    ORDER BY created_at DESC
+    LIMIT $limit START $offset
+"#;
 
-// =============================================================================
-// QUERIES
-// =============================================================================
-// 
-// For a production feature, move these to `shared/db/queries.rs`
-// under a `pub mod {{feature_name}}` module.
+#[derive(Serialize)]
+struct {{feature_name_pascal}}InsertPayload {
+    name: String,
+    description: Option<String>,
+    created_by: String,
+    updated_by: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    deleted_at: Option<DateTime<Utc>>,
+}
 
-mod queries {
-    pub const CREATE: &str = r#"
-        INSERT INTO {{table_name}} (name, description, created_by, updated_by) 
-        VALUES ($name, $description, $user, $user)
-    "#;
+impl {{feature_name_pascal}}InsertPayload {
+    fn new(name: String, description: Option<String>, user_id: &str) -> Self {
+        let now = Utc::now();
+        Self {
+            name,
+            description,
+            created_by: user_id.to_string(),
+            updated_by: user_id.to_string(),
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        }
+    }
+}
 
-    pub const SELECT_BY_ID: &str = r#"
-        SELECT * FROM type::thing($id)
-        WHERE created_by = $user AND deleted_at = NONE
-    "#;
+#[derive(Serialize)]
+struct {{feature_name_pascal}}UpdatePayload {
+    name: String,
+    description: Option<String>,
+    updated_by: String,
+    updated_at: DateTime<Utc>,
+}
 
-    pub const COUNT_BY_USER: &str = r#"
-        SELECT count() FROM {{table_name}}
-        WHERE created_by = $user AND deleted_at = NONE
-        GROUP ALL
-    "#;
+impl {{feature_name_pascal}}UpdatePayload {
+    fn new(item: {{feature_name_pascal}}, user_id: &str) -> Self {
+        Self {
+            name: item.name,
+            description: item.description,
+            updated_by: user_id.to_string(),
+            updated_at: Utc::now(),
+        }
+    }
+}
 
-    pub const LIST_BY_USER: &str = r#"
-        SELECT * FROM {{table_name}}
-        WHERE created_by = $user AND deleted_at = NONE
-        ORDER BY created_at DESC
-        LIMIT $limit START $offset
-    "#;
-
-    pub const UPDATE: &str = r#"
-        UPDATE type::thing($id) SET
-            name = $name,
-            description = $description,
-            updated_by = $user,
-            updated_at = time::now()
-        WHERE created_by = $user AND deleted_at = NONE
-        RETURN *
-    "#;
-
-    pub const SOFT_DELETE: &str = r#"
-        UPDATE type::thing($id) SET
-            deleted_at = type::datetime($now),
-            updated_by = $user,
-            updated_at = time::now()
-        WHERE created_by = $user AND deleted_at = NONE
-        RETURN id
-    "#;
+#[derive(Serialize)]
+struct {{feature_name_pascal}}SoftDeletePayload {
+    deleted_at: Option<DateTime<Utc>>,
+    updated_by: String,
+    updated_at: DateTime<Utc>,
 }
 
 // =============================================================================
@@ -96,6 +103,11 @@ impl {{feature_name_pascal}}Id {
     /// Get full record ID (table:id)
     fn full_id(&self) -> String {
         format!("{}:{}", TABLE, self.0)
+    }
+
+    /// Convert to a SurrealDB Thing for builder APIs
+    fn as_thing(&self) -> Thing {
+        Thing::from((TABLE, self.0.as_str()))
     }
 }
 
@@ -135,33 +147,22 @@ impl {{feature_name_pascal}}Repository {
 
         tracing::debug!(name = %name, "creating {{feature_name}}");
 
-        let mut result = self
+        let payload = {{feature_name_pascal}}InsertPayload::new(name.clone(), description, user_id);
+
+        let created: Vec<{{feature_name_pascal}}> = self
             .db
-            .query(queries::CREATE)
-            .bind(("name", name.clone()))
-            .bind(("description", description))
-            .bind(("user", user_id.to_string()))
+            .create(TABLE)
+            .content(payload)
             .await?;
 
-        // Check for query errors
-        let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
-        if !errors.is_empty() {
-            tracing::error!(?errors, "{{feature_name}} create failed");
-            return Err(AppError::Internal);
-        }
-
-        let created: Option<{{feature_name_pascal}}> = result.take(0)?;
-
-        match created {
-            Some(item) => {
+        created
+            .into_iter()
+            .next()
+            .map(|item| {
                 tracing::debug!(id = ?item.id, "{{feature_name}} created");
-                Ok(item)
-            },
-            None => {
-                tracing::error!("{{feature_name}} create returned no result");
-                Err(AppError::Internal)
-            },
-        }
+                item
+            })
+            .ok_or(AppError::Internal)
     }
 
     /// List {{feature_name}}s for a user with pagination
@@ -182,21 +183,16 @@ impl {{feature_name_pascal}}Repository {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<{{feature_name_pascal}}>, i64), AppError> {
-        // Execute count and list queries in a single batch
         let mut result = self
             .db
-            .query(queries::COUNT_BY_USER)
-            .query(queries::LIST_BY_USER)
+            .query(COUNT_BY_USER_FN)
+            .query(LIST_BY_USER_QUERY)
             .bind(("user", user_id.to_string()))
             .bind(("limit", limit))
             .bind(("offset", offset))
             .await?;
 
-        // Extract count from first query
-        let count_result: Option<CountResult> = result.take(0)?;
-        let total = CountResult::unwrap_or_zero(count_result);
-
-        // Extract items from second query
+        let total: i64 = result.take(0)?;
         let items: Vec<{{feature_name_pascal}}> = result.take(1)?;
 
         Ok((items, total))
@@ -213,15 +209,11 @@ impl {{feature_name_pascal}}Repository {
     pub async fn find_by_id(&self, id: &str, user_id: &str) -> Result<{{feature_name_pascal}}, AppError> {
         let record_id = {{feature_name_pascal}}Id::new(id);
 
-        let mut result = self
-            .db
-            .query(queries::SELECT_BY_ID)
-            .bind(("id", record_id.full_id()))
-            .bind(("user", user_id.to_string()))
-            .await?;
+        let record: Option<{{feature_name_pascal}}> = self.db.select(record_id.as_thing()).await?;
 
-        let items: Vec<{{feature_name_pascal}}> = result.take(0)?;
-        items.into_iter().next().ok_or(AppError::NotFound)
+        record
+            .filter(|item| item._created_by == user_id && item.deleted_at.is_none())
+            .ok_or(AppError::NotFound)
     }
 
     /// Update a {{feature_name}} (enforces ownership)
@@ -239,10 +231,8 @@ impl {{feature_name_pascal}}Repository {
         req: Update{{feature_name_pascal}}Request,
         user_id: &str,
     ) -> Result<{{feature_name_pascal}}, AppError> {
-        // Fetch existing (verifies ownership)
         let mut existing = self.find_by_id(id, user_id).await?;
 
-        // Apply updates
         if let Some(name) = req.name {
             existing.name = name;
         }
@@ -252,16 +242,14 @@ impl {{feature_name_pascal}}Repository {
 
         let record_id = {{feature_name_pascal}}Id::new(id);
 
-        let mut result = self
+        let payload = {{feature_name_pascal}}UpdatePayload::new(existing, user_id);
+
+        let updated: Option<{{feature_name_pascal}}> = self
             .db
-            .query(queries::UPDATE)
-            .bind(("id", record_id.full_id()))
-            .bind(("name", existing.name))
-            .bind(("description", existing.description))
-            .bind(("user", user_id.to_string()))
+            .update(record_id.as_thing())
+            .merge(payload)
             .await?;
 
-        let updated: Option<{{feature_name_pascal}}> = result.take(0)?;
         updated.ok_or(AppError::NotFound)
     }
 
@@ -274,18 +262,22 @@ impl {{feature_name_pascal}}Repository {
     /// - `id`: Record ID to delete
     /// - `user_id`: User ID for ownership verification
     pub async fn delete(&self, id: &str, user_id: &str) -> Result<(), AppError> {
-        let record_id = {{feature_name_pascal}}Id::new(id);
-        let now = Utc::now().to_rfc3339();
+        let _ = self.find_by_id(id, user_id).await?;
 
-        let mut result = self
+        let record_id = {{feature_name_pascal}}Id::new(id);
+        let now = Utc::now();
+        let payload = {{feature_name_pascal}}SoftDeletePayload {
+            deleted_at: Some(now),
+            updated_by: user_id.to_string(),
+            updated_at: now,
+        };
+
+        let deleted: Option<{{feature_name_pascal}}> = self
             .db
-            .query(queries::SOFT_DELETE)
-            .bind(("id", record_id.full_id()))
-            .bind(("now", now))
-            .bind(("user", user_id.to_string()))
+            .update(record_id.as_thing())
+            .merge(payload)
             .await?;
 
-        let deleted: Option<IdResult> = result.take(0)?;
         if deleted.is_none() {
             return Err(AppError::NotFound);
         }

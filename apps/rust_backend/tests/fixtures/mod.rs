@@ -27,4 +27,3 @@ pub const SAMPLE_AUTH_JSON: &str = r#"{
     "username": "test@example.com",
     "password": "testpassword123"
 }"#;
-

@@ -156,7 +156,7 @@ let app_state = AppState::new(/* ... */, my_feature_service);
 1. Create `repositories/my_entity.rs`:
 
 ```rust
-use crate::repositories::base::{ensure_record_id, CountResult};
+use crate::repositories::base::ensure_record_id;
 
 const TABLE: &str = "my_entities";
 
@@ -234,7 +234,6 @@ where
 ### Helper Functions
 
 - `ensure_record_id(id, table)`: Ensures SurrealDB record IDs have the table prefix
-- `CountResult`: Helper struct for count aggregation queries
 
 ## Error Handling
 

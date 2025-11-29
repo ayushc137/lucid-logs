@@ -47,4 +47,3 @@ fn test_category_id_parse() {
     // Wrong table returns None
     assert!(CategoryId::parse("tasks:work").is_none());
 }
-

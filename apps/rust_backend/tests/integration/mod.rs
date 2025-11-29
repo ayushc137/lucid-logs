@@ -4,4 +4,3 @@
 //! using mock services for isolation.
 
 mod health_tests;
-

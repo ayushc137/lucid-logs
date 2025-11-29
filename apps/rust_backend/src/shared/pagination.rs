@@ -31,4 +31,3 @@ pub struct PaginationParams {
     #[param(example = 0, minimum = 0, maximum = 100_000)]
     pub offset: i64,
 }
-

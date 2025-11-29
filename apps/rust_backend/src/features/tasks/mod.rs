@@ -9,4 +9,3 @@ pub mod service;
 
 pub use handler::protected_routes;
 pub use service::{TaskService, TaskServiceImpl};
-

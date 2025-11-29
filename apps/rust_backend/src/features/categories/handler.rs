@@ -7,13 +7,12 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::Deserialize;
-use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
 use super::model::{Category, CreateCategoryRequest, UpdateCategoryRequest};
 use crate::core::error::{ApiResponse, AppError, PaginatedResponse};
 use crate::core::middleware::{auth_middleware, AuthenticatedUser};
+use crate::shared::pagination::PaginationParams;
 use crate::state::AppState;
 
 /// Create category routes (protected by auth middleware)
@@ -31,30 +30,11 @@ pub fn protected_routes(state: AppState) -> Router<AppState> {
     routes().layer(middleware::from_fn_with_state(state, auth_middleware))
 }
 
-#[derive(Debug, Deserialize, Validate, IntoParams, ToSchema)]
-pub struct CategoryPaginationParams {
-    /// Number of items to return (1-100)
-    #[serde(default = "default_limit")]
-    #[validate(range(min = 1, max = 100, message = "limit must be between 1 and 100"))]
-    #[param(example = 50, minimum = 1, maximum = 100)]
-    pub limit: i64,
-
-    /// Number of items to skip (0-100000)
-    #[serde(default)]
-    #[validate(range(min = 0, max = 100_000, message = "offset must be between 0 and 100000"))]
-    #[param(example = 0, minimum = 0, maximum = 100_000)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    50
-}
-
 /// List all categories with pagination
 #[utoipa::path(
     get,
     path = "/api/v1/categories",
-    params(CategoryPaginationParams),
+    params(PaginationParams),
     responses(
         (status = 200, description = "List of categories with pagination metadata"),
         (status = 400, description = "Invalid pagination parameters"),
@@ -67,7 +47,7 @@ fn default_limit() -> i64 {
 pub async fn list_categories(
     State(state): State<AppState>,
     auth_user: AuthenticatedUser,
-    Query(params): Query<CategoryPaginationParams>,
+    Query(params): Query<PaginationParams>,
 ) -> Result<(StatusCode, Json<ApiResponse<PaginatedResponse<Category>>>), AppError> {
     params.validate()?;
 
@@ -242,4 +222,3 @@ pub async fn delete_category(
 
     Ok(StatusCode::NO_CONTENT)
 }
-

@@ -329,4 +329,3 @@ mod tests {
         assert_eq!(checksum1, checksum2);
     }
 }
-

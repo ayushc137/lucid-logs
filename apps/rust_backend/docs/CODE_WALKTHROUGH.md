@@ -285,51 +285,35 @@ impl TaskRepository {
         req: CreateTaskRequest,
         user_id: &str,
     ) -> Result<Task, AppError> {
-        // Build INSERT query with type-safe bindings
-        let create_sql = format!(
-            r#"
-            INSERT INTO tasks {{
-                title: $title,
-                journal: $journal,
-                start_date: type::datetime($start_date),
-                end_date: type::datetime($end_date),
-                completed: false,
-                priority: $priority,
-                source: $source,
-                category: {category_sql},
-                created_by: $user,
-                updated_by: $user,
-                created_at: time::now(),
-                updated_at: time::now()
-            }} RETURN id
-            "#
+        let payload = TaskInsertPayload::new(
+            req.title,
+            req.journal,
+            req.start_date.time_value(),
+            req.end_date.time_value(),
+            req.priority,
+            req.source.unwrap_or_else(|| SOURCE_MANUAL.to_string()),
+            req.note.unwrap_or_default(),
+            req.positives.unwrap_or_default(),
+            req.negatives.unwrap_or_default(),
+            normalize_category_input(req.category_id),
+            user_id,
         );
 
-        let mut result = self.db
-            .query(&create_sql)
-            .bind(("title", req.title))
-            .bind(("journal", req.journal))
-            .bind(("start_date", req.start_date.time_value().to_rfc3339()))
-            .bind(("end_date", req.end_date.time_value().to_rfc3339()))
-            .bind(("priority", req.priority))
-            .bind(("user", user_id.to_string()))
+        let task_id = generate_task_id();
+
+        self.db
+            .create::<Option<Task>>(task_id.as_key())
+            .content(payload)
             .await?;
 
-        // Extract created task ID and fetch full record
-        let created: Option<IdResult> = result.take(0)?;
-        let task_id = match created {
-            Some(r) => TaskId::new(r.id_string()),
-            None => return Err(AppError::Internal),
-        };
-
-        // Return complete task with category populated
-        self.find_by_id(&task_id.full_id(), user_id).await
+        // Hydrate the linked category via SurrealDB function
+        self.fetch_task_with_category(&task_id, user_id).await
     }
 }
 ```
 
 **Repository responsibilities:**
-- Database queries using centralized query registry
+- Fluent builder mutations + server-side SurrealDB functions
 - Type-safe record IDs (`TaskId`, `CategoryId`)
 - Data mapping (DB format ↔ Domain models)
 - No business logic!
@@ -462,7 +446,7 @@ Content-Type: application/json
 | `src/features/*/repository.rs` | Database operations |
 | `src/features/*/model.rs` | Data structures (DTOs, entities) |
 | `src/shared/db/types.rs` | Type-safe record IDs |
-| `src/shared/db/queries.rs` | Centralized SQL query registry |
+| `src/shared/db/mod.rs` | Re-exports builder utilities and type-safe IDs |
 
 ---
 

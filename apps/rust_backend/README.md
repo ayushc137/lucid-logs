@@ -225,23 +225,28 @@ use crate::shared::{TaskId, CategoryId};
 let task_id = TaskId::new("abc123");
 assert_eq!(task_id.full_id(), "tasks:abc123");
 
-// Use in queries
-db.query("SELECT * FROM type::thing($id)")
-    .bind(("id", task_id.full_id()))
-    .await?;
+// Works seamlessly with the SurrealDB fluent builders
+let task: Option<Task> = db.select(task_id.as_thing()).await?;
 ```
 
-### Centralized Query Registry
+### Fluent Builders & SurrealDB Functions
 
-SQL queries are defined in `shared/db/queries.rs` for maintainability:
+Repositories use SurrealDB's builder API plus schema-defined functions for complex logic:
 
 ```rust
-use crate::shared::task_queries;
-
-db.query(task_queries::SELECT_BY_ID)
-    .bind(("id", task_id.full_id()))
-    .bind(("user", user_id))
+// Mutation via builder (type-safe payloads)
+let inserted: Vec<Task> = db
+    .create("tasks")
+    .content(task_payload)
     .await?;
+
+// Server-side function for reusable logic
+let mut result = db
+    .query("RETURN fn::task::with_category(type::thing($id))")
+    .bind(("id", task_id.full_id()))
+    .await?;
+
+let task_with_category: Vec<Task> = result.take(0)?;
 ```
 
 ## Testing

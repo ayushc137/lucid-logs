@@ -1,22 +1,93 @@
 //! Category repository for database operations
 //!
-//! Uses the centralized query registry and type-safe ID wrappers
-//! for maintainable and safe database operations.
+//! Uses SurrealDB's fluent builders and typed helpers instead of
+//! raw SQL whenever possible.
 //!
-//! # Architecture
+//! # SurrealDB 2.x Patterns Used
 //!
-//! - All queries are defined in `shared::db::queries::categories`
-//! - Record IDs use type-safe `CategoryId` wrapper
-//! - Unique constraint on (created_by, name) prevents duplicates per user
+//! - **Fluent builders**: `db.create()`, `db.select()`, `db.update().merge()`
+//! - **Server-side functions**: `fn::category::count_for_user()` for counts
+//! - **Typed payloads**: Serde structs for insert/update content
+//! - **Tuple keys**: `(table, id)` for select/update operations
 
-use chrono::Utc;
-use surrealdb::engine::remote::ws::Client;
-use surrealdb::Surreal;
+use chrono::{DateTime, Utc};
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use surrealdb::{engine::remote::ws::Client, Surreal};
 
 use super::model::{Category, CreateCategoryRequest, UpdateCategoryRequest};
 use crate::core::error::AppError;
-use crate::shared::db::CountResult;
-use crate::shared::{category_queries as queries, CategoryId};
+use crate::shared::db::DbResultExt;
+use crate::shared::CategoryId;
+
+/// Server-side function to count categories for a user
+const COUNT_CATEGORIES_FN: &str = "RETURN fn::category::count_for_user($user)";
+
+/// Raw query for paginated listing (fluent builders don't support LIMIT/START)
+const LIST_BY_USER_QUERY: &str = r"
+    SELECT id, name, color, created_at, updated_at, deleted_at, created_by, updated_by
+    FROM categories
+    WHERE created_by = $user AND deleted_at = NONE
+    ORDER BY name ASC
+    LIMIT $limit START $offset
+";
+
+
+/// Wrapper for extracting scalar count from server-side function
+#[derive(Debug, Deserialize)]
+struct CountWrapper(i64);
+
+#[derive(Serialize)]
+struct CategoryInsertPayload {
+    name: String,
+    color: String,
+    created_by: String,
+    updated_by: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    deleted_at: Option<DateTime<Utc>>,
+}
+
+impl CategoryInsertPayload {
+    fn new(name: String, color: String, user_id: &str) -> Self {
+        let now = Utc::now();
+        Self {
+            name,
+            color,
+            created_by: user_id.to_string(),
+            updated_by: user_id.to_string(),
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CategoryUpdatePayload {
+    name: String,
+    color: String,
+    updated_by: String,
+    updated_at: DateTime<Utc>,
+}
+
+impl CategoryUpdatePayload {
+    fn new(category: Category, user_id: &str) -> Self {
+        Self {
+            name: category.name,
+            color: category.color,
+            updated_by: user_id.to_string(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CategorySoftDeletePayload {
+    deleted_at: Option<DateTime<Utc>>,
+    updated_by: String,
+    updated_at: DateTime<Utc>,
+}
 
 /// Category repository for database operations
 ///
@@ -34,6 +105,8 @@ impl CategoryRepository {
     }
 
     /// Create a new category
+    ///
+    /// Uses SurrealDB's fluent `create().content()` builder for type-safe insertion.
     ///
     /// # Arguments
     /// - `req`: Category creation request
@@ -53,51 +126,25 @@ impl CategoryRepository {
 
         tracing::debug!(name = %name, "creating category");
 
-        let mut result = self
-            .db
-            .query(queries::CREATE)
-            .bind(("name", name.clone()))
-            .bind(("color", color))
-            .bind(("user", user_id.to_string()))
-            .await?;
+        let payload = CategoryInsertPayload::new(name.clone(), color, user_id);
+        let category_id = generate_category_id();
 
-        // Check for constraint violations
-        let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
-        if !errors.is_empty() {
-            let error_str = format!("{:?}", errors);
-            tracing::error!(?errors, "category create failed");
+        self.db
+            .create::<Option<Category>>(category_id.as_key())
+            .content(payload)
+            .await
+            .log_db_err(|err| tracing::error!(?err, %category_id, user_id, "category create failed"))
+            .map_err(map_category_error)?;
 
-            if error_str.contains("idx_categories_user_name") {
-                return Err(AppError::BadRequest(
-                    "A category with this name already exists".to_string(),
-                ));
-            }
-            return Err(AppError::Internal);
-        }
-
-        // Try to get the created category
-        let created: Option<Category> = result.take(0)?;
-
-        match created {
-            Some(category) => {
-                tracing::debug!(category_id = ?category.id, "category created");
-                Ok(category)
-            },
-            None => {
-                // Fallback: fetch by name (handles race conditions)
-                tracing::debug!("fallback: fetching created category by name");
-                if let Ok(Some(cat)) = self.find_by_name(&name, user_id).await {
-                    return Ok(cat);
-                }
-                Err(AppError::Internal)
-            },
-        }
+        let category = self.find_by_id(&category_id.full_id(), user_id).await?;
+        tracing::debug!(category_id = ?category.id, "category created");
+        Ok(category)
     }
 
     /// List categories for a user with pagination
     ///
-    /// Returns categories ordered by name ascending.
-    /// Soft-deleted categories are excluded.
+    /// Uses server-side function `fn::category::count_for_user()` for efficient counting
+    /// and raw query for pagination (fluent builders don't support LIMIT/START).
     ///
     /// # Arguments
     /// - `user_id`: User ID for ownership filter
@@ -112,27 +159,28 @@ impl CategoryRepository {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<Category>, i64), AppError> {
-        // Execute count and list queries in a single batch
+        // Batch both queries in a single round-trip
         let mut result = self
             .db
-            .query(queries::COUNT_BY_USER)
-            .query(queries::LIST_BY_USER)
+            .query(COUNT_CATEGORIES_FN)
+            .query(LIST_BY_USER_QUERY)
             .bind(("user", user_id.to_string()))
             .bind(("limit", limit))
             .bind(("offset", offset))
             .await?;
 
-        // Extract count from first query
-        let count_result: Option<CountResult> = result.take(0)?;
-        let total = CountResult::unwrap_or_zero(count_result);
+        // Server-side function returns scalar directly
+        let total: Option<CountWrapper> = result.take(0)?;
+        let total = total.map(|w| w.0).unwrap_or(0);
 
-        // Extract categories from second query
         let categories: Vec<Category> = result.take(1)?;
 
         Ok((categories, total))
     }
 
     /// Get a category by ID
+    ///
+    /// Uses SurrealDB's fluent `select()` builder with tuple key.
     ///
     /// # Arguments
     /// - `id`: Category ID (with or without table prefix)
@@ -142,20 +190,17 @@ impl CategoryRepository {
     /// The category if found and owned by user, NotFound otherwise
     pub async fn find_by_id(&self, id: &str, user_id: &str) -> Result<Category, AppError> {
         let category_id = CategoryId::new(id);
+        // SurrealDB 2.x: use tuple (table, id) for select
+        let record: Option<Category> = self.db.select(category_id.as_key()).await?;
 
-        let mut result = self
-            .db
-            .query(queries::SELECT_BY_ID)
-            .bind(("id", category_id.full_id()))
-            .bind(("user", user_id.to_string()))
-            .await?;
-
-        let categories: Vec<Category> = result.take(0)?;
-        categories.into_iter().next().ok_or(AppError::NotFound)
+        record
+            .filter(|category| category._created_by == user_id && category.deleted_at.is_none())
+            .ok_or(AppError::NotFound)
     }
 
     /// Update a category (enforces ownership)
     ///
+    /// Uses SurrealDB's fluent `update().merge()` builder for partial updates.
     /// Only provided fields are updated; others remain unchanged.
     /// Ownership is verified before the update.
     ///
@@ -173,10 +218,8 @@ impl CategoryRepository {
         req: UpdateCategoryRequest,
         user_id: &str,
     ) -> Result<Category, AppError> {
-        // Fetch existing category (verifies ownership)
         let mut existing = self.find_by_id(id, user_id).await?;
 
-        // Apply updates
         if let Some(name) = req.name {
             existing.name = name;
         }
@@ -186,51 +229,49 @@ impl CategoryRepository {
 
         let category_id = CategoryId::new(id);
 
-        let mut result = self
+        let payload = CategoryUpdatePayload::new(existing, user_id);
+
+        // SurrealDB 2.x: use tuple (table, id) for update
+        let updated: Option<Category> = self
             .db
-            .query(queries::UPDATE)
-            .bind(("id", category_id.full_id()))
-            .bind(("name", existing.name))
-            .bind(("color", existing.color))
-            .bind(("user", user_id.to_string()))
-            .await?;
+            .update(category_id.as_key())
+            .merge(payload)
+            .await
+            .log_db_err(|err| tracing::error!(?err, %category_id, user_id, "category update failed"))
+            .map_err(map_category_error)?;
 
-        // Check for unique constraint violations
-        let errors: Vec<surrealdb::Error> = result.take_errors().into_values().collect();
-        if !errors.is_empty() {
-            let error_str = format!("{:?}", errors);
-            if error_str.contains("idx_categories_user_name") {
-                return Err(AppError::BadRequest(
-                    "A category with this name already exists".to_string(),
-                ));
-            }
-        }
-
-        let updated: Option<Category> = result.take(0)?;
         updated.ok_or(AppError::NotFound)
     }
 
     /// Soft-delete a category
     ///
-    /// Sets `deleted_at` timestamp instead of actually removing the record.
+    /// Uses SurrealDB's fluent `update().merge()` to set `deleted_at` timestamp
+    /// instead of actually removing the record.
     /// Ownership is verified as part of the update.
     ///
     /// # Arguments
     /// - `id`: Category ID to delete
     /// - `user_id`: User ID for ownership verification
     pub async fn delete(&self, id: &str, user_id: &str) -> Result<(), AppError> {
+        // Verify ownership
+        let _ = self.find_by_id(id, user_id).await?;
+
         let category_id = CategoryId::new(id);
-        let now = Utc::now().to_rfc3339();
+        let now = Utc::now();
+        let payload = CategorySoftDeletePayload {
+            deleted_at: Some(now),
+            updated_by: user_id.to_string(),
+            updated_at: now,
+        };
 
-        let mut result = self
+        // SurrealDB 2.x: use tuple (table, id) for update
+        let deleted: Option<Category> = self
             .db
-            .query(queries::SOFT_DELETE)
-            .bind(("id", category_id.full_id()))
-            .bind(("now", now))
-            .bind(("user", user_id.to_string()))
-            .await?;
+            .update(category_id.as_key())
+            .merge(payload)
+            .await
+            .log_db_err(|err| tracing::error!(?err, %category_id, user_id, "category delete failed"))?;
 
-        let deleted: Option<Category> = result.take(0)?;
         if deleted.is_none() {
             return Err(AppError::NotFound);
         }
@@ -239,28 +280,20 @@ impl CategoryRepository {
         Ok(())
     }
 
-    /// Find a category by name for a specific user
-    ///
-    /// # Arguments
-    /// - `name`: Category name to search for
-    /// - `user_id`: User ID for ownership filter
-    ///
-    /// # Returns
-    /// The category if found, None otherwise
-    pub async fn find_by_name(
-        &self,
-        name: &str,
-        user_id: &str,
-    ) -> Result<Option<Category>, AppError> {
-        let mut result = self
-            .db
-            .query(queries::SELECT_BY_NAME)
-            .bind(("name", name.to_string()))
-            .bind(("user", user_id.to_string()))
-            .await?;
+}
 
-        let categories: Vec<Category> = result.take(0)?;
-        Ok(categories.into_iter().next())
+fn map_category_error(err: surrealdb::Error) -> AppError {
+    let message = err.to_string();
+    if message.contains("idx_categories_user_name") {
+        AppError::BadRequest("A category with this name already exists".into())
+    } else {
+        tracing::error!(error = %message, "category repository DB error");
+        AppError::Internal
     }
 }
 
+fn generate_category_id() -> CategoryId {
+    let mut rng = rand::rng();
+    let value: u128 = rng.random();
+    CategoryId::new(format!("{value:032x}"))
+}

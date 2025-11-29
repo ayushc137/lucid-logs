@@ -223,4 +223,3 @@ pub async fn delete_task(
 
     Ok((StatusCode::OK, Json(body)))
 }
-

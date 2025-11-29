@@ -11,15 +11,13 @@
 //! The `db` module provides type-safe abstractions for SurrealDB:
 //!
 //! ```rust,ignore
-//! use crate::shared::db::{TaskId, CategoryId, task_queries};
+//! use crate::shared::db::{TaskId, CategoryId};
 //!
 //! // Type-safe IDs
 //! let task_id = TaskId::new("abc123");
 //!
-//! // Centralized queries
-//! db.query(task_queries::SELECT_BY_ID)
-//!     .bind(("id", task_id.full_id()))
-//!     .await?;
+//! // Works seamlessly with SurrealDB builders
+//! let record = db.select(task_id.as_thing()).await?;
 //! ```
 
 pub mod db;
@@ -27,4 +25,4 @@ pub mod pagination;
 pub mod repository;
 
 // Re-export commonly used types
-pub use db::{category_queries, task_queries, CategoryId, TaskId};
+pub use db::{CategoryId, TaskId};
