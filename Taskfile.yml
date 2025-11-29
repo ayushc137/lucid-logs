@@ -6,378 +6,162 @@ env:
   PATH: "{{.HOME}}/.cargo/bin:{{.HOME}}/go/bin:{{.PATH}}"
 
 vars:
-  BIN_DIR: bin
+  GO_BACKEND: apps/go_backend
+  RUST_BACKEND: apps/rust_backend
 
 tasks:
+  # =============================================================================
+  # MAIN COMMANDS
+  # =============================================================================
+  
   default:
-    desc: Show tasks
+    desc: Show available commands
     cmds:
-      - go-task --list
+      - task --list
 
-  setup-env:
-    desc: Create .env file from example
+  setup:
+    desc: One-time project setup (install all tools)
     cmds:
-      - cp -n env.example .env || true
+      - cp -n env.example .env 2>/dev/null || true
+      - task: setup:go
+      - task: setup:rust
+      - echo ""
+      - echo "✅ Setup complete! Run 'task dev:go' or 'task dev:rust' to start"
 
-  tools:
-    desc: Install required dev tools locally (run once)
-    cmds:
-      - go install github.com/air-verse/air@v1.52.3
-      - go install github.com/swaggo/swag/cmd/swag@latest
-      - echo "Tools installed."
+  # =============================================================================
+  # GO BACKEND
+  # =============================================================================
 
-  db:up:
-    desc: Start SurrealDB
+  setup:go:
+    desc: Install Go development tools
+    dir: "{{.GO_BACKEND}}"
     cmds:
-      - docker compose -f deploy/docker-compose.yml up -d surrealdb 
+      - go mod download
+      - go install github.com/air-verse/air@latest
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install mvdan.cc/gofumpt@latest
+      - echo "✅ Go tools installed"
 
-  db:down:
-    desc: Stop database containers
+  dev:go:
+    desc: Start Go backend (hot reload + lint + format on save)
+    dir: "{{.GO_BACKEND}}"
+    deps: [db:up]
     cmds:
-      - docker compose -f deploy/docker-compose.yml down
-
-  schema:apply:
-    desc: Apply db/schema.surql to the running DB
-    cmds:
-      - cat db/schema.surql | docker compose -f deploy/docker-compose.yml exec -T surrealdb /surreal sql --conn http://localhost:8000 --user ${DB_USER:-root} --pass ${DB_PASS:-root} --ns ${DB_NAMESPACE:-daily_journal} --db ${DB_DATABASE:-core}
-
-  backend:tidy:
-    desc: Run go mod tidy for the backend
-    dir: apps/backend
-    cmds:
-      - go mod tidy
-
-  backend:docs:
-    desc: Generate Swagger documentation
-    dir: apps/backend
-    cmds:
-      - go generate ./cmd/api
-
-  dev:local:
-    desc: Start backend locally (Air) while DB runs in Docker
-    deps: [setup-env, db:up]
-    dir: apps/backend
-    env:
-      DB_SCHEMA_PATH: "{{.DB_SCHEMA_PATH}}"
-      ADMIN_USERNAME: "{{.ADMIN_USERNAME}}"
-      ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
-      JWT_SECRET: "{{.JWT_SECRET}}"
-      DB_HOST: localhost
-      DB_PORT: "8000"
-      DB_USER: "{{.DB_USER}}"
-      DB_PASS: "{{.DB_PASS}}"
-      DB_NAMESPACE: "{{.DB_NAMESPACE}}"
-      DB_DATABASE: "{{.DB_DATABASE}}"
-    cmds:
-      - go generate ./cmd/api
       - air
 
-  dev:docker:
-    desc: Start entire stack inside Docker
-    deps: [setup-env]
+  build:go:
+    desc: Build Go backend
+    dir: "{{.GO_BACKEND}}"
     cmds:
-      - docker compose -f deploy/docker-compose.yml up --build
+      - go build -o build/api ./cmd/api
 
-  rust:tools:
-    desc: Install Rust dev tools
+  test:go:
+    desc: Run Go tests
+    dir: "{{.GO_BACKEND}}"
     cmds:
-      - cargo install cargo-watch cargo-nextest cargo-audit cargo-deny cargo-machete cargo-expand bacon lefthook
+      - go test -v -race ./...
 
-  rust:hooks:
-    desc: Install git pre-commit hooks (lefthook)
-    dir: apps/rust_backend
+  lint:go:
+    desc: Lint and format Go code
+    dir: "{{.GO_BACKEND}}"
     cmds:
-      - lefthook install
-      - echo "✅ Git hooks installed! Commits will now run fmt, clippy, and check."
+      - gofumpt -l -w .
+      - golangci-lint run ./...
 
-  rust:dev:
-    desc: Start Rust backend with auto-reload
-    dir: apps/rust_backend
+  new:go:
+    desc: Create new Go feature (usage - task new:go -- comments)
+    dir: "{{.GO_BACKEND}}"
+    cmds:
+      - go run cmd/gen/main.go {{.CLI_ARGS}}
+
+  # =============================================================================
+  # RUST BACKEND
+  # =============================================================================
+
+  setup:rust:
+    desc: Install Rust development tools
+    cmds:
+      - cargo install cargo-watch cargo-nextest 2>/dev/null || true
+      - echo "✅ Rust tools installed"
+
+  dev:rust:
+    desc: Start Rust backend (hot reload + checks on save)
+    dir: "{{.RUST_BACKEND}}"
     deps: [db:up]
     cmds:
-      - task: db:up
-      - fuser -k 8080/tcp 2>/dev/null || true  # Kill anything on port 8080
       - cargo watch -x run
 
-  rust:build:
+  build:rust:
     desc: Build Rust backend
-    dir: apps/rust_backend
+    dir: "{{.RUST_BACKEND}}"
     cmds:
-      - cargo build
+      - cargo build --release
 
-  rust:test:
-    desc: Run Rust tests with nextest
-    dir: apps/rust_backend
+  test:rust:
+    desc: Run Rust tests
+    dir: "{{.RUST_BACKEND}}"
     cmds:
-      - cargo nextest run
+      - cargo nextest run 2>/dev/null || cargo test
 
-  rust:test:watch:
-    desc: Run tests in watch mode
-    dir: apps/rust_backend
-    cmds:
-      - cargo watch -x 'nextest run'
-
-  rust:lint:
-    desc: Run clippy and format check
-    dir: apps/rust_backend
-    cmds:
-      - cargo clippy --all-targets --all-features -- -D warnings
-      - cargo fmt --all -- --check
-
-  rust:fmt:
-    desc: Format Rust code
-    dir: apps/rust_backend
+  lint:rust:
+    desc: Lint and format Rust code
+    dir: "{{.RUST_BACKEND}}"
     cmds:
       - cargo fmt --all
+      - cargo clippy --all-targets -- -D warnings
 
-  rust:audit:
-    desc: Run security audit
-    dir: apps/rust_backend
-    cmds:
-      - cargo audit
-      - cargo deny check
-
-  rust:machete:
-    desc: Find unused dependencies
-    dir: apps/rust_backend
-    cmds:
-      - cargo machete
-
-  # ============================================
-  # Database & Migration Commands
-  # ============================================
-
-  rust:schema:
-    desc: Run schema CLI commands
-    dir: apps/rust_backend
-    deps: [db:up]
-    cmds:
-      - cargo run --bin schema -- {{.CLI_ARGS}}
-
-  rust:migrate:
-    desc: Apply pending database migrations
-    dir: apps/rust_backend
+  migrate:rust:
+    desc: Run database migrations
+    dir: "{{.RUST_BACKEND}}"
     deps: [db:up]
     cmds:
       - cargo run --bin schema -- migrate
 
-  rust:migrate:status:
-    desc: Show migration status (applied vs pending)
-    dir: apps/rust_backend
-    deps: [db:up]
-    cmds:
-      - cargo run --bin schema -- status
+  # =============================================================================
+  # DATABASE
+  # =============================================================================
 
-  rust:migrate:validate:
-    desc: Validate applied migrations against files
-    dir: apps/rust_backend
-    deps: [db:up]
+  db:up:
+    desc: Start SurrealDB
     cmds:
-      - cargo run --bin schema -- validate
+      - docker compose -f deploy/docker-compose.yml up -d surrealdb
+      - sleep 2
 
-  rust:migrate:new:
-    desc: Create a new migration file (usage - task rust:migrate:new -- add_tags)
-    dir: apps/rust_backend
+  db:down:
+    desc: Stop SurrealDB
     cmds:
-      - cargo run --bin schema -- new {{.CLI_ARGS}}
+      - docker compose -f deploy/docker-compose.yml down
 
-  rust:migrate:dry-run:
-    desc: Show pending migrations without applying
-    dir: apps/rust_backend
-    deps: [db:up]
-    cmds:
-      - cargo run --bin schema -- migrate --dry-run
-
-  rust:schema:apply:
-    desc: Apply consolidated schema.surql (development)
-    dir: apps/rust_backend
-    deps: [db:up]
-    cmds:
-      - cargo run --bin schema -- apply
-
-  rust:schema:reset:
+  db:reset:
     desc: Reset database (DESTRUCTIVE!)
-    dir: apps/rust_backend
-    deps: [db:up]
     cmds:
-      - cargo run --bin schema -- reset --force
+      - docker compose -f deploy/docker-compose.yml down -v
+      - docker compose -f deploy/docker-compose.yml up -d surrealdb
+      - sleep 2
+      - echo "✅ Database reset"
 
-  rust:bacon:
-    desc: Run bacon background checker
-    dir: apps/rust_backend
+  # =============================================================================
+  # SHORTCUTS
+  # =============================================================================
+
+  go:
+    desc: Alias for dev:go
     cmds:
-      - bacon
+      - task: dev:go
 
-  rust:doc:
-    desc: Generate and open documentation
-    dir: apps/rust_backend
+  rust:
+    desc: Alias for dev:rust
     cmds:
-      - cargo doc --open --no-deps
+      - task: dev:rust
 
-  # ============================================
-  # Beginner-Friendly Commands
-  # ============================================
-
-  rust:check:
-    desc: Quick type check (faster than build, great for catching errors)
-    dir: apps/rust_backend
+  test:
+    desc: Run all tests
     cmds:
-      - cargo check --all-targets
+      - task: test:go
+      - task: test:rust
 
-  rust:check:watch:
-    desc: Continuously check code as you type (run in separate terminal)
-    dir: apps/rust_backend
+  lint:
+    desc: Lint all code
     cmds:
-      - cargo watch -x check
-
-  rust:clippy:explain:
-    desc: Run clippy and explain each warning/error in detail
-    dir: apps/rust_backend
-    cmds:
-      - cargo clippy --all-targets 2>&1 | head -100
-      - 'echo ""'
-      - 'echo "💡 Tip - To understand a specific lint, run:"'
-      - 'echo "   cargo clippy --explain LINT_NAME"'
-      - 'echo ""'
-      - 'echo "   Example: cargo clippy --explain needless_return"'
-
-  rust:explain:
-    desc: Explain a compiler error code (e.g., task rust:explain -- E0382)
-    dir: apps/rust_backend
-    cmds:
-      - rustc --explain {{.CLI_ARGS}}
-
-  rust:expand:
-    desc: Show macro expansion (helps understand derive macros)
-    dir: apps/rust_backend
-    cmds:
-      - 'echo "Usage - Expand a specific item:"'
-      - 'echo "  cargo expand models::task::Task"'
-      - 'echo ""'
-      - 'echo "Expanding entire lib..."'
-      - cargo expand --lib 2>/dev/null | head -200
-
-  rust:tree:
-    desc: Show dependency tree (understand what crates are used)
-    dir: apps/rust_backend
-    cmds:
-      - cargo tree --depth 1
-
-  rust:tree:full:
-    desc: Show full dependency tree
-    dir: apps/rust_backend
-    cmds:
-      - cargo tree
-
-  rust:outdated:
-    desc: Check for outdated dependencies
-    dir: apps/rust_backend
-    cmds:
-      - cargo install cargo-outdated 2>/dev/null || true
-      - cargo outdated
-
-  rust:bloat:
-    desc: Analyze binary size (what's making it big?)
-    dir: apps/rust_backend
-    cmds:
-      - cargo install cargo-bloat 2>/dev/null || true
-      - cargo bloat --release --crates
-
-  rust:new:handler:
-    desc: Show how to create a new handler
-    cmds:
-      - 'echo "📝 Creating a new handler:"'
-      - 'echo ""'
-      - 'echo "1. Add handler function in src/handlers/your_feature.rs"'
-      - 'echo "2. Export routes() function from the module"'
-      - 'echo "3. Merge routes in main.rs"'
-      - 'echo ""'
-      - 'echo "💡 Use VSCode snippet handler for boilerplate"'
-      - 'echo ""'
-      - 'echo "See docs/CODE_WALKTHROUGH.md for detailed guide"'
-
-  rust:new:service:
-    desc: Show how to create a new service
-    cmds:
-      - 'echo "📝 Creating a new service:"'
-      - 'echo ""'
-      - 'echo "1. Add trait to src/services/traits.rs"'
-      - 'echo "2. Create implementation in src/services/your_service.rs"'
-      - 'echo "3. Add to AppState in src/utils/state.rs"'
-      - 'echo "4. Wire up in main.rs"'
-      - 'echo ""'
-      - 'echo "💡 Use VSCode snippets service-trait and service-impl"'
-      - 'echo ""'
-      - 'echo "See CONTRIBUTING.md for detailed guide"'
-
-  rust:new:feature:
-    desc: Generate a new feature from template
-    dir: apps/rust_backend
-    cmds:
-      - |
-        echo "🚀 Feature Generator"
-        echo ""
-        read -p "Feature name (e.g., 'comment', 'tag'): " FEATURE_NAME
-        echo ""
-        echo "This will create:"
-        echo "  - src/handlers/${FEATURE_NAME}.rs"
-        echo "  - src/services/${FEATURE_NAME}.rs"
-        echo "  - src/repositories/${FEATURE_NAME}.rs"
-        echo "  - src/models/${FEATURE_NAME}.rs"
-        echo ""
-        read -p "Continue? (y/n): " CONFIRM
-        if [ "$CONFIRM" = "y" ]; then
-          cargo generate --path templates/feature --name "$FEATURE_NAME" 2>/dev/null || echo "Note: Install cargo-generate first: cargo install cargo-generate"
-        fi
-
-  rust:help:
-    desc: Show all Rust-related commands with descriptions
-    cmds:
-      - |
-        echo "🦀 Rust Development Commands"
-        echo "=============================="
-        echo ""
-        echo "📦 Building & Running:"
-        echo "  task rust:dev        - Start with hot reload"
-        echo "  task rust:build      - Build the project"
-        echo "  task rust:check      - Quick type check (fast!)"
-        echo ""
-        echo "🗄️  Database & Migrations:"
-        echo "  task rust:migrate           - Apply pending migrations"
-        echo "  task rust:migrate:status    - Show migration status"
-        echo "  task rust:migrate:validate  - Validate checksums"
-        echo "  task rust:migrate:new       - Create new migration"
-        echo "  task rust:migrate:dry-run   - Preview migrations"
-        echo "  task rust:schema:apply      - Apply schema.surql (dev)"
-        echo "  task rust:schema:reset      - Reset database (DESTRUCTIVE)"
-        echo ""
-        echo "🧪 Testing:"
-        echo "  task rust:test       - Run all tests"
-        echo "  task rust:test:watch - Run tests on file change"
-        echo ""
-        echo "🔍 Code Quality:"
-        echo "  task rust:lint       - Run clippy + format check"
-        echo "  task rust:fmt        - Auto-format code"
-        echo "  task rust:audit      - Security audit"
-        echo "  task rust:machete    - Find unused deps"
-        echo ""
-        echo "📚 Learning & Documentation:"
-        echo "  task rust:doc        - Generate & open docs"
-        echo "  task rust:explain    - Explain error code (e.g., E0382)"
-        echo "  task rust:expand     - Show macro expansion"
-        echo "  task rust:tree       - Show dependency tree"
-        echo ""
-        echo "🛠️  Code Generation:"
-        echo "  task rust:new:handler  - How to create a handler"
-        echo "  task rust:new:service  - How to create a service"
-        echo "  task rust:new:feature  - Generate feature from template"
-        echo ""
-        echo "💡 Background Tools:"
-        echo "  task rust:bacon      - Background checker"
-        echo "  task rust:check:watch - Continuous type checking"
-        echo ""
-        echo "📖 Documentation:"
-        echo "  apps/rust_backend/docs/RUST_FOR_BEGINNERS.md"
-        echo "  apps/rust_backend/docs/CODE_WALKTHROUGH.md"
-        echo "  apps/rust_backend/docs/RUST_CHEATSHEET.md"
-        echo "  apps/rust_backend/docs/TROUBLESHOOTING.md"
+      - task: lint:go
+      - task: lint:rust
