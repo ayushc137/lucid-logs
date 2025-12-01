@@ -64,6 +64,7 @@ type AppError struct {
 	Status  int       `json:"-"`
 	Details any       `json:"details,omitempty"`
 	Err     error     `json:"-"`
+	kind    string
 }
 
 // Error implements the error interface.
@@ -91,6 +92,7 @@ func (e *AppError) WithMessage(msg string) *AppError {
 		Status:  e.Status,
 		Details: e.Details,
 		Err:     e.Err,
+		kind:    e.kind,
 	}
 }
 
@@ -106,6 +108,7 @@ func (e *AppError) WithDetails(details any) *AppError {
 		Status:  e.Status,
 		Details: details,
 		Err:     e.Err,
+		kind:    e.kind,
 	}
 }
 
@@ -123,6 +126,7 @@ func (e *AppError) Wrap(err error) *AppError {
 		Status:  e.Status,
 		Details: e.Details,
 		Err:     err,
+		kind:    e.kind,
 	}
 }
 
@@ -134,6 +138,7 @@ func (e *AppError) Wrap(err error) *AppError {
 var (
 	// ErrBadRequest indicates a malformed or invalid request.
 	ErrBadRequest = &AppError{
+		kind:    "ErrBadRequest",
 		Code:    CodeBadRequest,
 		Message: "Bad request",
 		Status:  http.StatusBadRequest,
@@ -142,6 +147,7 @@ var (
 	// ErrValidationFailed indicates request validation failure.
 	// Use WithDetails() to include validation error details.
 	ErrValidationFailed = &AppError{
+		kind:    "ErrValidationFailed",
 		Code:    CodeValidationFailed,
 		Message: "Request validation failed",
 		Status:  http.StatusBadRequest,
@@ -149,6 +155,7 @@ var (
 
 	// ErrUnauthorized indicates missing or invalid authentication.
 	ErrUnauthorized = &AppError{
+		kind:    "ErrUnauthorized",
 		Code:    CodeUnauthorized,
 		Message: "Authentication required",
 		Status:  http.StatusUnauthorized,
@@ -156,6 +163,7 @@ var (
 
 	// ErrForbidden indicates the user lacks permission for the resource.
 	ErrForbidden = &AppError{
+		kind:    "ErrForbidden",
 		Code:    CodeForbidden,
 		Message: "Access denied",
 		Status:  http.StatusForbidden,
@@ -163,6 +171,7 @@ var (
 
 	// ErrNotFound indicates the requested resource doesn't exist.
 	ErrNotFound = &AppError{
+		kind:    "ErrNotFound",
 		Code:    CodeNotFound,
 		Message: "Resource not found",
 		Status:  http.StatusNotFound,
@@ -170,6 +179,7 @@ var (
 
 	// ErrConflict indicates a conflict with existing data.
 	ErrConflict = &AppError{
+		kind:    "ErrConflict",
 		Code:    CodeConflict,
 		Message: "Resource already exists",
 		Status:  http.StatusConflict,
@@ -177,6 +187,7 @@ var (
 
 	// ErrTooManyRequests indicates rate limiting.
 	ErrTooManyRequests = &AppError{
+		kind:    "ErrTooManyRequests",
 		Code:    CodeTooManyRequests,
 		Message: "Too many requests",
 		Status:  http.StatusTooManyRequests,
@@ -188,6 +199,7 @@ var (
 	// ErrInternal indicates an unexpected server error.
 	// The actual error is logged but not exposed to clients.
 	ErrInternal = &AppError{
+		kind:    "ErrInternal",
 		Code:    CodeInternalError,
 		Message: "An internal error occurred",
 		Status:  http.StatusInternalServerError,
@@ -196,6 +208,7 @@ var (
 	// ErrDatabase indicates a database operation failure.
 	// Use Wrap() to include the underlying error for logging.
 	ErrDatabase = &AppError{
+		kind:    "ErrDatabase",
 		Code:    CodeDatabaseError,
 		Message: "Database operation failed",
 		Status:  http.StatusInternalServerError,
@@ -203,6 +216,7 @@ var (
 
 	// ErrServiceUnavailable indicates the service is temporarily unavailable.
 	ErrServiceUnavailable = &AppError{
+		kind:    "ErrServiceUnavailable",
 		Code:    CodeServiceError,
 		Message: "Service temporarily unavailable",
 		Status:  http.StatusServiceUnavailable,
@@ -217,6 +231,7 @@ var (
 var (
 	// ErrInvalidCredentials for auth failures.
 	ErrInvalidCredentials = &AppError{
+		kind:    "ErrInvalidCredentials",
 		Code:    CodeUnauthorized,
 		Message: "Invalid credentials",
 		Status:  http.StatusUnauthorized,
@@ -224,6 +239,7 @@ var (
 
 	// ErrUserExists for duplicate user registration.
 	ErrUserExists = &AppError{
+		kind:    "ErrUserExists",
 		Code:    CodeConflict,
 		Message: "User with this email already exists",
 		Status:  http.StatusConflict,
@@ -231,6 +247,7 @@ var (
 
 	// ErrInvalidDateRange for date validation.
 	ErrInvalidDateRange = &AppError{
+		kind:    "ErrInvalidDateRange",
 		Code:    CodeBadRequest,
 		Message: "end_date must be on or after start_date",
 		Status:  http.StatusBadRequest,
@@ -238,6 +255,7 @@ var (
 
 	// ErrCategoryNotFound for category lookups.
 	ErrCategoryNotFound = &AppError{
+		kind:    "ErrCategoryNotFound",
 		Code:    CodeBadRequest,
 		Message: "Category not found or has been deleted",
 		Status:  http.StatusBadRequest,
@@ -245,6 +263,7 @@ var (
 
 	// ErrCategoryNameExists for duplicate category names.
 	ErrCategoryNameExists = &AppError{
+		kind:    "ErrCategoryNameExists",
 		Code:    CodeConflict,
 		Message: "Category with this name already exists",
 		Status:  http.StatusConflict,
@@ -263,9 +282,17 @@ var (
 //	    // handle not found
 //	}
 func Is(err error, target *AppError) bool {
+	if target == nil {
+		return false
+	}
 	var appErr *AppError
 	if errors.As(err, &appErr) {
-		return appErr.Code == target.Code
+		switch {
+		case target.kind != "" && appErr.kind != "":
+			return target.kind == appErr.kind
+		default:
+			return appErr.Code == target.Code
+		}
 	}
 	return false
 }

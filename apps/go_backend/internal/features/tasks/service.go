@@ -3,9 +3,9 @@ package tasks
 import (
 	"context"
 
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -102,12 +102,12 @@ func (s *service) Get(ctx context.Context, id, userID string) (*Task, error) {
 // Create creates a new task with validation.
 func (s *service) Create(ctx context.Context, req *CreateRequest, userID string) (*Task, error) {
 	// Parse and validate dates
-	startDate, err := validator.ParseDateTime(req.StartDate)
+	startDate, err := timeutil.ParseDateTime(req.StartDate)
 	if err != nil {
 		return nil, errors.ErrBadRequest.WithMessage("Invalid start_date format")
 	}
 
-	endDate, err := validator.ParseDateTime(req.EndDate)
+	endDate, err := timeutil.ParseDateTime(req.EndDate)
 	if err != nil {
 		return nil, errors.ErrBadRequest.WithMessage("Invalid end_date format")
 	}
@@ -143,12 +143,12 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
 	// Validate dates if both provided
 	if req.StartDate != nil && req.EndDate != nil {
-		startDate, err := validator.ParseDateTime(*req.StartDate)
+		startDate, err := timeutil.ParseDateTime(*req.StartDate)
 		if err != nil {
 			return nil, errors.ErrBadRequest.WithMessage("Invalid start_date format")
 		}
 
-		endDate, err := validator.ParseDateTime(*req.EndDate)
+		endDate, err := timeutil.ParseDateTime(*req.EndDate)
 		if err != nil {
 			return nil, errors.ErrBadRequest.WithMessage("Invalid end_date format")
 		}

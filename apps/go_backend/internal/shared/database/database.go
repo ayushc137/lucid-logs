@@ -4,7 +4,13 @@
 //   - Type-safe CRUD operations using generics
 //   - Connection lifecycle management
 //   - Query logging for debugging
-//   - Record ID utilities
+//   - Record ID utilities with models.RecordID support
+//
+// # RecordID Usage Convention
+//
+// Use models.RecordID for any struct field that stores SurrealDB record IDs
+// in database-facing structs (e.g., taskDB, categoryDB). Convert to string
+// only when crossing API boundaries using ToStringID().
 //
 // SDK Methods Used:
 //   - surrealdb.Select[T]() - Type-safe record selection
@@ -24,10 +30,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daily-journal/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/surrealdb/surrealdb.go"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 // =============================================================================
@@ -497,7 +504,68 @@ func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string
 // RECORD ID UTILITIES
 // =============================================================================
 
-// RecordID creates a SurrealDB record ID from table and ID parts.
+// ToStringID converts a models.RecordID to its string representation.
+//
+// This is the primary way to convert SurrealDB record IDs to strings
+// when crossing API boundaries (e.g., in toTask(), toCategory() converters).
+//
+// Example:
+//
+//	rid := models.NewRecordID("tasks", "abc123")
+//	str := ToStringID(rid) // "tasks:abc123"
+func ToStringID(rid models.RecordID) string {
+	return rid.String()
+}
+
+// MustRecordID creates a models.RecordID from a table name and raw ID string.
+//
+// Use this when you have a string ID and need to convert it to RecordID
+// for database operations. The raw string can be either:
+//   - Just the ID portion: "abc123"
+//   - Full record ID: "tasks:abc123" (table will be extracted)
+//
+// Example:
+//
+//	rid := MustRecordID("tasks", "abc123")           // tasks:abc123
+//	rid := MustRecordID("tasks", "tasks:abc123")    // tasks:abc123 (extracts ID)
+func MustRecordID(table, raw string) models.RecordID {
+	// If raw already contains table prefix, extract just the ID
+	if strings.Contains(raw, ":") {
+		_, raw = ParseRecordID(raw)
+	}
+	return models.NewRecordID(table, raw)
+}
+
+// NewRecordID is an alias for models.NewRecordID for convenience.
+//
+// Use this to create record links for relationships (e.g., task.category).
+//
+// Example:
+//
+//	categoryLink := NewRecordID("categories", catID)
+func NewRecordID(table string, id any) models.RecordID {
+	return models.NewRecordID(table, id)
+}
+
+// RecordIDFromString parses a string record ID into models.RecordID.
+//
+// Returns an error if the string cannot be parsed.
+//
+// Example:
+//
+//	rid, err := RecordIDFromString("tasks:abc123")
+func RecordIDFromString(s string) (models.RecordID, error) {
+	rid, err := models.ParseRecordID(s)
+	if err != nil {
+		return models.RecordID{}, fmt.Errorf("invalid record ID %q: %w", s, err)
+	}
+	return *rid, nil
+}
+
+// RecordID creates a SurrealDB record ID string from table and ID parts.
+//
+// Deprecated: Use MustRecordID() to get models.RecordID for type safety,
+// or NewRecordID() for creating record links.
 //
 // Examples:
 //
@@ -510,7 +578,7 @@ func RecordID(table, id string) string {
 	return table + ":" + id
 }
 
-// ParseRecordID splits a record ID into table and ID parts.
+// ParseRecordID splits a record ID string into table and ID parts.
 //
 // Example:
 //
@@ -524,7 +592,7 @@ func ParseRecordID(recordID string) (table, id string) {
 	return "", recordID
 }
 
-// ExtractID extracts just the ID portion from a record ID.
+// ExtractID extracts just the ID portion from a record ID string.
 //
 // Example:
 //

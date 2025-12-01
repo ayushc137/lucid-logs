@@ -55,3 +55,12 @@ const (
 	// Table is the SurrealDB table name for categories.
 	Table = "categories"
 )
+
+// CategoryPageResponse documents the paginated response for categories.
+type CategoryPageResponse struct {
+	Items   []*Category `json:"items"`
+	Total   int64       `json:"total"`
+	Limit   int         `json:"limit"`
+	Offset  int         `json:"offset"`
+	HasMore bool        `json:"has_more"`
+}

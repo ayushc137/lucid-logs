@@ -15,8 +15,9 @@
 package pagination
 
 import (
-	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 // =============================================================================
@@ -63,18 +64,18 @@ func Default() Params {
 //   - offset: Items to skip (default 0)
 //
 // Example URL: /api/v1/tasks?limit=50&offset=100
-func FromRequest(r *http.Request) Params {
+func FromRequest(c *gin.Context) Params {
 	params := Default()
 
 	// Parse limit
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+	if limitStr := c.Query("limit"); limitStr != "" {
 		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
 			params.Limit = limit
 		}
 	}
 
 	// Parse offset
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+	if offsetStr := c.Query("offset"); offsetStr != "" {
 		if offset, err := strconv.Atoi(offsetStr); err == nil && offset >= 0 {
 			params.Offset = offset
 		}

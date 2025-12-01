@@ -23,7 +23,7 @@ pub fn routes() -> Router<AppState> {
 pub async fn health_check() -> impl IntoResponse {
     let data = json!({
         "status": "ok",
-        "service": "daily-journal-backend"
+        "service": "lucid-logs-backend"
     });
 
     (StatusCode::OK, Json(ApiResponse::success(data)))
@@ -49,7 +49,7 @@ pub async fn health_check_v1(State(state): State<AppState>) -> impl IntoResponse
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(ApiResponse::success(json!({
                     "status": "degraded",
-                    "service": "daily-journal-backend",
+                    "service": "lucid-logs-backend",
                     "database": "disconnected"
                 }))),
             );
@@ -58,7 +58,7 @@ pub async fn health_check_v1(State(state): State<AppState>) -> impl IntoResponse
 
     let data = json!({
         "status": "ok",
-        "service": "daily-journal-backend",
+        "service": "lucid-logs-backend",
         "database": db_status
     });
 

@@ -39,8 +39,9 @@ type RegisterRequest struct {
 //
 // @Description Authentication response with JWT token
 type AuthResponse struct {
-	Token string `json:"token" example:"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9..."`
-	User  string `json:"user" example:"user:abc123"`
+	Token   string `json:"token" example:"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9..."`
+	User    string `json:"user" example:"user:abc123"`
+	IsAdmin bool   `json:"is_admin" example:"false"`
 }
 
 // =============================================================================
@@ -49,11 +50,11 @@ type AuthResponse struct {
 
 // User represents a user in the system.
 type User struct {
-	ID        string     `json:"id"`
-	Email     string     `json:"email"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	IsAdmin   bool      `json:"is_admin"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // =============================================================================

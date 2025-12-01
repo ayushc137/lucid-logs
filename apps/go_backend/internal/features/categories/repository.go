@@ -11,6 +11,11 @@
 //   - database.QueryFirst[T]() - Single record queries
 //   - database.QueryScalar[T]() - Scalar value queries
 //
+// RecordID Convention:
+//   - categoryDB uses models.RecordID for ID field
+//   - Conversion to string happens in toCategory() at the repository boundary
+//   - This enables type-safe queries without SELECT type::string(id) casts
+//
 // See: https://surrealdb.com/docs/sdk/golang
 package categories
 
@@ -18,14 +23,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"strings"
 	"time"
 
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 // =============================================================================
@@ -63,22 +68,28 @@ func NewRepository(db *database.DB) Repository {
 // =============================================================================
 
 // categoryDB is the internal database representation of a category.
-// This struct maps directly to SurrealDB fields with proper JSON tags.
+//
+// This struct uses models.RecordID for the ID field, allowing SurrealDB SDK
+// to populate it directly without type::string casts in queries.
+// Convert to domain model via toCategory() at the repository boundary.
 type categoryDB struct {
-	ID        string     `json:"id,omitempty"`
-	Name      string     `json:"name"`
-	Color     string     `json:"color"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at,omitempty"`
-	CreatedBy string     `json:"created_by"`
-	UpdatedBy string     `json:"updated_by"`
+	ID        models.RecordID `json:"id,omitempty"`
+	Name      string          `json:"name"`
+	Color     string          `json:"color"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	DeletedAt *time.Time      `json:"deleted_at,omitempty"`
+	CreatedBy string          `json:"created_by"`
+	UpdatedBy string          `json:"updated_by"`
 }
 
 // toCategory converts the database model to the domain model.
+//
+// This is the boundary conversion point where models.RecordID is
+// converted to string for API responses.
 func (c *categoryDB) toCategory() *Category {
 	return &Category{
-		ID:        c.ID,
+		ID:        database.ToStringID(c.ID),
 		Name:      c.Name,
 		Color:     c.Color,
 		CreatedAt: c.CreatedAt,
@@ -96,27 +107,12 @@ func (c *categoryDB) toCategory() *Category {
 // categoryCreateData is the data structure for creating a category.
 // This matches SurrealDB's expected format for CREATE operations.
 type categoryCreateData struct {
-	Name      string `json:"name"`
-	Color     string `json:"color"`
-	CreatedBy string `json:"created_by"`
-	UpdatedBy string `json:"updated_by"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-}
-
-// categoryMergeData is the data structure for merging/updating a category.
-type categoryMergeData struct {
-	Name      *string `json:"name,omitempty"`
-	Color     *string `json:"color,omitempty"`
-	UpdatedBy string  `json:"updated_by"`
-	UpdatedAt string  `json:"updated_at"`
-}
-
-// softDeleteData is the data structure for soft-deleting a record.
-type softDeleteData struct {
-	DeletedAt string `json:"deleted_at"`
-	UpdatedBy string `json:"updated_by"`
-	UpdatedAt string `json:"updated_at"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	CreatedBy string    `json:"created_by"`
+	UpdatedBy string    `json:"updated_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // =============================================================================
@@ -126,14 +122,18 @@ type softDeleteData struct {
 // FindByID retrieves a category by ID using SDK's typed query.
 //
 // This uses database.QueryFirst[T]() for type-safe single record queries.
+// No type::string(id) cast needed since categoryDB.ID is models.RecordID.
 func (r *repository) FindByID(ctx context.Context, id, userID string) (*Category, error) {
-	categoryID := formatCategoryID(id)
+	categoryID := database.MustRecordID(Table, id)
 
 	// Use SDK's typed query to fetch category
+	// models.RecordID handles ID deserialization automatically
 	cat, err := database.QueryFirst[categoryDB](ctx, r.db, `
-		SELECT * FROM type::thing($id) WHERE deleted_at = NONE
+		SELECT * FROM type::thing($id)
+		WHERE deleted_at = NONE AND created_by = $user
 	`, map[string]any{
-		"id": categoryID,
+		"id":   categoryID,
+		"user": userID,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("category_id", id).Msg("SDK query failed for category fetch")
@@ -145,7 +145,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Category
 	}
 
 	// Verify ownership
-	if cat.CreatedBy != userID || cat.DeletedAt != nil {
+	if cat.DeletedAt != nil {
 		return nil, errors.ErrNotFound
 	}
 
@@ -157,10 +157,14 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Category
 // This uses:
 //   - database.QueryScalar[T]() for counting records
 //   - database.QueryAll[T]() for fetching paginated results
+//
+// No type::string(id) cast needed since categoryDB.ID is models.RecordID.
 func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*Category, int64, error) {
 	// Get count using SDK's QueryScalar
 	total, err := database.QueryScalar[float64](ctx, r.db, `
-		RETURN fn::category::count_for_user($user)
+		RETURN (SELECT count() FROM categories
+			WHERE created_by = $user AND deleted_at = NONE
+			GROUP ALL)[0].count OR 0
 	`, map[string]any{
 		"user": userID,
 	})
@@ -170,6 +174,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Get categories using SDK's typed QueryAll
+	// models.RecordID handles ID deserialization automatically
 	catsDB, err := database.QueryAll[categoryDB](ctx, r.db, `
 		SELECT * FROM categories
 		WHERE created_by = $user AND deleted_at = NONE
@@ -201,6 +206,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 // Create creates a new category using SDK's Create method.
 //
 // This uses database.Create[T]() for type-safe record creation.
+// Category ID uses models.RecordID for type-safe record references.
 // See: https://surrealdb.com/docs/sdk/golang/methods/create
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Category, error) {
 	// Check for duplicate name
@@ -208,8 +214,8 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		return nil, err
 	}
 
-	categoryID := generateCategoryID()
-	now := time.Now().UTC().Format(time.RFC3339)
+	categoryID := generateCategoryRecordID()
+	now := time.Now().UTC()
 
 	// Create category data for SDK Create
 	createData := categoryCreateData{
@@ -221,36 +227,39 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		UpdatedAt: now,
 	}
 
-	// Use SDK's Create method for type-safe creation
-	_, err := database.Create[categoryDB](ctx, r.db, categoryID, createData)
+	// Use SDK's typed QueryAll for creation to ensure correct table/ID handling
+	// We use CREATE type::thing($id) CONTENT $data to force the ID
+	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
+		CREATE type::thing($id) CONTENT $data
+	`, map[string]any{
+		"id":   categoryID,
+		"data": createData,
+	})
 	if err != nil {
-		r.logger.Error().Err(err).Str("category_id", categoryID).Msg("SDK Create failed for category")
+		r.logger.Error().Err(err).Str("category_id", database.ToStringID(categoryID)).Msg("SDK Create query failed for category")
 		return nil, err
 	}
 
-	r.logger.Info().Str("category_id", categoryID).Msg("category created via SDK")
+	if len(cats) == 0 {
+		return nil, errors.ErrInternal.WithMessage("Failed to create category")
+	}
 
-	return r.FindByID(ctx, categoryID, userID)
+	r.logger.Info().Str("category_id", database.ToStringID(categoryID)).Msg("category created via SDK")
+
+	return cats[0].toCategory(), nil
 }
 
 // =============================================================================
 // UPDATE OPERATION
 // =============================================================================
 
-// Update updates an existing category using SDK's Merge method.
+// Update updates an existing category using query-based UPDATE.
 //
-// This uses database.Merge[T]() for type-safe partial updates.
-// See: https://surrealdb.com/docs/sdk/golang/methods/merge
+// Uses UPDATE query for reliable single-record updates with models.RecordID.
 func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Category, error) {
 	existing, err := r.FindByID(ctx, id, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	// Build merge data with only provided fields
-	mergeData := categoryMergeData{
-		UpdatedBy: userID,
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
 	// Check for duplicate name if changing
@@ -258,57 +267,78 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		if err := r.checkDuplicateName(ctx, *req.Name, existing.ID, userID); err != nil {
 			return nil, err
 		}
-		mergeData.Name = req.Name
+	}
+
+	categoryID := database.MustRecordID(Table, id)
+	now := time.Now().UTC()
+
+	// Build update data dynamically
+	updateData := map[string]any{
+		"updated_by": userID,
+		"updated_at": now,
+	}
+	if req.Name != nil {
+		updateData["name"] = *req.Name
 	}
 	if req.Color != nil {
-		mergeData.Color = req.Color
+		updateData["color"] = *req.Color
 	}
 
-	categoryID := formatCategoryID(id)
-
-	// Use SDK's Merge method for partial update
-	_, err = database.Merge[categoryDB](ctx, r.db, categoryID, mergeData)
+	// Use UPDATE query for reliable single-record update
+	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
+		UPDATE type::thing($id) MERGE $data
+	`, map[string]any{
+		"id":   categoryID,
+		"data": updateData,
+	})
 	if err != nil {
-		r.logger.Error().Err(err).Str("category_id", id).Msg("SDK Merge failed for category update")
+		r.logger.Error().Err(err).Str("category_id", id).Msg("UPDATE query failed for category")
 		return nil, err
 	}
 
-	r.logger.Info().Str("category_id", id).Msg("category updated via SDK")
+	if len(cats) == 0 {
+		return nil, errors.ErrNotFound
+	}
 
-	return r.FindByID(ctx, id, userID)
+	r.logger.Info().Str("category_id", id).Msg("category updated via UPDATE query")
+
+	return cats[0].toCategory(), nil
 }
 
 // =============================================================================
 // DELETE OPERATION
 // =============================================================================
 
-// Delete soft-deletes a category using SDK's Merge method.
+// Delete soft-deletes a category using query-based UPDATE.
 //
-// This uses database.Merge[T]() to set the deleted_at timestamp.
-// See: https://surrealdb.com/docs/sdk/golang/methods/merge
+// Uses UPDATE query for reliable single-record soft delete with models.RecordID.
 func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	_, err := r.FindByID(ctx, id, userID)
 	if err != nil {
 		return err
 	}
 
-	categoryID := formatCategoryID(id)
-	now := time.Now().UTC().Format(time.RFC3339)
+	categoryID := database.MustRecordID(Table, id)
+	now := time.Now().UTC()
 
-	// Use SDK's Merge method for soft delete
-	softDelete := softDeleteData{
-		DeletedAt: now,
-		UpdatedBy: userID,
-		UpdatedAt: now,
-	}
-
-	_, err = database.Merge[categoryDB](ctx, r.db, categoryID, softDelete)
+	// Use UPDATE query for reliable soft delete
+	_, err = database.QueryAll[categoryDB](ctx, r.db, `
+		UPDATE type::thing($id) MERGE {
+			deleted_at: $now,
+			updated_by: $user,
+			updated_at: $now
+		}
+	`, map[string]any{
+		"id":   categoryID,
+		"now":  now,
+		"user": userID,
+	})
 	if err != nil {
-		r.logger.Error().Err(err).Str("category_id", id).Msg("SDK Merge failed for soft delete")
+		r.logger.Error().Err(err).Str("category_id", id).Msg("UPDATE query failed for soft delete")
 		return err
 	}
 
-	r.logger.Info().Str("category_id", id).Msg("category soft-deleted via SDK")
+	r.logger.Info().Str("category_id", id).Msg("category soft-deleted via UPDATE query")
 	return nil
 }
 
@@ -318,19 +348,20 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 
 // checkDuplicateName checks if a category name already exists for the user.
 func (r *repository) checkDuplicateName(ctx context.Context, name, excludeID, userID string) error {
-	if excludeID == "" {
-		excludeID = Table + ":none"
+	excludeRID := database.MustRecordID(Table, "none")
+	if excludeID != "" {
+		excludeRID = database.MustRecordID(Table, excludeID)
 	}
 
 	// Use SDK's typed QueryAll for duplicate check
 	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
 		SELECT id FROM categories
-		WHERE created_by = $user AND name = $name AND deleted_at = NONE AND id != type::thing($exclude_id)
+		WHERE created_by = $user AND name = $name AND deleted_at = NONE AND id != $exclude_id
 		LIMIT 1
 	`, map[string]any{
 		"user":       userID,
 		"name":       name,
-		"exclude_id": excludeID,
+		"exclude_id": excludeRID,
 	})
 	if err != nil {
 		return errors.ErrDatabase.Wrap(err)
@@ -343,15 +374,9 @@ func (r *repository) checkDuplicateName(ctx context.Context, name, excludeID, us
 	return nil
 }
 
-func formatCategoryID(id string) string {
-	if strings.HasPrefix(id, Table+":") {
-		return id
-	}
-	return Table + ":" + id
-}
-
-func generateCategoryID() string {
+// generateCategoryRecordID generates a unique category ID as models.RecordID.
+func generateCategoryRecordID() models.RecordID {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
-	return Table + ":" + hex.EncodeToString(bytes)
+	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }

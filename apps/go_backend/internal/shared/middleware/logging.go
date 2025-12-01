@@ -1,10 +1,16 @@
+// Package middleware provides HTTP middleware for the application.
+//
+// Middleware included:
+//   - Auth: JWT authentication and user context injection
+//   - Logger: Request/response logging
+//   - Recovery: Panic recovery with logging
 package middleware
 
 import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
@@ -28,24 +34,21 @@ import (
 //   - INFO: Successful requests (2xx, 3xx)
 //   - WARN: Client errors (4xx)
 //   - ERROR: Server errors (5xx)
-func Logger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func Logger() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		start := time.Now()
 
-		// Wrap response writer to capture status code and bytes
-		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-
 		// Process request
-		next.ServeHTTP(ww, r)
+		c.Next()
 
 		// Calculate duration
 		duration := time.Since(start)
 
 		// Get request ID if available
-		reqID := middleware.GetReqID(r.Context())
+		reqID := c.GetHeader("X-Request-ID")
 
 		// Determine log level based on status
-		status := ww.Status()
+		status := c.Writer.Status()
 		event := log.Info()
 		if status >= 500 {
 			event = log.Error()
@@ -55,25 +58,25 @@ func Logger(next http.Handler) http.Handler {
 
 		// Build log entry
 		event.
-			Str("method", r.Method).
-			Str("path", r.URL.Path).
+			Str("method", c.Request.Method).
+			Str("path", c.Request.URL.Path).
 			Int("status", status).
-			Int("bytes", ww.BytesWritten()).
+			Int("bytes", c.Writer.Size()).
 			Dur("duration", duration).
-			Str("remote_addr", r.RemoteAddr).
-			Str("user_agent", r.UserAgent())
+			Str("remote_addr", c.ClientIP()).
+			Str("user_agent", c.Request.UserAgent())
 
 		if reqID != "" {
 			event.Str("request_id", reqID)
 		}
 
 		// Log user ID if authenticated
-		if userID := UserID(r.Context()); userID != "" {
+		if userID := UserID(c.Request.Context()); userID != "" {
 			event.Str("user_id", userID)
 		}
 
 		event.Msg("request")
-	})
+	}
 }
 
 // =============================================================================
@@ -86,21 +89,21 @@ func Logger(next http.Handler) http.Handler {
 //   - Logs the panic with stack trace context
 //   - Returns a 500 Internal Server Error
 //   - Prevents the server from crashing
-func Recovery(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func Recovery() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Error().
 					Interface("panic", err).
-					Str("method", r.Method).
-					Str("path", r.URL.Path).
-					Str("remote_addr", r.RemoteAddr).
+					Str("method", c.Request.Method).
+					Str("path", c.Request.URL.Path).
+					Str("remote_addr", c.ClientIP()).
 					Msg("panic recovered")
 
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				c.AbortWithStatus(http.StatusInternalServerError)
 			}
 		}()
 
-		next.ServeHTTP(w, r)
-	})
+		c.Next()
+	}
 }

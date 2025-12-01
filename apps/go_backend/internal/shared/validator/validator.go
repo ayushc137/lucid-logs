@@ -17,10 +17,10 @@ package validator
 import (
 	"reflect"
 	"strings"
-	"time"
 
-	"github.com/daily-journal/go-backend/internal/shared/response"
 	"github.com/go-playground/validator/v10"
+	"github.com/lucid-logs/go-backend/internal/shared/response"
+	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
 )
 
 // =============================================================================
@@ -145,53 +145,6 @@ func validateDateTimeFlexible(fl validator.FieldLevel) bool {
 	if value == "" {
 		return true // Empty is OK, use 'required' tag for mandatory fields
 	}
-	_, err := ParseDateTime(value)
+	_, err := timeutil.ParseDateTime(value)
 	return err == nil
-}
-
-// =============================================================================
-// DATETIME PARSING
-// =============================================================================
-
-// ParseDateTime parses a datetime string in multiple formats.
-//
-// Supported formats:
-//   - RFC3339 (2006-01-02T15:04:05Z07:00)
-//   - RFC3339Nano (2006-01-02T15:04:05.999999999Z07:00)
-//   - Date only (2006-01-02) - assumes midnight UTC
-//   - Datetime without timezone (2006-01-02T15:04:05) - assumes UTC
-//
-// Example:
-//
-//	t, err := ParseDateTime("2025-11-24T09:00:00Z")
-//	t, err := ParseDateTime("2025-11-24")  // Returns midnight UTC
-func ParseDateTime(s string) (time.Time, error) {
-	if s == "" {
-		return time.Time{}, nil
-	}
-
-	// Try RFC3339/ISO8601 first (most common)
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
-	}
-
-	// Try RFC3339 with nanoseconds
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t, nil
-	}
-
-	// Try date only (YYYY-MM-DD) - assume midnight UTC
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t, nil
-	}
-
-	// Try datetime without timezone (assume UTC)
-	if t, err := time.Parse("2006-01-02T15:04:05", s); err == nil {
-		return t, nil
-	}
-
-	return time.Time{}, &time.ParseError{
-		Value:   s,
-		Message: "invalid datetime format, expected ISO8601 (2025-11-24T09:00:00Z) or date (2025-11-24)",
-	}
 }

@@ -8,12 +8,12 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 	"strings"
 
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/response"
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,86 +61,101 @@ type AuthConfig struct {
 //
 // Example usage:
 //
-//	r.Group(func(r chi.Router) {
+//	r.Group("/api/v1", func(r *gin.RouterGroup) {
 //	    r.Use(middleware.Auth(authConfig))
-//	    r.Get("/tasks", handler.ListTasks)
+//	    r.GET("/tasks", handler.ListTasks)
 //	})
-func Auth(cfg AuthConfig) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract Authorization header
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				response.Unauthorized(w, "Authorization header required")
-				return
+func Auth(cfg AuthConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Extract Authorization header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			response.Unauthorized(c, "Authorization header required")
+			c.Abort()
+			return
+		}
+
+		// Check Bearer prefix
+		const bearerPrefix = "Bearer "
+		if !strings.HasPrefix(authHeader, bearerPrefix) {
+			response.Unauthorized(c, "Authorization header must start with 'Bearer '")
+			c.Abort()
+			return
+		}
+
+		// Extract token
+		tokenString := strings.TrimSpace(authHeader[len(bearerPrefix):])
+		if tokenString == "" {
+			response.Unauthorized(c, "Token is empty")
+			c.Abort()
+			return
+		}
+
+		// Parse and validate token
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+			// Validate algorithm (SurrealDB uses HS512)
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
 			}
-
-			// Check Bearer prefix
-			const bearerPrefix = "Bearer "
-			if !strings.HasPrefix(authHeader, bearerPrefix) {
-				response.Unauthorized(w, "Authorization header must start with 'Bearer '")
-				return
-			}
-
-			// Extract token
-			tokenString := strings.TrimSpace(authHeader[len(bearerPrefix):])
-			if tokenString == "" {
-				response.Unauthorized(w, "Token is empty")
-				return
-			}
-
-			// Parse and validate token
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-				// Validate algorithm (SurrealDB uses HS512)
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, jwt.ErrSignatureInvalid
-				}
-				return []byte(cfg.JWTSecret), nil
-			})
-
-			if err != nil {
-				log.Warn().Err(err).Msg("token validation failed")
-				response.Unauthorized(w, "Invalid or expired token")
-				return
-			}
-
-			if !token.Valid {
-				response.Unauthorized(w, "Token is not valid")
-				return
-			}
-
-			// Extract claims
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
-				response.Unauthorized(w, "Invalid token claims")
-				return
-			}
-
-			// Extract user ID from claims
-			// SurrealDB uses "ID" claim, but we also support "sub" for flexibility
-			userID := ""
-			if id, ok := claims["ID"].(string); ok && id != "" {
-				userID = id
-			} else if sub, ok := claims["sub"].(string); ok && sub != "" {
-				userID = sub
-			}
-
-			if userID == "" {
-				response.Unauthorized(w, "Invalid token: missing user ID")
-				return
-			}
-
-			// Create authenticated user context
-			authUser := &AuthenticatedUser{
-				UserID:    userID,
-				Namespace: cfg.Namespace,
-				Database:  cfg.Database,
-			}
-
-			// Inject into request context
-			ctx := context.WithValue(r.Context(), UserContextKey, authUser)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			return []byte(cfg.JWTSecret), nil
 		})
+
+		if err != nil {
+			log.Warn().Err(err).Msg("token validation failed")
+			response.Unauthorized(c, "Invalid or expired token")
+			c.Abort()
+			return
+		}
+
+		if !token.Valid {
+			response.Unauthorized(c, "Token is not valid")
+			c.Abort()
+			return
+		}
+
+		// Extract claims
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			response.Unauthorized(c, "Invalid token claims")
+			c.Abort()
+			return
+		}
+
+		// Extract user ID from claims
+		// SurrealDB uses "ID" claim, but we also support "sub" for flexibility
+		userID := ""
+		if id, ok := claims["ID"].(string); ok && id != "" {
+			userID = id
+		} else if sub, ok := claims["sub"].(string); ok && sub != "" {
+			userID = sub
+		}
+
+		if userID == "" {
+			response.Unauthorized(c, "Invalid token: missing user ID")
+			c.Abort()
+			return
+		}
+
+		// Ensure user ID has the correct prefix
+		if !strings.HasPrefix(userID, "users:") {
+			userID = "users:" + strings.TrimPrefix(userID, "user:") // Handle potential legacy "user:" prefix too
+		}
+
+		// Create authenticated user context
+		authUser := &AuthenticatedUser{
+			UserID:    userID,
+			Namespace: cfg.Namespace,
+			Database:  cfg.Database,
+		}
+
+		// Inject into request context (both Gin context and standard context)
+		c.Set(string(UserContextKey), authUser)
+
+		// Also update the request context so it propagates to services that use context.Context
+		ctx := context.WithValue(c.Request.Context(), UserContextKey, authUser)
+		c.Request = c.Request.WithContext(ctx)
+
+		c.Next()
 	}
 }
 
@@ -154,9 +169,9 @@ func Auth(cfg AuthConfig) func(http.Handler) http.Handler {
 //
 // Example:
 //
-//	user, ok := middleware.GetAuthenticatedUser(r.Context())
+//	user, ok := middleware.GetAuthenticatedUser(c.Request.Context())
 //	if !ok {
-//	    response.Error(w, errors.ErrUnauthorized)
+//	    response.Error(c, errors.ErrUnauthorized)
 //	    return
 //	}
 func GetAuthenticatedUser(ctx context.Context) (*AuthenticatedUser, bool) {
@@ -170,9 +185,9 @@ func GetAuthenticatedUser(ctx context.Context) (*AuthenticatedUser, bool) {
 //
 // Example:
 //
-//	user, err := middleware.MustGetAuthenticatedUser(r.Context())
+//	user, err := middleware.MustGetAuthenticatedUser(c.Request.Context())
 //	if err != nil {
-//	    response.Error(w, err)
+//	    response.Error(c, err)
 //	    return
 //	}
 func MustGetAuthenticatedUser(ctx context.Context) (*AuthenticatedUser, *errors.AppError) {

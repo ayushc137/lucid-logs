@@ -1,4 +1,4 @@
-// Package main is the entry point for the Daily Journal API server.
+// Package main is the entry point for the Lucid Logs server.
 //
 // This file handles:
 //   - Configuration loading
@@ -11,6 +11,19 @@
 //	go run ./cmd/api
 //	# or
 //	make dev  (with hot reload)
+//
+// Swagger annotations (processed by swaggo/swag):
+//
+// @title           Lucid Logs API
+// @version         1.0
+// @description     Daily journal backend powered by SurrealDB.
+// @schemes         http https
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+//
+//go:generate swag init -g main.go -o ../../docs/swagger --parseDependency --parseInternal -d .,../../internal/features/auth,../../internal/features/health,../../internal/features/tasks,../../internal/features/categories,../../internal/features/users,../../internal/server,../../internal/shared/response,../../internal/shared/errors -q
 package main
 
 import (
@@ -25,10 +38,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/daily-journal/go-backend/internal/config"
-	"github.com/daily-journal/go-backend/internal/server"
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
+	"github.com/lucid-logs/go-backend/internal/bootstrap"
+	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/server"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/validator"
 )
 
 func main() {
@@ -42,6 +57,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	swaggerDocs.SwaggerInfo.Title = cfg.App.Name
+	swaggerDocs.SwaggerInfo.Version = cfg.App.Version
+	swaggerDocs.SwaggerInfo.BasePath = "/"
+	swaggerDocs.SwaggerInfo.Host = fmt.Sprintf("localhost:%d", cfg.Server.Port)
+
 	// =========================================================================
 	// SETUP LOGGING
 	// =========================================================================
@@ -52,7 +72,7 @@ func main() {
 		Str("env", cfg.App.Env).
 		Int("port", cfg.Server.Port).
 		Str("version", cfg.App.Version).
-		Msg("Starting Daily Journal API")
+		Msg("Starting Lucid Logs")
 
 	// =========================================================================
 	// CONNECT TO DATABASE
@@ -71,6 +91,10 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	defer db.Close(ctx)
+
+	if err := bootstrap.EnsureDevAdmin(ctx, db, cfg); err != nil {
+		log.Warn().Err(err).Msg("failed to seed development admin user")
+	}
 
 	// =========================================================================
 	// CREATE SERVICES
@@ -153,7 +177,7 @@ func setupLogging(cfg *config.Config) {
 
 	// Add default fields
 	log.Logger = log.With().
-		Str("service", "daily-journal-api").
+		Str("service", "lucid-logs-api").
 		Str("version", cfg.App.Version).
 		Logger()
 }

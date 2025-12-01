@@ -9,19 +9,26 @@
 //   - surrealdb.Query[T]() - Type-safe user queries
 //   - database.QueryAll[T]() - Type-safe query wrapper
 //
+// RecordID Convention:
+//   - userDB uses models.RecordID for ID field
+//   - Conversion to string happens in toUser() at the service boundary
+//   - This enables type-safe queries without SELECT type::string(id) casts
+//
 // See: https://surrealdb.com/docs/sdk/golang
 package auth
 
 import (
 	"context"
 	"strings"
+	"time"
 
-	"github.com/daily-journal/go-backend/internal/config"
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/errors"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 // =============================================================================
@@ -66,6 +73,33 @@ func NewService(db *database.DB, cfg *config.Config) Service {
 }
 
 // =============================================================================
+// DATABASE MODEL
+// =============================================================================
+
+// userDB is the internal database representation of a user.
+//
+// This struct uses models.RecordID for the ID field, allowing SurrealDB SDK
+// to populate it directly without type::string casts in queries.
+type userDB struct {
+	ID        models.RecordID `json:"id,omitempty"`
+	Email     string          `json:"email"`
+	IsAdmin   bool            `json:"is_admin"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// toUser converts the database model to the domain model.
+func (u *userDB) toUser() *User {
+	return &User{
+		ID:        database.ToStringID(u.ID),
+		Email:     u.Email,
+		IsAdmin:   u.IsAdmin,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
+}
+
+// =============================================================================
 // LOGIN
 // =============================================================================
 
@@ -73,6 +107,7 @@ func NewService(db *database.DB, cfg *config.Config) Service {
 //
 // This method uses the SDK's Query function with crypto::argon2::compare
 // for password verification, then generates a JWT token on success.
+// No type::string(id) cast needed since userDB.ID is models.RecordID.
 //
 // See: https://surrealdb.com/docs/sdk/golang/methods/query
 func (s *service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, error) {
@@ -82,8 +117,9 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, 
 
 	// Use SDK's typed Query function to find and verify user
 	// The query uses SurrealDB's crypto::argon2::compare for password verification
-	users, err := database.QueryAll[User](ctx, s.db, `
-		SELECT id, email FROM user 
+	// models.RecordID handles ID deserialization automatically
+	usersDB, err := database.QueryAll[userDB](ctx, s.db, `
+		SELECT * FROM users 
 		WHERE email = $email AND crypto::argon2::compare(pass, $password)
 	`, map[string]any{
 		"email":    email,
@@ -94,12 +130,12 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, 
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
 
-	if len(users) == 0 {
+	if len(usersDB) == 0 {
 		s.logger.Warn().Str("username", req.Username).Msg("invalid credentials")
 		return nil, errors.ErrInvalidCredentials
 	}
 
-	user := users[0]
+	user := usersDB[0].toUser()
 
 	// Generate JWT token
 	token, err := s.generateToken(user.ID)
@@ -111,8 +147,9 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, 
 	s.logger.Info().Str("user_id", user.ID).Msg("login successful")
 
 	return &AuthResponse{
-		Token: token,
-		User:  user.ID,
+		Token:   token,
+		User:    user.ID,
+		IsAdmin: user.IsAdmin,
 	}, nil
 }
 
@@ -126,6 +163,8 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, 
 //   - Checking if user already exists
 //   - Creating user with argon2-hashed password
 //
+// No type::string(id) cast needed since userDB.ID is models.RecordID.
+//
 // See: https://surrealdb.com/docs/sdk/golang/methods/query
 func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error) {
 	s.logger.Debug().Str("username", req.Username).Msg("registration attempt")
@@ -133,8 +172,9 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 	email := strings.ToLower(strings.TrimSpace(req.Username))
 
 	// Check if user already exists using SDK's typed query
-	existingUsers, err := database.QueryAll[User](ctx, s.db, `
-		SELECT id FROM user WHERE email = $email LIMIT 1
+	// models.RecordID handles ID deserialization automatically
+	existingUsers, err := database.QueryAll[userDB](ctx, s.db, `
+		SELECT id FROM users WHERE email = $email LIMIT 1
 	`, map[string]any{
 		"email": email,
 	})
@@ -149,12 +189,11 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 
 	// Create user with argon2 hashed password using SDK's typed query
 	// SurrealDB's crypto::argon2::generate automatically hashes the password
-	users, err := database.QueryAll[User](ctx, s.db, `
-		CREATE user CONTENT {
+	// No RETURN block needed - SDK deserializes RecordID directly
+	usersDB, err := database.QueryAll[userDB](ctx, s.db, `
+		CREATE users CONTENT {
 			email: $email,
-			pass: crypto::argon2::generate($password),
-			created_at: time::now(),
-			updated_at: time::now()
+			pass: crypto::argon2::generate($password)
 		}
 	`, map[string]any{
 		"email":    email,
@@ -165,12 +204,12 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
 
-	if len(users) == 0 {
+	if len(usersDB) == 0 {
 		s.logger.Error().Msg("failed to create user: no result returned")
 		return nil, errors.ErrInternal
 	}
 
-	user := users[0]
+	user := usersDB[0].toUser()
 
 	// Generate JWT token
 	token, err := s.generateToken(user.ID)
@@ -182,8 +221,9 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 	s.logger.Info().Str("user_id", user.ID).Msg("user registered successfully")
 
 	return &AuthResponse{
-		Token: token,
-		User:  user.ID,
+		Token:   token,
+		User:    user.ID,
+		IsAdmin: user.IsAdmin,
 	}, nil
 }
 

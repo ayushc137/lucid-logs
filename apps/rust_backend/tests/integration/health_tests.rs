@@ -12,11 +12,11 @@ async fn test_health_response_structure() {
     // In a full integration test, we'd create the actual router
 
     let expected_status = "ok";
-    let expected_service = "daily-journal-backend";
+    let expected_service = "lucid-logs-backend";
 
     // Placeholder assertion - replace with actual test
     assert_eq!(expected_status, "ok");
-    assert_eq!(expected_service, "daily-journal-backend");
+    assert_eq!(expected_service, "lucid-logs-backend");
 }
 
 #[tokio::test]

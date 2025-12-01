@@ -1,11 +1,11 @@
 # Go Backend
 
-A high-performance, feature-based backend built with Go and Chi, following clean architecture principles.
+A high-performance, feature-based backend built with Go and Gin, following clean architecture principles.
 
 ## Features
 
 - **Feature-Based Architecture**: Vertical slices for each domain (tasks, categories, auth)
-- **Chi Router**: Lightweight, idiomatic HTTP router
+- **Gin Router**: High-performance HTTP web framework
 - **SurrealDB SDK**: Type-safe database operations using official Go SDK
 - **JWT Authentication**: Secure token-based auth with SurrealDB integration
 - **Standardized Responses**: Consistent API response format
@@ -27,6 +27,12 @@ make tools         # Install dev tools (air, swag, lint, gofumpt)
 # Start development
 make dev           # Hot reload development server
 ```
+
+### Default Admin Login (development)
+
+- The dev server automatically seeds `ADMIN_USERNAME` / `ADMIN_PASSWORD` into SurrealDB.
+- Defaults: `admin@example.com` / `adminadmin` (configure via `.env`).
+- Use those credentials in Swagger (`/docs`) to log in immediately after `make dev`.
 
 ## Project Structure
 
@@ -141,12 +147,12 @@ make new name=comments
 Add to `internal/server/server.go`:
 
 ```go
-import "github.com/daily-journal/go-backend/internal/features/comments"
+import "github.com/lucid-logs/go-backend/internal/features/comments"
 
 // In setupRoutes():
 commentRepo := comments.NewRepository(cfg.DB)
 commentService := comments.NewService(commentRepo)
-r.Mount("/comments", comments.Routes(commentService, cfg.Validator))
+comments.RegisterRoutes(protected.Group("/comments"), commentService, cfg.Validator)
 ```
 
 ### Add Migration
@@ -165,6 +171,12 @@ make migrate-create name=add_comments
 - `POST /api/v1/auth/login` - User login
 - `POST /api/v1/auth/register` - User registration
 
+### Users (Protected)
+- `GET /api/v1/users/me` - Fetch current profile
+- `GET /api/v1/users/{id}` - Fetch any user (admin-only unless self)
+- `PATCH /api/v1/users/{id}` - Update email and/or password (self, or admin for others)
+- `DELETE /api/v1/users/{id}` - Delete user (self or admin-managed; at least one admin must remain)
+
 ### Tasks (Protected)
 - `GET /api/v1/tasks` - List tasks (paginated)
 - `GET /api/v1/tasks/{id}` - Get task
@@ -178,6 +190,10 @@ make migrate-create name=add_comments
 - `POST /api/v1/categories` - Create category
 - `PUT /api/v1/categories/{id}` - Update category
 - `DELETE /api/v1/categories/{id}` - Delete category
+
+- **Swagger tips**:
+  - Tokens entered in `/docs` are persisted locally, so you only log in once.
+  - Enter the raw JWT (no `Bearer ` prefix needed); the UI adds the scheme automatically.
 
 ## Architecture
 
@@ -232,6 +248,12 @@ errors.ErrDatabase.Wrap(dbErr)
 ```
 
 ### Standardized Pagination
+### Automatic Timestamps
+
+- Every table defines `created_at` and `updated_at` fields in `db/schema.surql`.
+- Fields use `VALUE $before.created_at ?? time::now()` and `VALUE time::now()` so SurrealDB populates them on CREATE/UPDATE.
+- When adding new tables, copy the same field definitions to keep timestamps consistent without touching service code.
+
 
 ```go
 // Request
@@ -248,6 +270,49 @@ GET /api/v1/tasks?limit=20&offset=0
   }
 }
 ```
+
+## API Documentation
+
+- API docs are generated from inline annotations using [swaggo/swag](https://github.com/swaggo/swag). Add `@Summary`, `@Param`, etc. comments above the handler (see `internal/features/tasks/handler.go` for examples).
+- Regenerate the spec with `task docs:go` (runs `go generate ./cmd/api`, which executes the `swag init ...` command embedded in `cmd/api/main.go`). The generated artifacts live under `apps/go_backend/docs/swagger`.
+- `/docs` still serves our custom Swagger UI (with persisted Bearer tokens) and loads the freshly generated `/api-docs/openapi.json`.
+- Because the spec is emitted from real handlers + structs, shipping code automatically updates the docs once you run the generator.
+
+### Sample flow (curl)
+
+```bash
+# 1) create a category and capture the returned id
+cat_id=$(curl -s -X POST http://localhost:8080/api/v1/categories \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Work","color":"#3B82F6"}' | jq -r '.data.id')
+
+# 2) create a task that links to that category
+curl -X POST http://localhost:8080/api/v1/tasks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+        \"title\": \"Plan tomorrow\",
+        \"start_date\": \"2025-11-24T09:00:00Z\",
+        \"end_date\": \"2025-11-25T17:00:00Z\",
+        \"category_id\": \"$cat_id\"
+      }"
+```
+
+### Contract-first (optional)
+
+Prefer writing the spec first? Drop an OpenAPI document under `apps/go_backend/docs/contracts/`, then generate handlers or clients with [`oapi-codegen`](https://github.com/deepmap/oapi-codegen):
+
+```bash
+go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
+oapi-codegen -generate gin -package categories -o internal/features/categories/contract_gen.go docs/contracts/categories.yaml
+```
+
+That flow coexists nicely with the annotation-based approach—use whichever works best for a feature.
+
+## Router Choice: Gin
+
+We use [Gin](https://github.com/gin-gonic/gin) for its high performance, robust middleware ecosystem, and ease of use. It provides a fast HTTP web framework that is well-suited for building scalable APIs.
 
 ## Code Snippets (VS Code)
 
@@ -297,7 +362,7 @@ ADMIN_PASSWORD=adminadmin
 | [Air](https://github.com/air-verse/air) | Hot reload | `make tools` |
 | [golangci-lint](https://golangci-lint.run/) | Linting | `make tools` |
 | [gofumpt](https://github.com/mvdan/gofumpt) | Formatting | `make tools` |
-| [swag](https://github.com/swaggo/swag) | API docs | `make tools` |
+| [swag](https://github.com/swaggo/swag) | API docs generation | `task docs:go` |
 | cmd/gen | Feature scaffolding | Built-in |
 
 ## License

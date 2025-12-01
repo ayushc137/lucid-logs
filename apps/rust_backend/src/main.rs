@@ -82,7 +82,7 @@ use crate::state::AppState;
         (name = "categories", description = "Category management endpoints")
     ),
     info(
-        title = "Daily Journal API",
+        title = "Lucid Logs",
         version = "1.0.0",
         description = "Backend API for the Daily Journal Application built with Rust and Axum"
     ),
@@ -135,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer().with_target(true))
         .init();
 
-    tracing::info!("Starting Daily Journal API (Rust)");
+    tracing::info!("Starting Lucid Logs (Rust)");
     tracing::info!("  Environment: {}", settings.app.env);
     tracing::info!("  Server port: {}", settings.server.port);
     tracing::info!("  Database URL: {}:{}", settings.db.host, settings.db.port);

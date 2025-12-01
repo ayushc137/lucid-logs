@@ -47,6 +47,8 @@ tasks:
     dir: "{{.GO_BACKEND}}"
     deps: [db:up]
     cmds:
+      - lsof -ti :8080 | xargs kill -9 2>/dev/null || true
+      - echo "✅ Port 8080 cleared"
       - air
 
   build:go:
@@ -67,6 +69,12 @@ tasks:
     cmds:
       - gofumpt -l -w .
       - golangci-lint run ./...
+
+  docs:go:
+    desc: Regenerate Go Swagger docs from annotations
+    dir: "{{.GO_BACKEND}}"
+    cmds:
+      - go generate ./cmd/api
 
   new:go:
     desc: Create new Go feature (usage - task new:go -- comments)

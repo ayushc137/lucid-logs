@@ -173,7 +173,7 @@ func Load() (*Config, error) {
 func setDefaults(v *viper.Viper) {
 	// App defaults
 	v.SetDefault("APP_ENV", "development")
-	v.SetDefault("APP_NAME", "Daily Journal API")
+	v.SetDefault("APP_NAME", "Lucid Logs")
 	v.SetDefault("APP_VERSION", "1.0.0")
 
 	// Server defaults
@@ -193,7 +193,7 @@ func setDefaults(v *viper.Viper) {
 
 	// JWT defaults
 	v.SetDefault("JWT_EXPIRATION_HOURS", 24)
-	v.SetDefault("JWT_ISSUER", "daily-journal")
+	v.SetDefault("JWT_ISSUER", "lucid-logs")
 
 	// Admin defaults (only for development)
 	v.SetDefault("ADMIN_USERNAME", "admin@example.com")

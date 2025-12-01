@@ -70,7 +70,7 @@ linters-settings:
     simplify: true
 
   goimports:
-    local-prefixes: github.com/daily-journal/go-backend
+    local-prefixes: github.com/lucid-logs/go-backend
 
   misspell:
     locale: US

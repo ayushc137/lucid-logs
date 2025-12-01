@@ -3,8 +3,8 @@ package categories
 import (
 	"context"
 
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

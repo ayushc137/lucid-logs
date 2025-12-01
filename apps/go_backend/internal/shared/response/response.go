@@ -13,10 +13,10 @@
 package response
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/daily-journal/go-backend/internal/shared/errors"
+	"github.com/gin-gonic/gin"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -57,25 +57,6 @@ type OperationMessage struct {
 }
 
 // =============================================================================
-// RESPONSE WRITERS
-// =============================================================================
-
-// JSON writes a JSON response with the given status code.
-//
-// This is the low-level function used by other response helpers.
-// Prefer using the higher-level helpers (OK, Created, Error, etc.)
-func JSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-
-	if data != nil {
-		if err := json.NewEncoder(w).Encode(data); err != nil {
-			log.Error().Err(err).Msg("failed to encode JSON response")
-		}
-	}
-}
-
-// =============================================================================
 // SUCCESS RESPONSES
 // =============================================================================
 
@@ -83,36 +64,36 @@ func JSON(w http.ResponseWriter, status int, data any) {
 //
 // Example:
 //
-//	response.OK(w, task)
-func OK(w http.ResponseWriter, data any) {
-	JSON(w, http.StatusOK, APIResponse{Data: data})
+//	response.OK(c, task)
+func OK(c *gin.Context, data any) {
+	c.JSON(http.StatusOK, APIResponse{Data: data})
 }
 
 // Created sends a 201 Created response with data.
 //
 // Example:
 //
-//	response.Created(w, newTask)
-func Created(w http.ResponseWriter, data any) {
-	JSON(w, http.StatusCreated, APIResponse{Data: data})
+//	response.Created(c, newTask)
+func Created(c *gin.Context, data any) {
+	c.JSON(http.StatusCreated, APIResponse{Data: data})
 }
 
 // NoContent sends a 204 No Content response.
 //
 // Example:
 //
-//	response.NoContent(w)
-func NoContent(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNoContent)
+//	response.NoContent(c)
+func NoContent(c *gin.Context) {
+	c.Status(http.StatusNoContent)
 }
 
 // Message sends a success response with a simple message.
 //
 // Example:
 //
-//	response.Message(w, http.StatusOK, "Task deleted")
-func Message(w http.ResponseWriter, status int, message string) {
-	JSON(w, status, APIResponse{Data: OperationMessage{Message: message}})
+//	response.Message(c, http.StatusOK, "Task deleted")
+func Message(c *gin.Context, status int, message string) {
+	c.JSON(status, APIResponse{Data: OperationMessage{Message: message}})
 }
 
 // =============================================================================
@@ -129,10 +110,10 @@ func Message(w http.ResponseWriter, status int, message string) {
 // Example:
 //
 //	if err != nil {
-//	    response.Error(w, errors.ErrNotFound)
+//	    response.Error(c, errors.ErrNotFound)
 //	    return
 //	}
-func Error(w http.ResponseWriter, appErr *errors.AppError) {
+func Error(c *gin.Context, appErr *errors.AppError) {
 	// Log server errors
 	if appErr.Status >= 500 {
 		if appErr.Err != nil {
@@ -147,7 +128,7 @@ func Error(w http.ResponseWriter, appErr *errors.AppError) {
 		}
 	}
 
-	JSON(w, appErr.Status, APIResponse{
+	c.JSON(appErr.Status, APIResponse{
 		Error: &APIError{
 			Code:    appErr.Code,
 			Message: appErr.Message,
@@ -164,11 +145,11 @@ func Error(w http.ResponseWriter, appErr *errors.AppError) {
 // Example:
 //
 //	if err := service.DoSomething(); err != nil {
-//	    response.ErrorFromErr(w, err)
+//	    response.ErrorFromErr(c, err)
 //	    return
 //	}
-func ErrorFromErr(w http.ResponseWriter, err error) {
-	Error(w, errors.ToAppError(err))
+func ErrorFromErr(c *gin.Context, err error) {
+	Error(c, errors.ToAppError(err))
 }
 
 // =============================================================================
@@ -179,62 +160,62 @@ func ErrorFromErr(w http.ResponseWriter, err error) {
 //
 // Example:
 //
-//	response.BadRequest(w, "Invalid JSON body")
-func BadRequest(w http.ResponseWriter, message string) {
-	Error(w, errors.ErrBadRequest.WithMessage(message))
+//	response.BadRequest(c, "Invalid JSON body")
+func BadRequest(c *gin.Context, message string) {
+	Error(c, errors.ErrBadRequest.WithMessage(message))
 }
 
 // ValidationFailed sends a 400 response with validation error details.
 //
 // Example:
 //
-//	response.ValidationFailed(w, []ValidationErrorDetail{
+//	response.ValidationFailed(c, []ValidationErrorDetail{
 //	    {Field: "title", Message: "title is required"},
 //	})
-func ValidationFailed(w http.ResponseWriter, details []ValidationErrorDetail) {
-	Error(w, errors.ErrValidationFailed.WithDetails(details))
+func ValidationFailed(c *gin.Context, details []ValidationErrorDetail) {
+	Error(c, errors.ErrValidationFailed.WithDetails(details))
 }
 
 // Unauthorized sends a 401 Unauthorized response.
 //
 // Example:
 //
-//	response.Unauthorized(w, "Invalid token")
-func Unauthorized(w http.ResponseWriter, message string) {
+//	response.Unauthorized(c, "Invalid token")
+func Unauthorized(c *gin.Context, message string) {
 	if message == "" {
 		message = "Authentication required"
 	}
-	Error(w, errors.ErrUnauthorized.WithMessage(message))
+	Error(c, errors.ErrUnauthorized.WithMessage(message))
 }
 
 // Forbidden sends a 403 Forbidden response.
 //
 // Example:
 //
-//	response.Forbidden(w, "Cannot modify this resource")
-func Forbidden(w http.ResponseWriter, message string) {
+//	response.Forbidden(c, "Cannot modify this resource")
+func Forbidden(c *gin.Context, message string) {
 	if message == "" {
 		message = "Access denied"
 	}
-	Error(w, errors.ErrForbidden.WithMessage(message))
+	Error(c, errors.ErrForbidden.WithMessage(message))
 }
 
 // NotFound sends a 404 Not Found response.
 //
 // Example:
 //
-//	response.NotFound(w)
-func NotFound(w http.ResponseWriter) {
-	Error(w, errors.ErrNotFound)
+//	response.NotFound(c)
+func NotFound(c *gin.Context) {
+	Error(c, errors.ErrNotFound)
 }
 
 // Conflict sends a 409 Conflict response.
 //
 // Example:
 //
-//	response.Conflict(w, "Category name already exists")
-func Conflict(w http.ResponseWriter, message string) {
-	Error(w, errors.ErrConflict.WithMessage(message))
+//	response.Conflict(c, "Category name already exists")
+func Conflict(c *gin.Context, message string) {
+	Error(c, errors.ErrConflict.WithMessage(message))
 }
 
 // InternalError sends a 500 Internal Server Error response.
@@ -243,7 +224,7 @@ func Conflict(w http.ResponseWriter, message string) {
 //
 // Example:
 //
-//	response.InternalError(w, err)
-func InternalError(w http.ResponseWriter, err error) {
-	Error(w, errors.ErrInternal.Wrap(err))
+//	response.InternalError(c, err)
+func InternalError(c *gin.Context, err error) {
+	Error(c, errors.ErrInternal.Wrap(err))
 }

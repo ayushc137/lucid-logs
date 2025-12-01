@@ -1,16 +1,16 @@
+// Package tasks provides task management endpoints.
 package tasks
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gin-gonic/gin"
 
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/middleware"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
-	"github.com/daily-journal/go-backend/internal/shared/response"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/middleware"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/response"
+	"github.com/lucid-logs/go-backend/internal/shared/validator"
 	"github.com/rs/zerolog/log"
 )
 
@@ -36,7 +36,7 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 // ROUTES
 // =============================================================================
 
-// Routes returns the task routes.
+// RegisterRoutes registers the task routes.
 //
 // Routes registered:
 //   - GET    /        : List tasks with pagination
@@ -44,17 +44,14 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 //   - GET    /{id}    : Get task by ID
 //   - PUT    /{id}    : Update task
 //   - DELETE /{id}    : Soft delete task
-func Routes(service Service, validator *validator.Validator) chi.Router {
-	r := chi.NewRouter()
+func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
-	r.Get("/", h.List)
-	r.Post("/", h.Create)
-	r.Get("/{id}", h.Get)
-	r.Put("/{id}", h.Update)
-	r.Delete("/{id}", h.Delete)
-
-	return r
+	r.GET("/", h.List)
+	r.POST("/", h.Create)
+	r.GET("/:id", h.Get)
+	r.PUT("/:id", h.Update)
+	r.DELETE("/:id", h.Delete)
 }
 
 // =============================================================================
@@ -69,21 +66,21 @@ func Routes(service Service, validator *validator.Validator) chi.Router {
 // @Produce      json
 // @Param        limit  query int false "Items per page (default 20, max 100)"
 // @Param        offset query int false "Items to skip (default 0)"
-// @Success      200 {object} pagination.Response[Task]
+// @Success      200 {object} tasks.TaskPageResponse
 // @Failure      401 {object} response.APIResponse
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/tasks [get]
-func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) List(c *gin.Context) {
 	// Get authenticated user
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
 	// Parse pagination
-	params := pagination.FromRequest(r)
+	params := pagination.FromRequest(c)
 
 	log.Debug().
 		Str("user_id", user.UserID).
@@ -92,13 +89,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Msg("listing tasks")
 
 	// Get tasks
-	resp, err := h.service.List(r.Context(), user.UserID, params)
+	resp, err := h.service.List(c.Request.Context(), user.UserID, params)
 	if err != nil {
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, resp)
+	response.OK(c, resp)
 }
 
 // =============================================================================
@@ -118,26 +115,26 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/tasks/{id} [get]
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Get(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	taskID := chi.URLParam(r, "id")
+	taskID := c.Param("id")
 
-	task, err := h.service.Get(r.Context(), taskID, user.UserID)
+	task, err := h.service.Get(c.Request.Context(), taskID, user.UserID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
-			response.NotFound(w)
+			response.NotFound(c)
 			return
 		}
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, task)
+	response.OK(c, task)
 }
 
 // =============================================================================
@@ -158,34 +155,34 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/tasks [post]
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Create(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
 	// Parse request
 	var req CreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid JSON body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
 		return
 	}
 
 	// Validate
 	if errs := h.validator.Validate(&req); errs != nil {
-		response.ValidationFailed(w, errs)
+		response.ValidationFailed(c, errs)
 		return
 	}
 
 	// Create task
-	task, err := h.service.Create(r.Context(), &req, user.UserID)
+	task, err := h.service.Create(c.Request.Context(), &req, user.UserID)
 	if err != nil {
-		handleTaskError(w, err)
+		handleTaskError(c, err)
 		return
 	}
 
-	response.Created(w, task)
+	response.Created(c, task)
 }
 
 // =============================================================================
@@ -208,36 +205,36 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/tasks/{id} [put]
-func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Update(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	taskID := chi.URLParam(r, "id")
+	taskID := c.Param("id")
 
 	// Parse request
 	var req UpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid JSON body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
 		return
 	}
 
 	// Validate
 	if errs := h.validator.Validate(&req); errs != nil {
-		response.ValidationFailed(w, errs)
+		response.ValidationFailed(c, errs)
 		return
 	}
 
 	// Update task
-	task, err := h.service.Update(r.Context(), taskID, &req, user.UserID)
+	task, err := h.service.Update(c.Request.Context(), taskID, &req, user.UserID)
 	if err != nil {
-		handleTaskError(w, err)
+		handleTaskError(c, err)
 		return
 	}
 
-	response.OK(w, task)
+	response.OK(c, task)
 }
 
 // =============================================================================
@@ -257,26 +254,26 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/tasks/{id} [delete]
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Delete(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	taskID := chi.URLParam(r, "id")
+	taskID := c.Param("id")
 
-	err := h.service.Delete(r.Context(), taskID, user.UserID)
+	err := h.service.Delete(c.Request.Context(), taskID, user.UserID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
-			response.NotFound(w)
+			response.NotFound(c)
 			return
 		}
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.Message(w, http.StatusOK, "Task deleted")
+	response.Message(c, http.StatusOK, "Task deleted")
 }
 
 // =============================================================================
@@ -284,15 +281,15 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 // =============================================================================
 
 // handleTaskError handles common task errors.
-func handleTaskError(w http.ResponseWriter, err error) {
+func handleTaskError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, errors.ErrNotFound):
-		response.NotFound(w)
+		response.NotFound(c)
 	case errors.Is(err, errors.ErrInvalidDateRange):
-		response.Error(w, errors.ErrInvalidDateRange)
+		response.Error(c, errors.ErrInvalidDateRange)
 	case errors.Is(err, errors.ErrCategoryNotFound):
-		response.Error(w, errors.ErrCategoryNotFound)
+		response.Error(c, errors.ErrCategoryNotFound)
 	default:
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 	}
 }

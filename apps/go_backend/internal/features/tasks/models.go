@@ -17,7 +17,7 @@ package tasks
 import (
 	"time"
 
-	"github.com/daily-journal/go-backend/internal/features/categories"
+	"github.com/lucid-logs/go-backend/internal/features/categories"
 )
 
 // =============================================================================
@@ -101,3 +101,12 @@ const (
 	// SourceManual is the default source for manually created tasks.
 	SourceManual = "manual"
 )
+
+// TaskPageResponse documents the paginated response returned by the List endpoint.
+type TaskPageResponse struct {
+	Items   []*Task `json:"items"`
+	Total   int64   `json:"total"`
+	Limit   int     `json:"limit"`
+	Offset  int     `json:"offset"`
+	HasMore bool    `json:"has_more"`
+}

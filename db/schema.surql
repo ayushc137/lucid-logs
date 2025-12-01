@@ -52,21 +52,26 @@ DEFINE INDEX IF NOT EXISTS idx_migrations_version ON TABLE _migrations COLUMNS v
 -- AUTHENTICATION (001_auth)
 -- -----------------------------------------------------------------------------
 DEFINE ACCESS IF NOT EXISTS account ON DATABASE TYPE RECORD 
-  SIGNUP ( CREATE user SET email = $user, pass = crypto::argon2::generate($pass) ) 
-  SIGNIN ( SELECT * FROM user WHERE email = $user AND crypto::argon2::compare(pass, $pass) ) 
+  SIGNUP ( CREATE users SET email = $user, pass = crypto::argon2::generate($pass) ) 
+  SIGNIN ( SELECT * FROM users WHERE email = $user AND crypto::argon2::compare(pass, $pass) ) 
   WITH JWT ALGORITHM HS512 KEY "${JWT_SECRET}" 
   DURATION FOR TOKEN 1h, FOR SESSION 1d;
 
-DEFINE TABLE IF NOT EXISTS user SCHEMAFULL;
-DEFINE FIELD IF NOT EXISTS email ON user TYPE string ASSERT string::is::email($value);
-DEFINE FIELD IF NOT EXISTS pass ON user TYPE string;
-DEFINE INDEX IF NOT EXISTS idx_user_email ON TABLE user COLUMNS email UNIQUE;
+DEFINE TABLE IF NOT EXISTS users SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS email ON users TYPE string ASSERT string::is::email($value);
+DEFINE FIELD IF NOT EXISTS pass ON users TYPE string;
+DEFINE FIELD IF NOT EXISTS is_admin ON users TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS created_at ON users TYPE datetime VALUE $before.created_at ?? time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON users TYPE datetime VALUE time::now();
+DEFINE INDEX IF NOT EXISTS idx_users_email ON TABLE users COLUMNS email UNIQUE;
 
 -- -----------------------------------------------------------------------------
 -- CATEGORIES (002_categories) - SCHEMALESS + FULL PERMISSIONS
 -- -----------------------------------------------------------------------------
 -- Service account model: permissions are FULL, tenancy enforced in application
 DEFINE TABLE IF NOT EXISTS categories PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_at ON categories TYPE datetime VALUE $before.created_at ?? time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON categories TYPE datetime VALUE time::now();
 
 -- Indexes for performance
 -- Composite index for the most common query pattern: user's categories by name
@@ -81,6 +86,8 @@ DEFINE INDEX IF NOT EXISTS idx_categories_user_active ON TABLE categories COLUMN
 -- Service account model: permissions are FULL, tenancy enforced in application
 -- category field holds a record link: categories:abc123
 DEFINE TABLE IF NOT EXISTS tasks PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_at ON tasks TYPE datetime VALUE $before.created_at ?? time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON tasks TYPE datetime VALUE time::now();
 
 -- Indexes for performance
 -- Primary composite index: user's tasks ordered by date (most common query)

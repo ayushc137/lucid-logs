@@ -13,10 +13,10 @@ package health
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gin-gonic/gin"
 
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/response"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/response"
 )
 
 // =============================================================================
@@ -49,17 +49,13 @@ func NewHandler(db *database.DB) *Handler {
 // ROUTES
 // =============================================================================
 
-// Routes returns the health check routes.
+// RegisterRoutes registers the health check routes.
 //
 // Routes registered:
 //   - GET / : Basic health check
-func Routes(db *database.DB) chi.Router {
-	r := chi.NewRouter()
+func RegisterRoutes(r *gin.RouterGroup, db *database.DB) {
 	h := NewHandler(db)
-
-	r.Get("/", h.Check)
-
-	return r
+	r.GET("/", h.Check)
 }
 
 // =============================================================================
@@ -74,8 +70,8 @@ func Routes(db *database.DB) chi.Router {
 // @Produce      json
 // @Success      200 {object} HealthResponse
 // @Router       /health [get]
-func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
-	response.OK(w, HealthResponse{Status: "ok"})
+func (h *Handler) Check(c *gin.Context) {
+	response.OK(c, HealthResponse{Status: "ok"})
 }
 
 // CheckWithDB performs a health check including database connectivity.
@@ -87,13 +83,13 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 // @Success      200 {object} HealthResponse "Healthy"
 // @Failure      503 {object} response.APIResponse "Database unavailable"
 // @Router       /api/v1/health [get]
-func (h *Handler) CheckWithDB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CheckWithDB(c *gin.Context) {
 	// Check database connectivity using SDK's QueryScalar
 	dbStatus := "connected"
-	_, err := database.QueryScalar[int](r.Context(), h.db, "RETURN 1", nil)
+	_, err := database.QueryScalar[int](c.Request.Context(), h.db, "RETURN 1", nil)
 	if err != nil {
 		dbStatus = "disconnected"
-		response.JSON(w, http.StatusServiceUnavailable, response.APIResponse{
+		c.JSON(http.StatusServiceUnavailable, response.APIResponse{
 			Data: HealthResponse{
 				Status:   "degraded",
 				Database: dbStatus,
@@ -102,7 +98,7 @@ func (h *Handler) CheckWithDB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, HealthResponse{
+	response.OK(c, HealthResponse{
 		Status:   "ok",
 		Database: dbStatus,
 	})

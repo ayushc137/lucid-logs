@@ -153,7 +153,7 @@ task new:go -- comments
 Then register routes in `internal/server/server.go`:
 
 ```go
-import "github.com/daily-journal/go-backend/internal/features/comments"
+import "github.com/lucid-logs/go-backend/internal/features/comments"
 
 // In setupRoutes():
 commentRepo := comments.NewRepository(cfg.DB)
@@ -478,7 +478,7 @@ task test:rust     # Run tests
 ### Database won't start
 ```bash
 task db:reset     # Reset containers
-docker logs daily-journal-surrealdb  # Check logs
+docker logs lucid-logs-surrealdb  # Check logs
 ```
 
 ### Port already in use

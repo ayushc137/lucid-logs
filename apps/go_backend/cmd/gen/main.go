@@ -73,7 +73,7 @@ func main() {
 	fmt.Println()
 	fmt.Printf("     %sRepo := %s.NewRepository(cfg.DB)\n", name, name)
 	fmt.Printf("     %sService := %s.NewService(%sRepo)\n", name, name, name)
-	fmt.Printf("     r.Mount(\"/%s\", %s.Routes(%sService, cfg.Validator))\n", namePlural, name, name)
+	fmt.Printf("     %s.RegisterRoutes(protected.Group(\"/%s\"), %sService, cfg.Validator)\n", name, namePlural, name)
 }
 
 // TemplateData holds the data for template rendering.
@@ -181,9 +181,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -450,7 +450,7 @@ const serviceTemplate = `package {{.Name}}
 import (
 	"context"
 
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -594,16 +594,13 @@ func (s *service) Delete(ctx context.Context, id, userID string) error {
 const handlerTemplate = `package {{.Name}}
 
 import (
-	"encoding/json"
-	"net/http"
+	"github.com/gin-gonic/gin"
 
-	"github.com/go-chi/chi/v5"
-
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/middleware"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
-	"github.com/daily-journal/go-backend/internal/shared/response"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/middleware"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/response"
+	"github.com/lucid-logs/go-backend/internal/shared/validator"
 	"github.com/rs/zerolog/log"
 )
 
@@ -629,25 +626,22 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 // ROUTES
 // =============================================================================
 
-// Routes returns the {{.Name}} routes.
+// RegisterRoutes registers the {{.Name}} routes.
 //
 // Routes registered:
 //   - GET    /        : List {{.Name}}s with pagination
 //   - POST   /        : Create a new {{.Name}}
-//   - GET    /{id}    : Get {{.Name}} by ID
-//   - PUT    /{id}    : Update {{.Name}}
-//   - DELETE /{id}    : Soft delete {{.Name}}
-func Routes(service Service, validator *validator.Validator) chi.Router {
-	r := chi.NewRouter()
+//   - GET    /:id     : Get {{.Name}} by ID
+//   - PUT    /:id     : Update {{.Name}}
+//   - DELETE /:id     : Soft delete {{.Name}}
+func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
-	r.Get("/", h.List)
-	r.Post("/", h.Create)
-	r.Get("/{id}", h.Get)
-	r.Put("/{id}", h.Update)
-	r.Delete("/{id}", h.Delete)
-
-	return r
+	r.GET("/", h.List)
+	r.POST("/", h.Create)
+	r.GET("/:id", h.Get)
+	r.PUT("/:id", h.Update)
+	r.DELETE("/:id", h.Delete)
 }
 
 // =============================================================================
@@ -667,14 +661,14 @@ func Routes(service Service, validator *validator.Validator) chi.Router {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/{{.NamePlural}} [get]
-func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) List(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	params := pagination.FromRequest(r)
+	params := pagination.FromRequest(c)
 
 	log.Debug().
 		Str("user_id", user.UserID).
@@ -682,13 +676,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Int("offset", params.Offset).
 		Msg("listing {{.Name}}s")
 
-	resp, err := h.service.List(r.Context(), user.UserID, params)
+	resp, err := h.service.List(c.Request.Context(), user.UserID, params)
 	if err != nil {
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, resp)
+	response.OK(c, resp)
 }
 
 // =============================================================================
@@ -708,26 +702,26 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/{{.NamePlural}}/{id} [get]
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Get(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	id := chi.URLParam(r, "id")
+	id := c.Param("id")
 
-	entity, err := h.service.Get(r.Context(), id, user.UserID)
+	entity, err := h.service.Get(c.Request.Context(), id, user.UserID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
-			response.NotFound(w)
+			response.NotFound(c)
 			return
 		}
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, entity)
+	response.OK(c, entity)
 }
 
 // =============================================================================
@@ -748,31 +742,31 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/{{.NamePlural}} [post]
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Create(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
 	var req CreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid JSON body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
 		return
 	}
 
 	if errs := h.validator.Validate(&req); errs != nil {
-		response.ValidationFailed(w, errs)
+		response.ValidationFailed(c, errs)
 		return
 	}
 
-	entity, err := h.service.Create(r.Context(), &req, user.UserID)
+	entity, err := h.service.Create(c.Request.Context(), &req, user.UserID)
 	if err != nil {
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.Created(w, entity)
+	response.Created(c, entity)
 }
 
 // =============================================================================
@@ -795,37 +789,37 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/{{.NamePlural}}/{id} [put]
-func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Update(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	id := chi.URLParam(r, "id")
+	id := c.Param("id")
 
 	var req UpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid JSON body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
 		return
 	}
 
 	if errs := h.validator.Validate(&req); errs != nil {
-		response.ValidationFailed(w, errs)
+		response.ValidationFailed(c, errs)
 		return
 	}
 
-	entity, err := h.service.Update(r.Context(), id, &req, user.UserID)
+	entity, err := h.service.Update(c.Request.Context(), id, &req, user.UserID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
-			response.NotFound(w)
+			response.NotFound(c)
 			return
 		}
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, entity)
+	response.OK(c, entity)
 }
 
 // =============================================================================
@@ -845,25 +839,25 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure      500 {object} response.APIResponse
 // @Security     BearerAuth
 // @Router       /api/v1/{{.NamePlural}}/{id} [delete]
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, appErr := middleware.MustGetAuthenticatedUser(r.Context())
+func (h *Handler) Delete(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
 	if appErr != nil {
-		response.Error(w, appErr)
+		response.Error(c, appErr)
 		return
 	}
 
-	id := chi.URLParam(r, "id")
+	id := c.Param("id")
 
-	err := h.service.Delete(r.Context(), id, user.UserID)
+	err := h.service.Delete(c.Request.Context(), id, user.UserID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
-			response.NotFound(w)
+			response.NotFound(c)
 			return
 		}
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.Message(w, http.StatusOK, "{{.NameTitle}} deleted")
+	response.Message(c, http.StatusOK, "{{.NameTitle}} deleted")
 }
 `

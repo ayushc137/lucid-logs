@@ -10,18 +10,19 @@ package server
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 
-	"github.com/daily-journal/go-backend/internal/config"
-	"github.com/daily-journal/go-backend/internal/features/auth"
-	"github.com/daily-journal/go-backend/internal/features/categories"
-	"github.com/daily-journal/go-backend/internal/features/health"
-	"github.com/daily-journal/go-backend/internal/features/tasks"
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/middleware"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
+	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/features/auth"
+	"github.com/lucid-logs/go-backend/internal/features/categories"
+	"github.com/lucid-logs/go-backend/internal/features/health"
+	"github.com/lucid-logs/go-backend/internal/features/tasks"
+	"github.com/lucid-logs/go-backend/internal/features/users"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/middleware"
+	"github.com/lucid-logs/go-backend/internal/shared/validator"
 )
 
 // =============================================================================
@@ -51,24 +52,25 @@ type Config struct {
 //	    /auth/register          - User registration
 //	    /tasks                  - Task CRUD (protected)
 //	    /categories             - Category CRUD (protected)
-func NewRouter(cfg Config) *chi.Mux {
-	r := chi.NewRouter()
+func NewRouter(cfg Config) *gin.Engine {
+	// Set gin mode
+	if cfg.Cfg.IsDev() {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	r := gin.New()
 
 	// ==========================================================================
 	// GLOBAL MIDDLEWARE
 	// ==========================================================================
 
-	// Request ID for tracing
-	r.Use(chimiddleware.RequestID)
-
-	// Real IP detection (behind proxy)
-	r.Use(chimiddleware.RealIP)
-
 	// Request/response logging
-	r.Use(middleware.Logger)
+	r.Use(middleware.Logger())
 
 	// Panic recovery
-	r.Use(middleware.Recovery)
+	r.Use(middleware.Recovery())
 
 	// CORS configuration
 	r.Use(corsHandler(cfg.Cfg))
@@ -78,45 +80,50 @@ func NewRouter(cfg Config) *chi.Mux {
 	// ==========================================================================
 
 	// Basic health check (no auth required)
-	r.Mount("/health", health.Routes(cfg.DB))
+	health.RegisterRoutes(r.Group("/health"), cfg.DB)
 
 	// API documentation
-	r.Get("/docs", serveSwaggerUI)
-	r.Get("/api-docs/openapi.json", serveOpenAPISpec)
+	r.GET("/docs", serveSwaggerUI)
+	r.GET("/api-docs/openapi.json", serveOpenAPISpec)
 
 	// ==========================================================================
 	// API V1 ROUTES
 	// ==========================================================================
 
-	r.Route("/api/v1", func(r chi.Router) {
+	v1 := r.Group("/api/v1")
+	{
 		// Health check with DB status
 		h := health.NewHandler(cfg.DB)
-		r.Get("/health", h.CheckWithDB)
+		v1.GET("/health", h.CheckWithDB)
 
 		// Auth routes (public)
 		authService := auth.NewService(cfg.DB, cfg.Cfg)
-		r.Mount("/auth", auth.Routes(authService, cfg.Validator))
+		auth.RegisterRoutes(v1.Group("/auth"), authService, cfg.Validator)
 
 		// Protected routes (require authentication)
-		r.Group(func(r chi.Router) {
-			// Auth middleware
-			r.Use(middleware.Auth(middleware.AuthConfig{
-				JWTSecret: cfg.Cfg.JWT.Secret,
-				Namespace: cfg.Cfg.Database.Namespace,
-				Database:  cfg.Cfg.Database.Database,
-			}))
-
+		protected := v1.Group("")
+		protected.Use(middleware.Auth(middleware.AuthConfig{
+			JWTSecret: cfg.Cfg.JWT.Secret,
+			Namespace: cfg.Cfg.Database.Namespace,
+			Database:  cfg.Cfg.Database.Database,
+		}))
+		{
 			// Task routes
 			taskRepo := tasks.NewRepository(cfg.DB)
 			taskService := tasks.NewService(taskRepo)
-			r.Mount("/tasks", tasks.Routes(taskService, cfg.Validator))
+			tasks.RegisterRoutes(protected.Group("/tasks"), taskService, cfg.Validator)
 
 			// Category routes
 			categoryRepo := categories.NewRepository(cfg.DB)
 			categoryService := categories.NewService(categoryRepo)
-			r.Mount("/categories", categories.Routes(categoryService, cfg.Validator))
-		})
-	})
+			categories.RegisterRoutes(protected.Group("/categories"), categoryService, cfg.Validator)
+
+			// User routes
+			userRepo := users.NewRepository(cfg.DB)
+			userService := users.NewService(userRepo)
+			users.RegisterRoutes(protected.Group("/users"), userService, cfg.Validator)
+		}
+	}
 
 	return r
 }
@@ -126,16 +133,16 @@ func NewRouter(cfg Config) *chi.Mux {
 // =============================================================================
 
 // corsHandler creates the CORS middleware based on configuration.
-func corsHandler(cfg *config.Config) func(http.Handler) http.Handler {
+func corsHandler(cfg *config.Config) gin.HandlerFunc {
 	allowedOrigins := cfg.CORS.AllowedOrigins
 	if cfg.IsDev() || len(allowedOrigins) == 0 {
 		allowedOrigins = []string{"*"}
 	}
 
-	return cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   cfg.CORS.AllowedMethods,
-		AllowedHeaders:   cfg.CORS.AllowedHeaders,
+	return cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     cfg.CORS.AllowedMethods,
+		AllowHeaders:     cfg.CORS.AllowedHeaders,
 		AllowCredentials: !cfg.IsDev(),
 		MaxAge:           300,
 	})
@@ -146,11 +153,11 @@ func corsHandler(cfg *config.Config) func(http.Handler) http.Handler {
 // =============================================================================
 
 // serveSwaggerUI serves the Swagger UI HTML page.
-func serveSwaggerUI(w http.ResponseWriter, r *http.Request) {
+func serveSwaggerUI(c *gin.Context) {
 	html := `<!DOCTYPE html>
 <html>
 <head>
-    <title>Daily Journal API</title>
+    <title>Lucid Logs</title>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
@@ -163,75 +170,71 @@ func serveSwaggerUI(w http.ResponseWriter, r *http.Request) {
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
-        SwaggerUIBundle({
+        const AUTH_STORAGE_KEY = 'lucid-logs-swagger-token';
+
+        function normalizeToken(token) {
+            if (!token) return '';
+            return token.replace(/^Bearer\s+/i, '').trim();
+        }
+
+        function attachPersistence(ui) {
+            const saved = window.localStorage.getItem(AUTH_STORAGE_KEY);
+            if (saved) {
+                ui.preauthorizeApiKey('BearerAuth', saved);
+            }
+
+            const system = ui.getSystem();
+            if (!system) {
+                return;
+            }
+
+            const persistToken = () => {
+                const authState = system.authSelectors?.authorized?.();
+                const auth = authState && authState.toJS ? authState.toJS() : null;
+                const token = auth?.BearerAuth?.value;
+                if (token) {
+                    window.localStorage.setItem(AUTH_STORAGE_KEY, normalizeToken(token));
+                }
+            };
+
+            const clearToken = () => {
+                window.localStorage.removeItem(AUTH_STORAGE_KEY);
+            };
+
+            system.events?.on?.('authorize', persistToken);
+            system.events?.on?.('logout', clearToken);
+        }
+
+        const ui = SwaggerUIBundle({
             url: "/api-docs/openapi.json",
             dom_id: '#swagger-ui',
             presets: [
                 SwaggerUIBundle.presets.apis,
                 SwaggerUIBundle.SwaggerUIStandalonePreset
             ],
-            layout: "BaseLayout"
+            layout: "BaseLayout",
+            requestInterceptor: (req) => {
+                const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
+                if (stored && !req.headers.Authorization) {
+                    req.headers.Authorization = 'Bearer ' + normalizeToken(stored);
+                } else if (req.headers.Authorization) {
+                    req.headers.Authorization = 'Bearer ' + normalizeToken(req.headers.Authorization);
+                }
+                return req;
+            }
         });
+
+        attachPersistence(ui);
     </script>
 </body>
 </html>`
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(html))
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, html)
 }
 
 // serveOpenAPISpec serves the OpenAPI specification.
-func serveOpenAPISpec(w http.ResponseWriter, r *http.Request) {
-	spec := `{
-  "openapi": "3.0.0",
-  "info": {
-    "title": "Daily Journal API",
-    "version": "1.0.0",
-    "description": "Backend API for the Daily Journal Application"
-  },
-  "servers": [{"url": "/"}],
-  "components": {
-    "securitySchemes": {
-      "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
-    }
-  },
-  "paths": {
-    "/health": {
-      "get": {"summary": "Health check", "tags": ["health"], "responses": {"200": {"description": "OK"}}}
-    },
-    "/api/v1/auth/login": {
-      "post": {
-        "summary": "User login", "tags": ["auth"],
-        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"username": {"type": "string"}, "password": {"type": "string"}}}}}},
-        "responses": {"200": {"description": "Login successful"}}
-      }
-    },
-    "/api/v1/auth/register": {
-      "post": {
-        "summary": "User registration", "tags": ["auth"],
-        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"username": {"type": "string"}, "password": {"type": "string"}}}}}},
-        "responses": {"200": {"description": "Registration successful"}}
-      }
-    },
-    "/api/v1/tasks": {
-      "get": {"summary": "List tasks", "tags": ["tasks"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}},
-      "post": {"summary": "Create task", "tags": ["tasks"], "security": [{"BearerAuth": []}], "responses": {"201": {"description": "Created"}}}
-    },
-    "/api/v1/tasks/{id}": {
-      "get": {"summary": "Get task", "tags": ["tasks"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}},
-      "put": {"summary": "Update task", "tags": ["tasks"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}},
-      "delete": {"summary": "Delete task", "tags": ["tasks"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}}
-    },
-    "/api/v1/categories": {
-      "get": {"summary": "List categories", "tags": ["categories"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}},
-      "post": {"summary": "Create category", "tags": ["categories"], "security": [{"BearerAuth": []}], "responses": {"201": {"description": "Created"}}}
-    },
-    "/api/v1/categories/{id}": {
-      "get": {"summary": "Get category", "tags": ["categories"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}},
-      "put": {"summary": "Update category", "tags": ["categories"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}},
-      "delete": {"summary": "Delete category", "tags": ["categories"], "security": [{"BearerAuth": []}], "responses": {"200": {"description": "OK"}}}
-    }
-  }
-}`
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(spec))
+func serveOpenAPISpec(c *gin.Context) {
+	spec := swaggerDocs.SwaggerInfo.ReadDoc()
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, spec)
 }

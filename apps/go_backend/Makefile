@@ -49,7 +49,7 @@ build:
 	@echo "==> Building..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) $(CMD_DIR)/api
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(MIGRATE_BINARY) $(CMD_DIR)/migrate
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY) $(CMD_DIR)/api
 	@echo "==> Build complete: $(BUILD_DIR)/"
 
 ## clean: Remove build artifacts
@@ -262,11 +262,11 @@ feature: new
 
 ## docker-build: Build Docker image
 docker-build:
-	docker build -t daily-journal-go-backend .
+	docker build -t lucid-logs-go-backend .
 
 ## docker-run: Run Docker container
 docker-run:
-	docker run -p 8080:8080 --env-file .env daily-journal-go-backend
+	docker run -p 8080:8080 --env-file .env lucid-logs-go-backend
 
 ## docker-dev: Run with docker-compose (includes SurrealDB)
 docker-dev:

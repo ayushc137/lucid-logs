@@ -1,14 +1,12 @@
+// Package auth provides authentication endpoints.
 package auth
 
 import (
-	"encoding/json"
-	"net/http"
+	"github.com/gin-gonic/gin"
 
-	"github.com/go-chi/chi/v5"
-
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/response"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/response"
+	"github.com/lucid-logs/go-backend/internal/shared/validator"
 	"github.com/rs/zerolog/log"
 )
 
@@ -34,19 +32,16 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 // ROUTES
 // =============================================================================
 
-// Routes returns the auth routes.
+// RegisterRoutes registers the auth routes.
 //
 // Routes registered:
 //   - POST /login    : User login
 //   - POST /register : User registration
-func Routes(service Service, validator *validator.Validator) chi.Router {
-	r := chi.NewRouter()
+func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
-	r.Post("/login", h.Login)
-	r.Post("/register", h.Register)
-
-	return r
+	r.POST("/login", h.Login)
+	r.POST("/register", h.Register)
 }
 
 // =============================================================================
@@ -65,33 +60,33 @@ func Routes(service Service, validator *validator.Validator) chi.Router {
 // @Failure      400 {object} response.APIResponse "Invalid request"
 // @Failure      401 {object} response.APIResponse "Invalid credentials"
 // @Router       /api/v1/auth/login [post]
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Login(c *gin.Context) {
 	// Parse request body
 	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid JSON body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
 		return
 	}
 
 	// Validate request
 	if errs := h.validator.Validate(&req); errs != nil {
-		response.ValidationFailed(w, errs)
+		response.ValidationFailed(c, errs)
 		return
 	}
 
 	// Attempt login
-	resp, err := h.service.Login(r.Context(), &req)
+	resp, err := h.service.Login(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, errors.ErrInvalidCredentials) {
-			response.Error(w, errors.ErrInvalidCredentials)
+			response.Error(c, errors.ErrInvalidCredentials)
 			return
 		}
 		log.Error().Err(err).Msg("login failed")
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, resp)
+	response.OK(c, resp)
 }
 
 // Register handles user registration.
@@ -106,31 +101,31 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure      400 {object} response.APIResponse "Invalid request"
 // @Failure      409 {object} response.APIResponse "User already exists"
 // @Router       /api/v1/auth/register [post]
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Register(c *gin.Context) {
 	// Parse request body
 	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.BadRequest(w, "Invalid JSON body")
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
 		return
 	}
 
 	// Validate request
 	if errs := h.validator.Validate(&req); errs != nil {
-		response.ValidationFailed(w, errs)
+		response.ValidationFailed(c, errs)
 		return
 	}
 
 	// Attempt registration
-	resp, err := h.service.Register(r.Context(), &req)
+	resp, err := h.service.Register(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, errors.ErrUserExists) {
-			response.Error(w, errors.ErrUserExists)
+			response.Error(c, errors.ErrUserExists)
 			return
 		}
 		log.Error().Err(err).Msg("registration failed")
-		response.ErrorFromErr(w, err)
+		response.ErrorFromErr(c, err)
 		return
 	}
 
-	response.OK(w, resp)
+	response.OK(c, resp)
 }

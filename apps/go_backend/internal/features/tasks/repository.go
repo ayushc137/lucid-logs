@@ -14,6 +14,11 @@
 //   - database.QueryFirst[T]() - Single record queries
 //   - database.QueryScalar[T]() - Scalar value queries
 //
+// RecordID Convention:
+//   - taskDB uses models.RecordID for ID and category link fields
+//   - Conversion to string happens in toTask() at the repository boundary
+//   - This enables type-safe queries without SELECT type::string(id) casts
+//
 // See: https://surrealdb.com/docs/sdk/golang
 package tasks
 
@@ -24,13 +29,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daily-journal/go-backend/internal/features/categories"
-	"github.com/daily-journal/go-backend/internal/shared/database"
-	"github.com/daily-journal/go-backend/internal/shared/errors"
-	"github.com/daily-journal/go-backend/internal/shared/pagination"
-	"github.com/daily-journal/go-backend/internal/shared/validator"
+	"github.com/lucid-logs/go-backend/internal/features/categories"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
+	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 // =============================================================================
@@ -83,45 +89,101 @@ func NewRepository(db *database.DB) Repository {
 // =============================================================================
 
 // taskDB is the internal database representation of a task.
-// This struct maps directly to SurrealDB fields with proper JSON tags.
+//
+// This struct uses models.RecordID for the ID field, allowing SurrealDB SDK
+// to populate it directly without type::string casts in queries.
+//
+// The Category field uses categoryDB when fetched via FETCH clause,
+// which also uses models.RecordID for its ID.
 type taskDB struct {
-	ID        string               `json:"id,omitempty"`
-	Title     string               `json:"title"`
-	Journal   string               `json:"journal"`
-	StartDate time.Time            `json:"start_date"`
-	EndDate   time.Time            `json:"end_date"`
-	Completed bool                 `json:"completed"`
-	Priority  int                  `json:"priority"`
-	Source    string               `json:"source"`
-	Note      string               `json:"note"`
-	Positives []string             `json:"positives"`
-	Negatives []string             `json:"negatives"`
-	Category  *categories.Category `json:"category,omitempty"`
-	CreatedAt time.Time            `json:"created_at"`
-	UpdatedAt time.Time            `json:"updated_at"`
-	DeletedAt *time.Time           `json:"deleted_at,omitempty"`
-	CreatedBy string               `json:"created_by"`
-	UpdatedBy string               `json:"updated_by"`
+	ID        models.RecordID       `json:"id,omitempty"`
+	Title     string                `json:"title"`
+	Journal   string                `json:"journal"`
+	StartDate database.SurrealTime  `json:"start_date"`
+	EndDate   database.SurrealTime  `json:"end_date"`
+	Completed bool                  `json:"completed"`
+	Priority  int                   `json:"priority"`
+	Source    string                `json:"source"`
+	Note      string                `json:"note"`
+	Positives []string              `json:"positives"`
+	Negatives []string              `json:"negatives"`
+	Category  *categoryDB           `json:"category,omitempty"` // Hydrated via FETCH
+	CreatedAt database.SurrealTime  `json:"created_at"`
+	UpdatedAt database.SurrealTime  `json:"updated_at"`
+	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
+	CreatedBy string                `json:"created_by"`
+	UpdatedBy string                `json:"updated_by"`
+}
+
+// categoryDB is the database representation of a category when fetched.
+//
+// This struct uses models.RecordID for the ID field for type-safe
+// SurrealDB interactions. Convert to categories.Category via toCategory().
+type categoryDB struct {
+	ID        models.RecordID       `json:"id,omitempty"`
+	Name      string                `json:"name"`
+	Color     string                `json:"color"`
+	CreatedAt database.SurrealTime  `json:"created_at"`
+	UpdatedAt database.SurrealTime  `json:"updated_at"`
+	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
+	CreatedBy string                `json:"created_by"`
+	UpdatedBy string                `json:"updated_by"`
+}
+
+// toCategory converts categoryDB to the domain model.
+func (c *categoryDB) toCategory() *categories.Category {
+	if c == nil {
+		return nil
+	}
+	var deletedAt *time.Time
+	if c.DeletedAt != nil && !c.DeletedAt.IsZero() {
+		dt := c.DeletedAt.Time
+		deletedAt = &dt
+	}
+	return &categories.Category{
+		ID:        database.ToStringID(c.ID),
+		Name:      c.Name,
+		Color:     c.Color,
+		CreatedAt: c.CreatedAt.Time,
+		UpdatedAt: c.UpdatedAt.Time,
+		DeletedAt: deletedAt,
+		CreatedBy: c.CreatedBy,
+		UpdatedBy: c.UpdatedBy,
+	}
 }
 
 // toTask converts the database model to the domain model.
+//
+// This is the boundary conversion point where models.RecordID is
+// converted to string for API responses.
 func (t *taskDB) toTask() *Task {
+	var cat *categories.Category
+	if t.Category != nil {
+		cat = t.Category.toCategory()
+	}
+
+	var deletedAt *time.Time
+	if t.DeletedAt != nil && !t.DeletedAt.IsZero() {
+		dt := t.DeletedAt.Time
+		deletedAt = &dt
+	}
+
 	return &Task{
-		ID:        t.ID,
+		ID:        database.ToStringID(t.ID),
 		Title:     t.Title,
 		Journal:   t.Journal,
-		StartDate: t.StartDate,
-		EndDate:   t.EndDate,
+		StartDate: t.StartDate.Time,
+		EndDate:   t.EndDate.Time,
 		Completed: t.Completed,
 		Priority:  t.Priority,
 		Source:    t.Source,
 		Note:      t.Note,
 		Positives: t.Positives,
 		Negatives: t.Negatives,
-		Category:  t.Category,
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
-		DeletedAt: t.DeletedAt,
+		Category:  cat,
+		CreatedAt: t.CreatedAt.Time,
+		UpdatedAt: t.UpdatedAt.Time,
+		DeletedAt: deletedAt,
 		CreatedBy: t.CreatedBy,
 		UpdatedBy: t.UpdatedBy,
 	}
@@ -132,46 +194,25 @@ func (t *taskDB) toTask() *Task {
 // =============================================================================
 
 // taskCreateData is the data structure for creating a task.
+//
 // This matches SurrealDB's expected format for CREATE operations.
+// Category uses *models.RecordID for type-safe record linking.
 type taskCreateData struct {
-	Title     string   `json:"title"`
-	Journal   string   `json:"journal"`
-	StartDate string   `json:"start_date"` // ISO8601 string for SurrealDB
-	EndDate   string   `json:"end_date"`   // ISO8601 string for SurrealDB
-	Completed bool     `json:"completed"`
-	Priority  int      `json:"priority"`
-	Source    string   `json:"source"`
-	Note      string   `json:"note"`
-	Positives []string `json:"positives"`
-	Negatives []string `json:"negatives"`
-	Category  any      `json:"category,omitempty"` // Record link or nil
-	CreatedBy string   `json:"created_by"`
-	UpdatedBy string   `json:"updated_by"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
-}
-
-// taskMergeData is the data structure for merging/updating a task.
-type taskMergeData struct {
-	Title     *string  `json:"title,omitempty"`
-	Journal   *string  `json:"journal,omitempty"`
-	StartDate *string  `json:"start_date,omitempty"`
-	EndDate   *string  `json:"end_date,omitempty"`
-	Completed *bool    `json:"completed,omitempty"`
-	Priority  *int     `json:"priority,omitempty"`
-	Note      *string  `json:"note,omitempty"`
-	Positives []string `json:"positives,omitempty"`
-	Negatives []string `json:"negatives,omitempty"`
-	Category  any      `json:"category,omitempty"` // Record link, nil, or omitted
-	UpdatedBy string   `json:"updated_by"`
-	UpdatedAt string   `json:"updated_at"`
-}
-
-// softDeleteData is the data structure for soft-deleting a record.
-type softDeleteData struct {
-	DeletedAt string `json:"deleted_at"`
-	UpdatedBy string `json:"updated_by"`
-	UpdatedAt string `json:"updated_at"`
+	Title     string           `json:"title"`
+	Journal   string           `json:"journal"`
+	StartDate time.Time        `json:"start_date"`
+	EndDate   time.Time        `json:"end_date"`
+	Completed bool             `json:"completed"`
+	Priority  int              `json:"priority"`
+	Source    string           `json:"source"`
+	Note      string           `json:"note"`
+	Positives []string         `json:"positives"`
+	Negatives []string         `json:"negatives"`
+	Category  *models.RecordID `json:"category,omitempty"` // Record link or nil
+	CreatedBy string           `json:"created_by"`
+	UpdatedBy string           `json:"updated_by"`
+	CreatedAt time.Time        `json:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at"`
 }
 
 // =============================================================================
@@ -182,13 +223,14 @@ type softDeleteData struct {
 //
 // This uses the database.QueryFirst[T]() SDK wrapper for type-safe queries.
 // The query fetches the task with its category hydrated via FETCH.
+// No type::string(id) cast needed since taskDB.ID is models.RecordID.
 func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, error) {
-	taskID := formatTaskID(id)
+	taskID := database.MustRecordID(Table, id)
 
 	// Use SDK's typed query to fetch task with category
-	// fn::task::with_category is a server-side function that handles FETCH
+	// models.RecordID handles ID serialization automatically
 	task, err := database.QueryFirst[taskDB](ctx, r.db, `
-		RETURN fn::task::with_category(type::thing($id))
+		SELECT * FROM type::thing($id) FETCH category
 	`, map[string]any{
 		"id": taskID,
 	})
@@ -222,10 +264,14 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, er
 // This uses:
 //   - database.QueryScalar[T]() for counting records
 //   - database.QueryAll[T]() for fetching paginated results
+//
+// No type::string(id) cast needed since taskDB.ID is models.RecordID.
 func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*Task, int64, error) {
 	// Get total count using server-side function with SDK's QueryScalar
 	total, err := database.QueryScalar[float64](ctx, r.db, `
-		RETURN fn::task::count_for_user($user)
+		RETURN (SELECT count() FROM tasks
+			WHERE created_by = $user AND deleted_at = NONE
+			GROUP ALL)[0].count OR 0
 	`, map[string]any{
 		"user": userID,
 	})
@@ -235,6 +281,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Get paginated tasks using SDK's typed QueryAll
+	// models.RecordID handles ID deserialization automatically
 	tasksDB, err := database.QueryAll[taskDB](ctx, r.db, `
 		SELECT * FROM tasks
 		WHERE created_by = $user AND deleted_at = NONE
@@ -269,12 +316,13 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 // Create creates a new task using SDK's Create method.
 //
 // This uses database.Create[T]() for type-safe record creation.
+// Category links use models.RecordID for type-safe record references.
 // See: https://surrealdb.com/docs/sdk/golang/methods/create
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Task, error) {
 	// Validate category ownership if provided
-	var categoryLink any
+	var categoryLink *models.RecordID
 	if req.CategoryID != "" {
-		catID := formatCategoryID(req.CategoryID)
+		catID := database.MustRecordID(categories.Table, req.CategoryID)
 		exists, err := r.validateCategoryOwnership(ctx, catID, userID)
 		if err != nil {
 			return nil, err
@@ -282,13 +330,13 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		if !exists {
 			return nil, errors.ErrCategoryNotFound
 		}
-		// Use raw record reference for SurrealDB
-		categoryLink = catID
+		// Use models.RecordID for type-safe record link
+		categoryLink = &catID
 	}
 
 	// Parse dates
-	startDate, _ := validator.ParseDateTime(req.StartDate)
-	endDate, _ := validator.ParseDateTime(req.EndDate)
+	startDate, _ := timeutil.ParseDateTime(req.StartDate)
+	endDate, _ := timeutil.ParseDateTime(req.EndDate)
 
 	// Prepare default values
 	positives := req.Positives
@@ -304,16 +352,16 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		source = SourceManual
 	}
 
-	// Generate task ID
-	taskID := generateTaskID()
-	now := time.Now().UTC().Format(time.RFC3339)
+	// Generate task ID using models.RecordID
+	taskID := generateTaskRecordID()
+	now := time.Now().UTC()
 
 	// Create task data for SDK Create
 	createData := taskCreateData{
 		Title:     req.Title,
 		Journal:   req.Journal,
-		StartDate: startDate.Format(time.RFC3339),
-		EndDate:   endDate.Format(time.RFC3339),
+		StartDate: startDate,
+		EndDate:   endDate,
 		Completed: false,
 		Priority:  req.Priority,
 		Source:    source,
@@ -327,108 +375,124 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		UpdatedAt: now,
 	}
 
-	// Use SDK's Create method for type-safe creation
-	_, err := database.Create[taskDB](ctx, r.db, taskID, createData)
+	// Use CREATE query but only decode the ID to avoid time parsing issues
+	type createResult struct {
+		ID models.RecordID `json:"id"`
+	}
+
+	results, err := database.QueryAll[createResult](ctx, r.db, `
+		CREATE type::thing($id) CONTENT $data
+	`, map[string]any{
+		"id":   taskID,
+		"data": createData,
+	})
 	if err != nil {
 		r.logger.Error().Err(err).
-			Str("task_id", taskID).
+			Str("task_id", database.ToStringID(taskID)).
 			Str("user_id", userID).
-			Msg("SDK Create failed for task")
+			Msg("SDK Create query failed for task")
 		return nil, err
 	}
 
-	r.logger.Info().Str("task_id", taskID).Msg("task created via SDK")
+	if len(results) == 0 {
+		return nil, errors.ErrInternal.WithMessage("Failed to create task")
+	}
+
+	r.logger.Info().Str("task_id", database.ToStringID(taskID)).Msg("task created via SDK")
 
 	// Fetch and return the created task (with category hydrated)
-	return r.FindByID(ctx, taskID, userID)
+	return r.FindByID(ctx, database.ToStringID(taskID), userID)
 }
 
 // =============================================================================
 // UPDATE OPERATION
 // =============================================================================
 
-// Update updates an existing task using SDK's Merge method.
+// Update updates an existing task using query-based UPDATE.
 //
-// This uses database.Merge[T]() for type-safe partial updates.
-// See: https://surrealdb.com/docs/sdk/golang/methods/merge
+// Uses UPDATE query for reliable single-record updates with models.RecordID.
 func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
 	// Verify task exists and user has ownership
 	if _, err := r.FindByID(ctx, id, userID); err != nil {
 		return nil, err
 	}
 
-	// Build merge data with only provided fields
-	mergeData := taskMergeData{
-		UpdatedBy: userID,
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+	taskID := database.MustRecordID(Table, id)
+	now := time.Now().UTC()
+
+	// Build update data dynamically with only provided fields
+	updateData := map[string]any{
+		"updated_by": userID,
+		"updated_at": now,
 	}
 
 	if req.Title != nil {
-		mergeData.Title = req.Title
+		updateData["title"] = *req.Title
 	}
 	if req.Journal != nil {
-		mergeData.Journal = req.Journal
+		updateData["journal"] = *req.Journal
 	}
 	if req.StartDate != nil {
-		if t, err := validator.ParseDateTime(*req.StartDate); err == nil {
-			dateStr := t.Format(time.RFC3339)
-			mergeData.StartDate = &dateStr
+		if t, err := timeutil.ParseDateTime(*req.StartDate); err == nil {
+			updateData["start_date"] = t
 		}
 	}
 	if req.EndDate != nil {
-		if t, err := validator.ParseDateTime(*req.EndDate); err == nil {
-			dateStr := t.Format(time.RFC3339)
-			mergeData.EndDate = &dateStr
+		if t, err := timeutil.ParseDateTime(*req.EndDate); err == nil {
+			updateData["end_date"] = t
 		}
 	}
 	if req.Completed != nil {
-		mergeData.Completed = req.Completed
+		updateData["completed"] = *req.Completed
 	}
 	if req.Priority != nil {
-		mergeData.Priority = req.Priority
+		updateData["priority"] = *req.Priority
 	}
 	if req.Note != nil {
-		mergeData.Note = req.Note
+		updateData["note"] = *req.Note
 	}
 	if req.Positives != nil {
-		mergeData.Positives = req.Positives
+		updateData["positives"] = req.Positives
 	}
 	if req.Negatives != nil {
-		mergeData.Negatives = req.Negatives
+		updateData["negatives"] = req.Negatives
 	}
 
 	// Handle category update
 	if req.CategoryID != nil {
 		catID := strings.TrimSpace(*req.CategoryID)
 		if catID == "" {
-			// Remove category link
-			mergeData.Category = nil
+			// Remove category link - set to NONE in SurrealDB
+			updateData["category"] = nil
 		} else {
 			// Validate and set new category
-			formattedCatID := formatCategoryID(catID)
-			exists, err := r.validateCategoryOwnership(ctx, formattedCatID, userID)
+			categoryRID := database.MustRecordID(categories.Table, catID)
+			exists, err := r.validateCategoryOwnership(ctx, categoryRID, userID)
 			if err != nil {
 				return nil, err
 			}
 			if !exists {
 				return nil, errors.ErrCategoryNotFound
 			}
-			mergeData.Category = formattedCatID
+			updateData["category"] = categoryRID
 		}
 	}
 
-	taskID := formatTaskID(id)
-
-	// Use SDK's Merge method for partial update
-	_, err := database.Merge[taskDB](ctx, r.db, taskID, mergeData)
+	// Use UPDATE query for reliable single-record update
+	_, err := database.QueryAll[taskDB](ctx, r.db, `
+		UPDATE type::thing($id) MERGE $data
+	`, map[string]any{
+		"id":   taskID,
+		"data": updateData,
+	})
 	if err != nil {
-		r.logger.Error().Err(err).Str("task_id", id).Msg("SDK Merge failed for task update")
+		r.logger.Error().Err(err).Str("task_id", id).Msg("UPDATE query failed for task")
 		return nil, err
 	}
 
-	r.logger.Info().Str("task_id", id).Msg("task updated via SDK")
+	r.logger.Info().Str("task_id", id).Msg("task updated via UPDATE query")
 
-	// Fetch and return updated task
+	// Fetch and return updated task with category hydrated
 	return r.FindByID(ctx, id, userID)
 }
 
@@ -436,10 +500,9 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 // DELETE OPERATION
 // =============================================================================
 
-// Delete soft-deletes a task using SDK's Merge method.
+// Delete soft-deletes a task using query-based UPDATE.
 //
-// This uses database.Merge[T]() to set the deleted_at timestamp.
-// See: https://surrealdb.com/docs/sdk/golang/methods/merge
+// Uses UPDATE query for reliable single-record soft delete with models.RecordID.
 func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	// Verify ownership first
 	_, err := r.FindByID(ctx, id, userID)
@@ -447,23 +510,27 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 		return err
 	}
 
-	taskID := formatTaskID(id)
-	now := time.Now().UTC().Format(time.RFC3339)
+	taskID := database.MustRecordID(Table, id)
+	now := time.Now().UTC()
 
-	// Use SDK's Merge method for soft delete
-	softDelete := softDeleteData{
-		DeletedAt: now,
-		UpdatedBy: userID,
-		UpdatedAt: now,
-	}
-
-	_, err = database.Merge[taskDB](ctx, r.db, taskID, softDelete)
+	// Use UPDATE query for reliable soft delete
+	_, err = database.QueryAll[taskDB](ctx, r.db, `
+		UPDATE type::thing($id) MERGE {
+			deleted_at: $now,
+			updated_by: $user,
+			updated_at: $now
+		}
+	`, map[string]any{
+		"id":   taskID,
+		"now":  now,
+		"user": userID,
+	})
 	if err != nil {
-		r.logger.Error().Err(err).Str("task_id", id).Msg("SDK Merge failed for soft delete")
+		r.logger.Error().Err(err).Str("task_id", id).Msg("UPDATE query failed for soft delete")
 		return err
 	}
 
-	r.logger.Info().Str("task_id", id).Msg("task soft-deleted via SDK")
+	r.logger.Info().Str("task_id", id).Msg("task soft-deleted via UPDATE query")
 	return nil
 }
 
@@ -472,9 +539,11 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 // =============================================================================
 
 // validateCategoryOwnership checks if a category exists and belongs to the user.
-func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID, userID string) (bool, error) {
+//
+// Uses models.RecordID for type-safe category reference.
+func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID models.RecordID, userID string) (bool, error) {
 	// Use SDK's typed query for validation
-	cats, err := database.QueryAll[categories.Category](ctx, r.db, `
+	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
 		SELECT id FROM type::thing($id) 
 		WHERE created_by = $user AND deleted_at = NONE
 	`, map[string]any{
@@ -487,7 +556,7 @@ func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID, 
 
 	if len(cats) == 0 {
 		r.logger.Warn().
-			Str("category_id", categoryID).
+			Str("category_id", database.ToStringID(categoryID)).
 			Str("user_id", userID).
 			Msg("category validation failed")
 		return false, nil
@@ -496,27 +565,16 @@ func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID, 
 	return true, nil
 }
 
-// formatTaskID ensures the ID has the table prefix.
+// formatTaskID ensures the ID has the table prefix (string version).
 func formatTaskID(id string) string {
-	if strings.HasPrefix(id, Table+":") {
-		return id
-	}
-	return Table + ":" + id
+	return database.RecordID(Table, id)
 }
 
-// formatCategoryID ensures the ID has the table prefix.
-func formatCategoryID(id string) string {
-	if strings.HasPrefix(id, categories.Table+":") {
-		return id
-	}
-	return categories.Table + ":" + id
-}
-
-// generateTaskID generates a unique task ID.
-func generateTaskID() string {
+// generateTaskRecordID generates a unique task ID as models.RecordID.
+func generateTaskRecordID() models.RecordID {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
-	return Table + ":" + hex.EncodeToString(bytes)
+	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }
 
 // sanitizeCategory removes deleted categories from task.
