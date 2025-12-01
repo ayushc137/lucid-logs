@@ -34,8 +34,9 @@ import (
 //
 //	{ "error": { "code": "...", "message": "...", "details": [...] } }
 type APIResponse struct {
-	Data  any       `json:"data,omitempty"`
-	Error *APIError `json:"error,omitempty"`
+	Data    any       `json:"data,omitempty"`
+	Error   *APIError `json:"error,omitempty"`
+	TraceID string    `json:"trace_id,omitempty"`
 }
 
 // APIError represents the error portion of an API response.
@@ -66,7 +67,9 @@ type OperationMessage struct {
 //
 //	response.OK(c, task)
 func OK(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, APIResponse{Data: data})
+	resp := APIResponse{Data: data}
+	attachTraceID(c, &resp)
+	c.JSON(http.StatusOK, resp)
 }
 
 // Created sends a 201 Created response with data.
@@ -75,7 +78,9 @@ func OK(c *gin.Context, data any) {
 //
 //	response.Created(c, newTask)
 func Created(c *gin.Context, data any) {
-	c.JSON(http.StatusCreated, APIResponse{Data: data})
+	resp := APIResponse{Data: data}
+	attachTraceID(c, &resp)
+	c.JSON(http.StatusCreated, resp)
 }
 
 // NoContent sends a 204 No Content response.
@@ -93,7 +98,9 @@ func NoContent(c *gin.Context) {
 //
 //	response.Message(c, http.StatusOK, "Task deleted")
 func Message(c *gin.Context, status int, message string) {
-	c.JSON(status, APIResponse{Data: OperationMessage{Message: message}})
+	resp := APIResponse{Data: OperationMessage{Message: message}}
+	attachTraceID(c, &resp)
+	c.JSON(status, resp)
 }
 
 // =============================================================================
@@ -128,13 +135,15 @@ func Error(c *gin.Context, appErr *errors.AppError) {
 		}
 	}
 
-	c.JSON(appErr.Status, APIResponse{
+	resp := APIResponse{
 		Error: &APIError{
 			Code:    appErr.Code,
 			Message: appErr.Message,
 			Details: appErr.Details,
 		},
-	})
+	}
+	attachTraceID(c, &resp)
+	c.JSON(appErr.Status, resp)
 }
 
 // ErrorFromErr converts a generic error to an AppError and sends it.
@@ -227,4 +236,17 @@ func Conflict(c *gin.Context, message string) {
 //	response.InternalError(c, err)
 func InternalError(c *gin.Context, err error) {
 	Error(c, errors.ErrInternal.Wrap(err))
+}
+
+func attachTraceID(c *gin.Context, resp *APIResponse) {
+	if c == nil || resp == nil {
+		return
+	}
+	traceID := c.Writer.Header().Get("X-Request-ID")
+	if traceID == "" {
+		traceID = c.GetHeader("X-Request-ID")
+	}
+	if traceID != "" {
+		resp.TraceID = traceID
+	}
 }

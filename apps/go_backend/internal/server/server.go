@@ -66,6 +66,9 @@ func NewRouter(cfg Config) *gin.Engine {
 	// GLOBAL MIDDLEWARE
 	// ==========================================================================
 
+	// Trace ID injection (must run before logging)
+	r.Use(middleware.Trace())
+
 	// Request/response logging
 	r.Use(middleware.Logger())
 

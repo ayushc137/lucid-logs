@@ -27,6 +27,8 @@ type ContextKey string
 const (
 	// UserContextKey is the context key for the authenticated user.
 	UserContextKey ContextKey = "authenticated_user"
+	// TraceContextKey stores the request trace/correlation ID.
+	TraceContextKey ContextKey = "trace_id"
 )
 
 // =============================================================================

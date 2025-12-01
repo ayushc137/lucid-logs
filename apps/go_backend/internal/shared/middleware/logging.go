@@ -44,8 +44,11 @@ func Logger() gin.HandlerFunc {
 		// Calculate duration
 		duration := time.Since(start)
 
-		// Get request ID if available
-		reqID := c.GetHeader("X-Request-ID")
+		// Get trace/request ID if available
+		traceID := TraceID(c.Request.Context())
+		if traceID == "" {
+			traceID = c.GetHeader(traceHeader)
+		}
 
 		// Determine log level based on status
 		status := c.Writer.Status()
@@ -66,8 +69,8 @@ func Logger() gin.HandlerFunc {
 			Str("remote_addr", c.ClientIP()).
 			Str("user_agent", c.Request.UserAgent())
 
-		if reqID != "" {
-			event.Str("request_id", reqID)
+		if traceID != "" {
+			event.Str("trace_id", traceID)
 		}
 
 		// Log user ID if authenticated
