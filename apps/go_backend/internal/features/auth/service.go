@@ -63,6 +63,14 @@ type service struct {
 	logger zerolog.Logger
 }
 
+type tokenClaims struct {
+	jwt.RegisteredClaims
+	ID string `json:"ID"`
+	NS string `json:"NS"`
+	DB string `json:"DB"`
+	AC string `json:"AC"`
+}
+
 // NewService creates a new auth Service.
 func NewService(db *database.DB, cfg *config.Config) Service {
 	return &service{
@@ -237,15 +245,14 @@ func (s *service) ValidateToken(tokenString string) (*SurrealClaims, error) {
 		return nil, errors.ErrUnauthorized.WithMessage("Token is empty")
 	}
 
-	// Parse and validate token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-		// Validate algorithm (SurrealDB uses HS512)
+	claims := &tokenClaims{}
+	// Parse and validate token (expiration, nbf, etc. handled by jwt library)
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
 		}
 		return []byte(s.cfg.JWT.Secret), nil
 	})
-
 	if err != nil {
 		return nil, errors.ErrUnauthorized.WithMessage("Invalid token")
 	}
@@ -254,36 +261,29 @@ func (s *service) ValidateToken(tokenString string) (*SurrealClaims, error) {
 		return nil, errors.ErrUnauthorized.WithMessage("Token is not valid")
 	}
 
-	// Extract claims
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, errors.ErrUnauthorized.WithMessage("Invalid token claims")
+	userID := claims.ID
+	if userID == "" {
+		userID = claims.Subject
 	}
-
-	// Build SurrealClaims
-	surrealClaims := &SurrealClaims{}
-
-	if id, ok := claims["ID"].(string); ok {
-		surrealClaims.ID = id
-	} else if sub, ok := claims["sub"].(string); ok {
-		surrealClaims.ID = sub
-	}
-
-	if surrealClaims.ID == "" {
+	if userID == "" {
 		return nil, errors.ErrUnauthorized.WithMessage("Missing user ID in token")
 	}
 
-	if ns, ok := claims["NS"].(string); ok {
-		surrealClaims.Namespace = ns
+	surrealClaims := &SurrealClaims{
+		ID:        userID,
+		Namespace: claims.NS,
+		Database:  claims.DB,
+		Access:    claims.AC,
 	}
-	if db, ok := claims["DB"].(string); ok {
-		surrealClaims.Database = db
+
+	if claims.IssuedAt != nil {
+		surrealClaims.IssuedAt = claims.IssuedAt.Time.Unix()
 	}
-	if ac, ok := claims["AC"].(string); ok {
-		surrealClaims.Access = ac
+	if claims.NotBefore != nil {
+		surrealClaims.NotBefore = claims.NotBefore.Time.Unix()
 	}
-	if exp, ok := claims["exp"].(float64); ok {
-		surrealClaims.ExpiresAt = int64(exp)
+	if claims.ExpiresAt != nil {
+		surrealClaims.ExpiresAt = claims.ExpiresAt.Time.Unix()
 	}
 
 	return surrealClaims, nil
@@ -295,13 +295,25 @@ func (s *service) ValidateToken(tokenString string) (*SurrealClaims, error) {
 
 // generateToken generates a JWT token for a user.
 func (s *service) generateToken(userID string) (string, error) {
-	claims := jwt.MapClaims{
-		"ID":  userID,
-		"sub": userID,
-		"NS":  s.cfg.Database.Namespace,
-		"DB":  s.cfg.Database.Database,
-		"AC":  "account",
-		"iss": s.cfg.JWT.Issuer,
+	now := time.Now().UTC()
+	expHours := s.cfg.JWT.ExpirationHours
+	if expHours <= 0 {
+		expHours = 24
+	}
+	expiration := now.Add(time.Duration(expHours) * time.Hour)
+
+	claims := tokenClaims{
+		ID: userID,
+		NS: s.cfg.Database.Namespace,
+		DB: s.cfg.Database.Database,
+		AC: "account",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			Issuer:    s.cfg.JWT.Issuer,
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(expiration),
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)

@@ -2,6 +2,8 @@ package tasks
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
@@ -141,21 +143,18 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 
 // Update updates an existing task with validation.
 func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
-	// Validate dates if both provided
-	if req.StartDate != nil && req.EndDate != nil {
-		startDate, err := timeutil.ParseDateTime(*req.StartDate)
-		if err != nil {
-			return nil, errors.ErrBadRequest.WithMessage("Invalid start_date format")
-		}
+	startDate, err := validateOptionalDate("start_date", req.StartDate)
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := validateOptionalDate("end_date", req.EndDate)
+	if err != nil {
+		return nil, err
+	}
 
-		endDate, err := timeutil.ParseDateTime(*req.EndDate)
-		if err != nil {
-			return nil, errors.ErrBadRequest.WithMessage("Invalid end_date format")
-		}
-
-		if endDate.Before(startDate) {
-			return nil, errors.ErrInvalidDateRange
-		}
+	// Validate date ordering when both provided in payload
+	if startDate != nil && endDate != nil && endDate.Before(*startDate) {
+		return nil, errors.ErrInvalidDateRange
 	}
 
 	// Update task
@@ -200,4 +199,20 @@ func (s *service) Delete(ctx context.Context, id, userID string) error {
 		Msg("task deleted")
 
 	return nil
+}
+
+func validateOptionalDate(field string, value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, errors.ErrBadRequest.WithMessage(field + " cannot be empty")
+	}
+	parsed, err := timeutil.ParseDateTime(trimmed)
+	if err != nil {
+		return nil, errors.ErrBadRequest.WithMessage("Invalid " + field + " format")
+	}
+	*value = trimmed
+	return &parsed, nil
 }

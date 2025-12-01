@@ -413,7 +413,8 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 // Uses UPDATE query for reliable single-record updates with models.RecordID.
 func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
 	// Verify task exists and user has ownership
-	if _, err := r.FindByID(ctx, id, userID); err != nil {
+	existing, err := r.FindByID(ctx, id, userID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -432,15 +433,35 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	if req.Journal != nil {
 		updateData["journal"] = *req.Journal
 	}
+
+	var (
+		newStart *time.Time
+		newEnd   *time.Time
+	)
+
 	if req.StartDate != nil {
-		if t, err := timeutil.ParseDateTime(*req.StartDate); err == nil {
-			updateData["start_date"] = t
+		startStr := strings.TrimSpace(*req.StartDate)
+		if startStr == "" {
+			return nil, errors.ErrBadRequest.WithMessage("start_date cannot be empty")
 		}
+		t, err := timeutil.ParseDateTime(startStr)
+		if err != nil {
+			return nil, errors.ErrBadRequest.WithMessage("Invalid start_date format")
+		}
+		newStart = &t
+		updateData["start_date"] = t
 	}
 	if req.EndDate != nil {
-		if t, err := timeutil.ParseDateTime(*req.EndDate); err == nil {
-			updateData["end_date"] = t
+		endStr := strings.TrimSpace(*req.EndDate)
+		if endStr == "" {
+			return nil, errors.ErrBadRequest.WithMessage("end_date cannot be empty")
 		}
+		t, err := timeutil.ParseDateTime(endStr)
+		if err != nil {
+			return nil, errors.ErrBadRequest.WithMessage("Invalid end_date format")
+		}
+		newEnd = &t
+		updateData["end_date"] = t
 	}
 	if req.Completed != nil {
 		updateData["completed"] = *req.Completed
@@ -478,8 +499,20 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		}
 	}
 
+	finalStart := existing.StartDate
+	if newStart != nil {
+		finalStart = *newStart
+	}
+	finalEnd := existing.EndDate
+	if newEnd != nil {
+		finalEnd = *newEnd
+	}
+	if finalEnd.Before(finalStart) {
+		return nil, errors.ErrInvalidDateRange
+	}
+
 	// Use UPDATE query for reliable single-record update
-	_, err := database.QueryAll[taskDB](ctx, r.db, `
+	_, err = database.QueryAll[taskDB](ctx, r.db, `
 		UPDATE type::thing($id) MERGE $data
 	`, map[string]any{
 		"id":   taskID,

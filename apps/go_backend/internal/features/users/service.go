@@ -61,7 +61,11 @@ func (s *service) Update(ctx context.Context, requesterID, targetID string, req 
 		if email == "" {
 			return nil, errors.ErrValidationFailed.WithMessage("Email cannot be empty")
 		}
-		if existing, err := s.repo.FindByEmail(ctx, email); err == nil && existing != nil && existing.ID != target.ID {
+		existing, err := s.repo.FindByEmail(ctx, email)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil && existing.ID != target.ID {
 			return nil, errors.ErrConflict.WithMessage("Email already in use")
 		}
 
