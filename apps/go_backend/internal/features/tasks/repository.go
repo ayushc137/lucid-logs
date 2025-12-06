@@ -3,6 +3,7 @@
 // This package implements:
 //   - CRUD operations for tasks using typed SDK methods
 //   - Category linking (record links)
+//   - Emotion tracking with inferred emotion calculation
 //   - Soft delete support
 //   - Pagination
 //
@@ -19,6 +20,11 @@
 //   - Conversion to string happens in toTask() at the repository boundary
 //   - This enables type-safe queries without SELECT type::string(id) casts
 //
+// Emotion Tracking:
+//   - InferredEmotion is calculated on CREATE/UPDATE, not on GET
+//   - Uses weighted centroid of all emotion tags in positives/negatives
+//   - Stored in database for efficient querying
+//
 // See: https://surrealdb.com/docs/sdk/golang
 package tasks
 
@@ -30,6 +36,7 @@ import (
 	"time"
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
+	"github.com/lucid-logs/go-backend/internal/features/emotions"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
@@ -96,18 +103,23 @@ func NewRepository(db *database.DB) Repository {
 // The Category field uses categoryDB when fetched via FETCH clause,
 // which also uses models.RecordID for its ID.
 type taskDB struct {
-	ID        models.RecordID       `json:"id,omitempty"`
-	Title     string                `json:"title"`
-	Journal   string                `json:"journal"`
-	StartDate database.SurrealTime  `json:"start_date"`
-	EndDate   database.SurrealTime  `json:"end_date"`
-	Completed bool                  `json:"completed"`
-	Priority  int                   `json:"priority"`
-	Source    string                `json:"source"`
-	Note      string                `json:"note"`
-	Positives []string              `json:"positives"`
-	Negatives []string              `json:"negatives"`
-	Category  *categoryDB           `json:"category,omitempty"` // Hydrated via FETCH
+	ID        models.RecordID      `json:"id,omitempty"`
+	Title     string               `json:"title"`
+	Journal   string               `json:"journal"`
+	StartDate database.SurrealTime `json:"start_date"`
+	EndDate   database.SurrealTime `json:"end_date"`
+	Completed bool                 `json:"completed"`
+	Priority  int                  `json:"priority"`
+	Source    string               `json:"source"`
+	Note      string               `json:"note"`
+	Positives []TaskItem           `json:"positives"`
+	Negatives []TaskItem           `json:"negatives"`
+	Category  *categoryDB          `json:"category,omitempty"` // Hydrated via FETCH
+
+	// Emotion tracking
+	EmotionID       *string                   `json:"emotion_id,omitempty"`
+	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
+
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
@@ -169,23 +181,25 @@ func (t *taskDB) toTask() *Task {
 	}
 
 	return &Task{
-		ID:        database.ToStringID(t.ID),
-		Title:     t.Title,
-		Journal:   t.Journal,
-		StartDate: t.StartDate.Time,
-		EndDate:   t.EndDate.Time,
-		Completed: t.Completed,
-		Priority:  t.Priority,
-		Source:    t.Source,
-		Note:      t.Note,
-		Positives: t.Positives,
-		Negatives: t.Negatives,
-		Category:  cat,
-		CreatedAt: t.CreatedAt.Time,
-		UpdatedAt: t.UpdatedAt.Time,
-		DeletedAt: deletedAt,
-		CreatedBy: t.CreatedBy,
-		UpdatedBy: t.UpdatedBy,
+		ID:              database.ToStringID(t.ID),
+		Title:           t.Title,
+		Journal:         t.Journal,
+		StartDate:       t.StartDate.Time,
+		EndDate:         t.EndDate.Time,
+		Completed:       t.Completed,
+		Priority:        t.Priority,
+		Source:          t.Source,
+		Note:            t.Note,
+		Positives:       t.Positives,
+		Negatives:       t.Negatives,
+		Category:        cat,
+		EmotionID:       t.EmotionID,
+		InferredEmotion: t.InferredEmotion,
+		CreatedAt:       t.CreatedAt.Time,
+		UpdatedAt:       t.UpdatedAt.Time,
+		DeletedAt:       deletedAt,
+		CreatedBy:       t.CreatedBy,
+		UpdatedBy:       t.UpdatedBy,
 	}
 }
 
@@ -206,13 +220,18 @@ type taskCreateData struct {
 	Priority  int              `json:"priority"`
 	Source    string           `json:"source"`
 	Note      string           `json:"note"`
-	Positives []string         `json:"positives"`
-	Negatives []string         `json:"negatives"`
+	Positives []TaskItem       `json:"positives"`
+	Negatives []TaskItem       `json:"negatives"`
 	Category  *models.RecordID `json:"category,omitempty"` // Record link or nil
-	CreatedBy string           `json:"created_by"`
-	UpdatedBy string           `json:"updated_by"`
-	CreatedAt time.Time        `json:"created_at"`
-	UpdatedAt time.Time        `json:"updated_at"`
+
+	// Emotion tracking
+	EmotionID       *string                   `json:"emotion_id,omitempty"`
+	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
+
+	CreatedBy string    `json:"created_by"`
+	UpdatedBy string    `json:"updated_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // =============================================================================
@@ -317,6 +336,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 //
 // This uses database.Create[T]() for type-safe record creation.
 // Category links use models.RecordID for type-safe record references.
+// InferredEmotion is calculated at write time from positives/negatives emotions.
 // See: https://surrealdb.com/docs/sdk/golang/methods/create
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Task, error) {
 	// Validate category ownership if provided
@@ -341,15 +361,25 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	// Prepare default values
 	positives := req.Positives
 	if positives == nil {
-		positives = []string{}
+		positives = []TaskItem{}
 	}
 	negatives := req.Negatives
 	if negatives == nil {
-		negatives = []string{}
+		negatives = []TaskItem{}
 	}
 	source := req.Source
 	if source == "" {
 		source = SourceManual
+	}
+
+	// Calculate inferred emotion from positives/negatives
+	var inferredEmotion *emotions.InferredEmotion
+	emotionItems := toEmotionItems(positives, negatives)
+	if len(emotionItems.positives) > 0 || len(emotionItems.negatives) > 0 {
+		inferredEmotion = emotions.InferFromItems(emotionItems.positives, emotionItems.negatives)
+	} else if req.EmotionID != nil && *req.EmotionID != "" {
+		// Fall back to single emotion if no items have emotions
+		inferredEmotion = emotions.InferFromSingle(*req.EmotionID)
 	}
 
 	// Generate task ID using models.RecordID
@@ -358,21 +388,23 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 
 	// Create task data for SDK Create
 	createData := taskCreateData{
-		Title:     req.Title,
-		Journal:   req.Journal,
-		StartDate: startDate,
-		EndDate:   endDate,
-		Completed: false,
-		Priority:  req.Priority,
-		Source:    source,
-		Note:      req.Note,
-		Positives: positives,
-		Negatives: negatives,
-		Category:  categoryLink,
-		CreatedBy: userID,
-		UpdatedBy: userID,
-		CreatedAt: now,
-		UpdatedAt: now,
+		Title:           req.Title,
+		Journal:         req.Journal,
+		StartDate:       startDate,
+		EndDate:         endDate,
+		Completed:       false,
+		Priority:        req.Priority,
+		Source:          source,
+		Note:            req.Note,
+		Positives:       positives,
+		Negatives:       negatives,
+		Category:        categoryLink,
+		EmotionID:       req.EmotionID,
+		InferredEmotion: inferredEmotion,
+		CreatedBy:       userID,
+		UpdatedBy:       userID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	// Use CREATE query but only decode the ID to avoid time parsing issues
@@ -398,10 +430,14 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		return nil, errors.ErrInternal.WithMessage("Failed to create task")
 	}
 
-	r.logger.Info().Str("task_id", database.ToStringID(taskID)).Msg("task created via SDK")
+	taskIDStr := database.ToStringID(taskID)
+	r.logger.Info().Str("task_id", taskIDStr).Msg("task created via SDK")
+
+	// Sync emotion edges for analytics (async-safe, errors logged not returned)
+	r.syncEmotionEdges(ctx, taskIDStr, req.EmotionID, positives, negatives)
 
 	// Fetch and return the created task (with category hydrated)
-	return r.FindByID(ctx, database.ToStringID(taskID), userID)
+	return r.FindByID(ctx, taskIDStr, userID)
 }
 
 // =============================================================================
@@ -411,6 +447,7 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 // Update updates an existing task using query-based UPDATE.
 //
 // Uses UPDATE query for reliable single-record updates with models.RecordID.
+// Recalculates InferredEmotion when positives/negatives or emotion_id changes.
 func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
 	// Verify task exists and user has ownership
 	existing, err := r.FindByID(ctx, id, userID)
@@ -479,6 +516,18 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		updateData["negatives"] = req.Negatives
 	}
 
+	// Handle emotion fields
+	emotionChanged := false
+	if req.EmotionID != nil {
+		emotionID := strings.TrimSpace(*req.EmotionID)
+		if emotionID == "" {
+			updateData["emotion_id"] = nil
+		} else {
+			updateData["emotion_id"] = emotionID
+		}
+		emotionChanged = true
+	}
+
 	// Handle category update
 	if req.CategoryID != nil {
 		catID := strings.TrimSpace(*req.CategoryID)
@@ -511,6 +560,36 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		return nil, errors.ErrInvalidDateRange
 	}
 
+	// Determine final values for positives, negatives, and emotion
+	finalPositives := existing.Positives
+	if req.Positives != nil {
+		finalPositives = req.Positives
+	}
+	finalNegatives := existing.Negatives
+	if req.Negatives != nil {
+		finalNegatives = req.Negatives
+	}
+	finalEmotionID := existing.EmotionID
+	if req.EmotionID != nil {
+		finalEmotionID = req.EmotionID
+	}
+
+	// Recalculate inferred emotion if positives, negatives, or emotion changed
+	if req.Positives != nil || req.Negatives != nil || emotionChanged {
+		// Calculate inferred emotion
+		emotionItems := toEmotionItems(finalPositives, finalNegatives)
+		if len(emotionItems.positives) > 0 || len(emotionItems.negatives) > 0 {
+			updateData["inferred_emotion"] = emotions.InferFromItems(emotionItems.positives, emotionItems.negatives)
+		} else {
+			// Fall back to single emotion
+			if finalEmotionID != nil && *finalEmotionID != "" {
+				updateData["inferred_emotion"] = emotions.InferFromSingle(*finalEmotionID)
+			} else {
+				updateData["inferred_emotion"] = nil
+			}
+		}
+	}
+
 	// Use UPDATE query for reliable single-record update
 	_, err = database.QueryAll[taskDB](ctx, r.db, `
 		UPDATE type::thing($id) MERGE $data
@@ -524,6 +603,11 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	r.logger.Info().Str("task_id", id).Msg("task updated via UPDATE query")
+
+	// Sync emotion edges for analytics (async-safe, errors logged not returned)
+	if req.Positives != nil || req.Negatives != nil || emotionChanged {
+		r.syncEmotionEdges(ctx, id, finalEmotionID, finalPositives, finalNegatives)
+	}
 
 	// Fetch and return updated task with category hydrated
 	return r.FindByID(ctx, id, userID)
@@ -614,5 +698,105 @@ func generateTaskRecordID() models.RecordID {
 func sanitizeCategory(task *Task) {
 	if task.Category != nil && task.Category.DeletedAt != nil {
 		task.Category = nil
+	}
+}
+
+// emotionItemsResult holds converted emotion items for inference calculation.
+type emotionItemsResult struct {
+	positives []emotions.TaskItem
+	negatives []emotions.TaskItem
+}
+
+// toEmotionItems converts TaskItem slices to emotions.TaskItem slices for inference.
+func toEmotionItems(positives, negatives []TaskItem) emotionItemsResult {
+	result := emotionItemsResult{
+		positives: make([]emotions.TaskItem, len(positives)),
+		negatives: make([]emotions.TaskItem, len(negatives)),
+	}
+
+	for i, item := range positives {
+		result.positives[i] = emotions.TaskItem{
+			Text:      item.Text,
+			EmotionID: item.EmotionID,
+		}
+	}
+
+	for i, item := range negatives {
+		result.negatives[i] = emotions.TaskItem{
+			Text:      item.Text,
+			EmotionID: item.EmotionID,
+		}
+	}
+
+	return result
+}
+
+// =============================================================================
+// EMOTION EDGE SYNC
+// =============================================================================
+
+// syncEmotionEdges creates graph edges linking task to emotions for analytics.
+// This enables efficient queries like "all tasks where user felt E16" and
+// emotion frequency aggregations.
+//
+// Edge types:
+//   - "primary": The main emotion selected for the task
+//   - "positive": Emotions from positive items
+//   - "negative": Emotions from negative items
+func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotionID *string, positives, negatives []TaskItem) {
+	// Delete existing edges for this task
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE task_emotions WHERE in = type::thing($task_id)
+	`, map[string]any{
+		"task_id": database.MustRecordID(Table, taskID),
+	})
+	if err != nil {
+		r.logger.Warn().Err(err).Str("task_id", taskID).Msg("failed to delete old emotion edges")
+	}
+
+	// Create edge for primary emotion
+	if emotionID != nil && *emotionID != "" {
+		r.createEmotionEdge(ctx, taskID, *emotionID, "primary", nil)
+	}
+
+	// Create edges for positive items
+	for _, item := range positives {
+		if item.EmotionID != nil && *item.EmotionID != "" {
+			r.createEmotionEdge(ctx, taskID, *item.EmotionID, "positive", &item.Text)
+		}
+	}
+
+	// Create edges for negative items
+	for _, item := range negatives {
+		if item.EmotionID != nil && *item.EmotionID != "" {
+			r.createEmotionEdge(ctx, taskID, *item.EmotionID, "negative", &item.Text)
+		}
+	}
+}
+
+// createEmotionEdge creates a single task -> emotion edge.
+func (r *repository) createEmotionEdge(ctx context.Context, taskID, emotionID, edgeType string, text *string) {
+	data := map[string]any{
+		"type": edgeType,
+	}
+	if text != nil {
+		data["text"] = *text
+	}
+
+	// RELATE requires proper record IDs: tasks:xxx -> task_emotions -> emotions:E16
+	_, err := database.QueryAll[any](ctx, r.db, `
+		RELATE $task_id->task_emotions->$emotion_id CONTENT $data
+	`, map[string]any{
+		"task_id":    database.MustRecordID(Table, taskID),
+		"emotion_id": database.NewRecordID("emotions", emotionID), // emotions:E16
+		"data":       data,
+	})
+	if err != nil {
+		r.logger.Warn().
+			Err(err).
+			Str("task_id", taskID).
+			Str("emotion_id", emotionID).
+			Str("type", edgeType).
+			Msg("failed to create emotion edge")
 	}
 }

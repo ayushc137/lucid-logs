@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/lucid-logs/go-backend/internal/features/emotions"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
 )
@@ -50,6 +51,7 @@ func New() *Validator {
 
 	// Register custom validations
 	_ = v.RegisterValidation("datetime_flexible", validateDateTimeFlexible)
+	_ = v.RegisterValidation("emotion_id", validateEmotionID)
 
 	return &Validator{v: v}
 }
@@ -122,6 +124,8 @@ func formatValidationMessage(e validator.FieldError) string {
 		return field + " must be a valid email address"
 	case "datetime_flexible":
 		return field + " must be a valid datetime (ISO8601 or YYYY-MM-DD)"
+	case "emotion_id":
+		return field + " must be a valid emotion ID (e.g., emotions:E16, emotions:E61)"
 	case "gtefield":
 		return field + " must be greater than or equal to " + e.Param()
 	case "oneof":
@@ -147,4 +151,14 @@ func validateDateTimeFlexible(fl validator.FieldLevel) bool {
 	}
 	_, err := timeutil.ParseDateTime(value)
 	return err == nil
+}
+
+// validateEmotionID validates that the value is a valid emotion ID.
+// Requires full format: "emotions:E16" (consistent with other IDs like categories:xxx).
+func validateEmotionID(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	if value == "" {
+		return true // Empty is OK, use 'required' tag for mandatory fields
+	}
+	return emotions.IsValidEmotionID(value)
 }

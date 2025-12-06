@@ -1,206 +1,54 @@
 # Database Migrations
 
-This directory contains versioned database migrations for the Daily Journal app.
+Simple migration files for SurrealDB. All migrations are idempotent (safe to run multiple times).
 
-## Architecture: Record Links
+## Files
 
-We use SurrealDB's **direct record links** for relationships:
+| File | Description |
+|------|-------------|
+| 001_core.surql | Users, categories, tasks tables + indexes |
+| 002_task_emotions.surql | Edge table for emotion analytics |
 
-```surql
--- Task stores a link to category
-task.category = categories:work123
+## Run Migrations
 
--- Query with FETCH hydrates the linked record
-SELECT *, category.* FROM tasks FETCH category
+```bash
+# Run all migrations (same namespace/database as Go app)
+cat db/migrations/*.surql | surreal sql \
+  --endpoint http://localhost:8000 \
+  --username <username> --password <pass> \
+  --namespace daily_journal --database core \
+  --hide-welcome
+
+# Or run specific migration
+cat db/migrations/001_core.surql | surreal sql \
+  --endpoint http://localhost:8000 \
+  --username <username> --password <pass> \
+  --namespace daily_journal --database core \
+  --hide-welcome
 ```
 
-### Why Record Links?
+## Architecture
 
-| Feature | Graph Edges | Record Links ✅ |
-|---------|-------------|-----------------|
-| Simplicity | Complex | Simple field |
-| One-to-Many | Works | ✅ Perfect fit |
-| Query syntax | `->edge->` | Dot notation |
-| FETCH support | Yes | ✅ Yes |
-| Performance | Good | ✅ Excellent |
-| Schema clarity | Hidden in edges | ✅ Visible in record |
+**Schemaless Tables**: We only define indexes for performance - data itself is flexible.
 
-### Query Examples
+**Record Links**: Tasks link to categories via `task.category = categories:abc123`
+
+**PERMISSIONS FULL**: The Go service handles authorization in code via `created_by` filters.
+
+## Query Examples
 
 ```sql
--- Get task with its category populated
+-- Task with category
 SELECT *, category.* FROM tasks:id FETCH category
 
--- Get all tasks with categories for a user
-SELECT *, category.* FROM tasks WHERE created_by = $user FETCH category
+-- Task's emotions
+SELECT ->task_emotions.* FROM tasks:abc
 
--- Filter tasks by category
-SELECT * FROM tasks WHERE category = categories:work123
+-- All tasks with emotion E16
+SELECT <-task_emotions<-tasks.* FROM "E16"
 
--- Get category with task count (reverse lookup)
-SELECT *, count(<-tasks) AS task_count FROM categories
+-- Emotion frequency
+SELECT out as emotion, count() FROM task_emotions 
+WHERE in.created_by = $user GROUP BY out
 ```
 
-## Permissions Model
-
-Tables use `PERMISSIONS FULL` because:
-- The Axum service runs as a root/service account
-- Multi-tenancy is enforced in Rust via `created_by` filters
-- This avoids `$auth.id` mismatch issues
-
-If per-request auth is needed later, issue Surreal tokens per request
-instead of using a shared root session.
-
-## Current Migrations
-
-| Version | Name | Description |
-|---------|------|-------------|
-| 000 | init | Migration tracking table |
-| 001 | auth | Authentication access & users |
-| 002 | categories | User-owned categories |
-| 003 | tasks | Tasks table with category record link |
-| 004 | relax_permissions | Service account permissions (FULL) |
-| 005 | composite_indexes | Optimized composite indexes & DB functions |
-
-## Commands
-
-```bash
-# Apply pending migrations
-task rust:migrate
-
-# Show migration status
-task rust:migrate:status
-
-# Create new migration
-task rust:migrate:new -- add_field
-
-# Preview migrations (dry run)
-task rust:migrate:dry-run
-
-# Validate migration checksums
-task rust:migrate:validate
-
-# Reset database (DESTRUCTIVE!)
-task rust:schema:reset
-```
-
-## Query Patterns
-
-Repositories use SurrealDB's fluent builders plus schema-defined functions:
-
-```rust
-// Fluent builder for mutations
-let created: Vec<Task> = db
-    .create("tasks")
-    .content(task_payload)
-    .await?;
-
-// Server-side function for reusable logic
-let mut result = db
-    .query("RETURN fn::task::count_for_user($user)")
-    .bind(("user", user_id.to_string()))
-    .await?;
-
-let total: i64 = result.take(0)?;
-```
-
-## Adding New Tables
-
-### Step 1: Create migration file
-
-```bash
-# Create new migration
-touch db/migrations/00N_my_feature.surql
-```
-
-### Step 2: Define the table
-
-```sql
--- db/migrations/00N_my_feature.surql
--- Migration: 00N_my_feature
--- Description: Add my_feature table
-
-DEFINE TABLE IF NOT EXISTS my_feature PERMISSIONS FULL;
-
--- Indexes for performance
-DEFINE INDEX IF NOT EXISTS idx_my_feature_user 
-  ON TABLE my_feature COLUMNS created_by;
-DEFINE INDEX IF NOT EXISTS idx_my_feature_user_active 
-  ON TABLE my_feature COLUMNS created_by, deleted_at;
-```
-
-### Step 3: Add record links (if needed)
-
-```sql
--- Task links to my_feature
--- In your repository, store as: my_feature = my_feature:abc123
-
--- Composite index on the link
-DEFINE INDEX IF NOT EXISTS idx_tasks_my_feature 
-  ON TABLE tasks COLUMNS my_feature;
-```
-
-### Step 4: Update consolidated schema
-
-Add the same definitions to `db/schema.surql` for reference.
-
-## Database Functions
-
-SurrealDB functions run server-side for better performance:
-
-```sql
--- Define a reusable function
-DEFINE FUNCTION IF NOT EXISTS fn::task::count_for_user($user_id: string) {
-    RETURN (SELECT count() FROM tasks 
-            WHERE created_by = $user_id AND deleted_at = NONE 
-            GROUP ALL)[0].count OR 0
-};
-
--- Use in queries
-RETURN fn::task::count_for_user($user);
-```
-
-## Type-Safe IDs
-
-Use type-safe record ID wrappers in Rust:
-
-```rust
-use crate::shared::{TaskId, CategoryId};
-
-// Type-safe creation
-let task_id = TaskId::new("abc123");
-let category_id = CategoryId::new("categories:work");
-
-// Correct format guaranteed
-assert_eq!(task_id.full_id(), "tasks:abc123");
-assert_eq!(category_id.full_id(), "categories:work");
-```
-
-## Migration Best Practices
-
-### DO:
-- ✅ Create new migrations for schema changes
-- ✅ Use record links for one-to-many relationships
-- ✅ Add composite indexes for common query patterns
-- ✅ Use `DEFINE ... IF NOT EXISTS` for idempotency
-- ✅ Test on fresh database before deploying
-- ✅ Reuse SurrealDB functions + builder helpers to avoid duplicated SQL
-
-### DON'T:
-- ❌ Modify applied migrations
-- ❌ Delete migration files
-- ❌ Skip version numbers
-- ❌ Use format!() for table names in queries
-
-## Development vs Production
-
-### Development
-- Edit `db/schema.surql` for quick iteration
-- Auto-applies on server startup with hot-reload
-- Run `task rust:schema:apply` to manually apply
-
-### Production
-- Use versioned migrations only
-- Run `task rust:migrate` before deploying
-- Validate with `task rust:migrate:validate`
-- Back up data before migrating

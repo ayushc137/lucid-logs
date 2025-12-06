@@ -1,0 +1,124 @@
+-- Migration: 003_seed_emotions
+-- Description: Seed all 100 emotions with full 6D vectors
+--
+-- Fields:
+--   name, emoji, quadrant, x, y (grid position)
+--   valence: -1 to +1 (pleasant/unpleasant)
+--   arousal: -1 to +1 (high/low energy)
+--   dominance: -1 to +1 (in control/controlled)
+--   intensity: 0.1 to 1.0 (default weight)
+--   certainty: -1 to +1 (sure/unsure)
+--   social: -1 to +1 (social/individual focus)
+--   description: user-friendly explanation
+
+-- Clear existing emotions (idempotent)
+DELETE emotions;
+
+-- Yellow Quadrant (E01-E25): High Energy + Pleasant
+CREATE emotions:E01 CONTENT { name: "Ecstatic", emoji: "🤩", quadrant: "yellow", x: 1, y: 5, valence: 0.95, arousal: 0.95, dominance: 0.75, intensity: 1.0, certainty: 0.60, social: 0.20, description: "Over-the-moon happy, can't contain your joy" };
+CREATE emotions:E02 CONTENT { name: "Elated", emoji: "🥳", quadrant: "yellow", x: 2, y: 5, valence: 0.90, arousal: 0.90, dominance: 0.70, intensity: 0.95, certainty: 0.55, social: 0.25, description: "Thrilled and celebrating inside" };
+CREATE emotions:E03 CONTENT { name: "Excited", emoji: "🎉", quadrant: "yellow", x: 3, y: 5, valence: 0.85, arousal: 0.88, dominance: 0.65, intensity: 0.90, certainty: 0.40, social: 0.15, description: "Pumped up about something coming" };
+CREATE emotions:E04 CONTENT { name: "Thrilled", emoji: "🎢", quadrant: "yellow", x: 4, y: 5, valence: 0.88, arousal: 0.92, dominance: 0.60, intensity: 0.92, certainty: 0.35, social: 0.20, description: "Heart racing with anticipation" };
+CREATE emotions:E05 CONTENT { name: "Energized", emoji: "⚡", quadrant: "yellow", x: 5, y: 5, valence: 0.75, arousal: 0.90, dominance: 0.72, intensity: 0.85, certainty: 0.55, social: 0.00, description: "Buzzing with energy" };
+CREATE emotions:E06 CONTENT { name: "Joyful", emoji: "😁", quadrant: "yellow", x: 1, y: 4, valence: 0.90, arousal: 0.75, dominance: 0.70, intensity: 0.85, certainty: 0.50, social: 0.30, description: "Warm, deep happiness from within" };
+CREATE emotions:E07 CONTENT { name: "Delighted", emoji: "🌈", quadrant: "yellow", x: 2, y: 4, valence: 0.88, arousal: 0.72, dominance: 0.68, intensity: 0.82, certainty: 0.55, social: 0.35, description: "Pleasantly surprised and pleased" };
+CREATE emotions:E08 CONTENT { name: "Passionate", emoji: "❤️‍🔥", quadrant: "yellow", x: 3, y: 4, valence: 0.85, arousal: 0.88, dominance: 0.75, intensity: 0.90, certainty: 0.60, social: 0.30, description: "Deeply invested and engaged" };
+CREATE emotions:E09 CONTENT { name: "Enthusiastic", emoji: "🙌", quadrant: "yellow", x: 4, y: 4, valence: 0.82, arousal: 0.82, dominance: 0.68, intensity: 0.80, certainty: 0.50, social: 0.35, description: "Eager and ready to dive in" };
+CREATE emotions:E10 CONTENT { name: "Amazed", emoji: "🤯", quadrant: "yellow", x: 5, y: 4, valence: 0.82, arousal: 0.80, dominance: 0.40, intensity: 0.85, certainty: -0.45, social: 0.40, description: "Blown away by something incredible" };
+CREATE emotions:E11 CONTENT { name: "Proud", emoji: "🏆", quadrant: "yellow", x: 1, y: 3, valence: 0.85, arousal: 0.70, dominance: 0.90, intensity: 0.80, certainty: 0.75, social: -0.20, description: "Accomplished something meaningful" };
+CREATE emotions:E12 CONTENT { name: "Confident", emoji: "😎", quadrant: "yellow", x: 2, y: 3, valence: 0.80, arousal: 0.65, dominance: 0.92, intensity: 0.75, certainty: 0.85, social: -0.15, description: "Sure of yourself and your abilities" };
+CREATE emotions:E13 CONTENT { name: "Triumphant", emoji: "🥇", quadrant: "yellow", x: 3, y: 3, valence: 0.88, arousal: 0.78, dominance: 0.95, intensity: 0.88, certainty: 0.90, social: -0.10, description: "Won! Achieved a victory" };
+CREATE emotions:E14 CONTENT { name: "Determined", emoji: "💪", quadrant: "yellow", x: 4, y: 3, valence: 0.70, arousal: 0.85, dominance: 0.90, intensity: 0.85, certainty: 0.80, social: -0.20, description: "Nothing will stop you" };
+CREATE emotions:E15 CONTENT { name: "Motivated", emoji: "🔥", quadrant: "yellow", x: 5, y: 3, valence: 0.75, arousal: 0.80, dominance: 0.78, intensity: 0.78, certainty: 0.65, social: -0.10, description: "Driven to take action now" };
+CREATE emotions:E16 CONTENT { name: "Happy", emoji: "😊", quadrant: "yellow", x: 1, y: 2, valence: 0.80, arousal: 0.60, dominance: 0.65, intensity: 0.70, certainty: 0.60, social: 0.25, description: "Simply feeling good right now" };
+CREATE emotions:E17 CONTENT { name: "Cheerful", emoji: "😃", quadrant: "yellow", x: 2, y: 2, valence: 0.78, arousal: 0.65, dominance: 0.62, intensity: 0.68, certainty: 0.55, social: 0.40, description: "Upbeat and positive mood" };
+CREATE emotions:E18 CONTENT { name: "Inspired", emoji: "💡", quadrant: "yellow", x: 3, y: 2, valence: 0.85, arousal: 0.75, dominance: 0.72, intensity: 0.82, certainty: 0.45, social: 0.40, description: "Full of new ideas and motivation" };
+CREATE emotions:E19 CONTENT { name: "Accomplished", emoji: "✅", quadrant: "yellow", x: 4, y: 2, valence: 0.82, arousal: 0.55, dominance: 0.88, intensity: 0.72, certainty: 0.80, social: -0.15, description: "Finished something you worked hard on" };
+CREATE emotions:E20 CONTENT { name: "Playful", emoji: "😜", quadrant: "yellow", x: 5, y: 2, valence: 0.78, arousal: 0.75, dominance: 0.55, intensity: 0.70, certainty: 0.40, social: 0.50, description: "In a fun, silly mood" };
+CREATE emotions:E21 CONTENT { name: "Optimistic", emoji: "🌟", quadrant: "yellow", x: 1, y: 1, valence: 0.78, arousal: 0.58, dominance: 0.65, intensity: 0.62, certainty: 0.55, social: 0.15, description: "Expecting things to work out well" };
+CREATE emotions:E22 CONTENT { name: "Hopeful", emoji: "🌅", quadrant: "yellow", x: 2, y: 1, valence: 0.75, arousal: 0.55, dominance: 0.50, intensity: 0.65, certainty: -0.35, social: 0.20, description: "Believing good things are coming" };
+CREATE emotions:E23 CONTENT { name: "Curious", emoji: "🧐", quadrant: "yellow", x: 3, y: 1, valence: 0.70, arousal: 0.65, dominance: 0.55, intensity: 0.65, certainty: -0.30, social: 0.25, description: "Want to explore and learn more" };
+CREATE emotions:E24 CONTENT { name: "Fascinated", emoji: "🔍", quadrant: "yellow", x: 4, y: 1, valence: 0.78, arousal: 0.72, dominance: 0.50, intensity: 0.75, certainty: -0.25, social: 0.35, description: "Captivated by something interesting" };
+CREATE emotions:E25 CONTENT { name: "Amused", emoji: "😆", quadrant: "yellow", x: 5, y: 1, valence: 0.75, arousal: 0.65, dominance: 0.60, intensity: 0.68, certainty: 0.50, social: 0.45, description: "Something made you smile or laugh" };
+
+-- Green Quadrant (E26-E50): Low Energy + Pleasant
+CREATE emotions:E26 CONTENT { name: "Content", emoji: "☺️", quadrant: "green", x: 1, y: -1, valence: 0.82, arousal: -0.50, dominance: 0.72, intensity: 0.60, certainty: 0.70, social: 0.10, description: "Satisfied with how things are" };
+CREATE emotions:E27 CONTENT { name: "Satisfied", emoji: "👌", quadrant: "green", x: 2, y: -1, valence: 0.85, arousal: -0.45, dominance: 0.75, intensity: 0.65, certainty: 0.75, social: 0.10, description: "Got what you needed" };
+CREATE emotions:E28 CONTENT { name: "Fulfilled", emoji: "✨", quadrant: "green", x: 3, y: -1, valence: 0.90, arousal: -0.40, dominance: 0.82, intensity: 0.78, certainty: 0.80, social: 0.15, description: "Life feels complete and meaningful" };
+CREATE emotions:E29 CONTENT { name: "Relieved", emoji: "😮‍💨", quadrant: "green", x: 4, y: -1, valence: 0.75, arousal: -0.40, dominance: 0.62, intensity: 0.70, certainty: 0.65, social: 0.10, description: "A weight has been lifted" };
+CREATE emotions:E30 CONTENT { name: "Refreshed", emoji: "🌿", quadrant: "green", x: 5, y: -1, valence: 0.78, arousal: -0.35, dominance: 0.70, intensity: 0.65, certainty: 0.68, social: 0.05, description: "Renewed and ready again" };
+CREATE emotions:E31 CONTENT { name: "Grateful", emoji: "🙏", quadrant: "green", x: 1, y: -2, valence: 0.88, arousal: -0.35, dominance: 0.55, intensity: 0.75, certainty: 0.70, social: 0.80, description: "Thankful for what you have" };
+CREATE emotions:E32 CONTENT { name: "Thankful", emoji: "💝", quadrant: "green", x: 2, y: -2, valence: 0.85, arousal: -0.38, dominance: 0.52, intensity: 0.72, certainty: 0.68, social: 0.82, description: "Appreciating someone or something" };
+CREATE emotions:E33 CONTENT { name: "Blessed", emoji: "🌸", quadrant: "green", x: 3, y: -2, valence: 0.82, arousal: -0.40, dominance: 0.50, intensity: 0.68, certainty: 0.65, social: 0.78, description: "Feeling fortunate and lucky" };
+CREATE emotions:E34 CONTENT { name: "Connected", emoji: "🤝", quadrant: "green", x: 4, y: -2, valence: 0.85, arousal: -0.32, dominance: 0.55, intensity: 0.72, certainty: 0.55, social: 0.88, description: "Feeling close to others" };
+CREATE emotions:E35 CONTENT { name: "Belonging", emoji: "🏡", quadrant: "green", x: 5, y: -2, valence: 0.88, arousal: -0.35, dominance: 0.58, intensity: 0.75, certainty: 0.60, social: 0.90, description: "Part of something bigger than yourself" };
+CREATE emotions:E36 CONTENT { name: "Loving", emoji: "🥰", quadrant: "green", x: 1, y: -3, valence: 0.95, arousal: -0.30, dominance: 0.55, intensity: 0.85, certainty: 0.60, social: 0.95, description: "Heart full of love for someone" };
+CREATE emotions:E37 CONTENT { name: "Affectionate", emoji: "💕", quadrant: "green", x: 2, y: -3, valence: 0.88, arousal: -0.35, dominance: 0.52, intensity: 0.78, certainty: 0.58, social: 0.90, description: "Wanting to show warmth and care" };
+CREATE emotions:E38 CONTENT { name: "Tender", emoji: "💗", quadrant: "green", x: 3, y: -3, valence: 0.82, arousal: -0.42, dominance: 0.48, intensity: 0.72, certainty: 0.55, social: 0.85, description: "Soft, gentle feelings for someone" };
+CREATE emotions:E39 CONTENT { name: "Compassionate", emoji: "🤲", quadrant: "green", x: 4, y: -3, valence: 0.80, arousal: -0.30, dominance: 0.45, intensity: 0.70, certainty: 0.50, social: 0.92, description: "Caring deeply about others' wellbeing" };
+CREATE emotions:E40 CONTENT { name: "Thoughtful", emoji: "🤔", quadrant: "green", x: 5, y: -3, valence: 0.65, arousal: -0.40, dominance: 0.62, intensity: 0.55, certainty: 0.45, social: 0.35, description: "Reflecting and considering things" };
+CREATE emotions:E41 CONTENT { name: "Safe", emoji: "🔒", quadrant: "green", x: 1, y: -4, valence: 0.80, arousal: -0.55, dominance: 0.85, intensity: 0.62, certainty: 0.82, social: 0.15, description: "Protected and out of harm's way" };
+CREATE emotions:E42 CONTENT { name: "Secure", emoji: "🛡️", quadrant: "green", x: 2, y: -4, valence: 0.82, arousal: -0.52, dominance: 0.88, intensity: 0.65, certainty: 0.85, social: 0.12, description: "Stable and confident in your situation" };
+CREATE emotions:E43 CONTENT { name: "Comfortable", emoji: "🏠", quadrant: "green", x: 3, y: -4, valence: 0.78, arousal: -0.58, dominance: 0.72, intensity: 0.58, certainty: 0.72, social: 0.08, description: "At home and at ease" };
+CREATE emotions:E44 CONTENT { name: "Calm", emoji: "😌", quadrant: "green", x: 4, y: -4, valence: 0.80, arousal: -0.65, dominance: 0.72, intensity: 0.60, certainty: 0.72, social: 0.00, description: "Relaxed and in control" };
+CREATE emotions:E45 CONTENT { name: "Relaxed", emoji: "🛋️", quadrant: "green", x: 5, y: -4, valence: 0.78, arousal: -0.70, dominance: 0.68, intensity: 0.58, certainty: 0.68, social: 0.05, description: "Body and mind at ease" };
+CREATE emotions:E46 CONTENT { name: "Serene", emoji: "🧘", quadrant: "green", x: 1, y: -5, valence: 0.90, arousal: -0.80, dominance: 0.75, intensity: 0.70, certainty: 0.80, social: 0.00, description: "Deep inner peace and stillness" };
+CREATE emotions:E47 CONTENT { name: "Tranquil", emoji: "🌊", quadrant: "green", x: 2, y: -5, valence: 0.88, arousal: -0.82, dominance: 0.72, intensity: 0.65, certainty: 0.78, social: 0.00, description: "Like still water, completely calm" };
+CREATE emotions:E48 CONTENT { name: "Peaceful", emoji: "☮️", quadrant: "green", x: 3, y: -5, valence: 0.85, arousal: -0.75, dominance: 0.70, intensity: 0.65, certainty: 0.75, social: 0.05, description: "No worries, everything feels okay" };
+CREATE emotions:E49 CONTENT { name: "Rested", emoji: "🔋", quadrant: "green", x: 4, y: -5, valence: 0.75, arousal: -0.45, dominance: 0.72, intensity: 0.62, certainty: 0.70, social: 0.05, description: "Recovered and recharged" };
+CREATE emotions:E50 CONTENT { name: "Mellow", emoji: "🍃", quadrant: "green", x: 5, y: -5, valence: 0.72, arousal: -0.68, dominance: 0.62, intensity: 0.52, certainty: 0.62, social: 0.10, description: "Easygoing and laid-back" };
+
+-- Red Quadrant (E51-E75): High Energy + Unpleasant
+CREATE emotions:E51 CONTENT { name: "Enraged", emoji: "🤬", quadrant: "red", x: -5, y: 5, valence: -0.95, arousal: 0.98, dominance: 0.85, intensity: 1.0, certainty: 0.80, social: 0.45, description: "Furious beyond words" };
+CREATE emotions:E52 CONTENT { name: "Furious", emoji: "😡", quadrant: "red", x: -4, y: 5, valence: -0.90, arousal: 0.95, dominance: 0.80, intensity: 0.95, certainty: 0.75, social: 0.40, description: "Extremely angry, ready to explode" };
+CREATE emotions:E53 CONTENT { name: "Terrified", emoji: "😱", quadrant: "red", x: -3, y: 5, valence: -0.92, arousal: 0.98, dominance: -0.90, intensity: 1.0, certainty: -0.85, social: -0.30, description: "Extreme fear, frozen or panicking" };
+CREATE emotions:E54 CONTENT { name: "Panicked", emoji: "🆘", quadrant: "red", x: -2, y: 5, valence: -0.88, arousal: 0.95, dominance: -0.85, intensity: 0.95, certainty: -0.80, social: -0.25, description: "Everything feels out of control" };
+CREATE emotions:E55 CONTENT { name: "Overwhelmed", emoji: "😵", quadrant: "red", x: -1, y: 5, valence: -0.78, arousal: 0.88, dominance: -0.82, intensity: 0.90, certainty: -0.75, social: -0.20, description: "Too much to handle right now" };
+CREATE emotions:E56 CONTENT { name: "Angry", emoji: "😠", quadrant: "red", x: -5, y: 4, valence: -0.80, arousal: 0.88, dominance: 0.65, intensity: 0.85, certainty: 0.70, social: 0.35, description: "Mad at someone or something" };
+CREATE emotions:E57 CONTENT { name: "Scared", emoji: "😨", quadrant: "red", x: -4, y: 4, valence: -0.78, arousal: 0.82, dominance: -0.72, intensity: 0.82, certainty: -0.65, social: -0.15, description: "Something feels threatening" };
+CREATE emotions:E58 CONTENT { name: "Frightened", emoji: "😧", quadrant: "red", x: -3, y: 4, valence: -0.75, arousal: 0.78, dominance: -0.68, intensity: 0.78, certainty: -0.60, social: -0.12, description: "Startled or alarmed by danger" };
+CREATE emotions:E59 CONTENT { name: "Stressed", emoji: "🤯", quadrant: "red", x: -2, y: 4, valence: -0.70, arousal: 0.82, dominance: -0.55, intensity: 0.82, certainty: -0.40, social: -0.05, description: "Under too much pressure" };
+CREATE emotions:E60 CONTENT { name: "Anxious", emoji: "😰", quadrant: "red", x: -1, y: 4, valence: -0.70, arousal: 0.75, dominance: -0.60, intensity: 0.75, certainty: -0.70, social: -0.10, description: "Worried about what might happen" };
+CREATE emotions:E61 CONTENT { name: "Frustrated", emoji: "😤", quadrant: "red", x: -5, y: 3, valence: -0.65, arousal: 0.78, dominance: 0.35, intensity: 0.75, certainty: 0.45, social: 0.15, description: "Blocked from what you want to do" };
+CREATE emotions:E62 CONTENT { name: "Exasperated", emoji: "🤦", quadrant: "red", x: -4, y: 3, valence: -0.68, arousal: 0.75, dominance: 0.30, intensity: 0.78, certainty: 0.40, social: 0.25, description: "At your wit's end, fed up" };
+CREATE emotions:E63 CONTENT { name: "Aggravated", emoji: "💢", quadrant: "red", x: -3, y: 3, valence: -0.62, arousal: 0.70, dominance: 0.48, intensity: 0.72, certainty: 0.50, social: 0.30, description: "Annoyance building up" };
+CREATE emotions:E64 CONTENT { name: "Tense", emoji: "😣", quadrant: "red", x: -2, y: 3, valence: -0.60, arousal: 0.72, dominance: -0.48, intensity: 0.70, certainty: -0.35, social: -0.08, description: "Body and mind wound up tight" };
+CREATE emotions:E65 CONTENT { name: "Worried", emoji: "😟", quadrant: "red", x: -1, y: 3, valence: -0.62, arousal: 0.65, dominance: -0.52, intensity: 0.68, certainty: -0.65, social: 0.20, description: "Concerned about something" };
+CREATE emotions:E66 CONTENT { name: "Irritated", emoji: "😒", quadrant: "red", x: -5, y: 2, valence: -0.55, arousal: 0.60, dominance: 0.45, intensity: 0.60, certainty: 0.55, social: 0.25, description: "Something's getting on your nerves" };
+CREATE emotions:E67 CONTENT { name: "Annoyed", emoji: "🙄", quadrant: "red", x: -4, y: 2, valence: -0.50, arousal: 0.55, dominance: 0.42, intensity: 0.55, certainty: 0.52, social: 0.22, description: "Bothered by something small" };
+CREATE emotions:E68 CONTENT { name: "Pressured", emoji: "🏋️", quadrant: "red", x: -3, y: 2, valence: -0.58, arousal: 0.68, dominance: -0.42, intensity: 0.68, certainty: -0.30, social: 0.15, description: "Feeling pushed by deadlines or demands" };
+CREATE emotions:E69 CONTENT { name: "Nervous", emoji: "😬", quadrant: "red", x: -2, y: 2, valence: -0.58, arousal: 0.68, dominance: -0.55, intensity: 0.65, certainty: -0.55, social: 0.05, description: "Butterflies in your stomach" };
+CREATE emotions:E70 CONTENT { name: "Uneasy", emoji: "🫤", quadrant: "red", x: -1, y: 2, valence: -0.52, arousal: 0.55, dominance: -0.45, intensity: 0.58, certainty: -0.50, social: 0.08, description: "Something feels off" };
+CREATE emotions:E71 CONTENT { name: "Jealous", emoji: "💚", quadrant: "red", x: -5, y: 1, valence: -0.65, arousal: 0.62, dominance: -0.40, intensity: 0.72, certainty: 0.30, social: 0.75, description: "Wanting what someone else has" };
+CREATE emotions:E72 CONTENT { name: "Envious", emoji: "👀", quadrant: "red", x: -4, y: 1, valence: -0.60, arousal: 0.55, dominance: -0.35, intensity: 0.68, certainty: 0.25, social: 0.78, description: "Wishing you had their success" };
+CREATE emotions:E73 CONTENT { name: "Resentful", emoji: "😾", quadrant: "red", x: -3, y: 1, valence: -0.68, arousal: 0.58, dominance: 0.40, intensity: 0.75, certainty: 0.55, social: 0.60, description: "Holding onto past hurts" };
+CREATE emotions:E74 CONTENT { name: "Restless", emoji: "🦶", quadrant: "red", x: -2, y: 1, valence: -0.40, arousal: 0.72, dominance: -0.35, intensity: 0.60, certainty: -0.30, social: -0.05, description: "Can't sit still or settle down" };
+CREATE emotions:E75 CONTENT { name: "Impatient", emoji: "⏰", quadrant: "red", x: -1, y: 1, valence: -0.48, arousal: 0.68, dominance: 0.30, intensity: 0.62, certainty: 0.40, social: 0.20, description: "Wanting things to happen faster" };
+
+-- Blue Quadrant (E76-E100): Low Energy + Unpleasant
+CREATE emotions:E76 CONTENT { name: "Disappointed", emoji: "😕", quadrant: "blue", x: -5, y: -1, valence: -0.65, arousal: -0.42, dominance: -0.38, intensity: 0.68, certainty: 0.40, social: 0.25, description: "Things didn't turn out as hoped" };
+CREATE emotions:E77 CONTENT { name: "Discouraged", emoji: "📉", quadrant: "blue", x: -4, y: -1, valence: -0.60, arousal: -0.48, dominance: -0.52, intensity: 0.65, certainty: -0.25, social: 0.10, description: "Lost confidence, want to give up" };
+CREATE emotions:E78 CONTENT { name: "Down", emoji: "😔", quadrant: "blue", x: -3, y: -1, valence: -0.68, arousal: -0.58, dominance: -0.45, intensity: 0.68, certainty: -0.35, social: 0.05, description: "Low mood, not yourself today" };
+CREATE emotions:E79 CONTENT { name: "Unhappy", emoji: "🙁", quadrant: "blue", x: -2, y: -1, valence: -0.65, arousal: -0.50, dominance: -0.42, intensity: 0.62, certainty: -0.30, social: 0.08, description: "Things aren't going well" };
+CREATE emotions:E80 CONTENT { name: "Embarrassed", emoji: "🫣", quadrant: "blue", x: -1, y: -1, valence: -0.58, arousal: -0.25, dominance: -0.55, intensity: 0.65, certainty: 0.35, social: 0.75, description: "Awkward moment, want to hide" };
+CREATE emotions:E81 CONTENT { name: "Guilty", emoji: "😖", quadrant: "blue", x: -5, y: -2, valence: -0.72, arousal: -0.38, dominance: -0.65, intensity: 0.78, certainty: 0.60, social: 0.55, description: "Did something wrong, feel bad about it" };
+CREATE emotions:E82 CONTENT { name: "Ashamed", emoji: "😳", quadrant: "blue", x: -4, y: -2, valence: -0.82, arousal: -0.42, dominance: -0.75, intensity: 0.85, certainty: 0.55, social: 0.60, description: "Deeply embarrassed about yourself" };
+CREATE emotions:E83 CONTENT { name: "Remorseful", emoji: "🥺", quadrant: "blue", x: -3, y: -2, valence: -0.75, arousal: -0.45, dominance: -0.68, intensity: 0.80, certainty: 0.58, social: 0.52, description: "Wishing you could take it back" };
+CREATE emotions:E84 CONTENT { name: "Sad", emoji: "😢", quadrant: "blue", x: -2, y: -2, valence: -0.75, arousal: -0.55, dominance: -0.50, intensity: 0.75, certainty: -0.40, social: 0.10, description: "Feeling down and unhappy" };
+CREATE emotions:E85 CONTENT { name: "Gloomy", emoji: "🌧️", quadrant: "blue", x: -1, y: -2, valence: -0.62, arousal: -0.62, dominance: -0.48, intensity: 0.60, certainty: -0.45, social: -0.10, description: "Dark cloud hanging over you" };
+CREATE emotions:E86 CONTENT { name: "Lonely", emoji: "🚶", quadrant: "blue", x: -5, y: -3, valence: -0.72, arousal: -0.52, dominance: -0.58, intensity: 0.75, certainty: -0.35, social: -0.85, description: "Feeling disconnected from others" };
+CREATE emotions:E87 CONTENT { name: "Isolated", emoji: "🏝️", quadrant: "blue", x: -4, y: -3, valence: -0.70, arousal: -0.55, dominance: -0.55, intensity: 0.72, certainty: -0.40, social: -0.90, description: "Cut off from everyone" };
+CREATE emotions:E88 CONTENT { name: "Alienated", emoji: "👤", quadrant: "blue", x: -3, y: -3, valence: -0.68, arousal: -0.48, dominance: -0.52, intensity: 0.70, certainty: -0.42, social: -0.88, description: "Don't fit in, don't belong" };
+CREATE emotions:E89 CONTENT { name: "Heartbroken", emoji: "💔", quadrant: "blue", x: -2, y: -3, valence: -0.88, arousal: -0.65, dominance: -0.80, intensity: 0.92, certainty: -0.70, social: 0.70, description: "Deep pain from loss or rejection" };
+CREATE emotions:E90 CONTENT { name: "Devastated", emoji: "🖤", quadrant: "blue", x: -1, y: -3, valence: -0.90, arousal: -0.70, dominance: -0.85, intensity: 0.95, certainty: -0.75, social: 0.25, description: "Completely crushed by something" };
+CREATE emotions:E91 CONTENT { name: "Tired", emoji: "😴", quadrant: "blue", x: -5, y: -4, valence: -0.45, arousal: -0.80, dominance: -0.42, intensity: 0.70, certainty: -0.10, social: -0.05, description: "Need rest, running on fumes" };
+CREATE emotions:E92 CONTENT { name: "Fatigued", emoji: "😪", quadrant: "blue", x: -4, y: -4, valence: -0.48, arousal: -0.85, dominance: -0.48, intensity: 0.75, certainty: -0.15, social: -0.08, description: "Physically worn out" };
+CREATE emotions:E93 CONTENT { name: "Drained", emoji: "🪫", quadrant: "blue", x: -3, y: -4, valence: -0.55, arousal: -0.88, dominance: -0.55, intensity: 0.82, certainty: -0.18, social: -0.12, description: "Energy tank is empty" };
+CREATE emotions:E94 CONTENT { name: "Exhausted", emoji: "😩", quadrant: "blue", x: -2, y: -4, valence: -0.58, arousal: -0.92, dominance: -0.58, intensity: 0.85, certainty: -0.20, social: -0.15, description: "Completely drained, nothing left" };
+CREATE emotions:E95 CONTENT { name: "Bored", emoji: "😑", quadrant: "blue", x: -1, y: -4, valence: -0.38, arousal: -0.68, dominance: -0.20, intensity: 0.45, certainty: 0.30, social: -0.20, description: "Nothing interesting, need stimulation" };
+CREATE emotions:E96 CONTENT { name: "Depressed", emoji: "😞", quadrant: "blue", x: -5, y: -5, valence: -0.88, arousal: -0.82, dominance: -0.78, intensity: 0.88, certainty: -0.70, social: -0.50, description: "Persistent heaviness and sadness" };
+CREATE emotions:E97 CONTENT { name: "Hopeless", emoji: "🕳️", quadrant: "blue", x: -4, y: -5, valence: -0.92, arousal: -0.80, dominance: -0.90, intensity: 0.92, certainty: -0.88, social: -0.40, description: "Can't see any way forward" };
+CREATE emotions:E98 CONTENT { name: "Despairing", emoji: "😭", quadrant: "blue", x: -3, y: -5, valence: -0.95, arousal: -0.85, dominance: -0.92, intensity: 0.98, certainty: -0.85, social: -0.45, description: "No hope left, in deep pain" };
+CREATE emotions:E99 CONTENT { name: "Numb", emoji: "😶‍🌫️", quadrant: "blue", x: -2, y: -5, valence: -0.50, arousal: -0.85, dominance: -0.68, intensity: 0.35, certainty: -0.50, social: -0.55, description: "Can't feel anything at all" };
+CREATE emotions:E100 CONTENT { name: "Apathetic", emoji: "😐", quadrant: "blue", x: -1, y: -5, valence: -0.45, arousal: -0.75, dominance: -0.30, intensity: 0.40, certainty: 0.25, social: -0.40, description: "Don't care about anything" };
+

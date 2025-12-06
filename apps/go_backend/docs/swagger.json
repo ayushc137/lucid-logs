@@ -1,0 +1,1421 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Daily journal backend powered by SurrealDB.",
+        "title": "Lucid Logs API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/api/v1/auth/login": {
+            "post": {
+                "description": "Authenticate user and return JWT token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "User login",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/register": {
+            "post": {
+                "description": "Create a new user and return JWT token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "User registration",
+                "parameters": [
+                    {
+                        "description": "Registration details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/categories": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated categories for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "List categories",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/categories.CategoryPageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a category for organizing tasks",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Create category",
+                "parameters": [
+                    {
+                        "description": "Category data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/categories.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/categories/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a single category by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Get category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the name or color of a category",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Update category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/categories.UpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft delete a category",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Delete category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/emotions/grid": {
+            "get": {
+                "description": "Get all 100 Yale RULER emotions organized by quadrant for mood meter display",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "emotions"
+                ],
+                "summary": "Get emotion grid",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/emotions.GridResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/emotions/{id}": {
+            "get": {
+                "description": "Get detailed information about a single emotion",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "emotions"
+                ],
+                "summary": "Get emotion by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Emotion ID (e.g., Y01, G15, R03, B10)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/emotions.EmotionDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/health": {
+            "get": {
+                "description": "Returns health status including database connectivity",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check with database status",
+                "responses": {
+                    "200": {
+                        "description": "Healthy",
+                        "schema": {
+                            "$ref": "#/definitions/health.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Database unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of tasks for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "List tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tasks.TaskPageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new task",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Create task",
+                "parameters": [
+                    {
+                        "description": "Task data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tasks.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/tasks.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a single task by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Get task by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tasks.Task"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing task",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Update task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tasks.UpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tasks.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft delete a task",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Delete task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns 200 OK if the service is running",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Basic health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/health.HealthResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "auth.AuthResponse": {
+            "description": "Authentication response with JWT token",
+            "type": "object",
+            "properties": {
+                "is_admin": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9..."
+                },
+                "user": {
+                    "type": "string",
+                    "example": "user:abc123"
+                }
+            }
+        },
+        "auth.LoginRequest": {
+            "description": "Login request payload",
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "adminadmin"
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "admin@example.com"
+                }
+            }
+        },
+        "auth.RegisterRequest": {
+            "description": "Registration request payload",
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "password123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "user@example.com"
+                }
+            }
+        },
+        "categories.Category": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "categories.CategoryPageResponse": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/categories.Category"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "categories.CreateRequest": {
+            "description": "Request payload for creating a category",
+            "type": "object",
+            "required": [
+                "color",
+                "name"
+            ],
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1,
+                    "example": "#3B82F6"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "example": "Work"
+                }
+            }
+        },
+        "categories.UpdateRequest": {
+            "description": "Request payload for updating a category",
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1,
+                    "example": "#10B981"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "example": "Personal"
+                }
+            }
+        },
+        "emotions.EmotionDetail": {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "description": "Arousal",
+                    "type": "number"
+                },
+                "c": {
+                    "description": "Certainty",
+                    "type": "number"
+                },
+                "d": {
+                    "description": "Dominance",
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "emoji": {
+                    "type": "string"
+                },
+                "i": {
+                    "description": "Default Intensity",
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quadrant": {
+                    "$ref": "#/definitions/emotions.Quadrant"
+                },
+                "s": {
+                    "description": "Social",
+                    "type": "number"
+                },
+                "v": {
+                    "description": "Valence",
+                    "type": "number"
+                }
+            }
+        },
+        "emotions.GridEmotion": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "emoji": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quadrant": {
+                    "$ref": "#/definitions/emotions.Quadrant"
+                },
+                "quadrant_x": {
+                    "description": "-1 or +1 (for grid placement)",
+                    "type": "integer"
+                },
+                "quadrant_y": {
+                    "description": "-1 or +1 (for grid placement)",
+                    "type": "integer"
+                },
+                "x": {
+                    "description": "Valence: -1 to +1 (horizontal axis, precise)",
+                    "type": "number"
+                },
+                "y": {
+                    "description": "Arousal: -1 to +1 (vertical axis, precise)",
+                    "type": "number"
+                }
+            }
+        },
+        "emotions.GridResponse": {
+            "type": "object",
+            "properties": {
+                "blue": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                },
+                "green": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                },
+                "red": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "yellow": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                }
+            }
+        },
+        "emotions.InferredEmotion": {
+            "type": "object",
+            "properties": {
+                "arousal": {
+                    "description": "-1 to +1",
+                    "type": "number"
+                },
+                "closest_emotion_id": {
+                    "description": "Nearest Yale RULER emotion",
+                    "type": "string"
+                },
+                "closest_emotion_name": {
+                    "type": "string"
+                },
+                "dissonance": {
+                    "description": "0-1: internal conflict score",
+                    "type": "number"
+                },
+                "dominance": {
+                    "description": "-1 to +1",
+                    "type": "number"
+                },
+                "negative_count": {
+                    "description": "Number of negative items with emotions",
+                    "type": "integer"
+                },
+                "positive_count": {
+                    "description": "Metadata",
+                    "type": "integer"
+                },
+                "quadrant": {
+                    "description": "Classification",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/emotions.Quadrant"
+                        }
+                    ]
+                },
+                "valence": {
+                    "description": "Weighted centroid coordinates",
+                    "type": "number"
+                }
+            }
+        },
+        "emotions.Quadrant": {
+            "type": "string",
+            "enum": [
+                "yellow",
+                "green",
+                "red",
+                "blue"
+            ],
+            "x-enum-comments": {
+                "QuadrantBlue": "Low Energy + Unpleasant",
+                "QuadrantGreen": "Low Energy + Pleasant",
+                "QuadrantRed": "High Energy + Unpleasant",
+                "QuadrantYellow": "High Energy + Pleasant"
+            },
+            "x-enum-descriptions": [
+                "High Energy + Pleasant",
+                "Low Energy + Pleasant",
+                "High Energy + Unpleasant",
+                "Low Energy + Unpleasant"
+            ],
+            "x-enum-varnames": [
+                "QuadrantYellow",
+                "QuadrantGreen",
+                "QuadrantRed",
+                "QuadrantBlue"
+            ]
+        },
+        "errors.ErrorCode": {
+            "type": "string",
+            "enum": [
+                "BAD_REQUEST",
+                "VALIDATION_FAILED",
+                "UNAUTHORIZED",
+                "FORBIDDEN",
+                "NOT_FOUND",
+                "CONFLICT",
+                "TOO_MANY_REQUESTS",
+                "INTERNAL_ERROR",
+                "DATABASE_ERROR",
+                "SERVICE_UNAVAILABLE"
+            ],
+            "x-enum-varnames": [
+                "CodeBadRequest",
+                "CodeValidationFailed",
+                "CodeUnauthorized",
+                "CodeForbidden",
+                "CodeNotFound",
+                "CodeConflict",
+                "CodeTooManyRequests",
+                "CodeInternalError",
+                "CodeDatabaseError",
+                "CodeServiceError"
+            ]
+        },
+        "health.HealthResponse": {
+            "description": "Health check response",
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "example": "connected"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "response.APIError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "$ref": "#/definitions/errors.ErrorCode"
+                },
+                "details": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.APIResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "$ref": "#/definitions/response.APIError"
+                },
+                "trace_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.OperationMessage": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "tasks.CreateRequest": {
+            "description": "Request payload for creating a task",
+            "type": "object",
+            "required": [
+                "end_date",
+                "start_date",
+                "title"
+            ],
+            "properties": {
+                "category_id": {
+                    "type": "string",
+                    "example": "categories:work123"
+                },
+                "emotion_id": {
+                    "description": "Emotion fields",
+                    "type": "string",
+                    "example": "Y06"
+                },
+                "emotion_intensity": {
+                    "type": "integer",
+                    "maximum": 10,
+                    "minimum": 1,
+                    "example": 7
+                },
+                "end_date": {
+                    "type": "string",
+                    "example": "2025-11-25T17:00:00Z"
+                },
+                "journal": {
+                    "type": "string",
+                    "maxLength": 10000,
+                    "example": "Capture high-level goals"
+                },
+                "negatives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
+                },
+                "note": {
+                    "type": "string",
+                    "maxLength": 5000,
+                    "example": "Focus on top priorities"
+                },
+                "positives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
+                },
+                "priority": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": -100,
+                    "example": 1
+                },
+                "source": {
+                    "type": "string",
+                    "example": "manual"
+                },
+                "start_date": {
+                    "type": "string",
+                    "example": "2025-11-24T09:00:00Z"
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "example": "Plan tomorrow"
+                }
+            }
+        },
+        "tasks.Task": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/categories.Category"
+                },
+                "completed": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "emotion_id": {
+                    "description": "Emotion tracking",
+                    "type": "string"
+                },
+                "emotion_intensity": {
+                    "description": "1-10 intensity",
+                    "type": "integer"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "inferred_emotion": {
+                    "description": "Computed on write",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/emotions.InferredEmotion"
+                        }
+                    ]
+                },
+                "journal": {
+                    "type": "string"
+                },
+                "negatives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
+                },
+                "note": {
+                    "type": "string"
+                },
+                "positives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "tasks.TaskItem": {
+            "type": "object",
+            "properties": {
+                "emotion_id": {
+                    "description": "Optional: Yale RULER emotion ID",
+                    "type": "string"
+                },
+                "intensity": {
+                    "description": "Optional: 1-10",
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "tasks.TaskPageResponse": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.Task"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "tasks.UpdateRequest": {
+            "description": "Request payload for updating a task",
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "completed": {
+                    "type": "boolean"
+                },
+                "emotion_id": {
+                    "description": "Emotion fields",
+                    "type": "string"
+                },
+                "emotion_intensity": {
+                    "type": "integer",
+                    "maximum": 10,
+                    "minimum": 1
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "journal": {
+                    "type": "string",
+                    "maxLength": 10000
+                },
+                "negatives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
+                },
+                "note": {
+                    "type": "string",
+                    "maxLength": 5000
+                },
+                "positives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
+                },
+                "priority": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": -100
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "minLength": 1
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

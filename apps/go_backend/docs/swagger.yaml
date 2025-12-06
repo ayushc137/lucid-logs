@@ -1,0 +1,960 @@
+basePath: /
+definitions:
+  auth.AuthResponse:
+    description: Authentication response with JWT token
+    properties:
+      is_admin:
+        example: false
+        type: boolean
+      token:
+        example: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user:
+        example: user:abc123
+        type: string
+    type: object
+  auth.LoginRequest:
+    description: Login request payload
+    properties:
+      password:
+        example: adminadmin
+        minLength: 6
+        type: string
+      username:
+        example: admin@example.com
+        minLength: 1
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  auth.RegisterRequest:
+    description: Registration request payload
+    properties:
+      password:
+        example: password123
+        minLength: 6
+        type: string
+      username:
+        example: user@example.com
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  categories.Category:
+    properties:
+      color:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  categories.CategoryPageResponse:
+    properties:
+      has_more:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/categories.Category'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  categories.CreateRequest:
+    description: Request payload for creating a category
+    properties:
+      color:
+        example: '#3B82F6'
+        maxLength: 50
+        minLength: 1
+        type: string
+      name:
+        example: Work
+        maxLength: 100
+        minLength: 1
+        type: string
+    required:
+    - color
+    - name
+    type: object
+  categories.UpdateRequest:
+    description: Request payload for updating a category
+    properties:
+      color:
+        example: '#10B981'
+        maxLength: 50
+        minLength: 1
+        type: string
+      name:
+        example: Personal
+        maxLength: 100
+        minLength: 1
+        type: string
+    type: object
+  emotions.EmotionDetail:
+    properties:
+      a:
+        description: Arousal
+        type: number
+      c:
+        description: Certainty
+        type: number
+      d:
+        description: Dominance
+        type: number
+      description:
+        type: string
+      emoji:
+        type: string
+      i:
+        description: Default Intensity
+        type: number
+      id:
+        type: string
+      name:
+        type: string
+      quadrant:
+        $ref: '#/definitions/emotions.Quadrant'
+      s:
+        description: Social
+        type: number
+      v:
+        description: Valence
+        type: number
+    type: object
+  emotions.GridEmotion:
+    properties:
+      description:
+        type: string
+      emoji:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      quadrant:
+        $ref: '#/definitions/emotions.Quadrant'
+      quadrant_x:
+        description: -1 or +1 (for grid placement)
+        type: integer
+      quadrant_y:
+        description: -1 or +1 (for grid placement)
+        type: integer
+      x:
+        description: 'Valence: -1 to +1 (horizontal axis, precise)'
+        type: number
+      "y":
+        description: 'Arousal: -1 to +1 (vertical axis, precise)'
+        type: number
+    type: object
+  emotions.GridResponse:
+    properties:
+      blue:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+      green:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+      red:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+      total:
+        type: integer
+      yellow:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+    type: object
+  emotions.InferredEmotion:
+    properties:
+      arousal:
+        description: -1 to +1
+        type: number
+      closest_emotion_id:
+        description: Nearest Yale RULER emotion
+        type: string
+      closest_emotion_name:
+        type: string
+      dissonance:
+        description: '0-1: internal conflict score'
+        type: number
+      dominance:
+        description: -1 to +1
+        type: number
+      negative_count:
+        description: Number of negative items with emotions
+        type: integer
+      positive_count:
+        description: Metadata
+        type: integer
+      quadrant:
+        allOf:
+        - $ref: '#/definitions/emotions.Quadrant'
+        description: Classification
+      valence:
+        description: Weighted centroid coordinates
+        type: number
+    type: object
+  emotions.Quadrant:
+    enum:
+    - yellow
+    - green
+    - red
+    - blue
+    type: string
+    x-enum-comments:
+      QuadrantBlue: Low Energy + Unpleasant
+      QuadrantGreen: Low Energy + Pleasant
+      QuadrantRed: High Energy + Unpleasant
+      QuadrantYellow: High Energy + Pleasant
+    x-enum-descriptions:
+    - High Energy + Pleasant
+    - Low Energy + Pleasant
+    - High Energy + Unpleasant
+    - Low Energy + Unpleasant
+    x-enum-varnames:
+    - QuadrantYellow
+    - QuadrantGreen
+    - QuadrantRed
+    - QuadrantBlue
+  errors.ErrorCode:
+    enum:
+    - BAD_REQUEST
+    - VALIDATION_FAILED
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - NOT_FOUND
+    - CONFLICT
+    - TOO_MANY_REQUESTS
+    - INTERNAL_ERROR
+    - DATABASE_ERROR
+    - SERVICE_UNAVAILABLE
+    type: string
+    x-enum-varnames:
+    - CodeBadRequest
+    - CodeValidationFailed
+    - CodeUnauthorized
+    - CodeForbidden
+    - CodeNotFound
+    - CodeConflict
+    - CodeTooManyRequests
+    - CodeInternalError
+    - CodeDatabaseError
+    - CodeServiceError
+  health.HealthResponse:
+    description: Health check response
+    properties:
+      database:
+        example: connected
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+  response.APIError:
+    properties:
+      code:
+        $ref: '#/definitions/errors.ErrorCode'
+      details: {}
+      message:
+        type: string
+    type: object
+  response.APIResponse:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/response.APIError'
+      trace_id:
+        type: string
+    type: object
+  response.OperationMessage:
+    properties:
+      message:
+        type: string
+    type: object
+  tasks.CreateRequest:
+    description: Request payload for creating a task
+    properties:
+      category_id:
+        example: categories:work123
+        type: string
+      emotion_id:
+        description: Emotion fields
+        example: Y06
+        type: string
+      emotion_intensity:
+        example: 7
+        maximum: 10
+        minimum: 1
+        type: integer
+      end_date:
+        example: "2025-11-25T17:00:00Z"
+        type: string
+      journal:
+        example: Capture high-level goals
+        maxLength: 10000
+        type: string
+      negatives:
+        items:
+          $ref: '#/definitions/tasks.TaskItem'
+        type: array
+      note:
+        example: Focus on top priorities
+        maxLength: 5000
+        type: string
+      positives:
+        items:
+          $ref: '#/definitions/tasks.TaskItem'
+        type: array
+      priority:
+        example: 1
+        maximum: 100
+        minimum: -100
+        type: integer
+      source:
+        example: manual
+        type: string
+      start_date:
+        example: "2025-11-24T09:00:00Z"
+        type: string
+      title:
+        example: Plan tomorrow
+        maxLength: 500
+        minLength: 1
+        type: string
+    required:
+    - end_date
+    - start_date
+    - title
+    type: object
+  tasks.Task:
+    properties:
+      category:
+        $ref: '#/definitions/categories.Category'
+      completed:
+        type: boolean
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      emotion_id:
+        description: Emotion tracking
+        type: string
+      emotion_intensity:
+        description: 1-10 intensity
+        type: integer
+      end_date:
+        type: string
+      id:
+        type: string
+      inferred_emotion:
+        allOf:
+        - $ref: '#/definitions/emotions.InferredEmotion'
+        description: Computed on write
+      journal:
+        type: string
+      negatives:
+        items:
+          $ref: '#/definitions/tasks.TaskItem'
+        type: array
+      note:
+        type: string
+      positives:
+        items:
+          $ref: '#/definitions/tasks.TaskItem'
+        type: array
+      priority:
+        type: integer
+      source:
+        type: string
+      start_date:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  tasks.TaskItem:
+    properties:
+      emotion_id:
+        description: 'Optional: Yale RULER emotion ID'
+        type: string
+      intensity:
+        description: 'Optional: 1-10'
+        type: integer
+      text:
+        type: string
+    type: object
+  tasks.TaskPageResponse:
+    properties:
+      has_more:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/tasks.Task'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  tasks.UpdateRequest:
+    description: Request payload for updating a task
+    properties:
+      category_id:
+        type: string
+      completed:
+        type: boolean
+      emotion_id:
+        description: Emotion fields
+        type: string
+      emotion_intensity:
+        maximum: 10
+        minimum: 1
+        type: integer
+      end_date:
+        type: string
+      journal:
+        maxLength: 10000
+        type: string
+      negatives:
+        items:
+          $ref: '#/definitions/tasks.TaskItem'
+        type: array
+      note:
+        maxLength: 5000
+        type: string
+      positives:
+        items:
+          $ref: '#/definitions/tasks.TaskItem'
+        type: array
+      priority:
+        maximum: 100
+        minimum: -100
+        type: integer
+      start_date:
+        type: string
+      title:
+        maxLength: 500
+        minLength: 1
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Daily journal backend powered by SurrealDB.
+  title: Lucid Logs API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: User login
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user and return JWT token
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: User registration
+      tags:
+      - auth
+  /api/v1/categories:
+    get:
+      description: Get paginated categories for the authenticated user
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/categories.CategoryPageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List categories
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      description: Create a category for organizing tasks
+      parameters:
+      - description: Category data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/categories.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/categories.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create category
+      tags:
+      - categories
+  /api/v1/categories/{id}:
+    delete:
+      description: Soft delete a category
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete category
+      tags:
+      - categories
+    get:
+      description: Get a single category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/categories.Category'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get category
+      tags:
+      - categories
+    put:
+      consumes:
+      - application/json
+      description: Update the name or color of a category
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/categories.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/categories.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update category
+      tags:
+      - categories
+  /api/v1/emotions/{id}:
+    get:
+      description: Get detailed information about a single emotion
+      parameters:
+      - description: Emotion ID (e.g., Y01, G15, R03, B10)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/emotions.EmotionDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Get emotion by ID
+      tags:
+      - emotions
+  /api/v1/emotions/grid:
+    get:
+      description: Get all 100 Yale RULER emotions organized by quadrant for mood
+        meter display
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/emotions.GridResponse'
+      summary: Get emotion grid
+      tags:
+      - emotions
+  /api/v1/health:
+    get:
+      description: Returns health status including database connectivity
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Healthy
+          schema:
+            $ref: '#/definitions/health.HealthResponse'
+        "503":
+          description: Database unavailable
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Health check with database status
+      tags:
+      - health
+  /api/v1/tasks:
+    get:
+      description: Get paginated list of tasks for the authenticated user
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tasks.TaskPageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Create a new task
+      parameters:
+      - description: Task data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/tasks.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/tasks.Task'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create task
+      tags:
+      - tasks
+  /api/v1/tasks/{id}:
+    delete:
+      description: Soft delete a task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete task
+      tags:
+      - tasks
+    get:
+      description: Get a single task by its ID
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tasks.Task'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get task by ID
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      description: Update an existing task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/tasks.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tasks.Task'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update task
+      tags:
+      - tasks
+  /health:
+    get:
+      description: Returns 200 OK if the service is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/health.HealthResponse'
+      summary: Basic health check
+      tags:
+      - health
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

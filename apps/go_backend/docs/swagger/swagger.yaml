@@ -103,6 +103,104 @@ definitions:
         minLength: 1
         type: string
     type: object
+  emotions.EmotionDetail:
+    properties:
+      arousal:
+        type: number
+      certainty:
+        type: number
+      description:
+        type: string
+      dominance:
+        type: number
+      emoji:
+        type: string
+      id:
+        description: e.g., "emotions:E16"
+        type: string
+      intensity:
+        type: number
+      name:
+        type: string
+      quadrant:
+        type: string
+      social:
+        type: number
+      valence:
+        type: number
+      x:
+        type: integer
+      "y":
+        type: integer
+    type: object
+  emotions.GridEmotion:
+    properties:
+      description:
+        type: string
+      emoji:
+        type: string
+      id:
+        description: e.g., "emotions:E16"
+        type: string
+      name:
+        type: string
+      quadrant:
+        type: string
+      x:
+        type: integer
+      "y":
+        type: integer
+    type: object
+  emotions.GridResponse:
+    properties:
+      blue:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+      green:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+      red:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+      total:
+        type: integer
+      yellow:
+        items:
+          $ref: '#/definitions/emotions.GridEmotion'
+        type: array
+    type: object
+  emotions.InferredEmotion:
+    properties:
+      arousal:
+        description: -1 to +1
+        type: number
+      closest_emotion_id:
+        description: Nearest emotion
+        type: string
+      closest_emotion_name:
+        type: string
+      dissonance:
+        description: '0-1: internal conflict score'
+        type: number
+      dominance:
+        description: -1 to +1
+        type: number
+      negative_count:
+        description: Number of negative items with emotions
+        type: integer
+      positive_count:
+        description: Metadata
+        type: integer
+      quadrant:
+        description: Classification
+        type: string
+      valence:
+        description: Weighted centroid coordinates
+        type: number
+    type: object
   errors.ErrorCode:
     enum:
     - BAD_REQUEST
@@ -150,6 +248,8 @@ definitions:
       data: {}
       error:
         $ref: '#/definitions/response.APIError'
+      trace_id:
+        type: string
     type: object
   response.OperationMessage:
     properties:
@@ -162,29 +262,30 @@ definitions:
       category_id:
         example: categories:work123
         type: string
+      emotion_id:
+        description: Primary emotion
+        example: emotions:E16
+        type: string
       end_date:
-        example: "2025-11-25T17:00:00Z"
+        example: "2025-12-06T09:30:00Z"
         type: string
       journal:
-        example: Capture high-level goals
+        example: Daily team sync meeting
         maxLength: 10000
         type: string
       negatives:
-        example:
-        - Some distractions
+        description: '[{"text": "...", "emotion_id": "emotions:E61"}]'
         items:
-          type: string
+          $ref: '#/definitions/tasks.TaskItem'
         type: array
       note:
-        example: Focus on top priorities
+        example: Focus on blockers
         maxLength: 5000
         type: string
       positives:
-        example:
-        - Great progress
-        - In flow
+        description: '[{"text": "...", "emotion_id": "emotions:E16"}]'
         items:
-          type: string
+          $ref: '#/definitions/tasks.TaskItem'
         type: array
       priority:
         example: 1
@@ -195,10 +296,10 @@ definitions:
         example: manual
         type: string
       start_date:
-        example: "2025-11-24T09:00:00Z"
+        example: "2025-12-06T09:00:00Z"
         type: string
       title:
-        example: Plan tomorrow
+        example: Morning standup
         maxLength: 500
         minLength: 1
         type: string
@@ -217,21 +318,28 @@ definitions:
         type: string
       deleted_at:
         type: string
+      emotion_id:
+        description: Emotion tracking
+        type: string
       end_date:
         type: string
       id:
         type: string
+      inferred_emotion:
+        allOf:
+        - $ref: '#/definitions/emotions.InferredEmotion'
+        description: Computed on write
       journal:
         type: string
       negatives:
         items:
-          type: string
+          $ref: '#/definitions/tasks.TaskItem'
         type: array
       note:
         type: string
       positives:
         items:
-          type: string
+          $ref: '#/definitions/tasks.TaskItem'
         type: array
       priority:
         type: integer
@@ -242,6 +350,16 @@ definitions:
       title:
         type: string
       updated_at:
+        type: string
+    type: object
+  tasks.TaskItem:
+    properties:
+      emotion_id:
+        description: 'Optional: emotions:E01-E100'
+        example: emotions:E16
+        type: string
+      text:
+        example: Good team collaboration
         type: string
     type: object
   tasks.TaskPageResponse:
@@ -266,21 +384,26 @@ definitions:
         type: string
       completed:
         type: boolean
+      emotion_id:
+        description: Primary emotion
+        type: string
       end_date:
         type: string
       journal:
         maxLength: 10000
         type: string
       negatives:
+        description: '[{"text": "...", "emotion_id": "emotions:E61"}]'
         items:
-          type: string
+          $ref: '#/definitions/tasks.TaskItem'
         type: array
       note:
         maxLength: 5000
         type: string
       positives:
+        description: '[{"text": "...", "emotion_id": "emotions:E16"}]'
         items:
-          type: string
+          $ref: '#/definitions/tasks.TaskItem'
         type: array
       priority:
         maximum: 100
@@ -543,6 +666,58 @@ paths:
       summary: Update category
       tags:
       - categories
+  /api/v1/emotions/{id}:
+    get:
+      description: Get detailed information about a single emotion
+      parameters:
+      - description: Emotion ID (e.g., emotions:E16, emotions:E61)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/emotions.EmotionDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get emotion by ID
+      tags:
+      - emotions
+  /api/v1/emotions/grid:
+    get:
+      description: Get all 100 emotions organized by quadrant for mood meter display
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/emotions.GridResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get emotion grid
+      tags:
+      - emotions
   /api/v1/health:
     get:
       description: Returns health status including database connectivity

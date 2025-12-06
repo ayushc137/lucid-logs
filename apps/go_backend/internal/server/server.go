@@ -17,6 +17,7 @@ import (
 	"github.com/lucid-logs/go-backend/internal/config"
 	"github.com/lucid-logs/go-backend/internal/features/auth"
 	"github.com/lucid-logs/go-backend/internal/features/categories"
+	"github.com/lucid-logs/go-backend/internal/features/emotions"
 	"github.com/lucid-logs/go-backend/internal/features/health"
 	"github.com/lucid-logs/go-backend/internal/features/tasks"
 	"github.com/lucid-logs/go-backend/internal/features/users"
@@ -111,6 +112,9 @@ func NewRouter(cfg Config) *gin.Engine {
 			Database:  cfg.Cfg.Database.Database,
 		}))
 		{
+			// Emotion routes
+			emotions.RegisterRoutes(protected.Group("/emotions"), cfg.DB)
+
 			// Task routes
 			taskRepo := tasks.NewRepository(cfg.DB)
 			taskService := tasks.NewService(taskRepo)

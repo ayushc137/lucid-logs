@@ -5,14 +5,17 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  # Build command
-  cmd = "go build -o ./tmp/main ./cmd/api"
+  # Build command:
+  # 1. Run DB migrations (idempotent, quiet) - uses same ns/db as Go app
+  # 2. Regenerate swagger docs
+  # 3. Build the Go binary
+  cmd = "cat ../../db/migrations/*.surql 2>/dev/null | surreal sql --endpoint http://localhost:8000 --username root --password root --namespace daily_journal --database core --hide-welcome >/dev/null 2>&1; swag init -g cmd/api/main.go -o docs/swagger --quiet 2>/dev/null; go build -o ./tmp/main ./cmd/api"
   # Binary file output
   bin = "./tmp/main"
-  # Watch these directories
-  include_dir = ["cmd", "internal", "pkg"]
+  # Watch these directories (including db migrations)
+  include_dir = ["cmd", "internal", "pkg", "../../db/migrations"]
   # Watch these extensions
-  include_ext = ["go", "tpl", "tmpl", "html"]
+  include_ext = ["go", "tpl", "tmpl", "html", "surql"]
   # Exclude directories
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "docs"]
   # Exclude files

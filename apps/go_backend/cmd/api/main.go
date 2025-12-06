@@ -41,6 +41,7 @@ import (
 	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
 	"github.com/lucid-logs/go-backend/internal/bootstrap"
 	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/features/emotions"
 	"github.com/lucid-logs/go-backend/internal/server"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
@@ -94,6 +95,14 @@ func main() {
 
 	if err := bootstrap.EnsureDevAdmin(ctx, db, cfg); err != nil {
 		log.Warn().Err(err).Msg("failed to seed development admin user")
+	}
+
+	// =========================================================================
+	// INITIALIZE EMOTION CACHE
+	// =========================================================================
+
+	if err := emotions.InitCache(db); err != nil {
+		log.Warn().Err(err).Msg("failed to initialize emotion cache - emotion features may not work")
 	}
 
 	// =========================================================================

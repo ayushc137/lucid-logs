@@ -395,6 +395,89 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/emotions/grid": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all 100 emotions organized by quadrant for mood meter display",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "emotions"
+                ],
+                "summary": "Get emotion grid",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/emotions.GridResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/emotions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed information about a single emotion",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "emotions"
+                ],
+                "summary": "Get emotion by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Emotion ID (e.g., emotions:E16, emotions:E61)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/emotions.EmotionDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Returns health status including database connectivity",
@@ -862,6 +945,150 @@ const docTemplate = `{
                 }
             }
         },
+        "emotions.EmotionDetail": {
+            "type": "object",
+            "properties": {
+                "arousal": {
+                    "type": "number"
+                },
+                "certainty": {
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dominance": {
+                    "type": "number"
+                },
+                "emoji": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "e.g., \"emotions:E16\"",
+                    "type": "string"
+                },
+                "intensity": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quadrant": {
+                    "type": "string"
+                },
+                "social": {
+                    "type": "number"
+                },
+                "valence": {
+                    "type": "number"
+                },
+                "x": {
+                    "type": "integer"
+                },
+                "y": {
+                    "type": "integer"
+                }
+            }
+        },
+        "emotions.GridEmotion": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "emoji": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "e.g., \"emotions:E16\"",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quadrant": {
+                    "type": "string"
+                },
+                "x": {
+                    "type": "integer"
+                },
+                "y": {
+                    "type": "integer"
+                }
+            }
+        },
+        "emotions.GridResponse": {
+            "type": "object",
+            "properties": {
+                "blue": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                },
+                "green": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                },
+                "red": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "yellow": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.GridEmotion"
+                    }
+                }
+            }
+        },
+        "emotions.InferredEmotion": {
+            "type": "object",
+            "properties": {
+                "arousal": {
+                    "description": "-1 to +1",
+                    "type": "number"
+                },
+                "closest_emotion_id": {
+                    "description": "Nearest emotion",
+                    "type": "string"
+                },
+                "closest_emotion_name": {
+                    "type": "string"
+                },
+                "dissonance": {
+                    "description": "0-1: internal conflict score",
+                    "type": "number"
+                },
+                "dominance": {
+                    "description": "-1 to +1",
+                    "type": "number"
+                },
+                "negative_count": {
+                    "description": "Number of negative items with emotions",
+                    "type": "integer"
+                },
+                "positive_count": {
+                    "description": "Metadata",
+                    "type": "integer"
+                },
+                "quadrant": {
+                    "description": "Classification",
+                    "type": "string"
+                },
+                "valence": {
+                    "description": "Weighted centroid coordinates",
+                    "type": "number"
+                }
+            }
+        },
         "errors.ErrorCode": {
             "type": "string",
             "enum": [
@@ -921,6 +1148,9 @@ const docTemplate = `{
                 "data": {},
                 "error": {
                     "$ref": "#/definitions/response.APIError"
+                },
+                "trace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -945,38 +1175,38 @@ const docTemplate = `{
                     "type": "string",
                     "example": "categories:work123"
                 },
+                "emotion_id": {
+                    "description": "Primary emotion",
+                    "type": "string",
+                    "example": "emotions:E16"
+                },
                 "end_date": {
                     "type": "string",
-                    "example": "2025-11-25T17:00:00Z"
+                    "example": "2025-12-06T09:30:00Z"
                 },
                 "journal": {
                     "type": "string",
                     "maxLength": 10000,
-                    "example": "Capture high-level goals"
+                    "example": "Daily team sync meeting"
                 },
                 "negatives": {
+                    "description": "[{\"text\": \"...\", \"emotion_id\": \"emotions:E61\"}]",
                     "type": "array",
                     "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "Some distractions"
-                    ]
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
                 },
                 "note": {
                     "type": "string",
                     "maxLength": 5000,
-                    "example": "Focus on top priorities"
+                    "example": "Focus on blockers"
                 },
                 "positives": {
+                    "description": "[{\"text\": \"...\", \"emotion_id\": \"emotions:E16\"}]",
                     "type": "array",
                     "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "Great progress",
-                        "In flow"
-                    ]
+                        "$ref": "#/definitions/tasks.TaskItem"
+                    }
                 },
                 "priority": {
                     "type": "integer",
@@ -990,13 +1220,13 @@ const docTemplate = `{
                 },
                 "start_date": {
                     "type": "string",
-                    "example": "2025-11-24T09:00:00Z"
+                    "example": "2025-12-06T09:00:00Z"
                 },
                 "title": {
                     "type": "string",
                     "maxLength": 500,
                     "minLength": 1,
-                    "example": "Plan tomorrow"
+                    "example": "Morning standup"
                 }
             }
         },
@@ -1015,11 +1245,23 @@ const docTemplate = `{
                 "deleted_at": {
                     "type": "string"
                 },
+                "emotion_id": {
+                    "description": "Emotion tracking",
+                    "type": "string"
+                },
                 "end_date": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
+                },
+                "inferred_emotion": {
+                    "description": "Computed on write",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/emotions.InferredEmotion"
+                        }
+                    ]
                 },
                 "journal": {
                     "type": "string"
@@ -1027,7 +1269,7 @@ const docTemplate = `{
                 "negatives": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
                 "note": {
@@ -1036,7 +1278,7 @@ const docTemplate = `{
                 "positives": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
                 "priority": {
@@ -1053,6 +1295,20 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "tasks.TaskItem": {
+            "type": "object",
+            "properties": {
+                "emotion_id": {
+                    "description": "Optional: emotions:E01-E100",
+                    "type": "string",
+                    "example": "emotions:E16"
+                },
+                "text": {
+                    "type": "string",
+                    "example": "Good team collaboration"
                 }
             }
         },
@@ -1089,6 +1345,10 @@ const docTemplate = `{
                 "completed": {
                     "type": "boolean"
                 },
+                "emotion_id": {
+                    "description": "Primary emotion",
+                    "type": "string"
+                },
                 "end_date": {
                     "type": "string"
                 },
@@ -1097,9 +1357,10 @@ const docTemplate = `{
                     "maxLength": 10000
                 },
                 "negatives": {
+                    "description": "[{\"text\": \"...\", \"emotion_id\": \"emotions:E61\"}]",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
                 "note": {
@@ -1107,9 +1368,10 @@ const docTemplate = `{
                     "maxLength": 5000
                 },
                 "positives": {
+                    "description": "[{\"text\": \"...\", \"emotion_id\": \"emotions:E16\"}]",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
                 "priority": {
