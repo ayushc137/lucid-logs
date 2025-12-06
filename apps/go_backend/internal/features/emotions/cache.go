@@ -37,7 +37,7 @@ func InitCache(db *database.DB) error {
 	allList = emotions
 
 	for _, e := range emotions {
-		// Store with full ID format only (consistent with other IDs like categories:xxx)
+		// Store with full ID format only (consistent with categories:xxx pattern)
 		cache[e.ID] = e // "emotions:E16"
 	}
 

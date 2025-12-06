@@ -154,7 +154,7 @@ func validateDateTimeFlexible(fl validator.FieldLevel) bool {
 }
 
 // validateEmotionID validates that the value is a valid emotion ID.
-// Requires full format: "emotions:E16" (consistent with other IDs like categories:xxx).
+// Requires full format: "emotions:E16" (consistent with categories:xxx pattern).
 func validateEmotionID(fl validator.FieldLevel) bool {
 	value := fl.Field().String()
 	if value == "" {
