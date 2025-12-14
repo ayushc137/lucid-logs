@@ -8,6 +8,7 @@ env:
 vars:
   GO_BACKEND: apps/go_backend
   RUST_BACKEND: apps/rust_backend
+  FRONTEND: apps/frontend
 
 tasks:
   # =============================================================================
@@ -25,8 +26,19 @@ tasks:
       - cp -n env.example .env 2>/dev/null || true
       - task: setup:go
       - task: setup:rust
+      - task: setup:fe
       - echo ""
-      - echo "✅ Setup complete! Run 'task dev:go' or 'task dev:rust' to start"
+      - echo "✅ Setup complete! Run 'task dev' for full-stack or 'task go' / 'task fe'"
+
+  dev:
+    desc: Start full-stack development (Go backend + SvelteKit frontend)
+    deps: [db:up]
+    cmds:
+      - |
+        echo "🚀 Starting Go backend on :8080 and Frontend on :5173"
+        (cd {{.GO_BACKEND}} && lsof -ti :8080 | xargs kill -9 2>/dev/null || true && air) &
+        (cd {{.FRONTEND}} && pnpm dev --host) &
+        wait
 
   # =============================================================================
   # GO BACKEND
@@ -81,6 +93,48 @@ tasks:
     dir: "{{.GO_BACKEND}}"
     cmds:
       - go run cmd/gen/main.go {{.CLI_ARGS}}
+
+  # =============================================================================
+  # SVELTEKIT FRONTEND
+  # =============================================================================
+
+  setup:fe:
+    desc: Install frontend dependencies with pnpm
+    dir: "{{.FRONTEND}}"
+    cmds:
+      - pnpm install
+      - echo "✅ Frontend dependencies installed"
+
+  dev:fe:
+    desc: Start SvelteKit frontend (hot reload)
+    dir: "{{.FRONTEND}}"
+    cmds:
+      - pnpm dev --host
+
+  build:fe:
+    desc: Build frontend for production
+    dir: "{{.FRONTEND}}"
+    cmds:
+      - pnpm build
+
+  check:fe:
+    desc: Type check frontend code
+    dir: "{{.FRONTEND}}"
+    cmds:
+      - pnpm check
+
+  lint:fe:
+    desc: Lint and format frontend code (Biome)
+    dir: "{{.FRONTEND}}"
+    cmds:
+      - pnpm lint:fix
+      - pnpm format
+
+  preview:fe:
+    desc: Preview production build locally
+    dir: "{{.FRONTEND}}"
+    cmds:
+      - pnpm preview --host
 
   # =============================================================================
   # RUST BACKEND
@@ -157,6 +211,11 @@ tasks:
     cmds:
       - task: dev:go
 
+  fe:
+    desc: Alias for dev:fe
+    cmds:
+      - task: dev:fe
+
   rust:
     desc: Alias for dev:rust
     cmds:
@@ -172,4 +231,18 @@ tasks:
     desc: Lint all code
     cmds:
       - task: lint:go
+      - task: lint:fe
       - task: lint:rust
+
+  build:
+    desc: Build all apps
+    cmds:
+      - task: build:go
+      - task: build:fe
+      - task: build:rust
+
+  check:
+    desc: Type check all code
+    cmds:
+      - task: check:fe
+
