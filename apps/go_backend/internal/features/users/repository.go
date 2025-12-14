@@ -11,6 +11,7 @@ package users
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
@@ -25,6 +26,8 @@ type Repository interface {
 	CountAdmins(ctx context.Context) (int64, error)
 	UpdateEmail(ctx context.Context, id, email string) (*User, error)
 	UpdatePassword(ctx context.Context, id, password string) error
+	UpdatePreferences(ctx context.Context, id string, req *UpdatePreferencesRequest) (*User, error)
+	GetUsersForRetroGeneration(ctx context.Context, now time.Time) ([]*User, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -120,4 +123,96 @@ func (r *repository) UpdatePassword(ctx context.Context, id, password string) er
 		return errors.ErrDatabase.Wrap(err)
 	}
 	return nil
+}
+
+func (r *repository) UpdatePreferences(ctx context.Context, id string, req *UpdatePreferencesRequest) (*User, error) {
+	userID := database.MustRecordID(userTable, id)
+	now := time.Now().UTC()
+
+	updateData := map[string]any{
+		"updated_at": now,
+	}
+
+	prefs := map[string]any{}
+	if req.DailyRetro != nil {
+		prefs["daily_retro"] = req.DailyRetro
+	}
+	if req.WeeklyRetroDay != nil {
+		prefs["weekly_retro_day"] = *req.WeeklyRetroDay
+	}
+	if req.MonthlyRetroDay != nil {
+		prefs["monthly_retro_day"] = *req.MonthlyRetroDay
+	}
+	if req.Timezone != nil {
+		prefs["timezone"] = *req.Timezone
+	}
+
+	if len(prefs) > 0 {
+		updateData["preferences"] = prefs
+	}
+
+	_, err := database.QueryAll[userDB](ctx, r.db, `
+		UPDATE type::thing($id) MERGE {
+			updated_at: $updated_at,
+			preferences: $preferences
+		}
+	`, map[string]any{
+		"id":          userID,
+		"updated_at":  now,
+		"preferences": prefs,
+	})
+	if err != nil {
+		return nil, errors.ErrDatabase.Wrap(err)
+	}
+
+	return r.FindByID(ctx, id)
+}
+
+// GetUsersForRetroGeneration returns users whose daily retro time matches now.
+// It checks each user's configured time and timezone to see if it's time.
+func (r *repository) GetUsersForRetroGeneration(ctx context.Context, now time.Time) ([]*User, error) {
+	// Get all users with retro enabled
+	results, err := database.QueryAll[userDB](ctx, r.db, `
+		SELECT * FROM users
+		WHERE preferences.daily_retro.enabled = true
+		  AND preferences.daily_retro.auto_generate = true
+	`, nil)
+	if err != nil {
+		return nil, errors.ErrDatabase.Wrap(err)
+	}
+
+	var eligible []*User
+	for _, u := range results {
+		user := u.toUser()
+		if user.Preferences.DailyRetro == nil {
+			continue
+		}
+
+		// Check if user's configured time matches now
+		if isRetroTime(user.Preferences.DailyRetro, now) {
+			eligible = append(eligible, user)
+		}
+	}
+
+	return eligible, nil
+}
+
+// isRetroTime checks if the current time matches the user's configured retro time.
+func isRetroTime(settings *DailyRetroSettings, serverNow time.Time) bool {
+	if settings == nil || settings.Time == "" {
+		return false
+	}
+
+	// Load user's timezone
+	loc, err := time.LoadLocation(settings.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	// Convert server time to user's timezone
+	userNow := serverNow.In(loc)
+	userTimeStr := userNow.Format("15:04")
+
+	// Check if times match (within the same minute)
+	return userTimeStr == settings.Time
 }

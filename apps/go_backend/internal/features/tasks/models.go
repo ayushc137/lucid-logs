@@ -36,6 +36,12 @@ import (
 //   - EmotionID: User's primary emotion from mood meter grid (e.g., "emotions:E16")
 //   - Positives/Negatives: Structured items with optional emotion tags
 //   - InferredEmotion: Server-calculated emotional state (computed on write)
+//
+// Goal integration fields:
+//   - ActivityKey: For auto-linking to goals with matching activity_key
+//   - TemplateID: Reference to the template used to create this task
+//   - Quantity: Tracked value for measurable goals (e.g., "500ml", "30min")
+//   - LinkedGoals: Goals linked to this task with impact metadata
 type Task struct {
 	ID        string               `json:"id,omitempty"`
 	Title     string               `json:"title"`
@@ -54,6 +60,12 @@ type Task struct {
 	EmotionID       *string                   `json:"emotion_id,omitempty"`       // e.g., "emotions:E16"
 	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"` // Computed on write
 
+	// Goal/Template integration
+	ActivityKey *string        `json:"activity_key,omitempty"` // For auto-linking to goals
+	TemplateID  *string        `json:"template_id,omitempty"`  // Source template (templates:xyz)
+	Quantity    *Quantity      `json:"quantity,omitempty"`     // For measurable goals
+	LinkedGoals []TaskGoalLink `json:"linked_goals,omitempty"` // Goals linked to this task
+
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
@@ -61,11 +73,28 @@ type Task struct {
 	UpdatedBy string     `json:"-"` // Hidden: audit field
 }
 
+// Quantity represents a measured value with unit for task contribution to goals.
+type Quantity struct {
+	Value float64 `json:"value"` // e.g., 500, 30
+	Unit  string  `json:"unit"`  // e.g., "ml", "minutes", "pages"
+}
+
 // TaskItem represents a structured positive/negative item with optional emotion.
 // Intensity is taken from the emotion's default Intensity value.
 type TaskItem struct {
 	Text      string  `json:"text" example:"Good team collaboration"`
 	EmotionID *string `json:"emotion_id,omitempty" example:"emotions:E16"` // Optional: emotions:E01-E100
+}
+
+// TaskGoalLink represents a linked goal with impact metadata.
+// This is populated via SurrealDB FETCH from the task_goals relation.
+type TaskGoalLink struct {
+	GoalID          string   `json:"goal_id"`
+	GoalTitle       string   `json:"goal_title"`
+	ImpactType      string   `json:"impact_type"`      // "positive", "negative", "neutral"
+	ImpactMagnitude int      `json:"impact_magnitude"` // 1-5
+	QuantityValue   *float64 `json:"quantity_value,omitempty"`
+	QuantityUnit    *string  `json:"quantity_unit,omitempty"`
 }
 
 // =============================================================================

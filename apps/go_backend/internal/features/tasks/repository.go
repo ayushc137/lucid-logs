@@ -120,11 +120,24 @@ type taskDB struct {
 	EmotionID       *string                   `json:"emotion_id,omitempty"`
 	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
 
+	// Linked goals (populated via subquery)
+	LinkedGoals []taskGoalDB `json:"linked_goals,omitempty"`
+
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
 	CreatedBy string                `json:"created_by"`
 	UpdatedBy string                `json:"updated_by"`
+}
+
+// taskGoalDB represents a linked goal from the task_goals relation.
+type taskGoalDB struct {
+	GoalID          string   `json:"goal_id"`
+	GoalTitle       string   `json:"goal_title"`
+	ImpactType      string   `json:"impact_type"`
+	ImpactMagnitude int      `json:"impact_magnitude"`
+	QuantityValue   *float64 `json:"quantity_value,omitempty"`
+	QuantityUnit    *string  `json:"quantity_unit,omitempty"`
 }
 
 // categoryDB is the database representation of a category when fetched.
@@ -180,6 +193,22 @@ func (t *taskDB) toTask() *Task {
 		deletedAt = &dt
 	}
 
+	// Convert linked goals
+	var linkedGoals []TaskGoalLink
+	if len(t.LinkedGoals) > 0 {
+		linkedGoals = make([]TaskGoalLink, len(t.LinkedGoals))
+		for i, lg := range t.LinkedGoals {
+			linkedGoals[i] = TaskGoalLink{
+				GoalID:          lg.GoalID,
+				GoalTitle:       lg.GoalTitle,
+				ImpactType:      lg.ImpactType,
+				ImpactMagnitude: lg.ImpactMagnitude,
+				QuantityValue:   lg.QuantityValue,
+				QuantityUnit:    lg.QuantityUnit,
+			}
+		}
+	}
+
 	return &Task{
 		ID:              database.ToStringID(t.ID),
 		Title:           t.Title,
@@ -195,6 +224,7 @@ func (t *taskDB) toTask() *Task {
 		Category:        cat,
 		EmotionID:       t.EmotionID,
 		InferredEmotion: t.InferredEmotion,
+		LinkedGoals:     linkedGoals,
 		CreatedAt:       t.CreatedAt.Time,
 		UpdatedAt:       t.UpdatedAt.Time,
 		DeletedAt:       deletedAt,
@@ -246,10 +276,19 @@ type taskCreateData struct {
 func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, error) {
 	taskID := database.MustRecordID(Table, id)
 
-	// Use SDK's typed query to fetch task with category
+	// Use SDK's typed query to fetch task with category and linked goals
 	// models.RecordID handles ID serialization automatically
 	task, err := database.QueryFirst[taskDB](ctx, r.db, `
-		SELECT * FROM type::thing($id) FETCH category
+		SELECT *,
+			(SELECT 
+				type::string(out) as goal_id,
+				out.title as goal_title,
+				impact_type,
+				impact_magnitude,
+				quantity_value,
+				quantity_unit
+			 FROM task_goals WHERE in = $parent.id) as linked_goals
+		FROM type::thing($id) FETCH category
 	`, map[string]any{
 		"id": taskID,
 	})
@@ -302,7 +341,16 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	// Get paginated tasks using SDK's typed QueryAll
 	// models.RecordID handles ID deserialization automatically
 	tasksDB, err := database.QueryAll[taskDB](ctx, r.db, `
-		SELECT * FROM tasks
+		SELECT *,
+			(SELECT 
+				type::string(out) as goal_id,
+				out.title as goal_title,
+				impact_type,
+				impact_magnitude,
+				quantity_value,
+				quantity_unit
+			 FROM task_goals WHERE in = $parent.id) as linked_goals
+		FROM tasks
 		WHERE created_by = $user AND deleted_at = NONE
 		ORDER BY start_date DESC
 		LIMIT $limit START $offset

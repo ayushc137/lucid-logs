@@ -1,5 +1,313 @@
 basePath: /
 definitions:
+  analytics.CategoryBreakdown:
+    properties:
+      category_id:
+        type: string
+      category_name:
+        type: string
+      hours:
+        type: number
+      percentage:
+        type: number
+      task_count:
+        type: integer
+    type: object
+  analytics.CategoryMetrics:
+    description: Category time distribution metrics
+    properties:
+      distribution:
+        items:
+          $ref: '#/definitions/analytics.CategoryBreakdown'
+        type: array
+      life_domain_distribution:
+        items:
+          $ref: '#/definitions/analytics.LifeDomainBreakdown'
+        type: array
+      neglected_areas:
+        items:
+          $ref: '#/definitions/analytics.NeglectedCategory'
+        type: array
+      total_hours:
+        type: number
+    type: object
+  analytics.ChartMeta:
+    properties:
+      computed_at:
+        type: string
+      data_points:
+        type: integer
+      end_date:
+        type: string
+      period:
+        type: string
+      start_date:
+        type: string
+    type: object
+  analytics.ChartRequest:
+    description: Generic request for generating chart data
+    properties:
+      chart_type:
+        enum:
+        - time_series
+        - pie
+        - bar
+        - heatmap
+        - radar
+        - scatter
+        - gauge
+        example: time_series
+        type: string
+      end_date:
+        example: "2025-12-14T23:59:59Z"
+        type: string
+      filters:
+        $ref: '#/definitions/analytics.Filters'
+      group_by:
+        description: '"hour", "day", "week", "month", "category", "quadrant"'
+        example: day
+        type: string
+      metric:
+        example: mood
+        type: string
+      period:
+        enum:
+        - day
+        - week
+        - month
+        - quarter
+        - year
+        - custom
+        example: week
+        type: string
+      start_date:
+        example: "2025-12-01T00:00:00Z"
+        type: string
+    required:
+    - chart_type
+    - metric
+    - period
+    type: object
+  analytics.ChartResponse:
+    description: Generic chart data response
+    properties:
+      chart_type:
+        type: string
+      data:
+        description: Shape varies by chart_type
+      meta:
+        $ref: '#/definitions/analytics.ChartMeta'
+      metric:
+        type: string
+    type: object
+  analytics.DailyMood:
+    properties:
+      arousal:
+        type: number
+      date:
+        type: string
+      quadrant:
+        type: string
+      valence:
+        type: number
+    type: object
+  analytics.DashboardResponse:
+    description: Combined dashboard metrics
+    properties:
+      categories:
+        $ref: '#/definitions/analytics.CategoryMetrics'
+      emotions:
+        $ref: '#/definitions/analytics.EmotionMetrics'
+      goals:
+        $ref: '#/definitions/analytics.GoalMetrics'
+      period:
+        type: string
+      tasks:
+        $ref: '#/definitions/analytics.TaskMetrics'
+    type: object
+  analytics.EmotionCount:
+    properties:
+      count:
+        type: integer
+      emotion_id:
+        type: string
+      emotion_name:
+        type: string
+      quadrant:
+        type: string
+    type: object
+  analytics.EmotionMetrics:
+    description: Emotion and mood metrics with 6D vector analysis
+    properties:
+      average_arousal:
+        description: -1 to +1
+        type: number
+      average_valence:
+        description: -1 to +1
+        type: number
+      dominant_quadrant:
+        description: yellow/green/red/blue
+        type: string
+      emotion_counts:
+        additionalProperties:
+          type: integer
+        description: Emotion name -> count
+        type: object
+      mood_stability:
+        description: 0 to 1 (1 = stable)
+        type: number
+      quadrant_distribution:
+        $ref: '#/definitions/analytics.QuadrantDist'
+      top_emotions:
+        items:
+          $ref: '#/definitions/analytics.EmotionCount'
+        type: array
+      trend:
+        description: Daily mood over time
+        items:
+          $ref: '#/definitions/analytics.DailyMood'
+        type: array
+    type: object
+  analytics.Filters:
+    properties:
+      category_ids:
+        items:
+          type: string
+        type: array
+      goal_ids:
+        items:
+          type: string
+        type: array
+      life_domain:
+        items:
+          type: string
+        type: array
+      quadrants:
+        description: '"yellow", "green", "red", "blue"'
+        items:
+          type: string
+        type: array
+      task_status:
+        items:
+          type: string
+        type: array
+    type: object
+  analytics.GoalMetrics:
+    description: Goal and streak metrics
+    properties:
+      active_goals:
+        type: integer
+      avg_progress:
+        description: Average % progress
+        type: number
+      completed_goals:
+        type: integer
+      goal_progress:
+        items:
+          $ref: '#/definitions/analytics.GoalProgress'
+        type: array
+      streak_leaders:
+        description: Top streaks
+        items:
+          $ref: '#/definitions/analytics.StreakInfo'
+        type: array
+      total_streak_days:
+        description: Sum of all current streaks
+        type: integer
+    type: object
+  analytics.GoalProgress:
+    properties:
+      current_value:
+        type: number
+      goal_id:
+        type: string
+      goal_title:
+        type: string
+      goal_type:
+        type: string
+      progress:
+        description: 0-100%
+        type: number
+      status:
+        type: string
+      target_value:
+        type: number
+    type: object
+  analytics.LifeDomainBreakdown:
+    properties:
+      domain:
+        type: string
+      hours:
+        type: number
+      percentage:
+        type: number
+    type: object
+  analytics.NeglectedCategory:
+    properties:
+      category_id:
+        type: string
+      category_name:
+        type: string
+      days_since_active:
+        type: integer
+    type: object
+  analytics.QuadrantDist:
+    properties:
+      blue:
+        description: Low energy, unpleasant
+        type: number
+      green:
+        description: Low energy, pleasant
+        type: number
+      red:
+        description: High energy, unpleasant
+        type: number
+      yellow:
+        description: High energy, pleasant
+        type: number
+    type: object
+  analytics.StreakInfo:
+    properties:
+      current_streak:
+        type: integer
+      goal_id:
+        type: string
+      goal_title:
+        type: string
+      longest_streak:
+        type: integer
+    type: object
+  analytics.TaskMetrics:
+    description: Task productivity metrics
+    properties:
+      abandoned_tasks:
+        type: integer
+      avg_task_duration_minutes:
+        type: number
+      by_category:
+        items:
+          $ref: '#/definitions/analytics.CategoryBreakdown'
+        type: array
+      completed_tasks:
+        type: integer
+      completion_rate:
+        description: '% of tasks completed'
+        type: number
+      peak_hours:
+        description: Most productive hours
+        items:
+          type: integer
+        type: array
+      postponed_tasks:
+        type: integer
+      total_duration_hours:
+        type: number
+      total_tasks:
+        type: integer
+      velocity:
+        description: Tasks per day
+        type: number
+    type: object
   auth.AuthResponse:
     description: Authentication response with JWT token
     properties:
@@ -225,6 +533,560 @@ definitions:
     - CodeInternalError
     - CodeDatabaseError
     - CodeServiceError
+  goalactions.ActionListResponse:
+    properties:
+      actions:
+        items:
+          $ref: '#/definitions/goalactions.GoalAction'
+        type: array
+      count:
+        type: integer
+      goal_id:
+        type: string
+    type: object
+  goalactions.CreateRequest:
+    description: Request payload for creating a goal action
+    properties:
+      description:
+        example: Finish all lessons in Module 1 including exercises
+        maxLength: 2000
+        type: string
+      order:
+        example: 1
+        type: integer
+      quantity_unit:
+        example: km
+        maxLength: 50
+        type: string
+      quantity_value:
+        example: 5
+        type: number
+      title:
+        example: Complete Python Basics course
+        maxLength: 500
+        minLength: 1
+        type: string
+    required:
+    - title
+    type: object
+  goalactions.GoalAction:
+    properties:
+      completed:
+        description: Completion status (for discrete goals only)
+        type: boolean
+      completed_at:
+        type: string
+      created_at:
+        description: Metadata
+        type: string
+      deleted_at:
+        type: string
+      description:
+        type: string
+      goal_id:
+        description: Parent goal ID
+        type: string
+      id:
+        description: '"goal_actions:abc123"'
+        type: string
+      order:
+        description: Display order
+        type: integer
+      quantity_unit:
+        description: e.g., "km"
+        type: string
+      quantity_value:
+        description: Quantity (for measurable contributions)
+        type: number
+      title:
+        description: Action definition
+        type: string
+      updated_at:
+        type: string
+    type: object
+  goalactions.ReorderRequest:
+    description: Request payload for reordering goal actions
+    properties:
+      action_ids:
+        description: Ordered list of action IDs
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - action_ids
+    type: object
+  goalactions.UpdateRequest:
+    description: Request payload for updating a goal action
+    properties:
+      completed:
+        description: Set completion status
+        example: true
+        type: boolean
+      description:
+        example: Updated description
+        maxLength: 2000
+        type: string
+      order:
+        example: 2
+        type: integer
+      quantity_unit:
+        example: pages
+        maxLength: 50
+        type: string
+      quantity_value:
+        example: 10
+        type: number
+      title:
+        example: Complete Advanced Python
+        maxLength: 500
+        minLength: 1
+        type: string
+    type: object
+  goalentries.CreateRequest:
+    description: Request payload for creating a goal entry
+    properties:
+      date:
+        example: "2025-12-13"
+        type: string
+      met:
+        example: true
+        type: boolean
+      notes:
+        maxLength: 1000
+        type: string
+      task_ids:
+        items:
+          type: string
+        type: array
+      value:
+        example: 1.5
+        type: number
+    required:
+    - date
+    type: object
+  goalentries.EntrySummary:
+    properties:
+      met_days:
+        type: integer
+      missed_days:
+        type: integer
+      success_rate:
+        description: met / total * 100
+        type: number
+      total_days:
+        type: integer
+      total_value:
+        type: number
+    type: object
+  goalentries.GoalEntry:
+    properties:
+      created_at:
+        description: Metadata
+        type: string
+      date:
+        description: The date this entry is for (YYYY-MM-DD, time component ignored)
+        type: string
+      goal_id:
+        type: string
+      id:
+        type: string
+      met:
+        description: Was the target met for this period?
+        type: boolean
+      notes:
+        description: Optional notes
+        type: string
+      task_ids:
+        description: Task IDs that contributed to this entry
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+      value:
+        description: Actual value achieved (for measurable goals)
+        type: number
+    type: object
+  goalentries.GoalEntryListResponse:
+    properties:
+      entries:
+        items:
+          $ref: '#/definitions/goalentries.GoalEntry'
+        type: array
+      goal_id:
+        type: string
+      summary:
+        $ref: '#/definitions/goalentries.EntrySummary'
+    type: object
+  goals.CreateRequest:
+    description: Request payload for creating a goal
+    properties:
+      category_id:
+        example: categories:health123
+        type: string
+      color:
+        example: '#3B82F6'
+        maxLength: 20
+        type: string
+      completion_mode:
+        enum:
+        - all
+        - any
+        example: all
+        type: string
+      deadline:
+        example: "2025-12-31T23:59:59Z"
+        type: string
+      description:
+        example: Stay hydrated throughout the day for better health and focus
+        maxLength: 2000
+        type: string
+      goal_type:
+        enum:
+        - discrete
+        - measurable
+        - epic
+        - avoidance
+        example: measurable
+        type: string
+      icon:
+        example: "\U0001F4A7"
+        maxLength: 50
+        type: string
+      is_private:
+        example: false
+        type: boolean
+      life_domain:
+        example: health
+        maxLength: 50
+        type: string
+      parent_goal:
+        example: goals:epic456
+        type: string
+      priority:
+        example: 2
+        maximum: 3
+        minimum: 0
+        type: integer
+      recurrence:
+        $ref: '#/definitions/goals.RecurrenceInput'
+      start_date:
+        example: "2025-01-01T00:00:00Z"
+        type: string
+      target:
+        $ref: '#/definitions/goals.TargetInput'
+      title:
+        example: Drink 3L water daily
+        maxLength: 500
+        minLength: 1
+        type: string
+      value_score:
+        example: 4
+        maximum: 5
+        minimum: 0
+        type: integer
+      why:
+        example: Improve energy levels and skin health
+        maxLength: 1000
+        type: string
+    required:
+    - goal_type
+    - title
+    type: object
+  goals.Goal:
+    properties:
+      activity_key:
+        description: Auto-generated unique key for matching
+        type: string
+      category:
+        $ref: '#/definitions/categories.Category'
+      child_goals:
+        description: Child goals (populated for epic goals)
+        items:
+          $ref: '#/definitions/goals.Goal'
+        type: array
+      color:
+        type: string
+      completion_date:
+        type: string
+      completion_mode:
+        description: Completion settings (for epic goals)
+        type: string
+      created_at:
+        description: Metadata
+        type: string
+      current_streak:
+        description: Streak tracking (computed, for recurring goals)
+        type: integer
+      deadline:
+        type: string
+      deleted_at:
+        type: string
+      description:
+        type: string
+      goal_type:
+        description: Goal type
+        type: string
+      grace_days_used:
+        type: integer
+      icon:
+        type: string
+      id:
+        type: string
+      is_private:
+        description: Privacy
+        type: boolean
+      last_completed_date:
+        type: string
+      life_domain:
+        description: health, work, learning, etc.
+        type: string
+      linked_tasks:
+        description: Linked tasks (populated via FETCH)
+        items:
+          $ref: '#/definitions/goals.GoalTaskLink'
+        type: array
+      linked_template:
+        description: Linked template (auto-created)
+        type: string
+      longest_streak:
+        type: integer
+      parent_goal:
+        description: For milestones under epics
+        type: string
+      priority:
+        description: Organization
+        type: integer
+      recurrence:
+        allOf:
+        - $ref: '#/definitions/goals.Recurrence'
+        description: Recurrence (null = one-time, populated = recurring/habit)
+      start_date:
+        description: Timeline
+        type: string
+      status:
+        description: Status & progress
+        type: string
+      target:
+        allOf:
+        - $ref: '#/definitions/goals.Target'
+        description: Target (for measurable goals)
+      title:
+        description: Core fields
+        type: string
+      updated_at:
+        type: string
+      value_score:
+        description: 1-5, how meaningful
+        type: integer
+      why:
+        description: '"Why does this matter?" - for retros'
+        type: string
+    type: object
+  goals.GoalPageResponse:
+    properties:
+      has_more:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/goals.Goal'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  goals.GoalTaskLink:
+    properties:
+      impact_magnitude:
+        description: 1-5
+        type: integer
+      impact_type:
+        description: '"positive", "negative", "neutral"'
+        type: string
+      quantity_unit:
+        type: string
+      quantity_value:
+        type: number
+      task_id:
+        type: string
+      task_title:
+        type: string
+    type: object
+  goals.Recurrence:
+    properties:
+      active_days:
+        description: '["mon", "tue", ...] or nil for all'
+        items:
+          type: string
+        type: array
+      after_time:
+        description: '"06:00" (complete after 6am)'
+        type: string
+      before_time:
+        description: Time constraints
+        type: string
+      frequency:
+        description: Times per period (e.g., 5)
+        type: integer
+      grace_days:
+        description: Streak settings
+        type: integer
+      period:
+        description: '"day", "week", "month"'
+        type: string
+    type: object
+  goals.RecurrenceInput:
+    properties:
+      active_days:
+        items:
+          type: string
+        type: array
+      after_time:
+        example: "06:00"
+        type: string
+      before_time:
+        example: "22:00"
+        type: string
+      frequency:
+        example: 1
+        maximum: 365
+        minimum: 1
+        type: integer
+      grace_days:
+        example: 1
+        maximum: 7
+        minimum: 0
+        type: integer
+      period:
+        enum:
+        - day
+        - week
+        - month
+        example: day
+        type: string
+    required:
+    - frequency
+    - period
+    type: object
+  goals.Target:
+    properties:
+      current_value:
+        description: Auto-computed from linked tasks
+        type: number
+      per_period:
+        description: true = "3L per day", false = "1000km total"
+        type: boolean
+      unit:
+        description: '"km", "L", "pages", "minutes"'
+        type: string
+      value:
+        description: e.g., 1000, 3
+        type: number
+    type: object
+  goals.TargetInput:
+    properties:
+      per_period:
+        example: true
+        type: boolean
+      unit:
+        example: liters
+        maxLength: 50
+        minLength: 1
+        type: string
+      value:
+        example: 3
+        type: number
+    required:
+    - unit
+    - value
+    type: object
+  goals.TodayGoal:
+    properties:
+      goal:
+        $ref: '#/definitions/goals.Goal'
+      streak:
+        type: integer
+      today_met:
+        type: boolean
+      today_value:
+        type: number
+    type: object
+  goals.TodayGoalsResponse:
+    properties:
+      date:
+        description: YYYY-MM-DD
+        type: string
+      goals:
+        items:
+          $ref: '#/definitions/goals.TodayGoal'
+        type: array
+    type: object
+  goals.UpdateRequest:
+    description: Request payload for updating a goal
+    properties:
+      category_id:
+        type: string
+      color:
+        maxLength: 20
+        type: string
+      completion_mode:
+        enum:
+        - all
+        - any
+        type: string
+      deadline:
+        type: string
+      description:
+        maxLength: 2000
+        type: string
+      goal_type:
+        enum:
+        - discrete
+        - measurable
+        - epic
+        - avoidance
+        type: string
+      icon:
+        maxLength: 50
+        type: string
+      is_private:
+        type: boolean
+      life_domain:
+        maxLength: 50
+        type: string
+      priority:
+        maximum: 3
+        minimum: 0
+        type: integer
+      recurrence:
+        $ref: '#/definitions/goals.RecurrenceInput'
+      start_date:
+        type: string
+      status:
+        enum:
+        - active
+        - completed
+        - paused
+        - abandoned
+        type: string
+      target:
+        $ref: '#/definitions/goals.TargetInput'
+      title:
+        maxLength: 500
+        minLength: 1
+        type: string
+      value_score:
+        maximum: 5
+        minimum: 0
+        type: integer
+      why:
+        maxLength: 1000
+        type: string
+    type: object
   health.HealthResponse:
     description: Health check response
     properties:
@@ -254,6 +1116,382 @@ definitions:
   response.OperationMessage:
     properties:
       message:
+        type: string
+    type: object
+  retrospectives.CategoriesSummary:
+    properties:
+      neglected:
+        items:
+          $ref: '#/definitions/retrospectives.NeglectedArea'
+        type: array
+      time_distribution:
+        items:
+          $ref: '#/definitions/retrospectives.CategoryTime'
+        type: array
+    type: object
+  retrospectives.CategoryCount:
+    properties:
+      category:
+        type: string
+      count:
+        type: integer
+      duration_hours:
+        type: number
+    type: object
+  retrospectives.CategoryTime:
+    properties:
+      category:
+        type: string
+      hours:
+        type: number
+      percentage:
+        type: number
+    type: object
+  retrospectives.GenerateRequest:
+    description: Request to generate a retrospective
+    properties:
+      date:
+        description: For daily retros (defaults to today)
+        example: "2025-12-14T00:00:00Z"
+        type: string
+      end_date:
+        description: For custom range
+        example: "2025-12-14T23:59:59Z"
+        type: string
+      retro_type:
+        enum:
+        - daily
+        - weekly
+        - monthly
+        - quarterly
+        - yearly
+        - custom
+        example: daily
+        type: string
+      start_date:
+        description: For custom range
+        example: "2025-12-01T00:00:00Z"
+        type: string
+    required:
+    - retro_type
+    type: object
+  retrospectives.GoalHighlight:
+    properties:
+      goal_id:
+        type: string
+      name:
+        type: string
+      progress_delta:
+        type: number
+      reason:
+        type: string
+    type: object
+  retrospectives.GoalImpact:
+    properties:
+      goal_id:
+        type: string
+      name:
+        type: string
+      negative:
+        type: integer
+      positive:
+        type: integer
+    type: object
+  retrospectives.GoalsSummary:
+    properties:
+      negatively_impacted:
+        items:
+          $ref: '#/definitions/retrospectives.GoalHighlight'
+        type: array
+      net_impact:
+        items:
+          $ref: '#/definitions/retrospectives.GoalImpact'
+        type: array
+      significantly_advanced:
+        items:
+          $ref: '#/definitions/retrospectives.GoalHighlight'
+        type: array
+    type: object
+  retrospectives.HabitStatus:
+    properties:
+      habit_id:
+        type: string
+      name:
+        type: string
+      success_rate:
+        type: number
+    type: object
+  retrospectives.HabitsSummary:
+    properties:
+      met:
+        items:
+          $ref: '#/definitions/retrospectives.HabitStatus'
+        type: array
+      missed:
+        items:
+          $ref: '#/definitions/retrospectives.HabitStatus'
+        type: array
+      partially_met:
+        items:
+          $ref: '#/definitions/retrospectives.HabitStatus'
+        type: array
+      streaks:
+        $ref: '#/definitions/retrospectives.StreaksSummary'
+    type: object
+  retrospectives.ListResponse:
+    properties:
+      limit:
+        type: integer
+      offset:
+        type: integer
+      retrospectives:
+        items:
+          $ref: '#/definitions/retrospectives.Retrospective'
+        type: array
+      total:
+        type: integer
+    type: object
+  retrospectives.MoodEvent:
+    properties:
+      context:
+        type: string
+      date:
+        type: string
+      emotion:
+        type: string
+    type: object
+  retrospectives.MoodSummary:
+    properties:
+      average_arousal:
+        type: number
+      average_valence:
+        type: number
+      dominant_quadrant:
+        type: string
+      notable_dips:
+        items:
+          $ref: '#/definitions/retrospectives.MoodEvent'
+        type: array
+      notable_spikes:
+        items:
+          $ref: '#/definitions/retrospectives.MoodEvent'
+        type: array
+      quadrant_distribution:
+        $ref: '#/definitions/retrospectives.QuadrantDist'
+    type: object
+  retrospectives.NeglectedArea:
+    properties:
+      category:
+        type: string
+      days_since_last_task:
+        type: integer
+    type: object
+  retrospectives.QuadrantDist:
+    properties:
+      blue:
+        type: number
+      green:
+        type: number
+      red:
+        type: number
+      yellow:
+        type: number
+    type: object
+  retrospectives.RetroAutoSummary:
+    properties:
+      categories:
+        $ref: '#/definitions/retrospectives.CategoriesSummary'
+      goals:
+        $ref: '#/definitions/retrospectives.GoalsSummary'
+      habits:
+        $ref: '#/definitions/retrospectives.HabitsSummary'
+      insights:
+        description: AI-generated insights (future)
+        items:
+          type: string
+        type: array
+      mood:
+        $ref: '#/definitions/retrospectives.MoodSummary'
+      tasks:
+        $ref: '#/definitions/retrospectives.TasksSummary'
+    type: object
+  retrospectives.Retrospective:
+    description: A retrospective contains auto-generated summaries and user reflections
+    properties:
+      auto_summary:
+        allOf:
+        - $ref: '#/definitions/retrospectives.RetroAutoSummary'
+        description: Auto-Generated Content
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      end_date:
+        type: string
+      generated_at:
+        description: Metadata
+        type: string
+      id:
+        type: string
+      retro_type:
+        description: Type & Scope
+        type: string
+      start_date:
+        type: string
+      status:
+        description: Status
+        type: string
+      updated_at:
+        type: string
+      user_content:
+        allOf:
+        - $ref: '#/definitions/retrospectives.UserReflection'
+        description: User-Editable Content
+    type: object
+  retrospectives.StreakUpdate:
+    properties:
+      habit_id:
+        type: string
+      name:
+        type: string
+      now:
+        type: integer
+      streak:
+        type: integer
+      was:
+        type: integer
+    type: object
+  retrospectives.StreaksSummary:
+    properties:
+      broken:
+        items:
+          $ref: '#/definitions/retrospectives.StreakUpdate'
+        type: array
+      continued:
+        items:
+          $ref: '#/definitions/retrospectives.StreakUpdate'
+        type: array
+      started:
+        items:
+          $ref: '#/definitions/retrospectives.StreakUpdate'
+        type: array
+    type: object
+  retrospectives.TasksSummary:
+    properties:
+      by_category:
+        items:
+          $ref: '#/definitions/retrospectives.CategoryCount'
+        type: array
+      cancelled:
+        type: integer
+      completed:
+        type: integer
+      not_started:
+        type: integer
+      postponed:
+        type: integer
+      total_duration_hours:
+        type: number
+    type: object
+  retrospectives.UpdateRequest:
+    description: Request to update retrospective user content
+    properties:
+      status:
+        enum:
+        - draft
+        - completed
+        example: completed
+        type: string
+      user_content:
+        $ref: '#/definitions/retrospectives.UserReflection'
+    type: object
+  retrospectives.UserReflection:
+    properties:
+      additional_notes:
+        example: Need to schedule a dentist appointment
+        type: string
+      change_tomorrow:
+        example: Start with the hardest task first thing in the morning
+        type: string
+      gratitude:
+        items:
+          type: string
+        type: array
+      proud_of:
+        example: Maintained my exercise streak for 30 days
+        type: string
+      what_didnt_go_well:
+        example: Procrastinated on the design review task
+        type: string
+      what_learned:
+        example: Breaking tasks into smaller chunks helps me focus
+        type: string
+      what_went_well:
+        example: Completed all my morning routines consistently
+        type: string
+    type: object
+  taskgoals.LinkRequest:
+    description: Request payload for creating a task-goal link
+    properties:
+      goal_id:
+        example: goals:abc123
+        type: string
+      impact_magnitude:
+        example: 3
+        maximum: 5
+        minimum: 1
+        type: integer
+      impact_type:
+        enum:
+        - positive
+        - negative
+        - neutral
+        example: positive
+        type: string
+      notes:
+        maxLength: 1000
+        type: string
+      quantity_unit:
+        example: km
+        type: string
+      quantity_value:
+        example: 5
+        type: number
+    required:
+    - goal_id
+    - impact_type
+    type: object
+  taskgoals.TaskGoal:
+    properties:
+      created_at:
+        description: Metadata
+        type: string
+      goal_id:
+        description: '"goals:xyz"'
+        type: string
+      id:
+        description: 'Edge ID: "task_goals:xyz"'
+        type: string
+      impact_magnitude:
+        description: 1-5
+        type: integer
+      impact_type:
+        description: Impact tracking
+        type: string
+      notes:
+        description: Context
+        type: string
+      quantity_unit:
+        description: e.g., "km"
+        type: string
+      quantity_value:
+        description: Quantity (for measurable goals)
+        type: number
+      source:
+        description: '"manual" or "auto"'
+        type: string
+      task_id:
+        description: Related entities
         type: string
     type: object
   tasks.CreateRequest:
@@ -308,8 +1546,20 @@ definitions:
     - start_date
     - title
     type: object
+  tasks.Quantity:
+    properties:
+      unit:
+        description: e.g., "ml", "minutes", "pages"
+        type: string
+      value:
+        description: e.g., 500, 30
+        type: number
+    type: object
   tasks.Task:
     properties:
+      activity_key:
+        description: Goal/Template integration
+        type: string
       category:
         $ref: '#/definitions/categories.Category'
       completed:
@@ -331,6 +1581,11 @@ definitions:
         description: Computed on write
       journal:
         type: string
+      linked_goals:
+        description: Goals linked to this task
+        items:
+          $ref: '#/definitions/tasks.TaskGoalLink'
+        type: array
       negatives:
         items:
           $ref: '#/definitions/tasks.TaskItem'
@@ -343,14 +1598,38 @@ definitions:
         type: array
       priority:
         type: integer
+      quantity:
+        allOf:
+        - $ref: '#/definitions/tasks.Quantity'
+        description: For measurable goals
       source:
         type: string
       start_date:
+        type: string
+      template_id:
+        description: Source template (templates:xyz)
         type: string
       title:
         type: string
       updated_at:
         type: string
+    type: object
+  tasks.TaskGoalLink:
+    properties:
+      goal_id:
+        type: string
+      goal_title:
+        type: string
+      impact_magnitude:
+        description: 1-5
+        type: integer
+      impact_type:
+        description: '"positive", "negative", "neutral"'
+        type: string
+      quantity_unit:
+        type: string
+      quantity_value:
+        type: number
     type: object
   tasks.TaskItem:
     properties:
@@ -416,12 +1695,449 @@ definitions:
         minLength: 1
         type: string
     type: object
+  templates.CreateRequest:
+    description: Request payload for creating a template
+    properties:
+      activity_key:
+        example: running
+        type: string
+      color:
+        example: '#10B981'
+        maxLength: 20
+        type: string
+      default_category_id:
+        example: categories:fitness123
+        type: string
+      default_duration:
+        description: seconds (30 min)
+        example: 1800
+        type: integer
+      default_emotion_id:
+        example: emotions:E16
+        type: string
+      default_priority:
+        example: 2
+        maximum: 3
+        minimum: 0
+        type: integer
+      description:
+        example: Quick morning jog before work
+        maxLength: 2000
+        type: string
+      expected_quadrant:
+        enum:
+        - green
+        - yellow
+        - red
+        - blue
+        example: yellow
+        type: string
+      goal_id:
+        example: goals:run100km
+        type: string
+      icon:
+        example: "\U0001F3C3"
+        maxLength: 50
+        type: string
+      is_quick_log:
+        example: true
+        type: boolean
+      quantity_default:
+        example: 5
+        minimum: 0
+        type: number
+      quantity_enabled:
+        example: true
+        type: boolean
+      quantity_step:
+        example: 0.5
+        minimum: 0
+        type: number
+      quantity_unit:
+        example: km
+        maxLength: 50
+        type: string
+      quick_log_order:
+        example: 1
+        type: integer
+      show_fields:
+        $ref: '#/definitions/templates.ShowFieldsInput'
+      title:
+        example: Morning Run
+        maxLength: 500
+        minLength: 1
+        type: string
+    required:
+    - title
+    type: object
+  templates.ShowFields:
+    properties:
+      duration:
+        type: boolean
+      emotion:
+        type: boolean
+      journal:
+        type: boolean
+      notes:
+        type: boolean
+      positives_negatives:
+        type: boolean
+      quantity:
+        type: boolean
+    type: object
+  templates.ShowFieldsInput:
+    properties:
+      duration:
+        example: true
+        type: boolean
+      emotion:
+        example: true
+        type: boolean
+      journal:
+        example: false
+        type: boolean
+      notes:
+        example: true
+        type: boolean
+      positives_negatives:
+        example: false
+        type: boolean
+      quantity:
+        example: true
+        type: boolean
+    type: object
+  templates.TaskTemplate:
+    properties:
+      activity_key:
+        description: Goal/Activity linking
+        type: string
+      color:
+        type: string
+      created_at:
+        description: Metadata
+        type: string
+      default_category:
+        $ref: '#/definitions/categories.Category'
+      default_duration:
+        description: Defaults for tasks created from this template
+        type: integer
+      default_emotion_id:
+        type: string
+      default_priority:
+        type: integer
+      deleted_at:
+        type: string
+      description:
+        type: string
+      expected_quadrant:
+        description: Emotion defaults
+        type: string
+      goal_id:
+        description: Source goal if auto-created
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_default:
+        description: Source
+        type: boolean
+      is_quick_log:
+        description: Quick log settings
+        type: boolean
+      last_used_at:
+        type: string
+      quantity_default:
+        type: number
+      quantity_enabled:
+        description: Quantity settings
+        type: boolean
+      quantity_step:
+        type: number
+      quantity_unit:
+        type: string
+      quick_log_order:
+        type: integer
+      show_fields:
+        allOf:
+        - $ref: '#/definitions/templates.ShowFields'
+        description: Fields to show in quick-log UI
+      source_task_id:
+        type: string
+      title:
+        description: Core
+        type: string
+      updated_at:
+        type: string
+      use_count:
+        description: Usage stats
+        type: integer
+    type: object
+  templates.TemplatePageResponse:
+    properties:
+      has_more:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/templates.TaskTemplate'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  templates.UpdateRequest:
+    description: Request payload for updating a template
+    properties:
+      color:
+        example: '#6366F1'
+        maxLength: 20
+        type: string
+      default_category_id:
+        example: categories:fitness123
+        type: string
+      default_duration:
+        example: 2700
+        type: integer
+      default_emotion_id:
+        example: emotions:E25
+        type: string
+      default_priority:
+        example: 2
+        maximum: 3
+        minimum: 0
+        type: integer
+      description:
+        example: Post-work stress relief run
+        maxLength: 2000
+        type: string
+      expected_quadrant:
+        enum:
+        - green
+        - yellow
+        - red
+        - blue
+        example: green
+        type: string
+      icon:
+        example: "\U0001F319"
+        maxLength: 50
+        type: string
+      is_quick_log:
+        example: true
+        type: boolean
+      quantity_default:
+        example: 7
+        minimum: 0
+        type: number
+      quantity_enabled:
+        example: true
+        type: boolean
+      quantity_step:
+        example: 1
+        minimum: 0
+        type: number
+      quantity_unit:
+        example: km
+        maxLength: 50
+        type: string
+      quick_log_order:
+        example: 2
+        type: integer
+      show_fields:
+        $ref: '#/definitions/templates.ShowFieldsInput'
+      title:
+        example: Evening Run
+        maxLength: 500
+        minLength: 1
+        type: string
+    type: object
 info:
   contact: {}
   description: Daily journal backend powered by SurrealDB.
   title: Lucid Logs API
   version: "1.0"
 paths:
+  /api/v1/analytics/charts:
+    post:
+      consumes:
+      - application/json
+      description: Generates chart data based on flexible configuration
+      parameters:
+      - description: Chart configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/analytics.ChartRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.ChartResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Generate chart data
+      tags:
+      - Analytics
+  /api/v1/analytics/dashboard:
+    get:
+      description: Retrieves combined dashboard metrics for tasks, emotions, goals,
+        categories
+      parameters:
+      - default: week
+        description: Time period (day, week, month, quarter, year)
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.DashboardResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get dashboard metrics
+      tags:
+      - Analytics
+  /api/v1/analytics/metrics/categories:
+    get:
+      description: Retrieves time spent per category with percentages
+      parameters:
+      - default: week
+        description: Time period (day, week, month, quarter, year)
+        in: query
+        name: period
+        type: string
+      - description: Start date for custom period (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date for custom period (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.CategoryMetrics'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get category time distribution
+      tags:
+      - Analytics
+  /api/v1/analytics/metrics/emotions:
+    get:
+      description: Retrieves valence, arousal, mood stability, quadrant distribution,
+        top emotions
+      parameters:
+      - default: week
+        description: Time period (day, week, month, quarter, year)
+        in: query
+        name: period
+        type: string
+      - description: Start date for custom period (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date for custom period (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.EmotionMetrics'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get emotion/mood metrics
+      tags:
+      - Analytics
+  /api/v1/analytics/metrics/goals:
+    get:
+      description: Retrieves goal progress, streaks, and completion stats
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.GoalMetrics'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get goal progress metrics
+      tags:
+      - Analytics
+  /api/v1/analytics/metrics/tasks:
+    get:
+      description: Retrieves task completion rate, velocity, peak hours, category
+        breakdown
+      parameters:
+      - default: week
+        description: Time period (day, week, month, quarter, year)
+        in: query
+        name: period
+        type: string
+      - description: Start date for custom period (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date for custom period (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.TaskMetrics'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get task productivity metrics
+      tags:
+      - Analytics
   /api/v1/auth/login:
     post:
       consumes:
@@ -718,6 +2434,536 @@ paths:
       summary: Get emotion grid
       tags:
       - emotions
+  /api/v1/goals:
+    get:
+      description: Get paginated list of goals for the authenticated user
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by status (active, completed, paused, abandoned)
+        in: query
+        name: status
+        type: string
+      - description: Filter by type (discrete, measurable, epic, avoidance)
+        in: query
+        name: goal_type
+        type: string
+      - description: Filter recurring (true) or one-time (false)
+        in: query
+        name: recurring
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goals.GoalPageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List goals
+      tags:
+      - goals
+    post:
+      consumes:
+      - application/json
+      description: Create a new goal (auto-creates linked template for recurring goals)
+      parameters:
+      - description: Goal data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/goals.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/goals.Goal'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create goal
+      tags:
+      - goals
+  /api/v1/goals/{goalId}/entries:
+    get:
+      description: Get entries for a goal within a date range
+      parameters:
+      - description: Goal ID
+        in: path
+        name: goalId
+        required: true
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goalentries.GoalEntryListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List goal entries
+      tags:
+      - goal-entries
+    post:
+      consumes:
+      - application/json
+      description: Create or update a daily entry for a goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: goalId
+        required: true
+        type: string
+      - description: Entry data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/goalentries.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/goalentries.GoalEntry'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Log goal entry
+      tags:
+      - goal-entries
+  /api/v1/goals/{id}:
+    delete:
+      description: Soft delete a goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete goal
+      tags:
+      - goals
+    get:
+      description: Get a single goal by its ID
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goals.Goal'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get goal by ID
+      tags:
+      - goals
+    put:
+      consumes:
+      - application/json
+      description: Update an existing goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/goals.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goals.Goal'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update goal
+      tags:
+      - goals
+  /api/v1/goals/{id}/actions:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all actions for a goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goalactions.ActionListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List goal actions
+      tags:
+      - Goal Actions
+    patch:
+      consumes:
+      - application/json
+      description: Reorders actions within a goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Ordered list of action IDs
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/goalactions.ReorderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Reorder actions
+      tags:
+      - Goal Actions
+    post:
+      consumes:
+      - application/json
+      description: Creates a new action for a goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Action data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/goalactions.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/goalactions.GoalAction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a goal action
+      tags:
+      - Goal Actions
+  /api/v1/goals/{id}/actions/{actionId}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft-deletes a goal action
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Action ID
+        in: path
+        name: actionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a goal action
+      tags:
+      - Goal Actions
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a single goal action by ID
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Action ID
+        in: path
+        name: actionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goalactions.GoalAction'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a goal action
+      tags:
+      - Goal Actions
+    patch:
+      consumes:
+      - application/json
+      description: Updates an existing goal action. Set "completed" field to mark
+        complete/incomplete.
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Action ID
+        in: path
+        name: actionId
+        required: true
+        type: string
+      - description: Action data (all fields optional)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/goalactions.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goalactions.GoalAction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a goal action
+      tags:
+      - Goal Actions
+  /api/v1/goals/today:
+    get:
+      description: Get recurring goals with today's completion status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goals.TodayGoalsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get today's goals
+      tags:
+      - goals
   /api/v1/health:
     get:
       description: Returns health status including database connectivity
@@ -735,6 +2981,163 @@ paths:
       summary: Health check with database status
       tags:
       - health
+  /api/v1/retrospectives:
+    get:
+      description: Retrieves paginated list of user's retrospectives
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/retrospectives.ListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List retrospectives
+      tags:
+      - Retrospectives
+  /api/v1/retrospectives/{id}:
+    delete:
+      description: Soft-deletes a retrospective
+      parameters:
+      - description: Retrospective ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete retrospective
+      tags:
+      - Retrospectives
+    get:
+      description: Retrieves a single retrospective with auto-summary and user content
+      parameters:
+      - description: Retrospective ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/retrospectives.Retrospective'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get retrospective by ID
+      tags:
+      - Retrospectives
+    put:
+      consumes:
+      - application/json
+      description: Updates user reflection content on a retrospective
+      parameters:
+      - description: Retrospective ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/retrospectives.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/retrospectives.Retrospective'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update retrospective
+      tags:
+      - Retrospectives
+  /api/v1/retrospectives/generate:
+    post:
+      consumes:
+      - application/json
+      description: Generates a new retrospective with auto-computed analytics summary
+      parameters:
+      - description: Generation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/retrospectives.GenerateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/retrospectives.Retrospective'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Generate retrospective
+      tags:
+      - Retrospectives
   /api/v1/tasks:
     get:
       description: Get paginated list of tasks for the authenticated user
@@ -911,6 +3314,295 @@ paths:
       summary: Update task
       tags:
       - tasks
+  /api/v1/tasks/{taskId}/goals:
+    post:
+      consumes:
+      - application/json
+      description: Create a link between a task and one or more goals with impact
+        tracking
+      parameters:
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      - description: Link data (single goal)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/taskgoals.LinkRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/taskgoals.TaskGoal'
+        "400":
+          description: Invalid request or validation failed
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Task or goal not found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "409":
+          description: Link already exists
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Link task to goal
+      tags:
+      - task-goals
+  /api/v1/tasks/{taskId}/goals/{goalId}:
+    delete:
+      description: Remove the link between a task and a goal
+      parameters:
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      - description: Goal ID
+        in: path
+        name: goalId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully unlinked
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Task, goal, or link not found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Unlink task from goal
+      tags:
+      - task-goals
+  /api/v1/templates:
+    get:
+      description: Get paginated list of templates for the authenticated user
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/templates.TemplatePageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List templates
+      tags:
+      - templates
+    post:
+      consumes:
+      - application/json
+      description: Create a new task template
+      parameters:
+      - description: Template data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/templates.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/templates.TaskTemplate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create template
+      tags:
+      - templates
+  /api/v1/templates/{id}:
+    delete:
+      description: Soft delete a template
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete template
+      tags:
+      - templates
+    get:
+      description: Get a single template by its ID
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/templates.TaskTemplate'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get template by ID
+      tags:
+      - templates
+    put:
+      consumes:
+      - application/json
+      description: Update an existing template
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/templates.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/templates.TaskTemplate'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update template
+      tags:
+      - templates
+  /api/v1/templates/quick-log:
+    get:
+      description: Get templates configured for quick logging
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/templates.TaskTemplate'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get quick-log templates
+      tags:
+      - templates
   /health:
     get:
       description: Returns 200 OK if the service is running

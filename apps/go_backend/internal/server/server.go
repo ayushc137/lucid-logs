@@ -15,11 +15,18 @@ import (
 
 	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
 	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/features/analytics"
 	"github.com/lucid-logs/go-backend/internal/features/auth"
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
+	"github.com/lucid-logs/go-backend/internal/features/goalactions"
+	"github.com/lucid-logs/go-backend/internal/features/goalentries"
+	"github.com/lucid-logs/go-backend/internal/features/goals"
 	"github.com/lucid-logs/go-backend/internal/features/health"
+	"github.com/lucid-logs/go-backend/internal/features/retrospectives"
+	"github.com/lucid-logs/go-backend/internal/features/taskgoals"
 	"github.com/lucid-logs/go-backend/internal/features/tasks"
+	"github.com/lucid-logs/go-backend/internal/features/templates"
 	"github.com/lucid-logs/go-backend/internal/features/users"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
@@ -129,6 +136,42 @@ func NewRouter(cfg Config) *gin.Engine {
 			userRepo := users.NewRepository(cfg.DB)
 			userService := users.NewService(userRepo)
 			users.RegisterRoutes(protected.Group("/users"), userService, cfg.Validator)
+
+			// Template routes
+			templateRepo := templates.NewRepository(cfg.DB)
+			templateService := templates.NewService(templateRepo)
+			templates.RegisterRoutes(protected.Group("/templates"), templateService, cfg.Validator)
+
+			// Goal routes (with linked template auto-creation)
+			goalRepo := goals.NewRepository(cfg.DB)
+			templateCreator := templates.NewGoalTemplateCreator(templateRepo)
+			goalService := goals.NewService(goalRepo, templateCreator)
+			goals.RegisterRoutes(protected.Group("/goals"), goalService, cfg.Validator)
+
+			// Goal Entry routes (nested under goals)
+			goalEntryRepo := goalentries.NewRepository(cfg.DB)
+			goalEntryService := goalentries.NewService(goalEntryRepo, goalRepo, goalService)
+			goalentries.RegisterRoutes(protected.Group("/goals/:id/entries"), goalEntryService, cfg.Validator)
+
+			// Goal Actions routes (nested under goals)
+			goalActionsRepo := goalactions.NewRepository(cfg.DB)
+			goalActionsService := goalactions.NewService(goalActionsRepo, goalService, goalRepo)
+			goalactions.RegisterRoutes(protected.Group("/goals/:id/actions"), goalActionsService, cfg.Validator)
+
+			// Task-Goals linking routes (nested under tasks)
+			taskGoalsRepo := taskgoals.NewRepository(cfg.DB)
+			taskGoalsService := taskgoals.NewService(taskGoalsRepo, taskService, goalService)
+			taskgoals.RegisterRoutes(protected.Group("/tasks/:id/goals"), taskGoalsService, cfg.Validator)
+
+			// Analytics routes
+			analyticsRepo := analytics.NewRepository(cfg.DB)
+			analyticsService := analytics.NewService(analyticsRepo)
+			analytics.RegisterRoutes(protected.Group("/analytics"), analyticsService, cfg.Validator)
+
+			// Retrospectives routes
+			retroRepo := retrospectives.NewRepository(cfg.DB)
+			retroService := retrospectives.NewService(retroRepo, analyticsRepo)
+			retrospectives.RegisterRoutes(protected.Group("/retrospectives"), retroService, cfg.Validator)
 		}
 	}
 
