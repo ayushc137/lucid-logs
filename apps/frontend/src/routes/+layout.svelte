@@ -1,27 +1,41 @@
 <script lang="ts">
-	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
-	import { ModeWatcher } from 'mode-watcher';
-	import '../app.css';
+  import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
+  import { page } from '$app/stores';
+  import { AppShell } from '$lib/components/layout';
+  
+  // UnoCSS (must be in JS, not CSS)
+  import '@unocss/reset/tailwind.css';
+  import 'virtual:uno.css';
+  
+  // App styles
+  import '../app.css';
 
-	let { children } = $props();
+  let { children } = $props();
 
-	// TanStack Query client with sensible defaults
-	const queryClient = new QueryClient({
-		defaultOptions: {
-			queries: {
-				staleTime: 1000 * 60 * 5, // 5 minutes
-				gcTime: 1000 * 60 * 30, // 30 minutes
-				refetchOnWindowFocus: true,
-				retry: 1
-			}
-		}
-	});
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5,
+        gcTime: 1000 * 60 * 30,
+        refetchOnWindowFocus: true,
+        retry: 1,
+      },
+    },
+  });
+
+  const isAuthPage = $derived(
+    $page.url.pathname.startsWith('/login') || $page.url.pathname.startsWith('/register')
+  );
 </script>
 
-<!-- Theme management -->
-<ModeWatcher defaultMode="system" />
-
-<!-- Query client provider for data fetching -->
 <QueryClientProvider client={queryClient}>
-	{@render children()}
+  {#if isAuthPage}
+    <div class="min-h-screen bg-base-200">
+      {@render children()}
+    </div>
+  {:else}
+    <AppShell>
+      {@render children()}
+    </AppShell>
+  {/if}
 </QueryClientProvider>
