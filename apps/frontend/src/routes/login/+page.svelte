@@ -1,20 +1,32 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { X } from 'lucide-svelte';
+  import { goto } from "$app/navigation";
+  import { Mail, Lock, AlertCircle, Sparkles, ArrowRight } from "lucide-svelte";
+  import { login } from "$lib/api";
+  import { authStore } from "$lib/stores/auth.svelte";
 
-  let email = $state('');
-  let password = $state('');
+  let email = $state("");
+  let password = $state("");
   let loading = $state(false);
-  let error = $state('');
+  let error = $state("");
 
   async function handleLogin() {
     loading = true;
-    error = '';
+    error = "";
     try {
-      await new Promise((r) => setTimeout(r, 1000));
-      goto('/');
-    } catch {
-      error = 'Invalid email or password';
+      const response = await login({ username: email, password });
+      authStore.loginWithResponse(response);
+      await goto("/", { replaceState: true });
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "response" in err) {
+        const httpErr = err as { response?: { status?: number } };
+        if (httpErr.response?.status === 401) {
+          error = "Invalid email or password";
+        } else {
+          error = "Login failed. Please try again.";
+        }
+      } else {
+        error = "Network error. Please check your connection.";
+      }
     } finally {
       loading = false;
     }
@@ -25,42 +37,137 @@
   <title>Login - Lucid Logs</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center p-4 bg-base-200">
-  <div class="card bg-base-100 w-full max-w-sm border border-base-300">
+<div
+  class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-base-100 via-base-100 to-base-200"
+>
+  <!-- Decorative Elements -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div
+      class="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl"
+    ></div>
+    <div
+      class="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl"
+    ></div>
+  </div>
+
+  <div class="card w-full max-w-md bg-base-100 shadow-2xl relative z-10">
     <div class="card-body">
+      <!-- Header -->
       <div class="text-center mb-4">
-        <div class="w-14 h-14 mx-auto rounded-xl bg-primary flex items-center justify-center">
-          <span class="text-primary-content font-bold text-xl">LL</span>
+        <div
+          class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20 mb-4"
+        >
+          <Sparkles class="w-7 h-7 text-primary-content" />
         </div>
-        <h1 class="text-xl font-bold mt-3">Welcome back</h1>
-        <p class="text-base-content/60 text-sm">Sign in to continue</p>
+        <h2 class="card-title text-2xl font-bold justify-center">
+          Welcome Back
+        </h2>
+        <p class="text-base-content/60">Sign in to continue your journey</p>
       </div>
 
+      <!-- Error Alert -->
       {#if error}
-        <div class="alert alert-error text-sm py-2">
-          <X class="w-4 h-4" />
+        <div class="alert alert-error">
+          <AlertCircle class="h-4 w-4" />
           <span>{error}</span>
         </div>
       {/if}
 
-      <form class="space-y-3" onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+      <!-- Form -->
+      <form
+        class="space-y-4"
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleLogin();
+        }}
+      >
         <div class="form-control">
-          <label class="label py-1" for="email"><span class="label-text">Email</span></label>
-          <input id="email" type="email" bind:value={email} placeholder="you@example.com" class="input input-bordered input-sm" required />
+          <label class="label" for="email">
+            <span class="label-text">Email</span>
+          </label>
+          <label class="input input-bordered flex items-center gap-2">
+            <Mail class="h-4 w-4 opacity-50" />
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              class="grow"
+              bind:value={email}
+              required
+            />
+          </label>
         </div>
 
         <div class="form-control">
-          <label class="label py-1" for="password"><span class="label-text">Password</span></label>
-          <input id="password" type="password" bind:value={password} placeholder="••••••••" class="input input-bordered input-sm" required />
+          <label class="label" for="password">
+            <span class="label-text">Password</span>
+            <a href="/forgot-password" class="label-text-alt link link-primary">
+              Forgot password?
+            </a>
+          </label>
+          <label class="input input-bordered flex items-center gap-2">
+            <Lock class="h-4 w-4 opacity-50" />
+            <input
+              id="password"
+              type="password"
+              placeholder="Enter your password"
+              class="grow"
+              bind:value={password}
+              required
+            />
+          </label>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-sm w-full" disabled={loading}>
-          {#if loading}<span class="loading loading-spinner loading-xs"></span>{:else}Sign In{/if}
+        <button type="submit" class="btn btn-primary w-full" disabled={loading}>
+          {#if loading}
+            <span class="loading loading-spinner loading-sm"></span>
+            Signing in...
+          {:else}
+            Sign In
+            <ArrowRight class="h-4 w-4" />
+          {/if}
         </button>
       </form>
 
-      <div class="divider text-xs">or</div>
-      <p class="text-center text-sm">Don't have an account? <a href="/register" class="link link-primary">Sign up</a></p>
+      <!-- Divider -->
+      <div class="divider text-xs uppercase opacity-60">Or continue with</div>
+
+      <!-- Social Buttons -->
+      <div class="grid grid-cols-2 gap-3">
+        <button class="btn btn-outline" disabled>
+          <svg class="h-4 w-4" viewBox="0 0 24 24"
+            ><path
+              fill="currentColor"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            /><path
+              fill="currentColor"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            /><path
+              fill="currentColor"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+            /><path
+              fill="currentColor"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            /></svg
+          >
+          Google
+        </button>
+        <button class="btn btn-outline" disabled>
+          <svg class="h-4 w-4" viewBox="0 0 24 24"
+            ><path
+              fill="currentColor"
+              d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+            /></svg
+          >
+          GitHub
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <p class="text-center text-sm opacity-60 mt-4">
+        Don't have an account?
+        <a href="/register" class="link link-primary font-medium">Create one</a>
+      </p>
     </div>
   </div>
 </div>

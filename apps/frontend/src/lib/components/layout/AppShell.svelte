@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Sidebar, Header } from '$lib/components/layout';
-  import { themeStore } from '$lib/stores';
 
   interface Props {
     children: import('svelte').Snippet;
@@ -10,13 +9,20 @@
   let sidebarCollapsed = $state(false);
   let mobileMenuOpen = $state(false);
 
-  // Apply theme on mount
+  // Apply saved theme on mount
   $effect(() => {
-    document.documentElement.setAttribute('data-theme', themeStore.current);
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (savedTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
   });
 </script>
 
-<div class="flex h-screen overflow-hidden bg-base-200">
+<div class="flex h-screen overflow-hidden bg-background">
   <!-- Desktop Sidebar -->
   <div class="hidden lg:block flex-shrink-0">
     <Sidebar bind:collapsed={sidebarCollapsed} onToggle={() => (sidebarCollapsed = !sidebarCollapsed)} />
@@ -43,7 +49,7 @@
   <div class="flex-1 flex flex-col overflow-hidden min-w-0">
     <Header onMenuClick={() => (mobileMenuOpen = true)} />
     
-    <main class="flex-1 overflow-y-auto">
+    <main class="flex-1 overflow-y-auto bg-muted/30">
       <div class="p-4 md:p-6 lg:p-8 h-full">
         <div class="max-w-7xl mx-auto h-full">
           {@render children()}

@@ -1,305 +1,113 @@
-/* ========================================
-   Lucid Logs - Complete UI Redesign
-   6 Custom Themes using oklch
-   ======================================== */
-
-/* Google Font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* Base DaisyUI */
-@import 'daisyui/daisyui.css';
-@import 'daisyui/themes.css';
+@import 'tailwindcss';
 
-/* ========================================
-   Custom Theme Definitions
-   Using oklch color format for DaisyUI 5
-   ======================================== */
-
-/* 🌙 Midnight - Dark Premium */
-[data-theme="midnight"] {
-  color-scheme: dark;
-  --color-base-100: oklch(15% 0.02 270);
-  --color-base-200: oklch(12% 0.02 270);
-  --color-base-300: oklch(20% 0.02 270);
-  --color-base-content: oklch(90% 0.01 270);
-  --color-primary: oklch(60% 0.25 290);
-  --color-primary-content: oklch(100% 0 0);
-  --color-secondary: oklch(65% 0.15 175);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(75% 0.15 85);
-  --color-accent-content: oklch(20% 0.02 85);
-  --color-neutral: oklch(25% 0.02 270);
-  --color-neutral-content: oklch(85% 0.01 270);
-  --color-info: oklch(70% 0.15 220);
-  --color-success: oklch(70% 0.2 145);
-  --color-warning: oklch(80% 0.15 85);
-  --color-error: oklch(65% 0.2 25);
-  --radius-box: 1rem;
-  --radius-btn: 0.5rem;
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark, cupcake, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset;
 }
 
-/* ☀️ Modern - Light & Clean */
-[data-theme="modern"] {
-  color-scheme: light;
-  --color-base-100: oklch(100% 0 0);
-  --color-base-200: oklch(98% 0.005 270);
-  --color-base-300: oklch(95% 0.01 270);
-  --color-base-content: oklch(25% 0.02 270);
-  --color-primary: oklch(55% 0.2 250);
-  --color-primary-content: oklch(100% 0 0);
-  --color-secondary: oklch(60% 0.15 160);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(65% 0.2 40);
-  --color-accent-content: oklch(100% 0 0);
-  --color-neutral: oklch(40% 0.02 270);
-  --color-neutral-content: oklch(100% 0 0);
-  --color-info: oklch(60% 0.15 230);
-  --color-success: oklch(60% 0.2 145);
-  --color-warning: oklch(75% 0.15 85);
-  --color-error: oklch(55% 0.25 25);
-  --radius-box: 1rem;
-  --radius-btn: 0.5rem;
-}
-
-/* 📜 Cozy - Warm Journal */
-[data-theme="cozy"] {
-  color-scheme: light;
-  --color-base-100: oklch(97% 0.02 80);
-  --color-base-200: oklch(94% 0.03 75);
-  --color-base-300: oklch(90% 0.04 70);
-  --color-base-content: oklch(30% 0.05 60);
-  --color-primary: oklch(50% 0.15 35);
-  --color-primary-content: oklch(100% 0 0);
-  --color-secondary: oklch(55% 0.12 130);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(60% 0.1 65);
-  --color-accent-content: oklch(20% 0.05 60);
-  --color-neutral: oklch(45% 0.05 60);
-  --color-neutral-content: oklch(95% 0.02 80);
-  --color-info: oklch(55% 0.1 220);
-  --color-success: oklch(55% 0.15 130);
-  --color-warning: oklch(70% 0.12 75);
-  --color-error: oklch(50% 0.18 25);
-  --radius-box: 1.25rem;
-  --radius-btn: 0.75rem;
-}
-
-/* 🌊 Ocean - Cool Calm */
-[data-theme="ocean"] {
-  color-scheme: dark;
-  --color-base-100: oklch(18% 0.03 240);
-  --color-base-200: oklch(14% 0.03 240);
-  --color-base-300: oklch(22% 0.03 240);
-  --color-base-content: oklch(90% 0.02 240);
-  --color-primary: oklch(75% 0.15 195);
-  --color-primary-content: oklch(20% 0.03 240);
-  --color-secondary: oklch(70% 0.12 165);
-  --color-secondary-content: oklch(20% 0.03 240);
-  --color-accent: oklch(75% 0.15 55);
-  --color-accent-content: oklch(20% 0.03 240);
-  --color-neutral: oklch(30% 0.03 240);
-  --color-neutral-content: oklch(85% 0.02 240);
-  --color-info: oklch(70% 0.15 220);
-  --color-success: oklch(70% 0.15 165);
-  --color-warning: oklch(80% 0.15 85);
-  --color-error: oklch(70% 0.18 15);
-  --radius-box: 1rem;
-  --radius-btn: 0.5rem;
-}
-
-/* 🌅 Sunset - Warm Vibrant */
-[data-theme="sunset"] {
-  color-scheme: light;
-  --color-base-100: oklch(98% 0.02 35);
-  --color-base-200: oklch(95% 0.03 30);
-  --color-base-300: oklch(92% 0.04 25);
-  --color-base-content: oklch(25% 0.06 350);
-  --color-primary: oklch(65% 0.2 35);
-  --color-primary-content: oklch(100% 0 0);
-  --color-secondary: oklch(60% 0.22 340);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(85% 0.15 90);
-  --color-accent-content: oklch(25% 0.06 350);
-  --color-neutral: oklch(50% 0.08 350);
-  --color-neutral-content: oklch(98% 0.02 35);
-  --color-info: oklch(60% 0.15 280);
-  --color-success: oklch(70% 0.2 145);
-  --color-warning: oklch(85% 0.15 90);
-  --color-error: oklch(60% 0.25 15);
-  --radius-box: 1.25rem;
-  --radius-btn: 0.75rem;
-}
-
-/* 🌲 Forest - Nature */
-[data-theme="forest"] {
-  color-scheme: light;
-  --color-base-100: oklch(97% 0.02 130);
-  --color-base-200: oklch(94% 0.03 130);
-  --color-base-300: oklch(90% 0.04 130);
-  --color-base-content: oklch(25% 0.06 130);
-  --color-primary: oklch(55% 0.18 145);
-  --color-primary-content: oklch(100% 0 0);
-  --color-secondary: oklch(45% 0.1 60);
-  --color-secondary-content: oklch(100% 0 0);
-  --color-accent: oklch(60% 0.1 65);
-  --color-accent-content: oklch(25% 0.06 130);
-  --color-neutral: oklch(40% 0.05 130);
-  --color-neutral-content: oklch(97% 0.02 130);
-  --color-info: oklch(55% 0.15 250);
-  --color-success: oklch(55% 0.18 145);
-  --color-warning: oklch(70% 0.15 85);
-  --color-error: oklch(45% 0.2 25);
-  --radius-box: 1rem;
-  --radius-btn: 0.625rem;
-}
-
-/* ========================================
-   Base Styles
-   ======================================== */
-
+/* Base font */
 * {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
 }
 
-/* ========================================
-   Button Styles
-   ======================================== */
-
-.btn {
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-}
-
-/* ========================================
-   Icon Box
-   ======================================== */
-
-.icon-box {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.6rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-box-primary { background: oklch(from var(--color-primary) l c h / 0.15); color: var(--color-primary); }
-.icon-box-secondary { background: oklch(from var(--color-secondary) l c h / 0.15); color: var(--color-secondary); }
-.icon-box-accent { background: oklch(from var(--color-accent) l c h / 0.15); color: var(--color-accent); }
-.icon-box-info { background: oklch(from var(--color-info) l c h / 0.15); color: var(--color-info); }
-.icon-box-success { background: oklch(from var(--color-success) l c h / 0.15); color: var(--color-success); }
-.icon-box-warning { background: oklch(from var(--color-warning) l c h / 0.15); color: var(--color-warning); }
-.icon-box-error { background: oklch(from var(--color-error) l c h / 0.15); color: var(--color-error); }
-
-/* ========================================
-   Text Gradient
-   ======================================== */
-
-.text-gradient {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* ========================================
-   Timeline
-   ======================================== */
-
-.timeline-container {
-  position: relative;
-}
-
+/* Timeline */
 .timeline-grid {
   display: grid;
   grid-template-columns: 50px 1fr;
 }
 
 .timeline-hour {
-  font-size: 0.7rem;
-  font-weight: 500;
-  opacity: 0.5;
-  padding: 0.5rem 0;
-  text-align: right;
-  padding-right: 0.75rem;
+  @apply text-xs font-medium opacity-60 py-2 text-right pr-3;
 }
 
 .timeline-row {
-  min-height: 50px;
-  border-top: 1px solid oklch(from var(--color-base-content) l c h / 0.08);
-  display: flex;
-  gap: 0.375rem;
-  padding: 0.25rem;
+  @apply min-h-[50px] border-t border-base-300 flex gap-1.5 p-1;
 }
 
 .timeline-task {
-  flex: 1;
-  min-width: 80px;
-  padding: 0.375rem 0.625rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  cursor: pointer;
+  @apply flex-1 min-w-[80px] px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer;
 }
 
-.timeline-task:hover { opacity: 0.85; }
-
-.timeline-task-primary { background: oklch(from var(--color-primary) l c h / 0.2); color: var(--color-primary); }
-.timeline-task-secondary { background: oklch(from var(--color-secondary) l c h / 0.2); color: var(--color-secondary); }
-.timeline-task-accent { background: oklch(from var(--color-accent) l c h / 0.2); color: var(--color-accent); }
-.timeline-task-info { background: oklch(from var(--color-info) l c h / 0.2); color: var(--color-info); }
-.timeline-task-success { background: oklch(from var(--color-success) l c h / 0.2); color: var(--color-success); }
-.timeline-task-warning { background: oklch(from var(--color-warning) l c h / 0.2); color: var(--color-warning); }
-
-/* ========================================
-   Scrollbar
-   ======================================== */
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.timeline-task-primary {
+  @apply bg-primary/20 text-primary;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-base-200);
+.timeline-task-secondary {
+  @apply bg-secondary/20 text-secondary;
 }
 
-::-webkit-scrollbar-thumb {
-  background: oklch(from var(--color-base-content) l c h / 0.2);
-  border-radius: 4px;
+.timeline-task-accent {
+  @apply bg-accent/20 text-accent;
 }
 
-/* ========================================
-   Responsive Utilities
-   ======================================== */
-
-.responsive-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.timeline-task-success {
+  @apply bg-success/20 text-success;
 }
 
-@media (min-width: 1024px) {
-  .responsive-stack {
-    flex-direction: row;
-    gap: 1.5rem;
-  }
+.timeline-task-warning {
+  @apply bg-warning/20 text-warning;
+}
+
+.timeline-task-info {
+  @apply bg-info/20 text-info;
+}
+
+/* Color picker button */
+.color-picker-btn {
+  @apply w-6 h-6 rounded-md cursor-pointer transition-transform;
+}
+
+.color-picker-btn:hover {
+  @apply scale-110;
+}
+
+.color-picker-btn.active {
+  @apply ring-2 ring-primary ring-offset-1 ring-offset-base-100;
+}
+
+/* Rich editor (TipTap) */
+.rich-editor .ProseMirror {
+  @apply outline-none min-h-full;
+}
+
+.rich-editor .ProseMirror p.is-editor-empty:first-child::before {
+  @apply text-base-content/30 float-left h-0 pointer-events-none;
+  content: attr(data-placeholder);
+}
+
+.rich-editor .ProseMirror ul[data-type="taskList"] {
+  @apply list-none p-0;
+}
+
+.rich-editor .ProseMirror ul[data-type="taskList"] li {
+  @apply flex items-start gap-2;
+}
+
+.rich-editor .ProseMirror ul[data-type="taskList"] li>label input[type="checkbox"] {
+  @apply checkbox checkbox-sm checkbox-primary;
+}
+
+.rich-editor .ProseMirror ul {
+  @apply list-disc pl-5;
+}
+
+.rich-editor .ProseMirror ol {
+  @apply list-decimal pl-5;
+}
+
+.rich-editor .ProseMirror blockquote {
+  @apply border-l-4 border-primary/30 pl-4 italic;
+}
+
+.rich-editor .ProseMirror code {
+  @apply bg-base-300 px-1 py-0.5 rounded text-sm;
+}
+
+.rich-editor .ProseMirror pre {
+  @apply bg-base-300 p-3 rounded-lg;
+}
+
+.rich-editor .ProseMirror a {
+  @apply text-primary underline;
 }

@@ -158,8 +158,8 @@ func Load() (*Config, error) {
 	if corsOrigins != "" && corsOrigins != "*" {
 		cfg.CORS.AllowedOrigins = strings.Split(corsOrigins, ",")
 	}
-	cfg.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
-	cfg.CORS.AllowedHeaders = []string{"Authorization", "Content-Type", "Accept"}
+	cfg.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	cfg.CORS.AllowedHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept", "X-Requested-With"}
 
 	// Validate and apply security defaults
 	if err := validateAndSecure(cfg); err != nil {

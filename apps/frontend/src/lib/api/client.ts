@@ -2,9 +2,9 @@ import ky from 'ky';
 import { browser } from '$app/environment';
 
 /**
- * API base URL - defaults to localhost for development
+ * API base URL - use relative path for dev proxy, full URL for production
  */
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /**
  * Type-safe HTTP client for API calls
@@ -27,6 +27,9 @@ export const api = ky.create({
         ],
         afterResponse: [
             async (_request, _options, response) => {
+                if (!response.ok) {
+                    console.error('API Error:', response.status, response.statusText, await response.clone().text());
+                }
                 // Handle 401 Unauthorized - redirect to login
                 if (response.status === 401 && browser) {
                     localStorage.removeItem('token');

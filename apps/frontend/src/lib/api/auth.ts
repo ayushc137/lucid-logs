@@ -13,18 +13,19 @@ export interface User {
 }
 
 export interface LoginRequest {
-    email: string;
+    username: string;
     password: string;
 }
 
 export interface RegisterRequest {
-    email: string;
+    username: string;
     password: string;
 }
 
 export interface AuthResponse {
     token: string;
-    user: User;
+    user: string; // User ID string like "users:xyz"
+    is_admin: boolean;
 }
 
 // =============================================================================

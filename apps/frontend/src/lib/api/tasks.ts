@@ -115,7 +115,7 @@ export async function getTasks(params?: {
 }
 
 export async function getTask(id: string): Promise<Task> {
-    return unwrap(api.get(`tasks/${id}`));
+    return unwrap(api.get(`tasks/${encodeURIComponent(id)}`));
 }
 
 export async function createTask(data: CreateTaskRequest): Promise<Task> {
@@ -123,9 +123,9 @@ export async function createTask(data: CreateTaskRequest): Promise<Task> {
 }
 
 export async function updateTask(id: string, data: UpdateTaskRequest): Promise<Task> {
-    return unwrap(api.put(`tasks/${id}`, { json: data }));
+    return unwrap(api.put(`tasks/${encodeURIComponent(id)}`, { json: data }));
 }
 
 export async function deleteTask(id: string): Promise<void> {
-    await api.delete(`tasks/${id}`);
+    await api.delete(`tasks/${encodeURIComponent(id)}`);
 }

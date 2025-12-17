@@ -43,7 +43,7 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
-	r.POST("/", h.Link)
+	r.POST("", h.Link)
 	r.DELETE("/:goalId", h.Unlink)
 }
 

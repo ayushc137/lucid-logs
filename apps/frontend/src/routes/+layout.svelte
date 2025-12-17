@@ -2,12 +2,9 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { page } from '$app/stores';
   import { AppShell } from '$lib/components/layout';
+  import { AuthGuard } from '$lib/components/auth';
   
-  // UnoCSS (must be in JS, not CSS)
-  import '@unocss/reset/tailwind.css';
-  import 'virtual:uno.css';
-  
-  // App styles
+  // App styles (Tailwind via PostCSS)
   import '../app.css';
 
   let { children } = $props();
@@ -30,12 +27,14 @@
 
 <QueryClientProvider client={queryClient}>
   {#if isAuthPage}
-    <div class="min-h-screen bg-base-200">
+    <div class="min-h-screen bg-background">
       {@render children()}
     </div>
   {:else}
-    <AppShell>
-      {@render children()}
-    </AppShell>
+    <AuthGuard>
+      <AppShell>
+        {@render children()}
+      </AppShell>
+    </AuthGuard>
   {/if}
 </QueryClientProvider>

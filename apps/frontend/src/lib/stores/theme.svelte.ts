@@ -1,8 +1,11 @@
 /**
- * Theme Store - 6 Custom Themes for Lucid Logs
+ * Theme Store - DaisyUI Themes for Lucid Logs
  */
 
-export type ThemeId = 'midnight' | 'modern' | 'cozy' | 'ocean' | 'sunset' | 'forest';
+export type ThemeId =
+  | 'light' | 'dark' | 'cupcake' | 'emerald' | 'corporate'
+  | 'synthwave' | 'retro' | 'cyberpunk' | 'forest' | 'dracula'
+  | 'night' | 'coffee' | 'nord' | 'sunset';
 
 export interface Theme {
   id: ThemeId;
@@ -13,16 +16,24 @@ export interface Theme {
 }
 
 export const THEMES: Theme[] = [
-  { id: 'midnight', label: 'Midnight', emoji: '🌙', description: 'Dark & Premium', isDark: true },
-  { id: 'modern', label: 'Modern', emoji: '☀️', description: 'Light & Clean', isDark: false },
-  { id: 'cozy', label: 'Cozy', emoji: '📜', description: 'Warm Journal', isDark: false },
-  { id: 'ocean', label: 'Ocean', emoji: '🌊', description: 'Cool Calm', isDark: true },
-  { id: 'sunset', label: 'Sunset', emoji: '🌅', description: 'Warm Vibrant', isDark: false },
-  { id: 'forest', label: 'Forest', emoji: '🌲', description: 'Nature', isDark: false },
+  { id: 'light', label: 'Light', emoji: '☀️', description: 'Clean & Bright', isDark: false },
+  { id: 'dark', label: 'Dark', emoji: '🌙', description: 'Easy on Eyes', isDark: true },
+  { id: 'cupcake', label: 'Cupcake', emoji: '🧁', description: 'Sweet Pastel', isDark: false },
+  { id: 'emerald', label: 'Emerald', emoji: '💚', description: 'Green Focus', isDark: false },
+  { id: 'corporate', label: 'Corporate', emoji: '🏢', description: 'Professional', isDark: false },
+  { id: 'synthwave', label: 'Synthwave', emoji: '🌆', description: 'Retro Neon', isDark: true },
+  { id: 'retro', label: 'Retro', emoji: '📺', description: 'Vintage Vibes', isDark: false },
+  { id: 'cyberpunk', label: 'Cyberpunk', emoji: '🤖', description: 'Futuristic', isDark: true },
+  { id: 'forest', label: 'Forest', emoji: '🌲', description: 'Nature', isDark: true },
+  { id: 'dracula', label: 'Dracula', emoji: '🧛', description: 'Dark Purple', isDark: true },
+  { id: 'night', label: 'Night', emoji: '🌃', description: 'Deep Dark', isDark: true },
+  { id: 'coffee', label: 'Coffee', emoji: '☕', description: 'Warm Brown', isDark: true },
+  { id: 'nord', label: 'Nord', emoji: '❄️', description: 'Arctic Cool', isDark: true },
+  { id: 'sunset', label: 'Sunset', emoji: '🌅', description: 'Warm Glow', isDark: true },
 ];
 
 const STORAGE_KEY = 'lucid-logs-theme';
-const DEFAULT_THEME: ThemeId = 'modern';
+const DEFAULT_THEME: ThemeId = 'dark';
 
 function createThemeStore() {
   let current = $state<ThemeId>(DEFAULT_THEME);

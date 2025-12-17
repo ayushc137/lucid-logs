@@ -55,3 +55,15 @@ export {
     type GridEmotion,
     type EmotionGridResponse
 } from './emotions';
+
+// Categories
+export {
+    getCategories,
+    getCategory,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    type CreateCategoryRequest,
+    type UpdateCategoryRequest,
+    type CategoryPageResponse
+} from './categories';
