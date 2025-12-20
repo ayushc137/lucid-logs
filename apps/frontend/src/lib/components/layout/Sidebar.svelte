@@ -29,52 +29,28 @@
   let currentTheme = $state("dark");
   let themeDropdownOpen = $state(false);
 
-  // Available DaisyUI themes
+  // Available DaisyUI themes - 10 curated themes
   const themes = [
     { id: "light", emoji: "☀️", label: "Light", description: "Clean & Bright" },
     { id: "dark", emoji: "🌙", label: "Dark", description: "Easy on Eyes" },
-    {
-      id: "cupcake",
-      emoji: "🧁",
-      label: "Cupcake",
-      description: "Sweet Pastel",
-    },
-    {
-      id: "emerald",
-      emoji: "💚",
-      label: "Emerald",
-      description: "Green Focus",
-    },
+    { id: "nord", emoji: "❄️", label: "Nord", description: "Arctic Cool" },
+    { id: "night", emoji: "🌃", label: "Night", description: "Deep Blue" },
+    { id: "dim", emoji: "🌑", label: "Dim", description: "Soft Dark" },
+    { id: "lofi", emoji: "📻", label: "Lofi", description: "Muted Tones" },
+    { id: "winter", emoji: "⛄", label: "Winter", description: "Frosty Light" },
     {
       id: "corporate",
-      emoji: "🏢",
+      emoji: "💼",
       label: "Corporate",
       description: "Professional",
     },
-    {
-      id: "synthwave",
-      emoji: "🌆",
-      label: "Synthwave",
-      description: "Retro Neon",
-    },
-    { id: "retro", emoji: "📺", label: "Retro", description: "Vintage Vibes" },
-    {
-      id: "cyberpunk",
-      emoji: "🤖",
-      label: "Cyberpunk",
-      description: "Futuristic",
-    },
-    { id: "forest", emoji: "🌲", label: "Forest", description: "Nature" },
+    { id: "retro", emoji: "🕹️", label: "Retro", description: "Vintage Vibes" },
     {
       id: "dracula",
       emoji: "🧛",
       label: "Dracula",
       description: "Dark Purple",
     },
-    { id: "night", emoji: "🌃", label: "Night", description: "Deep Dark" },
-    { id: "coffee", emoji: "☕", label: "Coffee", description: "Warm Brown" },
-    { id: "nord", emoji: "❄️", label: "Nord", description: "Arctic Cool" },
-    { id: "sunset", emoji: "🌅", label: "Sunset", description: "Warm Glow" },
   ] as const;
 
   // Load saved theme on mount
@@ -142,8 +118,12 @@
         <li>
           <a
             href={item.href}
-            class={cn("flex items-center gap-3", active && "active")}
-            title={collapsed ? item.label : undefined}
+            class={cn(
+              "flex items-center gap-3",
+              active && "active",
+              collapsed && "tooltip tooltip-right",
+            )}
+            data-tip={collapsed ? item.label : undefined}
           >
             <item.icon class="w-5 h-5 flex-shrink-0" />
             {#if !collapsed}
@@ -163,9 +143,9 @@
         tabindex="0"
         class={cn(
           "btn btn-ghost btn-sm w-full justify-start gap-3",
-          collapsed && "btn-square",
+          collapsed && "btn-square tooltip tooltip-right",
         )}
-        title={collapsed ? "Theme" : undefined}
+        data-tip={collapsed ? "Theme" : undefined}
       >
         <Palette class="w-5 h-5" />
         {#if !collapsed}
@@ -176,23 +156,21 @@
         {/if}
       </button>
       <ul
-        tabindex="0"
-        class="dropdown-content menu bg-base-100 rounded-box z-50 w-56 p-2 shadow-xl border border-base-300 max-h-80 overflow-y-auto"
+        class="dropdown-content menu bg-base-100 rounded-xl z-50 w-52 p-1.5 shadow-xl border border-base-300"
       >
-        <li class="menu-title text-xs uppercase opacity-60">Choose Theme</li>
         {#each themes as theme}
           <li>
             <button
               onclick={() => applyTheme(theme.id)}
-              class={cn(currentTheme === theme.id && "active")}
+              class={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg",
+                currentTheme === theme.id && "bg-primary/10",
+              )}
             >
-              <span class="text-xl">{theme.emoji}</span>
-              <div class="flex-1">
-                <div class="font-medium">{theme.label}</div>
-                <div class="text-xs opacity-60">{theme.description}</div>
-              </div>
+              <span class="text-lg">{theme.emoji}</span>
+              <span class="flex-1 font-medium text-sm">{theme.label}</span>
               {#if currentTheme === theme.id}
-                <Check class="w-4 h-4" />
+                <Check class="w-4 h-4 text-primary" />
               {/if}
             </button>
           </li>
@@ -204,10 +182,10 @@
       href="/settings"
       class={cn(
         "btn btn-ghost btn-sm w-full justify-start gap-3 mt-1",
-        collapsed && "btn-square",
+        collapsed && "btn-square tooltip tooltip-right",
         $page.url.pathname === "/settings" && "active",
       )}
-      title={collapsed ? "Settings" : undefined}
+      data-tip={collapsed ? "Settings" : undefined}
     >
       <Settings class="w-5 h-5" />
       {#if !collapsed}
@@ -218,10 +196,10 @@
     <button
       class={cn(
         "btn btn-ghost btn-sm w-full justify-start gap-3 mt-1 text-error hover:bg-error/10",
-        collapsed && "btn-square",
+        collapsed && "btn-square tooltip tooltip-right",
       )}
       onclick={handleLogout}
-      title={collapsed ? "Logout" : undefined}
+      data-tip={collapsed ? "Logout" : undefined}
     >
       <LogOut class="w-5 h-5" />
       {#if !collapsed}

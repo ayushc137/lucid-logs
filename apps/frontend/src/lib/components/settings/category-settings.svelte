@@ -277,16 +277,16 @@
           <span class="font-medium flex-1">{category.name}</span>
           <div class="flex gap-1">
             <button
-              class="btn btn-ghost btn-sm btn-square opacity-50 hover:opacity-100"
+              class="btn btn-ghost btn-sm btn-square opacity-50 hover:opacity-100 tooltip tooltip-left"
               onclick={() => startEdit(category)}
-              title="Edit"
+              data-tip="Edit"
             >
               <Pencil class="w-4 h-4" />
             </button>
             <button
-              class="btn btn-ghost btn-sm btn-square text-error opacity-50 hover:opacity-100"
+              class="btn btn-ghost btn-sm btn-square text-error opacity-50 hover:opacity-100 tooltip tooltip-left"
               onclick={() => $deleteMut.mutate(category.id)}
-              title="Delete"
+              data-tip="Delete"
             >
               <Trash2 class="w-4 h-4" />
             </button>

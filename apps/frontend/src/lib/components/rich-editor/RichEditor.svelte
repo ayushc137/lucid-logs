@@ -209,11 +209,11 @@
                     <button
                         type="button"
                         class={cn(
-                            "btn btn-ghost btn-xs btn-square",
+                            "btn btn-ghost btn-xs btn-square tooltip tooltip-bottom",
                             btn.isActive() && "bg-primary/20 text-primary",
                         )}
                         onclick={btn.action}
-                        title={btn.title}
+                        data-tip={btn.title}
                     >
                         <btn.icon class="w-3.5 h-3.5" />
                     </button>
@@ -228,11 +228,11 @@
                     <button
                         type="button"
                         class={cn(
-                            "btn btn-ghost btn-xs btn-square",
+                            "btn btn-ghost btn-xs btn-square tooltip tooltip-bottom",
                             btn.isActive() && "bg-primary/20 text-primary",
                         )}
                         onclick={btn.action}
-                        title={btn.title}
+                        data-tip={btn.title}
                     >
                         <btn.icon class="w-3.5 h-3.5" />
                     </button>
@@ -247,11 +247,11 @@
                     <button
                         type="button"
                         class={cn(
-                            "btn btn-ghost btn-xs btn-square",
+                            "btn btn-ghost btn-xs btn-square tooltip tooltip-bottom",
                             btn.isActive() && "bg-primary/20 text-primary",
                         )}
                         onclick={btn.action}
-                        title={btn.title}
+                        data-tip={btn.title}
                     >
                         <btn.icon class="w-3.5 h-3.5" />
                     </button>
@@ -264,19 +264,19 @@
             <div class="flex items-center gap-0.5">
                 <button
                     type="button"
-                    class="btn btn-ghost btn-xs btn-square"
+                    class="btn btn-ghost btn-xs btn-square tooltip tooltip-bottom"
                     onclick={() => editor?.chain().focus().undo().run()}
                     disabled={!editor?.can().undo()}
-                    title="Undo"
+                    data-tip="Undo"
                 >
                     <Undo class="w-3.5 h-3.5" />
                 </button>
                 <button
                     type="button"
-                    class="btn btn-ghost btn-xs btn-square"
+                    class="btn btn-ghost btn-xs btn-square tooltip tooltip-bottom"
                     onclick={() => editor?.chain().focus().redo().run()}
                     disabled={!editor?.can().redo()}
-                    title="Redo"
+                    data-tip="Redo"
                 >
                     <Redo class="w-3.5 h-3.5" />
                 </button>

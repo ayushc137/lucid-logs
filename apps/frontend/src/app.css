@@ -3,7 +3,7 @@
 @import 'tailwindcss';
 
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, cupcake, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset;
+  themes: light --default, dark --prefersdark, nord, night, dim, lofi, winter, corporate, retro, dracula;
 }
 
 /* Base font */
@@ -11,47 +11,7 @@
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Timeline */
-.timeline-grid {
-  display: grid;
-  grid-template-columns: 50px 1fr;
-}
-
-.timeline-hour {
-  @apply text-xs font-medium opacity-60 py-2 text-right pr-3;
-}
-
-.timeline-row {
-  @apply min-h-[50px] border-t border-base-300 flex gap-1.5 p-1;
-}
-
-.timeline-task {
-  @apply flex-1 min-w-[80px] px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer;
-}
-
-.timeline-task-primary {
-  @apply bg-primary/20 text-primary;
-}
-
-.timeline-task-secondary {
-  @apply bg-secondary/20 text-secondary;
-}
-
-.timeline-task-accent {
-  @apply bg-accent/20 text-accent;
-}
-
-.timeline-task-success {
-  @apply bg-success/20 text-success;
-}
-
-.timeline-task-warning {
-  @apply bg-warning/20 text-warning;
-}
-
-.timeline-task-info {
-  @apply bg-info/20 text-info;
-}
+/* Timeline styles are now in the Timeline.svelte component */
 
 /* Color picker button */
 .color-picker-btn {

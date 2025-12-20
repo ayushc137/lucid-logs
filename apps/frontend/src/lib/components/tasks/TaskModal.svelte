@@ -428,9 +428,9 @@
                             </select>
                             <button
                                 type="button"
-                                class="btn btn-sm btn-ghost btn-square"
+                                class="btn btn-sm btn-ghost btn-square tooltip tooltip-left"
                                 onclick={() => (showNewCategory = true)}
-                                title="Create new category"
+                                data-tip="Create new category"
                             >
                                 <Plus class="w-4 h-4" />
                             </button>
