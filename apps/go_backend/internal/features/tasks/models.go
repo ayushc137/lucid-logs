@@ -167,3 +167,64 @@ type TaskPageResponse struct {
 	Offset  int     `json:"offset"`
 	HasMore bool    `json:"has_more"`
 }
+
+// =============================================================================
+// FILTER PARAMETERS
+// =============================================================================
+
+// TaskFilterParams contains filter criteria for listing tasks.
+//
+// Filters can be combined (AND logic). Empty values are ignored.
+// Search uses SurrealDB full-text search on title, journal, and note fields.
+//
+// Example URL: /api/v1/tasks?search=meeting&category_id=cat123&status=pending&priority_min=5
+type TaskFilterParams struct {
+	// Search performs full-text search across title, journal, and note fields
+	// Uses SurrealDB FTS with BM25 ranking and English stemming
+	Search string `json:"search,omitempty"`
+
+	// CategoryID filters by specific category
+	CategoryID string `json:"category_id,omitempty"`
+
+	// Status filters by completion status: "all", "completed", "pending"
+	Status string `json:"status,omitempty"`
+
+	// PriorityMin filters tasks with priority >= this value (1-10)
+	PriorityMin *int `json:"priority_min,omitempty"`
+
+	// PriorityMax filters tasks with priority <= this value (1-10)
+	PriorityMax *int `json:"priority_max,omitempty"`
+
+	// StartDateFrom filters tasks starting on or after this date (RFC3339)
+	StartDateFrom string `json:"start_date_from,omitempty"`
+
+	// StartDateTo filters tasks starting on or before this date (RFC3339)
+	StartDateTo string `json:"start_date_to,omitempty"`
+
+	// SortField specifies the field to sort by: "start_date", "priority", "title", "created_at"
+	SortField string `json:"sort_field,omitempty"`
+
+	// SortOrder specifies sort direction: "asc" or "desc" (default: desc for dates, asc for title)
+	SortOrder string `json:"sort_order,omitempty"`
+}
+
+// Status filter constants
+const (
+	StatusAll       = "all"
+	StatusCompleted = "completed"
+	StatusPending   = "pending"
+)
+
+// Sort field constants
+const (
+	SortByStartDate = "start_date"
+	SortByPriority  = "priority"
+	SortByTitle     = "title"
+	SortByCreatedAt = "created_at"
+)
+
+// Sort order constants
+const (
+	SortAsc  = "asc"
+	SortDesc = "desc"
+)

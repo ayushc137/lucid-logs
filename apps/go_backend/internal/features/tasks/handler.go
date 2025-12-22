@@ -3,6 +3,7 @@ package tasks
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -58,14 +59,23 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 // LIST
 // =============================================================================
 
-// List handles GET /tasks - list tasks with pagination.
+// List handles GET /tasks - list tasks with pagination, filters, and search.
 //
 // @Summary      List tasks
-// @Description  Get paginated list of tasks for the authenticated user
+// @Description  Get paginated list of tasks with optional filters and full-text search
 // @Tags         tasks
 // @Produce      json
-// @Param        limit  query int false "Items per page (default 20, max 100)"
-// @Param        offset query int false "Items to skip (default 0)"
+// @Param        limit          query int    false "Items per page (default 20, max 100)"
+// @Param        offset         query int    false "Items to skip (default 0)"
+// @Param        search         query string false "Full-text search across title, journal, note"
+// @Param        category_id    query string false "Filter by category ID"
+// @Param        status         query string false "Filter by status: all, completed, pending"
+// @Param        priority_min   query int    false "Filter by minimum priority (1-10)"
+// @Param        priority_max   query int    false "Filter by maximum priority (1-10)"
+// @Param        start_date_from query string false "Filter tasks starting on or after (RFC3339)"
+// @Param        start_date_to   query string false "Filter tasks starting on or before (RFC3339)"
+// @Param        sort_field     query string false "Sort by: start_date, priority, title, created_at"
+// @Param        sort_order     query string false "Sort direction: asc or desc"
 // @Success      200 {object} tasks.TaskPageResponse
 // @Failure      401 {object} response.APIResponse
 // @Failure      500 {object} response.APIResponse
@@ -82,20 +92,75 @@ func (h *Handler) List(c *gin.Context) {
 	// Parse pagination
 	params := pagination.FromRequest(c)
 
+	// Parse filter parameters
+	filters := parseFilterParams(c)
+
+	// Check if any filters are active
+	hasFilters := filters.Search != "" ||
+		filters.CategoryID != "" ||
+		filters.Status != "" ||
+		filters.PriorityMin != nil ||
+		filters.PriorityMax != nil ||
+		filters.StartDateFrom != "" ||
+		filters.StartDateTo != "" ||
+		filters.SortField != ""
+
 	log.Debug().
 		Str("user_id", user.UserID).
 		Int("limit", params.Limit).
 		Int("offset", params.Offset).
+		Str("search", filters.Search).
+		Str("category", filters.CategoryID).
+		Str("status", filters.Status).
+		Bool("has_filters", hasFilters).
 		Msg("listing tasks")
 
-	// Get tasks
-	resp, err := h.service.List(c.Request.Context(), user.UserID, params)
+	var resp *pagination.Response[*Task]
+	var err error
+
+	if hasFilters {
+		// Use filtered query with FTS support
+		resp, err = h.service.ListFiltered(c.Request.Context(), user.UserID, filters, params)
+	} else {
+		// Use simple paginated query for better performance
+		resp, err = h.service.List(c.Request.Context(), user.UserID, params)
+	}
+
 	if err != nil {
 		response.ErrorFromErr(c, err)
 		return
 	}
 
 	response.OK(c, resp)
+}
+
+// parseFilterParams extracts filter parameters from the request query string.
+func parseFilterParams(c *gin.Context) TaskFilterParams {
+	filters := TaskFilterParams{
+		Search:        c.Query("search"),
+		CategoryID:    c.Query("category_id"),
+		Status:        c.Query("status"),
+		StartDateFrom: c.Query("start_date_from"),
+		StartDateTo:   c.Query("start_date_to"),
+		SortField:     c.Query("sort_field"),
+		SortOrder:     c.Query("sort_order"),
+	}
+
+	// Parse priority_min
+	if minStr := c.Query("priority_min"); minStr != "" {
+		if min, err := strconv.Atoi(minStr); err == nil && min >= 1 && min <= 10 {
+			filters.PriorityMin = &min
+		}
+	}
+
+	// Parse priority_max
+	if maxStr := c.Query("priority_max"); maxStr != "" {
+		if max, err := strconv.Atoi(maxStr); err == nil && max >= 1 && max <= 10 {
+			filters.PriorityMax = &max
+		}
+	}
+
+	return filters
 }
 
 // =============================================================================

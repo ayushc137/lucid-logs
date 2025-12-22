@@ -17,23 +17,22 @@
   import { getCategories, type Category } from "$lib/api/categories";
   import { cn } from "$lib/utils";
 
-  // Fetch today's tasks
+  // Fetch today's tasks - use YYYY-MM-DD format for consistent filtering
   const today = new Date();
-  const startOfDay = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  ).toISOString();
-  const endOfDay = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() + 1,
-  ).toISOString();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  const startOfDay = `${year}-${month}-${day}T00:00:00Z`;
+  const endOfDay = `${year}-${month}-${day}T23:59:59Z`;
 
   const tasksQuery = createQuery({
     queryKey: ["tasks", "today"],
     queryFn: () =>
-      getTasks({ limit: 50, start_date: startOfDay, end_date: endOfDay }),
+      getTasks({
+        limit: 50,
+        start_date_from: startOfDay,
+        start_date_to: endOfDay,
+      }),
   });
 
   const categoriesQuery = createQuery({
@@ -94,6 +93,22 @@
 
   // Task modal state
   let modalOpen = $state(false);
+  let editingTask = $state<Task | null>(null);
+
+  // Handle task click from timeline to open edit modal
+  function handleTaskClick(taskId: string) {
+    const task = $tasksQuery.data?.items?.find((t) => t.id === taskId);
+    if (task) {
+      editingTask = task;
+      modalOpen = true;
+    }
+  }
+
+  // Handle modal close
+  function handleModalClose() {
+    modalOpen = false;
+    editingTask = null;
+  }
 
   // Quick logs data
   const quickLogs = [
@@ -131,6 +146,7 @@
 
   function openTaskModal() {
     fabOpen = false;
+    editingTask = null;
     modalOpen = true;
   }
 </script>
@@ -149,10 +165,7 @@
         <h1 class="text-2xl sm:text-3xl font-bold mt-1">{getGreeting()}! 👋</h1>
       </div>
       <div class="flex items-center gap-2">
-        <button
-          class="btn btn-primary gap-2"
-          onclick={() => (modalOpen = true)}
-        >
+        <button class="btn btn-primary gap-2" onclick={openTaskModal}>
           <Plus class="w-4 h-4" />
           <span class="hidden sm:inline">New Task</span>
         </button>
@@ -320,7 +333,12 @@
               <p class="text-sm opacity-50">Loading your day...</p>
             </div>
           {:else}
-            <Timeline tasks={timelineTasks} startHour={0} endHour={24} />
+            <Timeline
+              tasks={timelineTasks}
+              startHour={0}
+              endHour={24}
+              onTaskClick={handleTaskClick}
+            />
           {/if}
         </div>
       </div>
@@ -402,7 +420,11 @@
 </div>
 
 <!-- Task Modal -->
-<TaskModal bind:open={modalOpen} onClose={() => (modalOpen = false)} />
+<TaskModal
+  bind:open={modalOpen}
+  task={editingTask}
+  onClose={handleModalClose}
+/>
 
 <style>
   @keyframes fade-in {

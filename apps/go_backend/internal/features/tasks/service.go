@@ -26,6 +26,10 @@ type Service interface {
 	// List retrieves paginated tasks for a user.
 	List(ctx context.Context, userID string, params pagination.Params) (*pagination.Response[*Task], error)
 
+	// ListFiltered retrieves paginated tasks with filters and search.
+	// Supports full-text search on title, journal, and note fields.
+	ListFiltered(ctx context.Context, userID string, filters TaskFilterParams, params pagination.Params) (*pagination.Response[*Task], error)
+
 	// Get retrieves a single task by ID.
 	Get(ctx context.Context, id, userID string) (*Task, error)
 
@@ -74,6 +78,34 @@ func (s *service) List(ctx context.Context, userID string, params pagination.Par
 		Int("count", len(tasks)).
 		Int64("total", total).
 		Msg("tasks listed")
+
+	resp := pagination.NewResponse(tasks, total, params)
+	return &resp, nil
+}
+
+// =============================================================================
+// LIST FILTERED
+// =============================================================================
+
+// ListFiltered retrieves paginated tasks with filters and search.
+func (s *service) ListFiltered(ctx context.Context, userID string, filters TaskFilterParams, params pagination.Params) (*pagination.Response[*Task], error) {
+	tasks, total, err := s.repo.FindFiltered(ctx, userID, filters, params)
+	if err != nil {
+		s.logger.Error().Err(err).
+			Str("user_id", userID).
+			Str("search", filters.Search).
+			Str("category", filters.CategoryID).
+			Str("status", filters.Status).
+			Msg("failed to list filtered tasks")
+		return nil, err
+	}
+
+	s.logger.Debug().
+		Str("user_id", userID).
+		Str("search", filters.Search).
+		Int("count", len(tasks)).
+		Int64("total", total).
+		Msg("filtered tasks listed")
 
 	resp := pagination.NewResponse(tasks, total, params)
 	return &resp, nil

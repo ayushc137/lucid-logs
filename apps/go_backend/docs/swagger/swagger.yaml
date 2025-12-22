@@ -3140,7 +3140,8 @@ paths:
       - Retrospectives
   /api/v1/tasks:
     get:
-      description: Get paginated list of tasks for the authenticated user
+      description: Get paginated list of tasks with optional filters and full-text
+        search
       parameters:
       - description: Items per page (default 20, max 100)
         in: query
@@ -3150,6 +3151,42 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Full-text search across title, journal, note
+        in: query
+        name: search
+        type: string
+      - description: Filter by category ID
+        in: query
+        name: category_id
+        type: string
+      - description: 'Filter by status: all, completed, pending'
+        in: query
+        name: status
+        type: string
+      - description: Filter by minimum priority (1-10)
+        in: query
+        name: priority_min
+        type: integer
+      - description: Filter by maximum priority (1-10)
+        in: query
+        name: priority_max
+        type: integer
+      - description: Filter tasks starting on or after (RFC3339)
+        in: query
+        name: start_date_from
+        type: string
+      - description: Filter tasks starting on or before (RFC3339)
+        in: query
+        name: start_date_to
+        type: string
+      - description: 'Sort by: start_date, priority, title, created_at'
+        in: query
+        name: sort_field
+        type: string
+      - description: 'Sort direction: asc or desc'
+        in: query
+        name: sort_order
+        type: string
       produces:
       - application/json
       responses:

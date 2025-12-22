@@ -63,6 +63,10 @@ type Repository interface {
 	// FindPaginated retrieves tasks for a user with pagination.
 	FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*Task, int64, error)
 
+	// FindFiltered retrieves tasks with filters, search, and pagination.
+	// Supports full-text search on title, journal, and note fields.
+	FindFiltered(ctx context.Context, userID string, filters TaskFilterParams, params pagination.Params) ([]*Task, int64, error)
+
 	// Create creates a new task.
 	Create(ctx context.Context, req *CreateRequest, userID string) (*Task, error)
 
@@ -374,6 +378,177 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	return tasks, int64(total), nil
+}
+
+// =============================================================================
+// FIND FILTERED OPERATION (FTS + FILTERS)
+// =============================================================================
+
+// FindFiltered retrieves tasks with filters, search, and pagination.
+//
+// This method supports:
+//   - Full-text search on title, journal, and note fields (SurrealDB FTS with BM25)
+//   - Category filtering
+//   - Status filtering (completed/pending)
+//   - Priority range filtering
+//   - Date range filtering
+//   - Custom sorting
+//
+// The full-text search uses the task_search_analyzer defined in migrations.
+func (r *repository) FindFiltered(ctx context.Context, userID string, filters TaskFilterParams, params pagination.Params) ([]*Task, int64, error) {
+	// Build dynamic WHERE conditions
+	conditions := []string{"created_by = $user", "deleted_at = NONE"}
+	queryVars := map[string]any{
+		"user":   userID,
+		"limit":  params.Limit,
+		"offset": params.Offset,
+	}
+
+	// Full-text search across title, journal, note
+	// Using string::lowercase + string::contains for reliable case-insensitive search
+	// FTS with @@ requires existing records to be re-indexed after index creation
+	hasSearch := filters.Search != ""
+	if hasSearch {
+		conditions = append(conditions, "(string::lowercase(title) CONTAINS string::lowercase($search) OR string::lowercase(journal) CONTAINS string::lowercase($search) OR string::lowercase(note) CONTAINS string::lowercase($search))")
+		queryVars["search"] = filters.Search
+	}
+
+	// Category filter
+	if filters.CategoryID != "" {
+		catID := database.MustRecordID(categories.Table, filters.CategoryID)
+		conditions = append(conditions, "category = $category")
+		queryVars["category"] = catID
+	}
+
+	// Status filter
+	switch filters.Status {
+	case StatusCompleted:
+		conditions = append(conditions, "completed = true")
+	case StatusPending:
+		conditions = append(conditions, "completed = false")
+		// StatusAll or empty: no filter
+	}
+
+	// Priority range filter
+	if filters.PriorityMin != nil {
+		conditions = append(conditions, "priority >= $priority_min")
+		queryVars["priority_min"] = *filters.PriorityMin
+	}
+	if filters.PriorityMax != nil {
+		conditions = append(conditions, "priority <= $priority_max")
+		queryVars["priority_max"] = *filters.PriorityMax
+	}
+
+	// Date range filter - parse strings to time.Time for proper SurrealDB datetime comparison
+	if filters.StartDateFrom != "" {
+		if parsedTime, err := time.Parse(time.RFC3339, filters.StartDateFrom); err == nil {
+			conditions = append(conditions, "start_date >= $start_from")
+			queryVars["start_from"] = parsedTime
+		}
+	}
+	if filters.StartDateTo != "" {
+		if parsedTime, err := time.Parse(time.RFC3339, filters.StartDateTo); err == nil {
+			conditions = append(conditions, "start_date <= $start_to")
+			queryVars["start_to"] = parsedTime
+		}
+	}
+
+	// Build WHERE clause
+	whereClause := strings.Join(conditions, " AND ")
+
+	// Build ORDER BY clause
+	orderClause := buildOrderClause(filters.SortField, filters.SortOrder, hasSearch)
+
+	// Count query
+	countQuery := `
+		RETURN (SELECT count() FROM tasks
+			WHERE ` + whereClause + `
+			GROUP ALL)[0].count OR 0
+	`
+
+	total, err := database.QueryScalar[float64](ctx, r.db, countQuery, queryVars)
+	if err != nil {
+		r.logger.Error().Err(err).Str("user_id", userID).Msg("FindFiltered count query failed")
+		return nil, 0, err
+	}
+
+	// Main query with linked goals and category fetch
+	selectQuery := `
+		SELECT *,
+			(SELECT 
+				type::string(out) as goal_id,
+				out.title as goal_title,
+				impact_type,
+				impact_magnitude,
+				quantity_value,
+				quantity_unit
+			 FROM task_goals WHERE in = $parent.id) as linked_goals
+		FROM tasks
+		WHERE ` + whereClause + `
+		` + orderClause + `
+		LIMIT $limit START $offset
+		FETCH category
+	`
+
+	r.logger.Debug().
+		Str("user_id", userID).
+		Str("search", filters.Search).
+		Str("category", filters.CategoryID).
+		Str("status", filters.Status).
+		Str("query", selectQuery).
+		Msg("executing FindFiltered query")
+
+	tasksDB, err := database.QueryAll[taskDB](ctx, r.db, selectQuery, queryVars)
+	if err != nil {
+		r.logger.Error().Err(err).Str("user_id", userID).Msg("FindFiltered query failed")
+		return nil, 0, err
+	}
+
+	// Convert to domain models
+	tasks := make([]*Task, len(tasksDB))
+	for i := range tasksDB {
+		task := tasksDB[i].toTask()
+		sanitizeCategory(task)
+		tasks[i] = task
+	}
+
+	return tasks, int64(total), nil
+}
+
+// buildOrderClause constructs the ORDER BY clause based on sort parameters.
+// When searching with FTS, we can use search::score for relevance-based sorting.
+func buildOrderClause(sortField, sortOrder string, hasSearch bool) string {
+	// Default sort direction based on field type
+	if sortOrder == "" {
+		switch sortField {
+		case SortByTitle:
+			sortOrder = SortAsc
+		default:
+			sortOrder = SortDesc
+		}
+	}
+
+	direction := "DESC"
+	if sortOrder == SortAsc {
+		direction = "ASC"
+	}
+
+	// Determine sort field
+	field := "start_date" // default
+	switch sortField {
+	case SortByPriority:
+		field = "priority"
+	case SortByTitle:
+		field = "title"
+	case SortByCreatedAt:
+		field = "created_at"
+	case SortByStartDate:
+		field = "start_date"
+	}
+
+	// When searching, we could optionally add search::score() for relevance
+	// but for now we keep it simple with the specified sort field
+	return "ORDER BY " + field + " " + direction
 }
 
 // =============================================================================

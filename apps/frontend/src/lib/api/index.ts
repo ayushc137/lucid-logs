@@ -29,7 +29,8 @@ export {
     type Category,
     type InferredEmotion,
     type CreateTaskRequest,
-    type UpdateTaskRequest
+    type UpdateTaskRequest,
+    type TaskFilterParams
 } from './tasks';
 
 // Goals

@@ -1860,7 +1860,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get paginated list of tasks for the authenticated user",
+                "description": "Get paginated list of tasks with optional filters and full-text search",
                 "produces": [
                     "application/json"
                 ],
@@ -1879,6 +1879,60 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Items to skip (default 0)",
                         "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Full-text search across title, journal, note",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by category ID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status: all, completed, pending",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by minimum priority (1-10)",
+                        "name": "priority_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by maximum priority (1-10)",
+                        "name": "priority_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter tasks starting on or after (RFC3339)",
+                        "name": "start_date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter tasks starting on or before (RFC3339)",
+                        "name": "start_date_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort by: start_date, priority, title, created_at",
+                        "name": "sort_field",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction: asc or desc",
+                        "name": "sort_order",
                         "in": "query"
                     }
                 ],

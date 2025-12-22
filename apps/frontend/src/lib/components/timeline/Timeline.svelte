@@ -18,9 +18,15 @@
         tasks?: Task[];
         startHour?: number;
         endHour?: number;
+        onTaskClick?: (taskId: string) => void;
     }
 
-    let { tasks = [], startHour = 0, endHour = 24 }: Props = $props();
+    let {
+        tasks = [],
+        startHour = 0,
+        endHour = 24,
+        onTaskClick,
+    }: Props = $props();
 
     // Default color for uncategorized tasks
     const DEFAULT_TASK_COLOR = "#525252";
@@ -88,6 +94,24 @@
     // Get task color
     function getTaskColor(task: Task): string {
         return task.categoryColor || DEFAULT_TASK_COLOR;
+    }
+
+    // Calculate luminance and return optimal text color (white or dark)
+    function getContrastTextColor(hexColor: string): string {
+        // Remove # if present
+        const hex = hexColor.replace("#", "");
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        // Calculate relative luminance
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        // Return white for dark colors, dark for light colors
+        return luminance > 0.5 ? "#1f2937" : "#ffffff";
+    }
+
+    // Generate a softer shadow color from the category color
+    function getShadowColor(hexColor: string): string {
+        return `${hexColor}40`; // 25% opacity
     }
 
     // Calculate current time position
@@ -216,6 +240,8 @@
                     {#each taskRows as { task, row }}
                         {@const style = getTaskStyle(task)}
                         {@const color = getTaskColor(task)}
+                        {@const textColor = getContrastTextColor(color)}
+                        {@const shadowColor = getShadowColor(color)}
                         {@const rowHeight = 100 / Math.max(maxRows, 2)}
                         <div
                             class="task-card absolute cursor-pointer transition-all duration-200 hover:z-20 group"
@@ -228,25 +254,30 @@
                             "
                             role="button"
                             tabindex="0"
+                            onclick={() => onTaskClick?.(task.id)}
+                            onkeydown={(e) =>
+                                e.key === "Enter" && onTaskClick?.(task.id)}
                         >
-                            <!-- Card with modern design -->
+                            <!-- Card with theme-compatible design -->
                             <div
-                                class="absolute inset-0 rounded-2xl transition-all duration-200 group-hover:scale-[1.03] group-hover:shadow-xl overflow-hidden"
-                                style="background: {color};"
+                                class="absolute inset-0 rounded-2xl transition-all duration-200 group-hover:scale-[1.02] overflow-hidden ring-1 ring-base-content/10"
+                                style="background: {color}; box-shadow: 0 4px 16px {shadowColor}, 0 2px 4px {shadowColor};"
                             >
-                                <!-- Glass overlay -->
+                                <!-- Subtle glass overlay for depth -->
                                 <div
-                                    class="absolute inset-0 bg-gradient-to-br from-white/20 via-white/5 to-black/10"
+                                    class="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-black/10"
                                 ></div>
                                 <!-- Left accent bar -->
                                 <div
-                                    class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-white/40"
+                                    class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full"
+                                    style="background: {textColor}40;"
                                 ></div>
                             </div>
 
-                            <!-- Card content -->
+                            <!-- Card content with dynamic text color -->
                             <div
-                                class="relative h-full px-4 py-2 flex items-center gap-3 text-white overflow-hidden"
+                                class="relative h-full px-4 py-2 flex items-center gap-3 overflow-hidden"
+                                style="color: {textColor};"
                             >
                                 {#if task.emoji}
                                     <span
@@ -255,13 +286,11 @@
                                     >
                                 {/if}
                                 <div class="min-w-0 flex-1">
-                                    <h4
-                                        class="font-semibold text-sm truncate drop-shadow-sm"
-                                    >
+                                    <h4 class="font-semibold text-sm truncate">
                                         {task.title}
                                     </h4>
                                     <div
-                                        class="flex items-center gap-2 text-[11px] opacity-80 mt-0.5"
+                                        class="flex items-center gap-2 text-[11px] opacity-70 mt-0.5"
                                     >
                                         {#if task.categoryName}
                                             <span class="truncate"
@@ -284,7 +313,8 @@
                                 </div>
                                 {#if task.completed}
                                     <div
-                                        class="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0 backdrop-blur-sm"
+                                        class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                                        style="background: {textColor}20;"
                                     >
                                         <span class="text-xs font-bold">✓</span>
                                     </div>
