@@ -379,20 +379,20 @@
     {:else}
       <div class="text-center py-10">
         <div
-          class="w-14 h-14 mx-auto rounded-xl bg-base-200 flex items-center justify-center mb-4"
+          class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mb-4"
         >
-          <Palette class="w-7 h-7 opacity-30" />
+          <Palette class="w-8 h-8 text-primary" />
         </div>
-        <h4 class="font-semibold opacity-60">No categories yet</h4>
-        <p class="text-sm opacity-40 mt-1">
-          Create your first category to get started!
+        <h4 class="text-lg font-bold">No categories yet</h4>
+        <p class="text-sm opacity-60 mt-1 max-w-xs mx-auto">
+          Create your first category to organize your tasks
         </p>
         <button
-          class="btn btn-primary btn-sm gap-2 mt-4"
+          class="btn btn-primary btn-sm gap-2 mt-4 shadow-lg shadow-primary/20"
           onclick={() => (isCreating = true)}
         >
           <Plus class="w-4 h-4" />
-          Create Category
+          Create Your First Category
         </button>
       </div>
     {/each}

@@ -194,7 +194,7 @@ func createCategories(ctx context.Context, db *database.DB, userID string) ([]ca
 		// Check if exists
 		existing, err := database.QueryAll[categoryResult](ctx, db, `
 			SELECT type::string(id) as id, name, color FROM categories 
-			WHERE name = $name AND created_by = type::thing($user) LIMIT 1
+			WHERE name = $name AND created_by = $user LIMIT 1
 		`, map[string]any{
 			"name": cat.name,
 			"user": userID,
@@ -213,7 +213,7 @@ func createCategories(ctx context.Context, db *database.DB, userID string) ([]ca
 			CREATE categories CONTENT {
 				name: $name,
 				color: $color,
-				created_by: type::thing($user),
+				created_by: $user,
 				created_at: time::now(),
 				updated_at: time::now()
 			}
@@ -229,7 +229,7 @@ func createCategories(ctx context.Context, db *database.DB, userID string) ([]ca
 		// Fetch the created category
 		created, err := database.QueryAll[categoryResult](ctx, db, `
 			SELECT type::string(id) as id, name, color FROM categories 
-			WHERE name = $name AND created_by = type::thing($user) LIMIT 1
+			WHERE name = $name AND created_by = $user LIMIT 1
 		`, map[string]any{
 			"name": cat.name,
 			"user": userID,

@@ -10,16 +10,15 @@
   onMount(async () => {
     // Check if dev auth bypass is enabled
     if (isDevAuthBypassEnabled()) {
-      // If no token, attempt dev auto-login
-      if (!authStore.hasToken) {
-        const success = await authStore.devAutoLogin();
-        if (!success) {
-          console.error(
-            "[Dev Auth] Auto-login failed, redirecting to login page",
-          );
-          goto("/login");
-          return;
-        }
+      // Always perform fresh login in dev mode to handle database resets
+      // This ensures we always have a valid token for the current database state
+      const success = await authStore.devAutoLogin();
+      if (!success) {
+        console.error(
+          "[Dev Auth] Auto-login failed, redirecting to login page",
+        );
+        goto("/login");
+        return;
       }
       ready = true;
       return;

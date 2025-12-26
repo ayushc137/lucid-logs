@@ -1,32 +1,49 @@
 <script lang="ts">
-  import { Zap, Plus } from 'lucide-svelte';
+  import { Zap, Plus } from "lucide-svelte";
 </script>
 
 <svelte:head>
   <title>Templates - Lucid Logs</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto space-y-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold">Templates</h1>
-    <button class="btn btn-primary btn-sm gap-2">
+<div class="max-w-5xl mx-auto space-y-6">
+  <!-- Header -->
+  <div
+    class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+  >
+    <div>
+      <h1
+        class="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
+      >
+        Templates
+      </h1>
+      <p class="text-sm opacity-60 mt-1">
+        Quick-start your tasks with reusable templates
+      </p>
+    </div>
+    <button
+      class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+    >
       <Plus class="w-4 h-4" />
       New Template
     </button>
   </div>
 
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body items-center text-center py-12">
-      <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center mb-4">
-        <Zap class="w-8 h-8 text-base-content/30" />
+  <!-- Empty State -->
+  <div class="card bg-base-100 shadow-lg border border-base-200">
+    <div class="card-body py-12 text-center">
+      <div
+        class="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4"
+      >
+        <Zap class="w-10 h-10 text-primary" />
       </div>
-      <h2 class="text-xl font-semibold text-base-content/70">No templates yet</h2>
-      <p class="text-base-content/50 mt-1 max-w-md">
-        Create templates for quick logging
+      <h2 class="text-2xl font-bold">No templates yet</h2>
+      <p class="opacity-60 mt-2 max-w-md mx-auto">
+        Create templates to speed up your task creation with predefined settings
       </p>
-      <button class="btn btn-primary btn-sm mt-4 gap-2">
+      <button class="btn btn-primary mt-6 gap-2 shadow-lg shadow-primary/20">
         <Plus class="w-4 h-4" />
-        Create Template
+        Create Your First Template
       </button>
     </div>
   </div>
