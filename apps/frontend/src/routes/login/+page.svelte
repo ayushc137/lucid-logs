@@ -1,13 +1,28 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
   import { Mail, Lock, AlertCircle, Sparkles, ArrowRight } from "lucide-svelte";
   import { login } from "$lib/api";
-  import { authStore } from "$lib/stores/auth.svelte";
+  import { authStore, isDevAuthBypassEnabled } from "$lib/stores/auth.svelte";
 
   let email = $state("");
   let password = $state("");
   let loading = $state(false);
   let error = $state("");
+
+  // Check for dev auth bypass on mount
+  onMount(async () => {
+    if (isDevAuthBypassEnabled()) {
+      loading = true;
+      const success = await authStore.devAutoLogin();
+      if (success) {
+        await goto("/", { replaceState: true });
+        return;
+      }
+      loading = false;
+      error = "Dev auto-login failed. Please check backend connection.";
+    }
+  });
 
   async function handleLogin() {
     loading = true;

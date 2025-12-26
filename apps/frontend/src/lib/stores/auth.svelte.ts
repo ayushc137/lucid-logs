@@ -1,5 +1,18 @@
 import { browser } from '$app/environment';
 import type { User, AuthResponse } from '$lib/api';
+import { login as apiLogin } from '$lib/api';
+
+// Dev auth bypass config from environment
+const DEV_AUTH_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
+const DEV_ADMIN_EMAIL = import.meta.env.VITE_DEV_ADMIN_EMAIL || 'admin@example.com';
+const DEV_ADMIN_PASSWORD = import.meta.env.VITE_DEV_ADMIN_PASSWORD || 'adminadmin';
+
+/**
+ * Check if dev auth bypass is enabled
+ */
+export function isDevAuthBypassEnabled(): boolean {
+    return DEV_AUTH_BYPASS;
+}
 
 /**
  * Auth store using Svelte 5 runes
@@ -66,7 +79,7 @@ class AuthStore {
         this.isAdmin = response.is_admin;
         this.isInitialized = true;
         this.isLoading = false;
-        
+
         if (browser) {
             localStorage.setItem('token', response.token);
             localStorage.setItem('userId', response.user);
@@ -108,6 +121,34 @@ class AuthStore {
             localStorage.removeItem('token');
             localStorage.removeItem('userId');
             localStorage.removeItem('isAdmin');
+        }
+    }
+
+    /**
+     * Perform auto-login using dev credentials from environment variables.
+     * This is used when VITE_DEV_AUTH_BYPASS is enabled.
+     * @returns true if auto-login succeeded, false otherwise
+     */
+    async devAutoLogin(): Promise<boolean> {
+        if (!DEV_AUTH_BYPASS) {
+            return false;
+        }
+
+        this.isLoading = true;
+        try {
+            console.log('[Dev Auth] Auto-login with dev credentials...');
+            const response = await apiLogin({
+                username: DEV_ADMIN_EMAIL,
+                password: DEV_ADMIN_PASSWORD
+            });
+            this.loginWithResponse(response);
+            console.log('[Dev Auth] Auto-login successful');
+            return true;
+        } catch (error) {
+            console.error('[Dev Auth] Auto-login failed:', error);
+            return false;
+        } finally {
+            this.isLoading = false;
         }
     }
 }

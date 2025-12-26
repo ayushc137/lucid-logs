@@ -1,5 +1,7 @@
 
 
+Fix category ui 
+
 
 add websocket infinite scroll + text heighlighting in search  for task table 
 make the setup generalised such that it can be expanded and uded for other items in future 

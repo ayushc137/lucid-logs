@@ -1,23 +1,40 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
-  import { authStore } from '$lib/stores/auth.svelte';
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import { authStore, isDevAuthBypassEnabled } from "$lib/stores/auth.svelte";
 
   let { children } = $props();
 
   let ready = $state(false);
 
   onMount(async () => {
-    // Check if we have a token
+    // Check if dev auth bypass is enabled
+    if (isDevAuthBypassEnabled()) {
+      // If no token, attempt dev auto-login
+      if (!authStore.hasToken) {
+        const success = await authStore.devAutoLogin();
+        if (!success) {
+          console.error(
+            "[Dev Auth] Auto-login failed, redirecting to login page",
+          );
+          goto("/login");
+          return;
+        }
+      }
+      ready = true;
+      return;
+    }
+
+    // Normal auth flow
     if (!authStore.hasToken) {
-      goto('/login');
+      goto("/login");
       return;
     }
 
     // Validate token and load user
     const isValid = await authStore.initialize();
     if (!isValid) {
-      goto('/login');
+      goto("/login");
       return;
     }
 

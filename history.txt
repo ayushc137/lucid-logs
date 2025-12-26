@@ -1,31 +1,101 @@
 #V2
--- Migration: 007_tasks_fts
--- Description: Add full-text search capabilities to tasks table
--- 
--- Run: surreal sql -e http://localhost:8000 -u root -p root -ns daily_journal -db core < db/migrations/007_tasks_fts.surql
--- -----------------------------------------------------------------------------
--- ANALYZER FOR TASK SEARCH
--- -----------------------------------------------------------------------------
--- Creates an analyzer for task full-text search with:
--- - class tokenizer: breaks text by character class (words, numbers, symbols)
--- - lowercase filter: case-insensitive search
--- - ascii filter: normalize diacritics (é -> e, ñ -> n)
--- - snowball(english): stem words (running -> run, completed -> complet)
-DEFINE ANALYZER IF NOT EXISTS task_search_analyzer 
--- Migration: 007_tasks_fts
--- Description: Add full-text search capabilities to tasks table
--- Run: surreal sql --endpoint http://localhost:8000 --username root --password root --namespace daily_journal --database core < db/migrations/007_tasks_fts.surql
--- Create analyzer for task search (class tokenizer, lowercase, ascii, snowball filters)
-DEFINE ANALYZER IF NOT EXISTS task_search_analyzer TOKENIZERS class FILTERS lowercase, ascii, snowball(english);
--- Full-text search index for task title
-DEFINE INDEX IF NOT EXISTS idx_tasks_title_fts ON TABLE tasks COLUMNS title SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
--- Full-text search index for task journal
-DEFINE INDEX IF NOT EXISTS idx_tasks_journal_fts ON TABLE tasks COLUMNS journal SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
--- Full-text search index for task note
-DEFINE INDEX IF NOT EXISTS idx_tasks_note_fts ON TABLE tasks COLUMNS note SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
--- Priority-based filtering index
-DEFINE INDEX IF NOT EXISTS idx_tasks_user_priority ON TABLE tasks COLUMNS created_by, priority;
--- Date range queries (for filtering by date range)
-DEFINE INDEX IF NOT EXISTS idx_tasks_user_end_date ON TABLE tasks COLUMNS created_by, end_date;
-SELECT id, name, created_by FROM categories;
-SELECT id, email FROM users;
+--   old_value: object,         // Previous value (JSON)
+--   new_value: object,         // New value (JSON)
+--   delta: 5.0,                // For progress changes (optional)
+--   
+--   reason: "Holiday travel",  // User-provided reason (optional)
+--   triggered_by: "user" | "system" | "rollover",
+--   retro_period: "2024-W49",  // For retro grouping (optional)
+--   
+--   created_at: datetime
+-- }
+-- =============================================================================
+-- TEMPLATES TABLE (Task blueprints for quick logging)
+-- =============================================================================
+-- Reusable task templates for one-tap logging
+DEFINE TABLE IF NOT EXISTS templates PERMISSIONS FULL;
+DEFINE INDEX IF NOT EXISTS idx_templates_user ON TABLE templates COLUMNS created_by;
+DEFINE INDEX IF NOT EXISTS idx_templates_quick_log ON TABLE templates COLUMNS created_by, is_quick_log;
+DEFINE INDEX IF NOT EXISTS idx_templates_activity_key ON TABLE templates COLUMNS created_by, activity_key;
+DEFINE INDEX IF NOT EXISTS idx_templates_deleted ON TABLE templates COLUMNS created_by, deleted_at;
+-- Template fields:
+-- {
+--   id: "templates:abc123",
+--   created_by: "users:xyz",
+--   
+--   // Core
+--   title: "Drink Water",
+--   description: "Log water intake",
+--   icon: "💧",
+--   color: "#3B82F6",
+--   
+--   // Defaults
+--   default_duration: 30,      // seconds
+--   default_priority: 1,
+--   default_category: categories:health,  // record link
+--   
+--   // Quick log settings
+--   is_quick_log: true,
+--   quick_log_order: 1,
+--   
+--   // Quantity settings
+--   quantity_enabled: true,
+--   quantity_default: 1,
+--   quantity_unit: "glasses",
+--   quantity_step: 1,
+--   
+--   // Emotion defaults
+--   expected_quadrant: "green",
+--   default_emotion_id: "emotions:E16",
+--   
+--   // Goal/Activity linking
+--   activity_key: "drink_water",  // Inherited from goal
+--   goal_id: goals:xyz,           // Source goal (optional)
+--   
+--   // Fields to show in UI
+--   show_fields: {
+--     journal: false,
+--     duration: false,
+--     quantity: true,
+--     emotion: false,
+--     positives_negatives: false,
+--     notes: false
+--   },
+--   
+--   // Source
+--   is_default: false,
+--   
+--   // Usage tracking
+--   use_count: 0,
+--   last_used_at: datetime,
+--   
+--   // Metadata
+--   created_at: datetime,
+--   updated_at: datetime,
+--   deleted_at: datetime
+-- }
+-- =============================================================================
+-- TASKS TABLE UPDATES
+-- =============================================================================
+-- Add new fields for goal/template integration
+-- Activity key for goal matching
+DEFINE INDEX IF NOT EXISTS idx_tasks_activity_key ON TABLE tasks COLUMNS created_by, activity_key;
+-- Template reference
+DEFINE INDEX IF NOT EXISTS idx_tasks_template ON TABLE tasks COLUMNS template_id;
+-- New task fields documented (schemaless):
+-- {
+--   // ... existing fields ...
+--   
+--   activity_key: "drink_water",  // For goal auto-linking
+--   template_id: templates:xyz,   // Source template (record link)
+--   quantity: {                   // For measurable tasks
+--     value: 500,
+--     unit: "ml"
+--   }
+-- }
+-- =============================================================================
+-- TASK_GOALS RELATION TABLE (Edge: tasks → goals)
+-- =============================================================================
+-- Links tasks to goals with impact tracking
+DEFINE TABLE IF NOT EXISTS task_goals TYPE RELATION IN tasks OUT goals PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS impact_type ON task_goals TYPE string 
