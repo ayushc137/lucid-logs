@@ -33,6 +33,11 @@
     type TaskFilterParams,
   } from "$lib/api";
   import { TaskModal } from "$lib/components/tasks";
+  import {
+    CategoryDropdown,
+    StatusDropdown,
+    PriorityDropdown,
+  } from "$lib/components/ui";
   import { cn } from "$lib/utils";
 
   const queryClient = useQueryClient();
@@ -420,61 +425,18 @@
             </div>
           {/if}
 
-          <div class="form-control">
-            <label class="label py-1" for="filterCategory">
-              <span class="label-text text-xs font-medium opacity-70">
-                Category
-              </span>
-            </label>
-            <select
-              id="filterCategory"
-              class="select select-bordered select-sm w-full"
-              bind:value={filterCategory}
-              onchange={onFilterChange}
-            >
-              <option value="all">All Categories</option>
-              {#each categories as cat}
-                <option value={cat.id}>{cat.name}</option>
-              {/each}
-            </select>
-          </div>
+          <CategoryDropdown
+            {categories}
+            bind:value={filterCategory}
+            label="Category"
+            showAllOption={true}
+            allLabel="All Categories"
+            placeholder="All Categories"
+          />
 
-          <div class="form-control">
-            <label class="label py-1" for="filterStatus">
-              <span class="label-text text-xs font-medium opacity-70">
-                Status
-              </span>
-            </label>
-            <select
-              id="filterStatus"
-              class="select select-bordered select-sm w-full"
-              bind:value={filterStatus}
-              onchange={onFilterChange}
-            >
-              <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-            </select>
-          </div>
+          <StatusDropdown bind:value={filterStatus} label="Status" />
 
-          <div class="form-control">
-            <label class="label py-1" for="filterPriority">
-              <span class="label-text text-xs font-medium opacity-70">
-                Priority
-              </span>
-            </label>
-            <select
-              id="filterPriority"
-              class="select select-bordered select-sm w-full"
-              bind:value={filterPriority}
-              onchange={onFilterChange}
-            >
-              <option value="all">All Priorities</option>
-              <option value="high">High (7-10)</option>
-              <option value="medium">Medium (4-6)</option>
-              <option value="low">Low (1-3)</option>
-            </select>
-          </div>
+          <PriorityDropdown bind:value={filterPriority} label="Priority" />
 
           <!-- Clear Filters -->
           {#if hasActiveFilters}

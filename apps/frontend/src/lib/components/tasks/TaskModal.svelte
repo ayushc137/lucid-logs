@@ -11,6 +11,7 @@
     import { createQuery } from "@tanstack/svelte-query";
     import { getCategories, createCategory } from "$lib/api/categories";
     import { RichEditor } from "$lib/components/rich-editor";
+    import { CategoryDropdown } from "$lib/components/ui";
     import { cn } from "$lib/utils";
     import {
         Sparkles,
@@ -24,7 +25,6 @@
         Save,
         Tag,
         Calendar,
-        Search,
     } from "lucide-svelte";
 
     interface Props {
@@ -73,10 +73,9 @@
     let startTime = $state("09:00");
     let endTime = $state("10:00");
 
-    // Category creation & search
+    // Category creation
     let newCategoryName = $state("");
     let newCategoryColor = $state("#6366f1");
-    let categorySearch = $state("");
     let showNewCategory = $state(false);
     let useCustomCategoryColor = $state(false);
 
@@ -89,13 +88,6 @@
     const categories = $derived($categoriesQuery.data?.items || []);
     const selectedCategory = $derived(
         categories.find((c) => c.id === categoryId),
-    );
-    const filteredCategories = $derived(
-        categorySearch.trim()
-            ? categories.filter((c) =>
-                  c.name.toLowerCase().includes(categorySearch.toLowerCase()),
-              )
-            : categories,
     );
 
     const isEditing = $derived(!!task);
@@ -357,14 +349,14 @@
             >
                 <!-- Category Selector -->
                 <div class="form-control mb-5">
-                    <label class="label pb-1">
+                    <div class="label pb-1">
                         <span
                             class="label-text text-xs font-semibold uppercase opacity-50 flex items-center gap-1.5"
                         >
                             <Tag class="w-3 h-3" />
                             Category
                         </span>
-                    </label>
+                    </div>
                     {#if showNewCategory}
                         <div
                             class="space-y-3 p-3 rounded-lg bg-base-100 border border-base-300"
@@ -468,103 +460,13 @@
                             </div>
                         </div>
                     {:else}
-                        <!-- Enhanced Category Dropdown with Search -->
-                        <div class="space-y-2">
-                            <!-- Search Input -->
-                            <div class="relative">
-                                <Search
-                                    class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-40"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Search categories..."
-                                    class="input input-sm input-bordered w-full pl-8 pr-8"
-                                    bind:value={categorySearch}
-                                />
-                                {#if categorySearch}
-                                    <button
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
-                                        onclick={() => (categorySearch = "")}
-                                    >
-                                        <X class="w-3 h-3" />
-                                    </button>
-                                {/if}
-                            </div>
-
-                            <!-- Category List -->
-                            <div
-                                class="max-h-40 overflow-y-auto rounded-lg border border-base-300 bg-base-100"
-                            >
-                                <!-- No Category Option -->
-                                <button
-                                    type="button"
-                                    class={cn(
-                                        "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors",
-                                        categoryId === undefined
-                                            ? "bg-primary/10"
-                                            : "hover:bg-base-200",
-                                    )}
-                                    onclick={() => (categoryId = undefined)}
-                                >
-                                    <div
-                                        class="w-4 h-4 rounded bg-base-300"
-                                    ></div>
-                                    <span class="text-sm opacity-60"
-                                        >No category</span
-                                    >
-                                    {#if categoryId === undefined}
-                                        <Check
-                                            class="w-3.5 h-3.5 text-primary ml-auto"
-                                        />
-                                    {/if}
-                                </button>
-
-                                {#each filteredCategories as cat (cat.id)}
-                                    <button
-                                        type="button"
-                                        class={cn(
-                                            "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors border-t border-base-200",
-                                            categoryId === cat.id
-                                                ? "bg-primary/10"
-                                                : "hover:bg-base-200",
-                                        )}
-                                        onclick={() => (categoryId = cat.id)}
-                                    >
-                                        <div
-                                            class="w-4 h-4 rounded flex-shrink-0"
-                                            style="background-color: {cat.color};"
-                                        ></div>
-                                        <span
-                                            class="text-sm font-medium truncate flex-1"
-                                            >{cat.name}</span
-                                        >
-                                        {#if categoryId === cat.id}
-                                            <Check
-                                                class="w-3.5 h-3.5 text-primary flex-shrink-0"
-                                            />
-                                        {/if}
-                                    </button>
-                                {:else}
-                                    {#if categorySearch && categories.length > 0}
-                                        <div
-                                            class="px-3 py-4 text-center text-sm opacity-50"
-                                        >
-                                            No matching categories
-                                        </div>
-                                    {/if}
-                                {/each}
-                            </div>
-
-                            <!-- Create New Button -->
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-ghost w-full gap-2 text-primary"
-                                onclick={() => (showNewCategory = true)}
-                            >
-                                <Plus class="w-4 h-4" />
-                                Create new category
-                            </button>
-                        </div>
+                        <CategoryDropdown
+                            {categories}
+                            bind:value={categoryId}
+                            placeholder="Select category..."
+                            showCreateButton={true}
+                            onCreate={() => (showNewCategory = true)}
+                        />
                     {/if}
                 </div>
 
