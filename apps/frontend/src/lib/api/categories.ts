@@ -30,10 +30,12 @@ export interface CategoryPageResponse {
 export async function getCategories(params?: {
     limit?: number;
     offset?: number;
+    search?: string;
 }): Promise<CategoryPageResponse> {
     const searchParams = new URLSearchParams();
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.offset) searchParams.set('offset', String(params.offset));
+    if (params?.search) searchParams.set('search', params.search);
 
     return unwrap(api.get('categories', { searchParams }));
 }

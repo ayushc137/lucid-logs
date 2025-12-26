@@ -159,10 +159,17 @@
     const maxRows = $derived(
         taskRows.length > 0 ? Math.max(...taskRows.map((t) => t.row)) + 1 : 1,
     );
+
+    // Fixed height per row for consistent sizing (no overlap)
+    const ROW_HEIGHT = 60; // pixels per row
+    const ROW_GAP = 8; // gap between rows
+    const tasksAreaHeight = $derived(
+        maxRows * ROW_HEIGHT + (maxRows - 1) * ROW_GAP,
+    );
 </script>
 
 <div class="timeline-wrapper h-full flex flex-col">
-    <div class="timeline-container flex-1 overflow-x-auto overflow-y-hidden">
+    <div class="timeline-container flex-1 overflow-x-auto overflow-y-auto">
         <div
             class="timeline-inner min-w-[1800px] h-full flex flex-col pl-6 pr-6"
         >
@@ -235,22 +242,23 @@
                     </div>
                 {/if}
 
-                <!-- Tasks area -->
-                <div class="tasks-area absolute inset-x-0 top-14 bottom-3">
+                <!-- Tasks area with fixed row heights to prevent overlap -->
+                <div
+                    class="tasks-area absolute inset-x-0 top-14"
+                    style="height: {Math.max(tasksAreaHeight, 100)}px;"
+                >
                     {#each taskRows as { task, row }}
                         {@const style = getTaskStyle(task)}
                         {@const color = getTaskColor(task)}
                         {@const textColor = getContrastTextColor(color)}
                         {@const shadowColor = getShadowColor(color)}
-                        {@const rowHeight = 100 / Math.max(maxRows, 2)}
                         <div
                             class="task-card absolute cursor-pointer transition-all duration-200 hover:z-20 group"
                             style="
                                 left: {style.left}%;
                                 width: {style.width}%;
-                                top: calc({row * rowHeight}% + 4px);
-                                height: calc({rowHeight}% - 8px);
-                                min-height: 52px;
+                                top: {row * (ROW_HEIGHT + ROW_GAP)}px;
+                                height: {ROW_HEIGHT}px;
                             "
                             role="button"
                             tabindex="0"

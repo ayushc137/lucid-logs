@@ -40,7 +40,7 @@ import (
 // Repository defines the category data access interface.
 type Repository interface {
 	FindByID(ctx context.Context, id, userID string) (*Category, error)
-	FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*Category, int64, error)
+	FindPaginated(ctx context.Context, userID string, params pagination.Params, search string) ([]*Category, int64, error)
 	Create(ctx context.Context, req *CreateRequest, userID string) (*Category, error)
 	Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Category, error)
 	Delete(ctx context.Context, id, userID string) error
@@ -152,39 +152,54 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Category
 	return cat.toCategory(), nil
 }
 
-// FindPaginated retrieves categories for a user with pagination using SDK methods.
+// FindPaginated retrieves categories for a user with pagination and optional search.
 //
 // This uses:
 //   - database.QueryScalar[T]() for counting records
 //   - database.QueryAll[T]() for fetching paginated results
 //
 // No type::string(id) cast needed since categoryDB.ID is models.RecordID.
-func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*Category, int64, error) {
-	// Get count using SDK's QueryScalar
-	total, err := database.QueryScalar[float64](ctx, r.db, `
+func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params, search string) ([]*Category, int64, error) {
+	// Build dynamic query for count
+	countQuery := `
 		RETURN (SELECT count() FROM categories
-			WHERE created_by = $user AND deleted_at = NONE
-			GROUP ALL)[0].count OR 0
-	`, map[string]any{
-		"user": userID,
-	})
+			WHERE created_by = $user AND deleted_at = NONE`
+
+	queryParams := map[string]any{
+		"user":   userID,
+		"limit":  params.Limit,
+		"offset": params.Offset,
+	}
+
+	// Add search filter if provided
+	if search != "" {
+		countQuery += ` AND string::lowercase(name) CONTAINS string::lowercase($search)`
+		queryParams["search"] = search
+	}
+
+	countQuery += ` GROUP ALL)[0].count OR 0`
+
+	// Get count using SDK's QueryScalar
+	total, err := database.QueryScalar[float64](ctx, r.db, countQuery, queryParams)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("SDK QueryScalar failed for category count")
 		return nil, 0, err
 	}
 
+	// Build dynamic query for results
+	resultQuery := `
+		SELECT * FROM categories
+		WHERE created_by = $user AND deleted_at = NONE`
+
+	if search != "" {
+		resultQuery += ` AND string::lowercase(name) CONTAINS string::lowercase($search)`
+	}
+
+	resultQuery += ` ORDER BY name ASC LIMIT $limit START $offset`
+
 	// Get categories using SDK's typed QueryAll
 	// models.RecordID handles ID deserialization automatically
-	catsDB, err := database.QueryAll[categoryDB](ctx, r.db, `
-		SELECT * FROM categories
-		WHERE created_by = $user AND deleted_at = NONE
-		ORDER BY name ASC
-		LIMIT $limit START $offset
-	`, map[string]any{
-		"user":   userID,
-		"limit":  params.Limit,
-		"offset": params.Offset,
-	})
+	catsDB, err := database.QueryAll[categoryDB](ctx, r.db, resultQuery, queryParams)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("SDK QueryAll failed for category list")
 		return nil, 0, err

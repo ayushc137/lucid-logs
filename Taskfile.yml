@@ -36,7 +36,19 @@ tasks:
     cmds:
       - |
         echo "🚀 Starting Go backend on :8080 and Frontend on :5173"
+        # Start backend first
         (cd {{.GO_BACKEND}} && lsof -ti :8080 | xargs kill -9 2>/dev/null || true && air) &
+        BACKEND_PID=$!
+        # Wait for backend to be ready (check health endpoint)
+        echo "⏳ Waiting for backend to start..."
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health/ > /dev/null 2>&1; then
+            echo "✅ Backend is ready!"
+            break
+          fi
+          sleep 0.5
+        done
+        # Start frontend
         (cd {{.FRONTEND}} && pnpm dev --host) &
         wait
 
@@ -93,6 +105,20 @@ tasks:
     dir: "{{.GO_BACKEND}}"
     cmds:
       - go run cmd/gen/main.go {{.CLI_ARGS}}
+
+  seed:
+    desc: Populate database with test data (tasks for yesterday, today, tomorrow)
+    dir: "{{.GO_BACKEND}}"
+    deps: [db:up]
+    cmds:
+      - go run ./cmd/seed
+
+  seed:reset:
+    desc: Reset and repopulate seed data (deletes existing seeded data first)
+    dir: "{{.GO_BACKEND}}"
+    deps: [db:up]
+    cmds:
+      - go run ./cmd/seed --reset
 
   # =============================================================================
   # SVELTEKIT FRONTEND

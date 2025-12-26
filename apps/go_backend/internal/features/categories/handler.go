@@ -57,6 +57,7 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 // @Produce      json
 // @Param        limit  query int false "Items per page (default 20, max 100)"
 // @Param        offset query int false "Items to skip (default 0)"
+// @Param        search query string false "Search by category name"
 // @Success      200 {object} categories.CategoryPageResponse
 // @Failure      401 {object} response.APIResponse
 // @Failure      500 {object} response.APIResponse
@@ -70,8 +71,9 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	params := pagination.FromRequest(c)
+	search := c.Query("search")
 
-	resp, err := h.service.List(c.Request.Context(), user.UserID, params)
+	resp, err := h.service.List(c.Request.Context(), user.UserID, params, search)
 	if err != nil {
 		response.ErrorFromErr(c, err)
 		return

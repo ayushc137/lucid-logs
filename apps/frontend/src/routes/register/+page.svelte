@@ -153,11 +153,11 @@
             />
           </label>
           {#if !passwordsMatch}
-            <label class="label">
+            <p class="label">
               <span class="label-text-alt text-error"
                 >Passwords don't match</span
               >
-            </label>
+            </p>
           {/if}
         </div>
 

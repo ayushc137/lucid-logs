@@ -412,6 +412,12 @@ const docTemplate = `{
                         "description": "Items to skip (default 0)",
                         "name": "offset",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search by category name",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3217,13 +3223,13 @@ const docTemplate = `{
             "properties": {
                 "color": {
                     "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1,
+                    "maxLength": 20,
+                    "minLength": 4,
                     "example": "#3B82F6"
                 },
                 "name": {
                     "type": "string",
-                    "maxLength": 100,
+                    "maxLength": 40,
                     "minLength": 1,
                     "example": "Work"
                 }
@@ -3235,13 +3241,13 @@ const docTemplate = `{
             "properties": {
                 "color": {
                     "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1,
+                    "maxLength": 20,
+                    "minLength": 4,
                     "example": "#10B981"
                 },
                 "name": {
                     "type": "string",
-                    "maxLength": 100,
+                    "maxLength": 40,
                     "minLength": 1,
                     "example": "Personal"
                 }

@@ -15,7 +15,7 @@ import (
 
 // Service defines the category business logic interface.
 type Service interface {
-	List(ctx context.Context, userID string, params pagination.Params) (*pagination.Response[*Category], error)
+	List(ctx context.Context, userID string, params pagination.Params, search string) (*pagination.Response[*Category], error)
 	Get(ctx context.Context, id, userID string) (*Category, error)
 	Create(ctx context.Context, req *CreateRequest, userID string) (*Category, error)
 	Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Category, error)
@@ -39,8 +39,8 @@ func NewService(repo Repository) Service {
 	}
 }
 
-func (s *service) List(ctx context.Context, userID string, params pagination.Params) (*pagination.Response[*Category], error) {
-	cats, total, err := s.repo.FindPaginated(ctx, userID, params)
+func (s *service) List(ctx context.Context, userID string, params pagination.Params, search string) (*pagination.Response[*Category], error) {
+	cats, total, err := s.repo.FindPaginated(ctx, userID, params, search)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID).Msg("failed to list categories")
 		return nil, err

@@ -70,6 +70,7 @@
   const navItems = [
     { href: "/", icon: Home, label: "Dashboard" },
     { href: "/tasks", icon: ListTodo, label: "Tasks" },
+    { href: "/categories", icon: Palette, label: "Categories" },
     { href: "/goals", icon: Target, label: "Goals" },
     { href: "/templates", icon: Zap, label: "Quick Log" },
     { href: "/retrospectives", icon: Calendar, label: "Retros" },

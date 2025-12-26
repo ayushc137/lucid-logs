@@ -60,8 +60,8 @@
         </div>
       </button>
       <ul
-        tabindex="0"
         class="dropdown-content menu bg-base-100 rounded-box z-50 w-48 p-2 shadow-xl border border-base-300"
+        role="menu"
       >
         <li class="menu-title">My Account</li>
         <li><a href="/settings">Settings</a></li>

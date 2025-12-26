@@ -42,11 +42,40 @@ export const api = ky.create({
 
 /**
  * Helper to extract data from API response
+ * Properly handles error responses and extracts error messages
  */
 export async function unwrap<T>(response: Promise<Response>): Promise<T> {
-    const res = await response;
-    const json = (await res.json()) as { data: T };
-    return json.data;
+    try {
+        const res = await response;
+        const json = (await res.json()) as { data: T; error?: { code: string; message: string } };
+
+        // If there's an error in the response, throw it
+        if (json.error) {
+            throw new Error(json.error.message);
+        }
+
+        return json.data;
+    } catch (error) {
+        // Handle ky HTTPError - extract the actual error message from the response
+        if (error && typeof error === 'object' && 'response' in error) {
+            const httpError = error as { response: Response };
+            try {
+                // Clone the response to avoid consuming the body
+                const clonedResponse = httpError.response.clone();
+                const errorJson = await clonedResponse.json() as { error?: { message: string; code: string } };
+                if (errorJson.error?.message) {
+                    throw new Error(errorJson.error.message);
+                }
+            } catch (parseError) {
+                // If parseError is already the error we created above, re-throw it
+                if (parseError instanceof Error && !('response' in parseError)) {
+                    throw parseError;
+                }
+                // Otherwise, it's a parse error - re-throw the original with a better message
+            }
+        }
+        throw error;
+    }
 }
 
 /**

@@ -7,6 +7,8 @@
     Check,
     AlertCircle,
     Palette,
+    ExternalLink,
+    Pipette,
   } from "lucide-svelte";
   import {
     getCategories,
@@ -55,11 +57,13 @@
   let isCreating = $state(false);
   let newName = $state("");
   let newColor = $state("#6366f1");
+  let useCustomColor = $state(false);
   let createError = $state("");
 
   let editingId = $state<string | null>(null);
   let editName = $state("");
   let editColor = $state("");
+  let editUseCustomColor = $state(false);
 
   const categories = $derived($query.data?.items || []);
 
@@ -70,10 +74,12 @@
       await queryClient.invalidateQueries({ queryKey: ["categories"] });
       newName = "";
       newColor = "#6366f1";
+      useCustomColor = false;
       createError = "";
       isCreating = false;
     },
     onError: (error: Error) => {
+      // Use the error message directly from the API
       createError = error.message || "Failed to create category";
     },
   });
@@ -102,6 +108,7 @@
     editingId = cat.id;
     editName = cat.name;
     editColor = cat.color;
+    editUseCustomColor = !colorPresets.includes(cat.color);
   }
 
   function saveEdit() {
@@ -115,6 +122,10 @@
 
   function handleCreate() {
     createError = "";
+    if (newName.trim().length > 40) {
+      createError = "Category name must be 40 characters or less";
+      return;
+    }
     if (newName.trim()) {
       $createMut.mutate({ name: newName.trim(), color: newColor });
     }
@@ -124,6 +135,8 @@
     isCreating = false;
     createError = "";
     newName = "";
+    newColor = "#6366f1";
+    useCustomColor = false;
   }
 </script>
 
@@ -140,15 +153,21 @@
         </p>
       </div>
     </div>
-    {#if !isCreating}
-      <button
-        class="btn btn-primary btn-sm gap-2"
-        onclick={() => (isCreating = true)}
-      >
-        <Plus class="w-4 h-4" />
-        Add
-      </button>
-    {/if}
+    <div class="flex items-center gap-2">
+      <a href="/categories" class="btn btn-ghost btn-sm gap-2">
+        <ExternalLink class="w-4 h-4" />
+        Full Page
+      </a>
+      {#if !isCreating}
+        <button
+          class="btn btn-primary btn-sm gap-2"
+          onclick={() => (isCreating = true)}
+        >
+          <Plus class="w-4 h-4" />
+          Add
+        </button>
+      {/if}
+    </div>
   </div>
 
   {#if isCreating}
@@ -166,12 +185,17 @@
         <div class="form-control">
           <label class="label" for="new-category-name">
             <span class="label-text font-medium">Name</span>
+            <span class="label-text-alt opacity-50">{newName.length}/40</span>
           </label>
           <input
             id="new-category-name"
             type="text"
             placeholder="e.g., Work, Personal, Health"
-            class="input input-bordered input-sm w-full"
+            class={cn(
+              "input input-bordered input-sm w-full",
+              newName.length > 40 && "input-error",
+            )}
+            maxlength={40}
             bind:value={newName}
             onkeydown={(e: KeyboardEvent) =>
               e.key === "Enter" && handleCreate()}
@@ -179,28 +203,60 @@
         </div>
 
         <div class="form-control">
-          <span class="label py-1">
+          <div class="flex items-center justify-between py-1">
             <span class="label-text font-medium">Color</span>
-          </span>
-          <!-- 16 Colors in 8x2 grid -->
-          <div class="grid grid-cols-8 gap-1.5">
-            {#each colorPresets as color}
-              <button
-                type="button"
-                class={cn("color-picker-btn", newColor === color && "active")}
-                style="background-color: {color};"
-                onclick={() => (newColor = color)}
-                aria-label="Select color"
-              ></button>
-            {/each}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <Pipette class="w-3 h-3 opacity-60" />
+              <span class="text-xs opacity-60">Custom</span>
+              <input
+                type="checkbox"
+                class="toggle toggle-xs toggle-primary"
+                bind:checked={useCustomColor}
+              />
+            </label>
           </div>
+          {#if useCustomColor}
+            <div class="flex items-center gap-2 mt-2">
+              <input
+                type="color"
+                class="w-12 h-10 rounded-lg cursor-pointer border-2 border-base-300"
+                bind:value={newColor}
+              />
+              <input
+                type="text"
+                class="input input-bordered input-sm flex-1 font-mono"
+                bind:value={newColor}
+                placeholder="#000000"
+              />
+            </div>
+          {:else}
+            <!-- 16 Colors in 8x2 grid -->
+            <div class="grid grid-cols-8 gap-2 mt-2">
+              {#each colorPresets as color}
+                <button
+                  type="button"
+                  class={cn(
+                    "w-8 h-8 rounded-lg transition-all border-2",
+                    newColor === color
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 border-white scale-110"
+                      : "border-transparent hover:scale-105",
+                  )}
+                  style="background-color: {color};"
+                  onclick={() => (newColor = color)}
+                  aria-label="Select color"
+                ></button>
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <div class="flex items-center gap-2 pt-2">
           <button
             class="btn btn-primary btn-sm gap-1"
             onclick={handleCreate}
-            disabled={!newName.trim() || $createMut.isPending}
+            disabled={!newName.trim() ||
+              newName.length > 40 ||
+              $createMut.isPending}
           >
             {#if $createMut.isPending}
               <span class="loading loading-spinner loading-xs"></span>
@@ -230,12 +286,13 @@
       >
         {#if editingId === category.id}
           <!-- Edit Mode -->
-          <div class="flex-1 space-y-2">
+          <div class="flex-1 space-y-3">
             <div class="flex items-center gap-2">
               <input
                 type="text"
                 bind:value={editName}
                 class="input input-sm input-bordered flex-1"
+                maxlength={40}
               />
               <div class="flex gap-1">
                 <button
@@ -252,21 +309,47 @@
                 </button>
               </div>
             </div>
-            <!-- All 16 colors in edit mode -->
-            <div class="grid grid-cols-8 gap-1">
-              {#each colorPresets as color}
-                <button
-                  type="button"
-                  class={cn(
-                    "color-picker-btn",
-                    editColor === color && "active",
-                  )}
-                  style="background-color: {color};"
-                  onclick={() => (editColor = color)}
-                  aria-label="Select color"
-                ></button>
-              {/each}
+            <!-- Color picker with custom option -->
+            <div class="flex items-center gap-2">
+              <label class="flex items-center gap-1 cursor-pointer">
+                <Pipette class="w-3 h-3 opacity-60" />
+                <input
+                  type="checkbox"
+                  class="toggle toggle-xs toggle-primary"
+                  bind:checked={editUseCustomColor}
+                />
+              </label>
+              {#if editUseCustomColor}
+                <input
+                  type="color"
+                  class="w-8 h-6 rounded cursor-pointer"
+                  bind:value={editColor}
+                />
+                <input
+                  type="text"
+                  class="input input-bordered input-xs flex-1 font-mono"
+                  bind:value={editColor}
+                />
+              {/if}
             </div>
+            {#if !editUseCustomColor}
+              <div class="grid grid-cols-8 gap-1">
+                {#each colorPresets as color}
+                  <button
+                    type="button"
+                    class={cn(
+                      "w-6 h-6 rounded transition-all border-2",
+                      editColor === color
+                        ? "ring-2 ring-primary ring-offset-1 border-white scale-110"
+                        : "border-transparent hover:scale-105",
+                    )}
+                    style="background-color: {color};"
+                    onclick={() => (editColor = color)}
+                    aria-label="Select color"
+                  ></button>
+                {/each}
+              </div>
+            {/if}
           </div>
         {:else}
           <!-- View Mode -->

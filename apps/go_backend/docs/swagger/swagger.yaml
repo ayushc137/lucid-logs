@@ -385,12 +385,12 @@ definitions:
     properties:
       color:
         example: '#3B82F6'
-        maxLength: 50
-        minLength: 1
+        maxLength: 20
+        minLength: 4
         type: string
       name:
         example: Work
-        maxLength: 100
+        maxLength: 40
         minLength: 1
         type: string
     required:
@@ -402,12 +402,12 @@ definitions:
     properties:
       color:
         example: '#10B981'
-        maxLength: 50
-        minLength: 1
+        maxLength: 20
+        minLength: 4
         type: string
       name:
         example: Personal
-        maxLength: 100
+        maxLength: 40
         minLength: 1
         type: string
     type: object
@@ -2210,6 +2210,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Search by category name
+        in: query
+        name: search
+        type: string
       produces:
       - application/json
       responses:

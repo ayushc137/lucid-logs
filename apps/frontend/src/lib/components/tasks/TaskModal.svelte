@@ -78,6 +78,7 @@
     let newCategoryColor = $state("#6366f1");
     let categorySearch = $state("");
     let showNewCategory = $state(false);
+    let useCustomCategoryColor = $state(false);
 
     const categoriesQuery = createQuery({
         queryKey: ["categories"],
@@ -125,6 +126,8 @@
             queryClient.invalidateQueries({ queryKey: ["categories"] });
             categoryId = newCat.id;
             newCategoryName = "";
+            newCategoryColor = "#6366f1";
+            useCustomCategoryColor = false;
             showNewCategory = false;
         },
     });
@@ -369,31 +372,83 @@
                             <input
                                 type="text"
                                 bind:value={newCategoryName}
-                                placeholder="Category name"
-                                class="input input-sm input-bordered w-full"
+                                placeholder="Category name (max 40 chars)"
+                                class={cn(
+                                    "input input-sm input-bordered w-full",
+                                    newCategoryName.length > 40 &&
+                                        "input-error",
+                                )}
+                                maxlength={40}
                             />
-                            <!-- 16 Color Grid - 4x4 small squarish buttons -->
-                            <div class="grid grid-cols-8 gap-1.5">
-                                {#each colorPresets as color}
-                                    <button
-                                        type="button"
-                                        class={cn(
-                                            "color-picker-btn",
-                                            newCategoryColor === color &&
-                                                "active",
-                                        )}
-                                        style="background-color: {color};"
-                                        onclick={() =>
-                                            (newCategoryColor = color)}
-                                        aria-label="Select color"
-                                    ></button>
-                                {/each}
+                            <!-- Custom color toggle -->
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs opacity-60">Color</span>
+                                <label
+                                    class="flex items-center gap-2 cursor-pointer"
+                                >
+                                    <span class="text-xs opacity-60"
+                                        >Custom</span
+                                    >
+                                    <input
+                                        type="checkbox"
+                                        class="toggle toggle-xs toggle-primary"
+                                        bind:checked={useCustomCategoryColor}
+                                    />
+                                </label>
+                            </div>
+                            {#if useCustomCategoryColor}
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        class="w-10 h-8 rounded cursor-pointer border border-base-300"
+                                        bind:value={newCategoryColor}
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input input-sm input-bordered flex-1 font-mono text-xs"
+                                        bind:value={newCategoryColor}
+                                        placeholder="#000000"
+                                    />
+                                </div>
+                            {:else}
+                                <!-- 16 Color Grid -->
+                                <div class="grid grid-cols-8 gap-1.5">
+                                    {#each colorPresets as color}
+                                        <button
+                                            type="button"
+                                            class={cn(
+                                                "w-6 h-6 rounded transition-all border-2",
+                                                newCategoryColor === color
+                                                    ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 border-white scale-110"
+                                                    : "border-transparent hover:scale-105",
+                                            )}
+                                            style="background-color: {color};"
+                                            onclick={() =>
+                                                (newCategoryColor = color)}
+                                            aria-label="Select color"
+                                        ></button>
+                                    {/each}
+                                </div>
+                            {/if}
+                            <!-- Preview -->
+                            <div
+                                class="flex items-center gap-2 text-xs opacity-60"
+                            >
+                                <span>Preview:</span>
+                                <span
+                                    class="badge badge-sm"
+                                    style="background-color: {newCategoryColor}; color: white; border: none;"
+                                >
+                                    {newCategoryName || "Category"}
+                                </span>
                             </div>
                             <div class="flex gap-2">
                                 <button
                                     class="btn btn-sm btn-primary flex-1 gap-1"
                                     onclick={handleCreateCategory}
-                                    disabled={$createCategoryMut.isPending}
+                                    disabled={$createCategoryMut.isPending ||
+                                        !newCategoryName.trim() ||
+                                        newCategoryName.length > 40}
                                 >
                                     {#if $createCategoryMut.isPending}
                                         <span
@@ -413,26 +468,101 @@
                             </div>
                         </div>
                     {:else}
-                        <!-- Simple dropdown + add button -->
-                        <div class="flex gap-2">
-                            <select
-                                bind:value={categoryId}
-                                class="select select-bordered select-sm flex-1"
+                        <!-- Enhanced Category Dropdown with Search -->
+                        <div class="space-y-2">
+                            <!-- Search Input -->
+                            <div class="relative">
+                                <Search
+                                    class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-40"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Search categories..."
+                                    class="input input-sm input-bordered w-full pl-8 pr-8"
+                                    bind:value={categorySearch}
+                                />
+                                {#if categorySearch}
+                                    <button
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+                                        onclick={() => (categorySearch = "")}
+                                    >
+                                        <X class="w-3 h-3" />
+                                    </button>
+                                {/if}
+                            </div>
+
+                            <!-- Category List -->
+                            <div
+                                class="max-h-40 overflow-y-auto rounded-lg border border-base-300 bg-base-100"
                             >
-                                <option value={undefined}>No category</option>
-                                {#each categories as cat}
-                                    <option value={cat.id}>
-                                        {cat.name}
-                                    </option>
+                                <!-- No Category Option -->
+                                <button
+                                    type="button"
+                                    class={cn(
+                                        "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors",
+                                        categoryId === undefined
+                                            ? "bg-primary/10"
+                                            : "hover:bg-base-200",
+                                    )}
+                                    onclick={() => (categoryId = undefined)}
+                                >
+                                    <div
+                                        class="w-4 h-4 rounded bg-base-300"
+                                    ></div>
+                                    <span class="text-sm opacity-60"
+                                        >No category</span
+                                    >
+                                    {#if categoryId === undefined}
+                                        <Check
+                                            class="w-3.5 h-3.5 text-primary ml-auto"
+                                        />
+                                    {/if}
+                                </button>
+
+                                {#each filteredCategories as cat (cat.id)}
+                                    <button
+                                        type="button"
+                                        class={cn(
+                                            "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors border-t border-base-200",
+                                            categoryId === cat.id
+                                                ? "bg-primary/10"
+                                                : "hover:bg-base-200",
+                                        )}
+                                        onclick={() => (categoryId = cat.id)}
+                                    >
+                                        <div
+                                            class="w-4 h-4 rounded flex-shrink-0"
+                                            style="background-color: {cat.color};"
+                                        ></div>
+                                        <span
+                                            class="text-sm font-medium truncate flex-1"
+                                            >{cat.name}</span
+                                        >
+                                        {#if categoryId === cat.id}
+                                            <Check
+                                                class="w-3.5 h-3.5 text-primary flex-shrink-0"
+                                            />
+                                        {/if}
+                                    </button>
+                                {:else}
+                                    {#if categorySearch && categories.length > 0}
+                                        <div
+                                            class="px-3 py-4 text-center text-sm opacity-50"
+                                        >
+                                            No matching categories
+                                        </div>
+                                    {/if}
                                 {/each}
-                            </select>
+                            </div>
+
+                            <!-- Create New Button -->
                             <button
                                 type="button"
-                                class="btn btn-sm btn-ghost btn-square tooltip tooltip-left"
+                                class="btn btn-sm btn-ghost w-full gap-2 text-primary"
                                 onclick={() => (showNewCategory = true)}
-                                data-tip="Create new category"
                             >
                                 <Plus class="w-4 h-4" />
+                                Create new category
                             </button>
                         </div>
                     {/if}

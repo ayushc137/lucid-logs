@@ -41,7 +41,7 @@
     }: Props = $props();
 
     let element: HTMLElement;
-    let editor: Editor | null = null;
+    let editor = $state<Editor | null>(null);
     let isFocused = $state(false);
 
     onMount(() => {

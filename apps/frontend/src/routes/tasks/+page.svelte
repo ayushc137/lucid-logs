@@ -112,16 +112,18 @@
     return params;
   });
 
-  // Mutable ref for current params - updated before each refetch
-  let currentParams = queryParams;
-  let currentParamsJson = JSON.stringify(queryParams);
+  // Mutable refs for tracking param changes - initialized lazily
+  let currentParams: TaskFilterParams | null = null;
+  let currentParamsJson = "";
 
   // Fetch tasks - queryFn reads currentParams which is updated by $effect
   const tasksQuery = createQuery({
     queryKey: ["tasks-list"],
     queryFn: async () => {
-      console.log("[Tasks] Fetching with params:", currentParams);
-      return getTasks(currentParams);
+      // Use currentParams if set, otherwise use queryParams directly
+      const params = currentParams ?? queryParams;
+      console.log("[Tasks] Fetching with params:", params);
+      return getTasks(params);
     },
     staleTime: 0,
   });
@@ -130,8 +132,14 @@
   // Update currentParams before calling refetch so queryFn sees fresh values
   $effect(() => {
     const newParamsJson = JSON.stringify(queryParams);
+    // Skip initial run (first time currentParamsJson is empty)
+    if (currentParamsJson === "") {
+      currentParamsJson = newParamsJson;
+      currentParams = queryParams;
+      return;
+    }
     if (newParamsJson !== currentParamsJson) {
-      currentParams = queryParams; // Update mutable ref
+      currentParams = queryParams;
       currentParamsJson = newParamsJson;
       console.log("[Tasks] Params changed, refetching...", queryParams);
       $tasksQuery.refetch();
