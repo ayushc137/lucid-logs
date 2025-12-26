@@ -224,11 +224,7 @@
         class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
     >
         <div>
-            <h1
-                class="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
-            >
-                Categories
-            </h1>
+            <h1 class="text-3xl font-bold">Categories</h1>
             <p class="text-sm opacity-60 mt-1">
                 {#if debouncedSearch}
                     Found {categories.length} matching categories
@@ -457,7 +453,7 @@
                     </button>
                 {:else}
                     <div
-                        class="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4"
+                        class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4"
                     >
                         <Palette class="w-10 h-10 text-primary" />
                     </div>

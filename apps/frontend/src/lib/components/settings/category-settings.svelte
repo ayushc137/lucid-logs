@@ -379,7 +379,7 @@
     {:else}
       <div class="text-center py-10">
         <div
-          class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mb-4"
+          class="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4"
         >
           <Palette class="w-8 h-8 text-primary" />
         </div>

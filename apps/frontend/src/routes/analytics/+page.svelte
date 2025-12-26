@@ -12,11 +12,7 @@
     class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
   >
     <div>
-      <h1
-        class="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
-      >
-        Analytics
-      </h1>
+      <h1 class="text-3xl font-bold">Analytics</h1>
       <p class="text-sm opacity-60 mt-1">
         Insights and statistics about your productivity
       </p>
@@ -27,7 +23,7 @@
   <div class="card bg-base-100 shadow-lg border border-base-200">
     <div class="card-body py-12 text-center">
       <div
-        class="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4"
+        class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4"
       >
         <BarChart3 class="w-10 h-10 text-primary" />
       </div>
