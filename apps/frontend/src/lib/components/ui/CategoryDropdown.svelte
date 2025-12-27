@@ -12,6 +12,8 @@
         showSearch?: boolean;
         showAllOption?: boolean;
         allLabel?: string;
+        showNoCategoryOption?: boolean;
+        noCategoryLabel?: string;
         placeholder?: string;
         showCreateButton?: boolean;
         onCreate?: () => void;
@@ -27,6 +29,8 @@
         showSearch = true,
         showAllOption = false,
         allLabel = "All Categories",
+        showNoCategoryOption = false,
+        noCategoryLabel = "Uncategorized",
         placeholder = "Select category...",
         showCreateButton = false,
         onCreate,
@@ -50,6 +54,7 @@
 
     const displayLabel = $derived(() => {
         if (showAllOption && value === "all") return allLabel;
+        if (showNoCategoryOption && value === "none") return noCategoryLabel;
         if (selectedCategory) return selectedCategory.name;
         if (!value) return placeholder;
         return placeholder;
@@ -116,6 +121,11 @@
                     <span class="w-3 h-3 rounded-full flex-shrink-0 bg-base-300"
                     ></span>
                     <span class="truncate">{allLabel}</span>
+                {:else if showNoCategoryOption && value === "none"}
+                    <span
+                        class="w-3 h-3 rounded-full flex-shrink-0 bg-base-content/20 border border-dashed border-base-content/40"
+                    ></span>
+                    <span class="truncate">{noCategoryLabel}</span>
                 {:else}
                     <span class="opacity-50 truncate">{placeholder}</span>
                 {/if}
@@ -182,6 +192,30 @@
                             ></span>
                             <span class="truncate flex-1">{allLabel}</span>
                             {#if value === "all"}
+                                <Check class="w-3.5 h-3.5 text-primary" />
+                            {/if}
+                        </button>
+                    {/if}
+
+                    <!-- Uncategorized Option (when showNoCategoryOption is true) -->
+                    {#if showNoCategoryOption}
+                        <button
+                            type="button"
+                            class={cn(
+                                "w-full px-3 py-2 text-left flex items-center gap-2 transition-colors text-sm",
+                                value === "none"
+                                    ? "bg-primary/10 text-primary"
+                                    : "hover:bg-base-200",
+                            )}
+                            onclick={() => handleSelect("none" as any)}
+                        >
+                            <span
+                                class="w-3 h-3 rounded-full flex-shrink-0 bg-base-content/20 border border-dashed border-base-content/40"
+                            ></span>
+                            <span class="truncate flex-1 opacity-70"
+                                >{noCategoryLabel}</span
+                            >
+                            {#if value === "none"}
                                 <Check class="w-3.5 h-3.5 text-primary" />
                             {/if}
                         </button>

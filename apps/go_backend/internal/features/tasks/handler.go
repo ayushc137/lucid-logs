@@ -98,6 +98,7 @@ func (h *Handler) List(c *gin.Context) {
 	// Check if any filters are active
 	hasFilters := filters.Search != "" ||
 		filters.CategoryID != "" ||
+		filters.NoCategoryFilter ||
 		filters.Status != "" ||
 		filters.PriorityMin != nil ||
 		filters.PriorityMax != nil ||
@@ -137,13 +138,14 @@ func (h *Handler) List(c *gin.Context) {
 // parseFilterParams extracts filter parameters from the request query string.
 func parseFilterParams(c *gin.Context) TaskFilterParams {
 	filters := TaskFilterParams{
-		Search:        c.Query("search"),
-		CategoryID:    c.Query("category_id"),
-		Status:        c.Query("status"),
-		StartDateFrom: c.Query("start_date_from"),
-		StartDateTo:   c.Query("start_date_to"),
-		SortField:     c.Query("sort_field"),
-		SortOrder:     c.Query("sort_order"),
+		Search:           c.Query("search"),
+		CategoryID:       c.Query("category_id"),
+		NoCategoryFilter: c.Query("no_category") == "true",
+		Status:           c.Query("status"),
+		StartDateFrom:    c.Query("start_date_from"),
+		StartDateTo:      c.Query("start_date_to"),
+		SortField:        c.Query("sort_field"),
+		SortOrder:        c.Query("sort_order"),
 	}
 
 	// Parse priority_min

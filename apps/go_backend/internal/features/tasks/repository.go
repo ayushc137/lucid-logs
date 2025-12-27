@@ -413,8 +413,11 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 		queryVars["search"] = filters.Search
 	}
 
-	// Category filter
-	if filters.CategoryID != "" {
+	// Category filter - NoCategoryFilter takes precedence
+	if filters.NoCategoryFilter {
+		// Filter for tasks without any category
+		conditions = append(conditions, "category = NONE")
+	} else if filters.CategoryID != "" {
 		catID := database.MustRecordID(categories.Table, filters.CategoryID)
 		conditions = append(conditions, "category = $category")
 		queryVars["category"] = catID

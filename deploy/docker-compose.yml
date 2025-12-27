@@ -3,11 +3,13 @@ services:
   surrealdb:
     image: surrealdb/surrealdb:latest
     container_name: daily_journal_db
+    user: "0:0"  # Run as root to ensure write access to data volume
     ports:
       - "${HOST_DB_PORT:-8000}:8000"
-    command: start --log debug --user ${DB_USER:-root} --pass ${DB_PASS:-root} memory
+    command: start --log debug --user ${DB_USER:-root} --pass ${DB_PASS:-root} file:/data/database.db
     volumes:
       - ../db:/schema:ro
+      - surrealdb_data:/data
     healthcheck:
       test: ["CMD", "/surreal", "is-ready"]
       interval: 10s
@@ -51,3 +53,4 @@ networks:
 
 volumes:
   go_mod_cache:
+  surrealdb_data:

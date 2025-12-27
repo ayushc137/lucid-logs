@@ -28,8 +28,9 @@
         onTaskClick,
     }: Props = $props();
 
-    // Default color for uncategorized tasks
-    const DEFAULT_TASK_COLOR = "#525252";
+    // Theme-aware color for uncategorized tasks
+    // Uses neutral/muted color that adapts to light/dark themes
+    const UNCATEGORIZED_TASK_COLOR = "oklch(var(--bc) / 0.35)";
 
     // Current time state - updates every second
     let currentTime = $state(new Date());
@@ -93,7 +94,7 @@
 
     // Get task color
     function getTaskColor(task: Task): string {
-        return task.categoryColor || DEFAULT_TASK_COLOR;
+        return task.categoryColor || UNCATEGORIZED_TASK_COLOR;
     }
 
     // Calculate luminance and return optimal text color (white or dark)

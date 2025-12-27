@@ -112,6 +112,8 @@ export interface TaskFilterParams {
     search?: string;
     /** Filter by category ID */
     category_id?: string;
+    /** Filter for tasks without any category */
+    no_category?: boolean;
     /** Filter by status: "all", "completed", "pending" */
     status?: 'all' | 'completed' | 'pending';
     /** Filter by minimum priority (1-10) */
@@ -146,6 +148,7 @@ export async function getTasks(params?: TaskFilterParams): Promise<PaginatedResp
 
     // Filters
     if (params?.category_id) searchParams.set('category_id', params.category_id);
+    if (params?.no_category) searchParams.set('no_category', 'true');
     if (params?.status && params.status !== 'all') searchParams.set('status', params.status);
     if (params?.priority_min !== undefined) searchParams.set('priority_min', String(params.priority_min));
     if (params?.priority_max !== undefined) searchParams.set('priority_max', String(params.priority_max));

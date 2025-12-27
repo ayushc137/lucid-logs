@@ -186,6 +186,10 @@ type TaskFilterParams struct {
 	// CategoryID filters by specific category
 	CategoryID string `json:"category_id,omitempty"`
 
+	// NoCategoryFilter filters for tasks without any category assigned
+	// When true, overrides CategoryID and returns only uncategorized tasks
+	NoCategoryFilter bool `json:"no_category,omitempty"`
+
 	// Status filters by completion status: "all", "completed", "pending"
 	Status string `json:"status,omitempty"`
 

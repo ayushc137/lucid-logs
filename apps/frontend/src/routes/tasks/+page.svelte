@@ -100,7 +100,11 @@
     }
 
     if (debouncedSearch) params.search = debouncedSearch;
-    if (filterCategory !== "all") params.category_id = filterCategory;
+    if (filterCategory === "none") {
+      params.no_category = true;
+    } else if (filterCategory !== "all") {
+      params.category_id = filterCategory;
+    }
     if (filterStatus !== "all") params.status = filterStatus;
 
     if (filterPriority === "high") {
@@ -431,6 +435,8 @@
             label="Category"
             showAllOption={true}
             allLabel="All Categories"
+            showNoCategoryOption={true}
+            noCategoryLabel="Uncategorized"
             placeholder="All Categories"
           />
 
