@@ -46,7 +46,7 @@ export async function getMe(): Promise<User> {
 
 export async function logout(): Promise<void> {
     if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
     }
 }
 
@@ -55,7 +55,7 @@ export async function logout(): Promise<void> {
  */
 export function storeToken(token: string): void {
     if (typeof window !== 'undefined') {
-        localStorage.setItem('token', token);
+        sessionStorage.setItem('token', token);
     }
 }
 
@@ -64,5 +64,5 @@ export function storeToken(token: string): void {
  */
 export function isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false;
-    return !!localStorage.getItem('token');
+    return !!sessionStorage.getItem('token');
 }

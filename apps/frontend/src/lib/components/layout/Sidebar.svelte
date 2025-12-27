@@ -97,11 +97,11 @@
   <!-- Logo -->
   <div class="flex items-center h-14 px-3 border-b border-base-300">
     <div class="flex items-center gap-3 w-full">
-      <div
-        class="w-9 h-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0"
-      >
-        <span class="text-primary-content font-bold text-sm">LL</span>
-      </div>
+      <img
+        src="/icon.png"
+        alt="Lucid Logs"
+        class="w-9 h-9 rounded-lg flex-shrink-0"
+      />
       {#if !collapsed}
         <div class="flex flex-col overflow-hidden">
           <span class="font-bold text-sm">Lucid Logs</span>

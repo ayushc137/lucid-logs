@@ -18,7 +18,7 @@ export const api = ky.create({
             (request) => {
                 // Add auth token to all requests
                 if (browser) {
-                    const token = localStorage.getItem('token');
+                    const token = sessionStorage.getItem('token');
                     if (token) {
                         request.headers.set('Authorization', `Bearer ${token}`);
                     }
@@ -32,7 +32,7 @@ export const api = ky.create({
                 }
                 // Handle 401 Unauthorized - redirect to login
                 if (response.status === 401 && browser) {
-                    localStorage.removeItem('token');
+                    sessionStorage.removeItem('token');
                     window.location.href = '/login';
                 }
             }

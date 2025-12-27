@@ -36,11 +36,11 @@ class AuthStore {
 
     constructor() {
         if (browser) {
-            this.token = localStorage.getItem('token');
-            this.userIdString = localStorage.getItem('userId');
-            this.isAdmin = localStorage.getItem('isAdmin') === 'true';
+            this.token = sessionStorage.getItem('token');
+            this.userIdString = sessionStorage.getItem('userId');
+            this.isAdmin = sessionStorage.getItem('isAdmin') === 'true';
             this.isLoading = false;
-            // If we have a token in localStorage, we're authenticated
+            // If we have a token in sessionStorage, we're authenticated
             if (this.token) {
                 this.isInitialized = true;
             }
@@ -49,7 +49,7 @@ class AuthStore {
 
     /**
      * Initialize auth state - just checks if token exists
-     * Since backend getMe has issues, we rely on localStorage
+     * Since backend getMe has issues, we rely on sessionStorage
      */
     async initialize(): Promise<boolean> {
         if (this.isInitialized) {
@@ -81,9 +81,9 @@ class AuthStore {
         this.isLoading = false;
 
         if (browser) {
-            localStorage.setItem('token', response.token);
-            localStorage.setItem('userId', response.user);
-            localStorage.setItem('isAdmin', String(response.is_admin));
+            sessionStorage.setItem('token', response.token);
+            sessionStorage.setItem('userId', response.user);
+            sessionStorage.setItem('isAdmin', String(response.is_admin));
         }
     }
 
@@ -98,9 +98,9 @@ class AuthStore {
         this.user = null;
         if (browser) {
             if (token) {
-                localStorage.setItem('token', token);
+                sessionStorage.setItem('token', token);
             } else {
-                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
             }
         }
     }
@@ -118,9 +118,9 @@ class AuthStore {
         this.isAdmin = false;
         this.isInitialized = false;
         if (browser) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('userId');
-            localStorage.removeItem('isAdmin');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('userId');
+            sessionStorage.removeItem('isAdmin');
         }
     }
 

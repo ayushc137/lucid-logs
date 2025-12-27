@@ -100,13 +100,13 @@
           <label class="label" for="email">
             <span class="label-text">Email</span>
           </label>
-          <label class="input input-bordered flex items-center gap-2">
-            <Mail class="h-4 w-4 opacity-50" />
+          <label class="input input-bordered flex items-center gap-2 w-full">
+            <Mail class="h-4 w-4 opacity-50 shrink-0" />
             <input
               id="email"
               type="email"
               placeholder="you@example.com"
-              class="grow"
+              class="grow min-w-0 bg-transparent outline-none"
               bind:value={email}
               required
             />
@@ -120,13 +120,13 @@
               Forgot password?
             </a>
           </label>
-          <label class="input input-bordered flex items-center gap-2">
-            <Lock class="h-4 w-4 opacity-50" />
+          <label class="input input-bordered flex items-center gap-2 w-full">
+            <Lock class="h-4 w-4 opacity-50 shrink-0" />
             <input
               id="password"
               type="password"
               placeholder="Enter your password"
-              class="grow"
+              class="grow min-w-0 bg-transparent outline-none"
               bind:value={password}
               required
             />
