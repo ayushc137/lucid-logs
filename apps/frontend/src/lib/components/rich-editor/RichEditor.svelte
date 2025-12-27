@@ -50,6 +50,8 @@
             extensions: [
                 StarterKit.configure({
                     heading: { levels: [1, 2, 3] },
+                    // Disable link from StarterKit since we add it separately with custom config
+                    link: false,
                 }),
                 Placeholder.configure({
                     placeholder,
