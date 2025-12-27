@@ -22,14 +22,14 @@
 -- -----------------------------------------------------------------------------
 -- USERS (Authentication - SCHEMAFULL)
 -- -----------------------------------------------------------------------------
-REMOVE TABLE IF EXISTS users;
-DEFINE TABLE users SCHEMAFULL PERMISSIONS FULL;
-DEFINE FIELD email ON users TYPE string ASSERT string::is::email($value);
-DEFINE FIELD pass ON users TYPE string;
-DEFINE FIELD is_admin ON users TYPE bool DEFAULT false;
-DEFINE FIELD created_at ON users TYPE datetime DEFAULT time::now();
-DEFINE FIELD updated_at ON users TYPE datetime DEFAULT time::now();
-DEFINE INDEX idx_users_email ON TABLE users COLUMNS email UNIQUE;
+-- Use IF NOT EXISTS to preserve existing data when schema is reapplied
+DEFINE TABLE IF NOT EXISTS users SCHEMAFULL PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS email ON users TYPE string ASSERT string::is::email($value);
+DEFINE FIELD IF NOT EXISTS pass ON users TYPE string;
+DEFINE FIELD IF NOT EXISTS is_admin ON users TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS created_at ON users TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON users TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_users_email ON TABLE users COLUMNS email UNIQUE;
 
 -- -----------------------------------------------------------------------------
 -- CATEGORIES (Schemaless + FULL Permissions)
