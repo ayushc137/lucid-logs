@@ -28,9 +28,8 @@
         onTaskClick,
     }: Props = $props();
 
-    // Theme-aware color for uncategorized tasks
-    // Uses neutral/muted color that adapts to light/dark themes
-    const UNCATEGORIZED_TASK_COLOR = "oklch(var(--bc) / 0.35)";
+    // Default color for uncategorized tasks (neutral gray that works in both themes)
+    const UNCATEGORIZED_TASK_COLOR = "#6b7280"; // Gray-500
 
     // Current time state - updates every second
     let currentTime = $state(new Date());
@@ -92,18 +91,37 @@
         };
     }
 
-    // Get task color
+    // Check if a task has a category
+    function hasCategory(task: Task): boolean {
+        return !!task.categoryColor && task.categoryColor.startsWith("#");
+    }
+
+    // Get task color (returns hex color, uses default for uncategorized)
     function getTaskColor(task: Task): string {
-        return task.categoryColor || UNCATEGORIZED_TASK_COLOR;
+        if (hasCategory(task)) {
+            return task.categoryColor!;
+        }
+        return UNCATEGORIZED_TASK_COLOR;
     }
 
     // Calculate luminance and return optimal text color (white or dark)
     function getContrastTextColor(hexColor: string): string {
+        // Handle non-hex colors (like oklch) - default to white text
+        if (!hexColor.startsWith("#") && !hexColor.match(/^[0-9a-fA-F]{6}$/)) {
+            return "#ffffff";
+        }
         // Remove # if present
         const hex = hexColor.replace("#", "");
+        if (hex.length !== 6) {
+            return "#ffffff"; // Default to white for invalid hex
+        }
         const r = parseInt(hex.substring(0, 2), 16);
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
+        // Handle parse failures
+        if (isNaN(r) || isNaN(g) || isNaN(b)) {
+            return "#ffffff";
+        }
         // Calculate relative luminance
         const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
         // Return white for dark colors, dark for light colors
@@ -112,6 +130,10 @@
 
     // Generate a softer shadow color from the category color
     function getShadowColor(hexColor: string): string {
+        // Handle non-hex colors
+        if (!hexColor.startsWith("#")) {
+            return "rgba(107, 114, 128, 0.25)"; // Gray shadow
+        }
         return `${hexColor}40`; // 25% opacity
     }
 
