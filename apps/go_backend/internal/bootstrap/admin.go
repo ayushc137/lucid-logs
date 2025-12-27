@@ -70,7 +70,7 @@ func EnsureDevAdmin(ctx context.Context, db *database.DB, cfg *config.Config) er
 
 	// Create admin user - no RETURN block needed, SDK deserializes RecordID directly
 	_, err = database.QueryAll[userRecordDB](ctx, db, `
-		CREATE users:admin CONTENT {
+		CREATE users CONTENT {
 			email: $email,
 			pass: crypto::argon2::generate($password),
 			is_admin: true
