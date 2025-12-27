@@ -159,17 +159,28 @@
         );
         const result: Array<{ task: Task; row: number }> = [];
         const rows: Array<{ endTime: Date }> = [];
+        const totalHours = endHour - startHour;
+        const totalDurationMs = totalHours * 60 * 60 * 1000;
+        const minDurationMs = (3 / 100) * totalDurationMs;
 
         for (const task of sorted) {
+            // Calculate effective duration based on min width
+            const durationMs =
+                task.endTime.getTime() - task.startTime.getTime();
+            const effectiveDurationMs = Math.max(durationMs, minDurationMs);
+            const visualEndTime = new Date(
+                task.startTime.getTime() + effectiveDurationMs,
+            );
+
             let rowIndex = rows.findIndex(
                 (row) => row.endTime <= task.startTime,
             );
 
             if (rowIndex === -1) {
                 rowIndex = rows.length;
-                rows.push({ endTime: task.endTime });
+                rows.push({ endTime: visualEndTime });
             } else {
-                rows[rowIndex].endTime = task.endTime;
+                rows[rowIndex].endTime = visualEndTime;
             }
 
             result.push({ task, row: rowIndex });
