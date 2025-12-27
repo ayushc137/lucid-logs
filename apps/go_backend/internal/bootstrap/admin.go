@@ -43,6 +43,15 @@ func EnsureDevAdmin(ctx context.Context, db *database.DB, cfg *config.Config) er
 
 	logger := log.With().Str("component", "bootstrap").Logger()
 
+	// Ensure unique index on email to prevent duplicates
+	_, err := database.QueryAll[any](ctx, db, `
+		DEFINE INDEX IF NOT EXISTS idx_users_email ON TABLE users COLUMNS email UNIQUE;
+	`, nil)
+	if err != nil {
+		logger.Warn().Err(err).Msg("failed to define unique index on users.email")
+		// Continue anyway, as it might exist or be a permission issue
+	}
+
 	// Check if admin user exists using SDK's typed query
 	// models.RecordID handles ID deserialization automatically
 	existing, err := database.QueryAll[userRecordDB](ctx, db, `
@@ -56,7 +65,6 @@ func EnsureDevAdmin(ctx context.Context, db *database.DB, cfg *config.Config) er
 	}
 
 	if len(existing) > 0 {
-		logger.Debug().Str("admin_user", username).Msg("admin user already exists")
 		return nil
 	}
 

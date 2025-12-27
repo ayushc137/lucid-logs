@@ -1,6 +1,26 @@
 
 
 
+lets use 
+ vis-timeline
+
+
+use pnpm 
+
+migrate timeline to some package where its easy for me to handle blow things giving me good customisibaility on tasks ui as well i want opensource package , keeping the timeline layout as it it right now 
+
+
+make ui more beautiful of timeline
+add drag and drop option 
+add checkbox to complete to task modal and to the ttask ui 
+
+add option ot complete in timeline 
+add confirmation of removing complete  (if not already created generalised confirmation modal that cna be customised for diffrent uses )
+
+write code such its easy to work with by other devs and is expandable for more ui changes like task template and goals etc 
+
+
+
 
 fix the color of tasks without any category  
 fix the task ui
