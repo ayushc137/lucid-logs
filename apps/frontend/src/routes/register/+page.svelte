@@ -101,7 +101,7 @@
           <label class="label" for="email">
             <span class="label-text">Email</span>
           </label>
-          <label class="input input-bordered flex items-center gap-2">
+          <label class="input input-bordered flex items-center gap-2 w-full">
             <Mail class="h-4 w-4 opacity-50" />
             <input
               id="email"
@@ -118,7 +118,7 @@
           <label class="label" for="password">
             <span class="label-text">Password</span>
           </label>
-          <label class="input input-bordered flex items-center gap-2">
+          <label class="input input-bordered flex items-center gap-2 w-full">
             <Lock class="h-4 w-4 opacity-50" />
             <input
               id="password"
@@ -138,7 +138,7 @@
           </label>
           <label
             class={cn(
-              "input input-bordered flex items-center gap-2",
+              "input input-bordered flex items-center gap-2 w-full",
               !passwordsMatch && "input-error",
             )}
           >
