@@ -11,9 +11,9 @@
     import { createQuery } from "@tanstack/svelte-query";
     import { getCategories, createCategory } from "$lib/api/categories";
     import { RichEditor } from "$lib/components/rich-editor";
-    import { CategoryDropdown } from "$lib/components/ui";
+    import { CategoryDropdown, ColorPicker } from "$lib/components/ui";
     import { cn } from "$lib/utils";
-    import { COLOR_PRESETS, DEFAULT_COLOR } from "$lib/constants";
+
     import {
         Sparkles,
         Check,
@@ -369,40 +369,12 @@
                                     />
                                 </label>
                             </div>
-                            {#if useCustomCategoryColor}
-                                <div class="flex items-center gap-2">
-                                    <input
-                                        type="color"
-                                        class="w-10 h-8 rounded cursor-pointer border border-base-300"
-                                        bind:value={newCategoryColor}
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input input-sm input-bordered flex-1 font-mono text-xs"
-                                        bind:value={newCategoryColor}
-                                        placeholder="#000000"
-                                    />
-                                </div>
-                            {:else}
-                                <!-- 16 Color Grid -->
-                                <div class="grid grid-cols-8 gap-1.5">
-                                    {#each COLOR_PRESETS as color}
-                                        <button
-                                            type="button"
-                                            class={cn(
-                                                "w-6 h-6 rounded transition-all border-2",
-                                                newCategoryColor === color
-                                                    ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 border-white scale-110"
-                                                    : "border-transparent hover:scale-105",
-                                            )}
-                                            style="background-color: {color};"
-                                            onclick={() =>
-                                                (newCategoryColor = color)}
-                                            aria-label="Select color"
-                                        ></button>
-                                    {/each}
-                                </div>
-                            {/if}
+                            <ColorPicker
+                                bind:value={newCategoryColor}
+                                customMode={useCustomCategoryColor}
+                                size="sm"
+                                class="mt-2"
+                            />
                             <!-- Preview -->
                             <div
                                 class="flex items-center gap-2 text-xs opacity-60"

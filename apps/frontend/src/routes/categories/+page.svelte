@@ -488,6 +488,7 @@
                                                     <ColorPicker
                                                         bind:value={editColor}
                                                         customMode={editUseCustomColor}
+                                                        size="sm"
                                                     />
                                                 </div>
                                             </div>

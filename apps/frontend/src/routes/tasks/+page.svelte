@@ -373,6 +373,16 @@
           />
         </div>
 
+        <!-- Clear Filters Button -->
+        {#if hasActiveFilters}
+          <button
+            class="btn btn-ghost text-error gap-2 hidden sm:flex"
+            onclick={clearFilters}
+          >
+            Clear
+          </button>
+        {/if}
+
         <!-- Filter Toggle Button -->
         <button
           class={cn(
@@ -440,16 +450,6 @@
           <StatusDropdown bind:value={filterStatus} label="Status" />
 
           <PriorityDropdown bind:value={filterPriority} label="Priority" />
-
-          <!-- Clear Filters -->
-          {#if hasActiveFilters}
-            <div class="form-control justify-end">
-              <button class="btn btn-ghost btn-sm gap-1" onclick={clearFilters}>
-                <X class="w-4 h-4" />
-                Clear All
-              </button>
-            </div>
-          {/if}
         </div>
       {/if}
     </div>
