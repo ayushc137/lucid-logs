@@ -12,6 +12,7 @@
   } from "lucide-svelte";
   import { Timeline } from "$lib/components/timeline";
   import { TaskModal } from "$lib/components/tasks";
+  import { Card, IconBox, SectionHeader } from "$lib/components/ui";
   import { createQuery } from "@tanstack/svelte-query";
   import { getTasks, type Task } from "$lib/api";
   import { getCategories, type Category } from "$lib/api/categories";
