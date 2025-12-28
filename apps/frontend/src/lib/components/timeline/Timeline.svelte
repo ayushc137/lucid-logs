@@ -1,6 +1,7 @@
 <script lang="ts">
-    import { Clock, Check, Circle } from "lucide-svelte";
+    import { Clock, Check, Circle, Plus, CheckCircle2 } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
+    import { fade } from "svelte/transition";
 
     interface Task {
         id: string;
@@ -20,6 +21,7 @@
         endHour?: number;
         onTaskClick?: (taskId: string) => void;
         onToggleComplete?: (taskId: string, completed: boolean) => void;
+        onCategoryClick?: (categoryId: string) => void;
     }
 
     let {
@@ -28,14 +30,21 @@
         endHour = 24,
         onTaskClick,
         onToggleComplete,
+        onCategoryClick,
     }: Props = $props();
 
-    // Default color for uncategorized tasks (neutral gray that works in both themes)
-    const UNCATEGORIZED_TASK_COLOR = "#6b7280"; // Gray-500
+    const UNCATEGORIZED_COLOR = "#9ca3af"; // Gray-400
+    const ROW_HEIGHT = 56;
+    const ROW_GAP = 8;
+    const GROUP_PADDING = 16; // Top/bottom padding for each category group
 
-    // Current time state - updates every second
+    // Current time state
     let currentTime = $state(new Date());
     let timeInterval: ReturnType<typeof setInterval>;
+
+    // Hover state
+    let hoveredTaskId = $state<string | null>(null);
+    let tooltipPosition = $state<{ x: number; y: number } | null>(null);
 
     onMount(() => {
         timeInterval = setInterval(() => {
@@ -47,7 +56,8 @@
         if (timeInterval) clearInterval(timeInterval);
     });
 
-    // Generate all hours for labels
+    // --- Helpers ---
+
     const allHours = $derived(
         Array.from(
             { length: endHour - startHour + 1 },
@@ -55,7 +65,6 @@
         ),
     );
 
-    // Format hour display - full format
     function formatHour(hour: number): string {
         if (hour === 0 || hour === 24) return "12 AM";
         if (hour === 12) return "12 PM";
@@ -63,83 +72,174 @@
         return `${hour - 12} PM`;
     }
 
-    // Format exact time
     function formatExactTime(date: Date): string {
+        if (!isValidDate(date)) return "--:--";
         return date.toLocaleTimeString([], {
             hour: "numeric",
             minute: "2-digit",
-            second: "2-digit",
             hour12: true,
         });
     }
 
-    // Get time in hours (decimal) from Date
+    function isValidDate(date: any): boolean {
+        return date instanceof Date && !isNaN(date.getTime());
+    }
+
     function getDecimalHour(date: Date): number {
+        if (!isValidDate(date)) return startHour;
         return date.getHours() + date.getMinutes() / 60;
     }
 
-    // Get task position and width based on time (horizontal layout)
+    // --- Layout Logic ---
+
+    // Calculate position/width for a single task
     function getTaskStyle(task: Task): { left: number; width: number } {
+        if (!isValidDate(task.startTime) || !isValidDate(task.endTime)) {
+            return { left: 0, width: 0 };
+        }
+
         const startDecimal = getDecimalHour(task.startTime);
-        const endDecimal = getDecimalHour(task.endTime);
+        let endDecimal = getDecimalHour(task.endTime);
         const totalHours = endHour - startHour;
+
+        if (endDecimal < startDecimal) endDecimal += 24; // Crosses midnight
+        // Cap visual end for very long tasks to keep them sane in day view
+        if (endDecimal - startDecimal > 24) endDecimal = startDecimal + 24;
 
         const leftPercent = ((startDecimal - startHour) / totalHours) * 100;
         const widthPercent = ((endDecimal - startDecimal) / totalHours) * 100;
 
         return {
             left: Math.max(0, leftPercent),
-            width: Math.max(3, widthPercent),
+            width: Math.max(1, Math.min(widthPercent, 100 - leftPercent)), // Clamp to container
         };
     }
 
-    // Check if a task has a category
-    function hasCategory(task: Task): boolean {
-        return !!task.categoryColor && task.categoryColor.startsWith("#");
-    }
+    // Packing algorithm: Assigns a 'row' index to each task in a list to prevent overlap
+    function packTasks(taskList: Task[]) {
+        if (taskList.length === 0)
+            return { rows: [], height: ROW_HEIGHT + GROUP_PADDING * 2 };
 
-    // Get task color (returns hex color, uses default for uncategorized)
-    function getTaskColor(task: Task): string {
-        if (hasCategory(task)) {
-            return task.categoryColor!;
+        const validTasks = taskList.filter(
+            (t) => isValidDate(t.startTime) && isValidDate(t.endTime),
+        );
+        const sorted = [...validTasks].sort(
+            (a, b) => a.startTime.getTime() - b.startTime.getTime(),
+        );
+
+        const packedRows: Array<{ task: Task; row: number }> = [];
+        const lanes: number[] = []; // stores 'endTime' timestamp of the last task in each lane
+
+        const gapBufferMs = 15 * 60 * 1000; // 15 min buffer prevents tight visual squeezing
+
+        for (const task of sorted) {
+            const startMs = task.startTime.getTime();
+            const endMs = task.endTime.getTime();
+            let effectiveEndMs = endMs;
+
+            // Enforce minimum visual width rules impact on stacking
+            // If task is super short (e.g. 5 mins), visually it might be 30px wide
+            // So we treat it as effectively longer for collision detection
+            const minVisualDurationMs = 30 * 60 * 1000;
+            if (effectiveEndMs - startMs < minVisualDurationMs) {
+                effectiveEndMs = startMs + minVisualDurationMs;
+            }
+
+            // Find first lane where this task fits
+            let laneIndex = lanes.findIndex(
+                (laneEnd) => laneEnd + gapBufferMs <= startMs,
+            );
+
+            if (laneIndex === -1) {
+                // New lane
+                laneIndex = lanes.length;
+                lanes.push(effectiveEndMs);
+            } else {
+                // Update existing lane
+                lanes[laneIndex] = effectiveEndMs;
+            }
+
+            packedRows.push({ task, row: laneIndex });
         }
-        return UNCATEGORIZED_TASK_COLOR;
+
+        const maxLane = lanes.length > 0 ? lanes.length : 1;
+        const totalHeight =
+            maxLane * ROW_HEIGHT + (maxLane - 1) * ROW_GAP + GROUP_PADDING * 2;
+
+        return { rows: packedRows, height: totalHeight };
     }
 
-    // Calculate luminance and return optimal text color (white or dark)
+    // Group tasks by category and calculate layout for each group
+    const categoryGroups = $derived.by(() => {
+        const groups = new Map<
+            string,
+            { id: string; name: string; color: string; tasks: Task[] }
+        >();
+        const uncategorizedTasks: Task[] = [];
+
+        for (const task of tasks) {
+            if (task.categoryId && task.categoryName) {
+                if (!groups.has(task.categoryId)) {
+                    groups.set(task.categoryId, {
+                        id: task.categoryId,
+                        name: task.categoryName,
+                        color: task.categoryColor || UNCATEGORIZED_COLOR,
+                        tasks: [],
+                    });
+                }
+                groups.get(task.categoryId)!.tasks.push(task);
+            } else {
+                uncategorizedTasks.push(task);
+            }
+        }
+
+        // Process categorized groups
+        const result = Array.from(groups.values()).map((group) => {
+            const { rows, height } = packTasks(group.tasks);
+            return { ...group, rows, height };
+        });
+
+        // Add uncategorized if any
+        if (uncategorizedTasks.length > 0) {
+            const { rows, height } = packTasks(uncategorizedTasks);
+            result.push({
+                id: "uncategorized",
+                name: "Uncategorized",
+                color: UNCATEGORIZED_COLOR,
+                tasks: uncategorizedTasks,
+                rows,
+                height,
+            });
+        }
+
+        // Sort by name for consistency
+        result.sort((a, b) => a.name.localeCompare(b.name));
+
+        return result;
+    });
+
+    // --- Styling Helpers ---
+
     function getContrastTextColor(hexColor: string): string {
-        // Handle non-hex colors (like oklch) - default to white text
-        if (!hexColor.startsWith("#") && !hexColor.match(/^[0-9a-fA-F]{6}$/)) {
-            return "#ffffff";
-        }
-        // Remove # if present
+        if (!hexColor || !hexColor.startsWith("#")) return "#ffffff";
         const hex = hexColor.replace("#", "");
-        if (hex.length !== 6) {
-            return "#ffffff"; // Default to white for invalid hex
-        }
+        if (hex.length !== 6) return "#ffffff";
         const r = parseInt(hex.substring(0, 2), 16);
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
-        // Handle parse failures
-        if (isNaN(r) || isNaN(g) || isNaN(b)) {
-            return "#ffffff";
-        }
-        // Calculate relative luminance
+        // Custom logic: darker threshold for better readability on pastels
         const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        // Return white for dark colors, dark for light colors
-        return luminance > 0.5 ? "#1f2937" : "#ffffff";
+        return luminance > 0.6 ? "#1f2937" : "#ffffff";
     }
 
-    // Generate a softer shadow color from the category color
     function getShadowColor(hexColor: string): string {
-        // Handle non-hex colors
-        if (!hexColor.startsWith("#")) {
-            return "rgba(107, 114, 128, 0.25)"; // Gray shadow
-        }
-        return `${hexColor}40`; // 25% opacity
+        if (!hexColor || !hexColor.startsWith("#"))
+            return "rgba(107, 114, 128, 0.25)";
+        return `${hexColor}40`;
     }
 
-    // Calculate current time position
+    // --- Current Time Indicator ---
+
     const currentHour = $derived(
         currentTime.getHours() +
             currentTime.getMinutes() / 60 +
@@ -152,398 +252,299 @@
         currentHour >= startHour && currentHour <= endHour,
     );
 
-    // Group overlapping tasks into rows with improved overlap detection
-    function getTaskRows(tasks: Task[]): Array<{ task: Task; row: number }> {
-        if (tasks.length === 0) return [];
+    // --- Interaction ---
 
-        const sorted = [...tasks].sort(
-            (a, b) => a.startTime.getTime() - b.startTime.getTime(),
-        );
-        const result: Array<{ task: Task; row: number }> = [];
-        // Track each row's visual end position (including min width consideration)
-        const rows: Array<{ visualEndTime: Date }> = [];
-        const totalHours = endHour - startHour;
-        const totalDurationMs = totalHours * 60 * 60 * 1000;
-        // Minimum visual width as 3% of the timeline
-        const minVisualDurationMs = (3 / 100) * totalDurationMs;
-        // Add a small gap buffer between tasks (5 minutes in ms)
-        const gapBufferMs = 5 * 60 * 1000;
-
-        for (const task of sorted) {
-            // Calculate the visual duration (accounting for minimum width)
-            const actualDurationMs =
-                task.endTime.getTime() - task.startTime.getTime();
-            const visualDurationMs = Math.max(
-                actualDurationMs,
-                minVisualDurationMs,
-            );
-            const visualEndTime = new Date(
-                task.startTime.getTime() + visualDurationMs + gapBufferMs,
-            );
-
-            // Find the first row where this task fits (doesn't overlap with visual end)
-            let rowIndex = rows.findIndex(
-                (row) =>
-                    row.visualEndTime.getTime() <= task.startTime.getTime(),
-            );
-
-            if (rowIndex === -1) {
-                // No existing row can accommodate this task, create a new row
-                rowIndex = rows.length;
-                rows.push({ visualEndTime });
-            } else {
-                // Update the row's visual end time
-                rows[rowIndex].visualEndTime = visualEndTime;
-            }
-
-            result.push({ task, row: rowIndex });
-        }
-
-        return result;
+    function handleMouseEnter(e: MouseEvent, taskId: string) {
+        hoveredTaskId = taskId;
+        updateTooltipPosition(e);
     }
-
-    const taskRows = $derived(getTaskRows(tasks));
-    const maxRows = $derived(
-        taskRows.length > 0 ? Math.max(...taskRows.map((t) => t.row)) + 1 : 1,
-    );
-
-    // Fixed height per row for consistent sizing (no overlap)
-    const ROW_HEIGHT = 60; // pixels per row
-    const ROW_GAP = 8; // gap between rows
-    const tasksAreaHeight = $derived(
-        maxRows * ROW_HEIGHT + (maxRows - 1) * ROW_GAP,
-    );
+    function handleMouseMove(e: MouseEvent) {
+        if (hoveredTaskId) updateTooltipPosition(e);
+    }
+    function handleMouseLeave() {
+        hoveredTaskId = null;
+    }
+    function updateTooltipPosition(e: MouseEvent) {
+        tooltipPosition = { x: e.clientX + 16, y: e.clientY + 16 };
+    }
+    const hoveredTask = $derived(tasks.find((t) => t.id === hoveredTaskId));
 </script>
 
-<div class="timeline-wrapper h-full flex flex-col">
-    <div class="timeline-container flex-1 overflow-x-auto overflow-y-auto">
-        <div
-            class="timeline-inner min-w-[1800px] h-full flex flex-col pl-6 pr-6"
-        >
-            <!-- Hour labels row -->
+<div
+    class="timeline-wrapper h-full flex flex-col relative bg-base-100/50 rounded-xl border border-base-200 shadow-inner"
+>
+    <!-- CHANGED: overflow-x-hidden to force hide horizontal scroll -->
+    <div
+        class="timeline-container flex-1 overflow-x-hidden overflow-y-auto rounded-xl"
+    >
+        <!-- CHANGED: w-full instead of min-w-full to avoid scrollbar conflict -->
+        <div class="timeline-inner w-full h-full flex flex-col">
+            <!-- Header: Time Labels -->
             <div
-                class="hour-labels flex-shrink-0 h-6 relative border-b border-base-300/50"
+                class="sticky top-0 z-30 bg-base-100/95 backdrop-blur-sm border-b border-base-200"
             >
-                {#each allHours as hour}
-                    {@const leftPos =
-                        ((hour - startHour) / (endHour - startHour)) * 100}
-                    <div
-                        class="hour-label absolute text-[10px] font-medium opacity-50 transform -translate-x-1/2 whitespace-nowrap"
-                        style="left: {leftPos}%;"
-                    >
-                        {formatHour(hour)}
-                    </div>
-                {/each}
+                <div class="h-10 relative">
+                    {#each allHours as hour}
+                        {@const leftPos =
+                            ((hour - startHour) / (endHour - startHour)) * 100}
+                        <div
+                            class="absolute top-1/2 -translate-y-1/2 text-[10px] font-bold text-base-content/40 uppercase tracking-widest transform -translate-x-1/2 whitespace-nowrap"
+                            style="left: {leftPos}%;"
+                        >
+                            {formatHour(hour)}
+                        </div>
+                    {/each}
+                </div>
             </div>
 
-            <!-- Timeline grid area -->
-            <div
-                class="timeline-grid flex-1 relative bg-gradient-to-b from-base-200/20 to-base-200/40 rounded-xl overflow-visible"
-            >
-                <!-- Hour lines (vertical) -->
-                {#each allHours as hour}
-                    {@const leftPos =
-                        ((hour - startHour) / (endHour - startHour)) * 100}
-                    <div
-                        class="absolute top-0 bottom-0 w-px bg-base-300/40"
-                        style="left: {leftPos}%;"
-                    ></div>
-                {/each}
+            <!-- Body: Swimlanes -->
+            <div class="relative flex-1 min-h-[300px]">
+                <!-- Background Grid Lines (Absolute) -->
+                <div class="absolute inset-0 pointer-events-none">
+                    {#each allHours as hour}
+                        {@const leftPos =
+                            ((hour - startHour) / (endHour - startHour)) * 100}
+                        <div
+                            class="absolute top-0 bottom-0 w-px bg-base-content/5 border-r border-dashed border-base-content/5"
+                            style="left: {leftPos}%;"
+                        ></div>
+                    {/each}
+                </div>
 
-                <!-- Current time indicator - Improved design -->
+                <!-- Current Time Indicator -->
                 {#if showNowLine}
                     <div
-                        class="now-indicator absolute z-30"
+                        class="absolute top-0 bottom-0 z-20 pointer-events-none"
                         style="left: {nowPosition}%;"
                     >
-                        <!-- Gradient glow behind line -->
                         <div
-                            class="absolute -inset-x-4 top-0 bottom-0 bg-gradient-to-r from-transparent via-error/10 to-transparent pointer-events-none"
+                            class="absolute top-0 bottom-0 left-0 w-px bg-error shadow-[0_0_8px_rgba(255,0,0,0.6)]"
                         ></div>
-
-                        <!-- Main vertical line -->
                         <div
-                            class="absolute top-0 bottom-0 left-1/2 w-0.5 -translate-x-1/2 bg-gradient-to-b from-error via-error to-error/50"
+                            class="absolute -top-1 left-0 -translate-x-1/2 w-2 h-2 rounded-full bg-error animate-pulse"
                         ></div>
-
-                        <!-- Top badge with time -->
-                        <div
-                            class="absolute -top-1 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none"
-                        >
-                            <!-- Pulsing dot -->
-                            <div class="relative">
-                                <div
-                                    class="w-3 h-3 rounded-full bg-error"
-                                ></div>
-                                <div
-                                    class="absolute inset-0 w-3 h-3 rounded-full bg-error animate-ping opacity-75"
-                                ></div>
-                            </div>
-                            <!-- Time badge -->
-                            <div
-                                class="mt-1.5 px-2.5 py-1 rounded-lg bg-error text-error-content text-[11px] font-bold tracking-wide whitespace-nowrap shadow-lg shadow-error/30"
-                            >
-                                {formatExactTime(currentTime)}
-                            </div>
-                        </div>
                     </div>
                 {/if}
 
-                <!-- Tasks area with fixed row heights to prevent overlap -->
-                <div
-                    class="tasks-area absolute inset-x-0 top-14"
-                    style="height: {Math.max(tasksAreaHeight, 100)}px;"
-                >
-                    {#each taskRows as { task, row }}
-                        {@const style = getTaskStyle(task)}
-                        {@const color = getTaskColor(task)}
-                        {@const textColor = getContrastTextColor(color)}
-                        {@const shadowColor = getShadowColor(color)}
+                <!-- Swimlanes (Groups) -->
+                <div class="flex flex-col">
+                    {#each categoryGroups as group, i}
                         <div
-                            class="task-card absolute cursor-pointer transition-all duration-200 hover:z-20 group"
-                            style="
-                                left: {style.left}%;
-                                width: {style.width}%;
-                                top: {row * (ROW_HEIGHT + ROW_GAP)}px;
-                                height: {ROW_HEIGHT}px;
-                            "
-                            role="button"
-                            tabindex="0"
-                            onclick={() => onTaskClick?.(task.id)}
-                            onkeydown={(e) =>
-                                e.key === "Enter" && onTaskClick?.(task.id)}
+                            class="group-track relative border-b border-base-content/5 hover:bg-base-content/[0.02] transition-colors duration-300"
+                            style="height: {group.height}px;"
                         >
-                            <!-- Card with theme-compatible design -->
+                            <!-- Sticky Category Header (Interactive) -->
                             <div
-                                class="absolute inset-0 rounded-2xl transition-all duration-200 group-hover:scale-[1.02] overflow-hidden ring-1 ring-base-content/10"
-                                style="background: {color}; box-shadow: 0 4px 16px {shadowColor}, 0 2px 4px {shadowColor};"
+                                class="sticky left-0 z-20 inline-flex items-start pt-4 pl-4 pr-6 w-48 pointer-events-none"
                             >
-                                <!-- Subtle glass overlay for depth -->
-                                <div
-                                    class="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-black/10"
-                                ></div>
-                                <!-- Left accent bar -->
-                                <div
-                                    class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full"
-                                    style="background: {textColor}40;"
-                                ></div>
-                            </div>
-
-                            <!-- Card content with dynamic text color -->
-                            <div
-                                class="relative h-full px-4 py-2 flex items-center gap-3 overflow-hidden"
-                                style="color: {textColor};"
-                            >
-                                <!-- Completion checkbox -->
                                 <button
-                                    class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110"
-                                    style="background: {task.completed
-                                        ? textColor
-                                        : `${textColor}20`}; color: {task.completed
-                                        ? color
-                                        : textColor};"
-                                    onclick={(e) => {
-                                        e.stopPropagation();
-                                        onToggleComplete?.(
-                                            task.id,
-                                            !task.completed,
-                                        );
-                                    }}
-                                    title={task.completed
-                                        ? "Mark as incomplete"
-                                        : "Mark as complete"}
+                                    class="bg-base-100/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-base-content/10 flex items-center gap-2 shadow-sm transition-all duration-200 pointer-events-auto group/label {group.id !==
+                                    'uncategorized'
+                                        ? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-md hover:ring-1 ring-primary/20'
+                                        : ''}"
+                                    onclick={() =>
+                                        group.id !== "uncategorized" &&
+                                        onCategoryClick?.(group.id)}
+                                    title={group.id !== "uncategorized"
+                                        ? "Click to add task"
+                                        : ""}
                                 >
-                                    {#if task.completed}
-                                        <Check class="w-4 h-4" />
-                                    {:else}
-                                        <Circle class="w-4 h-4 opacity-50" />
+                                    <div
+                                        class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm transition-transform group-hover/label:scale-125"
+                                        style="background-color: {group.color};"
+                                    ></div>
+                                    <span
+                                        class="text-xs font-bold truncate max-w-[100px]"
+                                        >{group.name}</span
+                                    >
+                                    {#if group.id !== "uncategorized"}
+                                        <Plus
+                                            class="w-3 h-3 opacity-0 group-hover/label:opacity-100 -mr-1 transition-opacity text-base-content/50"
+                                        />
                                     {/if}
                                 </button>
-                                <div class="min-w-0 flex-1">
-                                    <h4
-                                        class="font-semibold text-sm truncate"
-                                        class:line-through={task.completed}
-                                        class:opacity-70={task.completed}
-                                    >
-                                        {task.title}
-                                    </h4>
-                                    <div
-                                        class="flex items-center gap-2 text-[11px] opacity-70 mt-0.5"
-                                    >
-                                        {#if task.categoryName}
-                                            <span class="truncate"
-                                                >{task.categoryName}</span
-                                            >
-                                            <span class="opacity-50">•</span>
-                                        {/if}
-                                        <span
-                                            class="whitespace-nowrap font-medium"
-                                        >
-                                            {task.startTime.toLocaleTimeString(
-                                                [],
-                                                {
-                                                    hour: "numeric",
-                                                    minute: "2-digit",
-                                                },
-                                            )}
-                                        </span>
-                                    </div>
-                                </div>
                             </div>
 
-                            <!-- Hover tooltip - position based on row -->
-                            <div
-                                class={`tooltip-popup opacity-0 group-hover:opacity-100 absolute z-50 pointer-events-none transition-all duration-200 scale-95 group-hover:scale-100 ${row === 0 ? "tooltip-bottom" : "tooltip-top"}`}
-                            >
-                                <div
-                                    class="bg-base-100 text-base-content rounded-2xl shadow-2xl border border-base-300 p-4 min-w-[220px]"
-                                >
-                                    <div class="flex items-start gap-3">
-                                        {#if task.emoji}
-                                            <span class="text-2xl"
-                                                >{task.emoji}</span
-                                            >
-                                        {/if}
-                                        <div class="flex-1 min-w-0">
-                                            <p class="font-bold text-sm">
-                                                {task.title}
-                                            </p>
-                                            {#if task.categoryName}
+                            <!-- Tasks Grid -->
+                            <div class="absolute inset-0 top-4">
+                                <!-- Offset matching top padding -->
+                                {#each group.rows as { task, row }}
+                                    {@const style = getTaskStyle(task)}
+                                    {@const textColor = getContrastTextColor(
+                                        group.color,
+                                    )}
+                                    {@const shadowColor = getShadowColor(
+                                        group.color,
+                                    )}
+                                    {@const isFiltered =
+                                        hoveredTaskId &&
+                                        hoveredTaskId !== task.id}
+
+                                    <!-- svelte-ignore a11y_interactive_supports_focus -->
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <div
+                                        class="absolute transition-all duration-300 ease-out"
+                                        class:z-40={hoveredTaskId === task.id}
+                                        class:z-10={hoveredTaskId !== task.id}
+                                        class:opacity-30={isFiltered}
+                                        class:scale-[1.02]={hoveredTaskId ===
+                                            task.id}
+                                        style="
+                                            left: {style.left}%;
+                                            width: {style.width}%;
+                                            top: {row *
+                                            (ROW_HEIGHT + ROW_GAP)}px;
+                                            height: {ROW_HEIGHT}px;
+                                        "
+                                        role="button"
+                                        onmouseenter={(e) =>
+                                            handleMouseEnter(e, task.id)}
+                                        onmousemove={handleMouseMove}
+                                        onmouseleave={handleMouseLeave}
+                                        onclick={(e) => onTaskClick?.(task.id)}
+                                    >
+                                        <div
+                                            class="absolute inset-0 rounded-xl overflow-hidden transition-all duration-300 ring-1 ring-black/5 dark:ring-white/10"
+                                            class:shadow-sm={!task.completed}
+                                            class:hover:shadow-lg={!task.completed}
+                                            class:shadow-inner={task.completed}
+                                            class:opacity-90={task.completed}
+                                            class:saturate-[0.75]={task.completed}
+                                            style="background-color: {group.color}; {task.completed
+                                                ? ''
+                                                : `box-shadow: 0 4px 6px -2px ${shadowColor};`}"
+                                        >
+                                            <!-- Completed Texture Overlay -->
+                                            {#if task.completed}
                                                 <div
-                                                    class="flex items-center gap-2 mt-1.5"
+                                                    class="absolute inset-0 bg-striped opacity-30 pointer-events-none z-10"
+                                                ></div>
+                                                <div
+                                                    class="absolute inset-0 bg-black/10 pointer-events-none z-0"
+                                                ></div>
+                                            {/if}
+
+                                            <div
+                                                class="relative z-20 h-full px-3 flex items-center justify-center gap-2"
+                                                style="color: {textColor};"
+                                            >
+                                                <div
+                                                    class="min-w-0 flex-1 flex flex-col justify-center"
                                                 >
                                                     <span
-                                                        class="w-3 h-3 rounded-full shadow-sm"
-                                                        style="background-color: {color};"
-                                                    ></span>
-                                                    <span
-                                                        class="text-xs opacity-70"
-                                                        >{task.categoryName}</span
+                                                        class="font-bold text-xs truncate leading-snug"
+                                                        class:opacity-60={task.completed}
                                                     >
+                                                        {task.title}
+                                                    </span>
+                                                    <span
+                                                        class="text-[10px] opacity-80 font-medium font-mono"
+                                                    >
+                                                        {formatExactTime(
+                                                            task.startTime,
+                                                        )}
+                                                    </span>
                                                 </div>
-                                            {/if}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="divider my-2"></div>
-                                    <div
-                                        class="flex items-center gap-2 text-xs opacity-60"
-                                    >
-                                        <Clock class="w-4 h-4" />
-                                        <span>
-                                            {task.startTime.toLocaleTimeString(
-                                                [],
-                                                {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                },
-                                            )} -
-                                            {task.endTime.toLocaleTimeString(
-                                                [],
-                                                {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                },
-                                            )}
-                                        </span>
-                                    </div>
-                                    {#if task.completed}
-                                        <div
-                                            class="mt-2 badge badge-success badge-sm gap-1"
-                                        >
-                                            <span>✓</span> Completed
-                                        </div>
-                                    {/if}
-                                </div>
+                                {/each}
                             </div>
                         </div>
                     {/each}
+
+                    <!-- Empty State -->
+                    {#if categoryGroups.length === 0}
+                        <div
+                            class="h-64 flex flex-col items-center justify-center opacity-50"
+                        >
+                            <Clock class="w-10 h-10 mb-3" />
+                            <p class="text-sm font-medium">
+                                No tasks scheduled for today
+                            </p>
+                        </div>
+                    {/if}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Empty state -->
-    {#if tasks.length === 0}
+    <!-- Tooltip (Portal) -->
+    {#if hoveredTask && tooltipPosition}
         <div
-            class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none bg-base-100/80 backdrop-blur-sm rounded-xl"
+            class="fixed z-[100] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+            style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"
         >
             <div
-                class="w-16 h-16 rounded-2xl bg-gradient-to-br from-info/20 to-primary/20 flex items-center justify-center mb-4"
+                class="bg-base-100/95 backdrop-blur-md text-base-content rounded-xl shadow-2xl border border-base-200/50 p-4 min-w-[220px] max-w-xs"
             >
-                <Clock class="w-8 h-8 text-info" />
+                <div class="flex items-start gap-3">
+                    {#if hoveredTask.emoji}
+                        <span class="text-2xl pt-1">{hoveredTask.emoji}</span>
+                    {/if}
+                    <div>
+                        <h4 class="font-bold text-sm leading-snug">
+                            {hoveredTask.title}
+                        </h4>
+                        {#if hoveredTask.categoryName}
+                            <div class="flex items-center gap-1.5 mt-1.5">
+                                <span
+                                    class="w-2 h-2 rounded-full"
+                                    style="background-color: {hoveredTask.categoryColor}"
+                                ></span>
+                                <span
+                                    class="text-[10px] font-semibold opacity-60 uppercase"
+                                    >{hoveredTask.categoryName}</span
+                                >
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+                <div class="h-px bg-base-content/10 my-3"></div>
+                <div
+                    class="flex items-center gap-2 text-xs font-mono opacity-70"
+                >
+                    <Clock class="w-3.5 h-3.5" />
+                    <span>
+                        {formatExactTime(hoveredTask.startTime)} — {formatExactTime(
+                            hoveredTask.endTime,
+                        )}
+                    </span>
+                </div>
             </div>
-            <h4 class="text-lg font-bold">No tasks today</h4>
-            <p class="text-sm opacity-50 mt-1 max-w-xs">
-                Add your first task to see it on the timeline
-            </p>
         </div>
     {/if}
 </div>
 
 <style>
-    .timeline-wrapper {
-        position: relative;
-        min-height: 180px;
-    }
-
+    /* Sleek Scrollbar */
     .timeline-container {
         scrollbar-width: thin;
-        scrollbar-color: oklch(var(--bc) / 0.2) transparent;
+        scrollbar-color: oklch(var(--bc) / 0.1) transparent;
     }
-
     .timeline-container::-webkit-scrollbar {
         height: 6px;
     }
-
+    .timeline-container::-webkit-scrollbar-thumb {
+        background: oklch(var(--bc) / 0.1);
+        border-radius: 10px;
+    }
     .timeline-container::-webkit-scrollbar-track {
         background: transparent;
     }
 
-    .timeline-container::-webkit-scrollbar-thumb {
-        background: oklch(var(--bc) / 0.2);
-        border-radius: 3px;
-    }
-
-    .timeline-grid {
-        min-height: 140px;
-    }
-
-    .now-indicator {
-        top: 0;
-        bottom: 0;
-    }
-
-    .task-card {
-        min-width: 120px;
-        /* Add right padding for horizontal separation between adjacent tasks */
-        padding-right: 4px;
-        box-sizing: border-box;
-    }
-
-    /* Tooltip positioning */
-    .tooltip-popup {
-        filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.2));
-    }
-
-    .tooltip-top {
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        margin-bottom: 12px;
-    }
-
-    .tooltip-bottom {
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        margin-top: 12px;
-    }
-
-    .group:hover .tooltip-top {
-        transform: translateX(-50%) scale(1);
-    }
-
-    .group:hover .tooltip-bottom {
-        transform: translateX(-50%) scale(1);
+    /* Striped Pattern for Completed Tasks */
+    .bg-striped {
+        background-image: linear-gradient(
+            45deg,
+            rgba(0, 0, 0, 0.1) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(0, 0, 0, 0.1) 50%,
+            rgba(0, 0, 0, 0.1) 75%,
+            transparent 75%,
+            transparent
+        );
+        background-size: 8px 8px;
     }
 </style>

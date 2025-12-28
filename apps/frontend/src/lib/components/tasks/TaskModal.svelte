@@ -37,10 +37,16 @@
     interface Props {
         open?: boolean;
         task?: Task | null;
+        initialCategoryId?: string;
         onClose?: () => void;
     }
 
-    let { open = $bindable(false), task = null, onClose }: Props = $props();
+    let {
+        open = $bindable(false),
+        task = null,
+        initialCategoryId,
+        onClose,
+    }: Props = $props();
 
     const queryClient = useQueryClient();
 
@@ -141,6 +147,10 @@
             endTime = endDateObj.toTimeString().slice(0, 5);
         } else if (open) {
             resetForm();
+            // Apply initial category if provided
+            if (initialCategoryId) {
+                categoryId = initialCategoryId;
+            }
             if (categories.length === 0 && !$categoriesQuery.isLoading) {
                 showNewCategory = true;
             }
@@ -174,20 +184,9 @@
         endTime = "10:00";
     }
 
-    // Handle completion toggle - show confirmation when uncompleting
+    // Handle completion toggle
     function handleCompletionToggle() {
-        if (completed) {
-            // Uncompleting - show confirmation
-            showUncompleteConfirm = true;
-        } else {
-            // Completing - just toggle without confirmation
-            completed = true;
-        }
-    }
-
-    function confirmUncomplete() {
-        completed = false;
-        showUncompleteConfirm = false;
+        completed = !completed;
     }
 
     function addPositive() {
@@ -245,6 +244,7 @@
             priority: priority || undefined,
             positives: positives.length > 0 ? positives : undefined,
             negatives: negatives.length > 0 ? negatives : undefined,
+            completed: completed, // Add completed here
         };
 
         if (isEditing && task) {
@@ -299,55 +299,42 @@
             class="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-200/50"
         >
             <div class="flex items-center gap-3">
-                <!-- Completion Checkbox (only in edit mode) -->
-                {#if isEditing}
-                    <button
-                        class={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer",
-                            completed
-                                ? "bg-success text-success-content hover:bg-success/80"
-                                : "bg-base-300 hover:bg-primary/10 hover:text-primary",
-                        )}
-                        onclick={handleCompletionToggle}
-                        title={completed
-                            ? "Mark as incomplete"
-                            : "Mark as complete"}
-                    >
-                        {#if completed}
-                            <CircleCheck class="w-5 h-5" />
-                        {:else}
-                            <Circle class="w-5 h-5" />
-                        {/if}
-                    </button>
-                {:else}
-                    <div class="stat-icon bg-primary/10">
-                        <Sparkles class="w-5 h-5 text-primary" />
-                    </div>
-                {/if}
+                <!-- Completion Checkbox -->
+                <button
+                    class={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer",
+                        completed
+                            ? "bg-success text-success-content hover:bg-success/80"
+                            : "bg-base-300 hover:bg-primary/10 hover:text-primary",
+                    )}
+                    onclick={handleCompletionToggle}
+                    title={completed
+                        ? "Mark as incomplete"
+                        : "Mark as complete"}
+                >
+                    {#if completed}
+                        <CircleCheck class="w-5 h-5" />
+                    {:else}
+                        <Circle class="w-5 h-5" />
+                    {/if}
+                </button>
                 <div>
                     <div class="flex items-center gap-2">
                         <h3
                             class={cn(
                                 "font-bold text-lg",
-                                completed && isEditing && "text-success",
+                                completed && "text-success",
                             )}
                         >
                             {isEditing ? "Edit Task" : "Create New Task"}
                         </h3>
-                        {#if isEditing && completed}
+                        {#if completed}
                             <span class="badge badge-success badge-sm gap-1">
                                 <Check class="w-3 h-3" />
                                 Completed
                             </span>
                         {/if}
                     </div>
-                    <p class="text-xs opacity-50">
-                        {#if isEditing && completed}
-                            Task is complete
-                        {:else}
-                            Capture your moment
-                        {/if}
-                    </p>
                 </div>
             </div>
             <button
@@ -737,15 +724,3 @@
         <button onclick={handleClose}>close</button>
     </form>
 </dialog>
-
-<!-- Uncomplete Confirmation Dialog -->
-<ConfirmDialog
-    bind:open={showUncompleteConfirm}
-    title="Mark as Incomplete?"
-    message="Are you sure you want to mark this task as incomplete? This will remove the completion status."
-    confirmText="Mark Incomplete"
-    cancelText="Keep Complete"
-    destructive={false}
-    onConfirm={confirmUncomplete}
-    onCancel={() => (showUncompleteConfirm = false)}
-/>

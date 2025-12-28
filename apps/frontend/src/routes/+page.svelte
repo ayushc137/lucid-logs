@@ -67,11 +67,19 @@
 
   function transformTasks(apiTasks: Task[]): TimelineTask[] {
     return apiTasks.map((task) => {
+      // Defensive date parsing
+      const startTime = task.start_date
+        ? new Date(task.start_date)
+        : new Date();
+      const endTime = task.end_date
+        ? new Date(task.end_date)
+        : new Date(startTime.getTime() + 30 * 60000); // default 30m duration
+
       return {
         id: task.id,
         title: task.title,
-        startTime: new Date(task.start_date),
-        endTime: new Date(task.end_date),
+        startTime,
+        endTime,
         categoryColor: task.category?.color,
         categoryName: task.category?.name,
         completed: task.completed,
@@ -100,6 +108,7 @@
   // Task modal state
   let modalOpen = $state(false);
   let editingTask = $state<Task | null>(null);
+  let initialCategoryId = $state<string | undefined>(undefined);
 
   // Uncomplete confirmation state
   let showUncompleteConfirm = $state(false);
@@ -119,14 +128,23 @@
     const task = $tasksQuery.data?.items?.find((t) => t.id === taskId);
     if (task) {
       editingTask = task;
+      initialCategoryId = undefined;
       modalOpen = true;
     }
+  }
+
+  // Handle category label click from timeline
+  function handleCategoryClick(categoryId: string) {
+    editingTask = null;
+    initialCategoryId = categoryId;
+    modalOpen = true;
   }
 
   // Handle modal close
   function handleModalClose() {
     modalOpen = false;
     editingTask = null;
+    initialCategoryId = undefined;
     $tasksQuery.refetch();
   }
 
@@ -190,6 +208,7 @@
   function openTaskModal() {
     fabOpen = false;
     editingTask = null;
+    initialCategoryId = undefined;
     modalOpen = true;
   }
 </script>
@@ -381,6 +400,7 @@
               startHour={0}
               endHour={24}
               onTaskClick={handleTaskClick}
+              onCategoryClick={handleCategoryClick}
               onToggleComplete={handleToggleComplete}
             />
           {/if}
@@ -467,10 +487,9 @@
 <TaskModal
   bind:open={modalOpen}
   task={editingTask}
+  {initialCategoryId}
   onClose={handleModalClose}
 />
-
-<!-- Uncomplete Confirmation Dialog -->
 <ConfirmDialog
   bind:open={showUncompleteConfirm}
   title="Mark as Incomplete?"
@@ -485,20 +504,3 @@
     pendingUncompleteTaskId = null;
   }}
 />
-
-<style>
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .animate-fade-in {
-    animation: fade-in 0.2s ease-out;
-  }
-</style>
