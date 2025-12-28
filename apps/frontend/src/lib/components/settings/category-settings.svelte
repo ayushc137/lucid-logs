@@ -24,6 +24,7 @@
   } from "@tanstack/svelte-query";
   import { cn } from "$lib/utils";
   import { COLOR_PRESETS, DEFAULT_COLOR } from "$lib/constants";
+  import { ColorPicker } from "$lib/components/ui";
 
   const queryClient = useQueryClient();
 
@@ -198,39 +199,11 @@
               />
             </label>
           </div>
-          {#if useCustomColor}
-            <div class="flex items-center gap-2 mt-2">
-              <input
-                type="color"
-                class="w-12 h-10 rounded-lg cursor-pointer border-2 border-base-300"
-                bind:value={newColor}
-              />
-              <input
-                type="text"
-                class="input input-bordered input-sm flex-1 font-mono"
-                bind:value={newColor}
-                placeholder="#000000"
-              />
-            </div>
-          {:else}
-            <!-- 16 Colors in 8x2 grid -->
-            <div class="grid grid-cols-8 gap-2 mt-2">
-              {#each COLOR_PRESETS as color}
-                <button
-                  type="button"
-                  class={cn(
-                    "w-8 h-8 rounded-lg transition-all border-2",
-                    newColor === color
-                      ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 border-white scale-110"
-                      : "border-transparent hover:scale-105",
-                  )}
-                  style="background-color: {color};"
-                  onclick={() => (newColor = color)}
-                  aria-label="Select color"
-                ></button>
-              {/each}
-            </div>
-          {/if}
+          <ColorPicker
+            bind:value={newColor}
+            customMode={useCustomColor}
+            class="mt-2"
+          />
         </div>
 
         <div class="flex items-center gap-2 pt-2">
@@ -293,46 +266,22 @@
               </div>
             </div>
             <!-- Color picker with custom option -->
-            <div class="flex items-center gap-2">
-              <label class="flex items-center gap-1 cursor-pointer">
-                <Pipette class="w-3 h-3 opacity-60" />
-                <input
-                  type="checkbox"
-                  class="toggle toggle-xs toggle-primary"
-                  bind:checked={editUseCustomColor}
-                />
-              </label>
-              {#if editUseCustomColor}
-                <input
-                  type="color"
-                  class="w-8 h-6 rounded cursor-pointer"
-                  bind:value={editColor}
-                />
-                <input
-                  type="text"
-                  class="input input-bordered input-xs flex-1 font-mono"
-                  bind:value={editColor}
-                />
-              {/if}
-            </div>
-            {#if !editUseCustomColor}
-              <div class="grid grid-cols-8 gap-1">
-                {#each COLOR_PRESETS as color}
-                  <button
-                    type="button"
-                    class={cn(
-                      "w-6 h-6 rounded transition-all border-2",
-                      editColor === color
-                        ? "ring-2 ring-primary ring-offset-1 border-white scale-110"
-                        : "border-transparent hover:scale-105",
-                    )}
-                    style="background-color: {color};"
-                    onclick={() => (editColor = color)}
-                    aria-label="Select color"
-                  ></button>
-                {/each}
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1 cursor-pointer">
+                  <Pipette class="w-3 h-3 opacity-60" />
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-xs toggle-primary"
+                    bind:checked={editUseCustomColor}
+                  />
+                </label>
               </div>
-            {/if}
+              <ColorPicker
+                bind:value={editColor}
+                customMode={editUseCustomColor}
+              />
+            </div>
           </div>
         {:else}
           <!-- View Mode -->

@@ -7,11 +7,8 @@
     Check,
     Search,
     Funnel,
-    ChevronUp,
-    ChevronDown,
     X,
     Clock,
-    ArrowUpDown,
     LoaderCircle,
     CalendarDays,
   } from "lucide-svelte";
@@ -34,6 +31,9 @@
     StatusDropdown,
     PriorityDropdown,
     ErrorAlert,
+    ConfirmDialog,
+    DataTable,
+    SortableHeader,
   } from "$lib/components/ui";
   import { cn } from "$lib/utils";
 
@@ -521,236 +521,174 @@
       </div>
     </div>
   {:else}
-    <div
-      class="card bg-base-100 shadow-lg border border-base-200 overflow-hidden"
-    >
-      <div class="overflow-x-auto">
-        <table class="table table-lg">
-          <!-- Table Header with Sortable Columns -->
-          <thead class="bg-base-200">
-            <tr>
-              <th class="w-12"></th>
-              <!-- Title - Sortable -->
-              <th>
-                <button
-                  class={cn(
-                    "flex items-center gap-2 font-semibold transition-colors",
-                    sortField === "title"
-                      ? "text-primary"
-                      : "hover:text-primary",
-                  )}
-                  onclick={() => toggleSort("title")}
-                >
-                  Task
-                  {#if sortField === "title"}
-                    {#if sortDirection === "asc"}
-                      <ChevronUp class="w-4 h-4" />
-                    {:else}
-                      <ChevronDown class="w-4 h-4" />
-                    {/if}
-                  {:else}
-                    <ArrowUpDown class="w-3 h-3 opacity-40" />
-                  {/if}
-                </button>
-              </th>
-              <!-- Category -->
-              <th class="hidden lg:table-cell">Category</th>
-              <!-- Date - Sortable -->
-              <th>
-                <button
-                  class={cn(
-                    "flex items-center gap-2 font-semibold transition-colors",
-                    sortField === "start_date"
-                      ? "text-primary"
-                      : "hover:text-primary",
-                  )}
-                  onclick={() => toggleSort("start_date")}
-                >
-                  Date
-                  {#if sortField === "start_date"}
-                    {#if sortDirection === "asc"}
-                      <ChevronUp class="w-4 h-4" />
-                    {:else}
-                      <ChevronDown class="w-4 h-4" />
-                    {/if}
-                  {:else}
-                    <ArrowUpDown class="w-3 h-3 opacity-40" />
-                  {/if}
-                </button>
-              </th>
-              <!-- Priority - Sortable -->
-              <th class="hidden md:table-cell">
-                <button
-                  class={cn(
-                    "flex items-center gap-2 font-semibold transition-colors",
-                    sortField === "priority"
-                      ? "text-primary"
-                      : "hover:text-primary",
-                  )}
-                  onclick={() => toggleSort("priority")}
-                >
-                  Priority
-                  {#if sortField === "priority"}
-                    {#if sortDirection === "asc"}
-                      <ChevronUp class="w-4 h-4" />
-                    {:else}
-                      <ChevronDown class="w-4 h-4" />
-                    {/if}
-                  {:else}
-                    <ArrowUpDown class="w-3 h-3 opacity-40" />
-                  {/if}
-                </button>
-              </th>
-              <th class="w-24"></th>
-            </tr>
-          </thead>
+    <DataTable variant="lg">
+      <!-- Table Header with Sortable Columns -->
+      <thead class="bg-base-200">
+        <tr>
+          <th class="w-12"></th>
+          <SortableHeader
+            label="Task"
+            field="title"
+            {sortField}
+            {sortDirection}
+            onSort={(f) => toggleSort(f as SortField)}
+          />
+          <th class="hidden lg:table-cell">Category</th>
+          <SortableHeader
+            label="Date"
+            field="start_date"
+            {sortField}
+            {sortDirection}
+            onSort={(f) => toggleSort(f as SortField)}
+          />
+          <SortableHeader
+            label="Priority"
+            field="priority"
+            {sortField}
+            {sortDirection}
+            onSort={(f) => toggleSort(f as SortField)}
+            class="hidden md:table-cell"
+          />
+          <th class="w-24"></th>
+        </tr>
+      </thead>
 
-          <!-- Table Body -->
-          <tbody>
-            {#each tasks as task (task.id)}
-              <tr
-                class={cn(
-                  "hover:bg-base-200/50 transition-colors cursor-pointer group",
-                  task.completed && "bg-success/5 opacity-70",
-                )}
-                onclick={() => openEditModal(task)}
+      <!-- Table Body -->
+      <tbody>
+        {#each tasks as task (task.id)}
+          <tr
+            class={cn(
+              "hover:bg-base-200/50 transition-colors cursor-pointer group",
+              task.completed && "bg-success/5 opacity-70",
+            )}
+            onclick={() => openEditModal(task)}
+          >
+            <!-- Status -->
+            <td>
+              <button
+                onclick={(e) => toggleComplete(task, e)}
+                disabled={$toggleCompleteMut.isPending}
               >
-                <!-- Status -->
-                <td>
-                  <button
-                    onclick={(e) => toggleComplete(task, e)}
-                    disabled={$toggleCompleteMut.isPending}
-                  >
-                    <div
-                      class={cn(
-                        "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                        task.completed
-                          ? "bg-success border-success text-success-content"
-                          : "border-base-content/20 hover:border-primary hover:scale-110",
-                      )}
-                    >
-                      {#if task.completed}
-                        <Check class="w-4 h-4" />
-                      {/if}
-                    </div>
-                  </button>
-                </td>
+                <div
+                  class={cn(
+                    "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                    task.completed
+                      ? "bg-success border-success text-success-content"
+                      : "border-base-content/20 hover:border-primary hover:scale-110",
+                  )}
+                >
+                  {#if task.completed}
+                    <Check class="w-4 h-4" />
+                  {/if}
+                </div>
+              </button>
+            </td>
 
-                <!-- Title with Search Highlight -->
-                <td>
-                  <div class="flex flex-col gap-1">
-                    <span
-                      class={cn(
-                        "font-semibold",
-                        task.completed && "line-through opacity-50",
+            <!-- Title with Search Highlight -->
+            <td>
+              <div class="flex flex-col gap-1">
+                <span
+                  class={cn(
+                    "font-semibold",
+                    task.completed && "line-through opacity-50",
+                  )}
+                >
+                  {#if debouncedSearch}
+                    {@html highlightText(task.title, debouncedSearch)}
+                  {:else}
+                    {task.title}
+                  {/if}
+                </span>
+                {#if task.journal}
+                  <span class="text-sm opacity-50 line-clamp-1 max-w-md">
+                    {#if debouncedSearch}
+                      {@html highlightText(
+                        task.journal.replace(/<[^>]*>/g, "").slice(0, 80),
+                        debouncedSearch,
                       )}
-                    >
-                      {#if debouncedSearch}
-                        {@html highlightText(task.title, debouncedSearch)}
-                      {:else}
-                        {task.title}
-                      {/if}
-                    </span>
-                    {#if task.journal}
-                      <span class="text-sm opacity-50 line-clamp-1 max-w-md">
-                        {#if debouncedSearch}
-                          {@html highlightText(
-                            task.journal.replace(/<[^>]*>/g, "").slice(0, 80),
-                            debouncedSearch,
-                          )}
-                        {:else}
-                          {task.journal.replace(/<[^>]*>/g, "").slice(0, 80)}
-                        {/if}
-                      </span>
+                    {:else}
+                      {task.journal.replace(/<[^>]*>/g, "").slice(0, 80)}
                     {/if}
-                    {#if task.category}
-                      <div class="lg:hidden mt-1">
-                        <span
-                          class="badge badge-sm"
-                          style="background-color: {task.category
-                            .color}20; color: {task.category.color};"
-                        >
-                          {task.category.name}
-                        </span>
-                      </div>
-                    {/if}
-                  </div>
-                </td>
-
-                <!-- Category -->
-                <td class="hidden lg:table-cell">
-                  {#if task.category}
+                  </span>
+                {/if}
+                {#if task.category}
+                  <div class="lg:hidden mt-1">
                     <span
-                      class="badge"
+                      class="badge badge-sm"
                       style="background-color: {task.category
                         .color}20; color: {task.category.color};"
                     >
                       {task.category.name}
                     </span>
-                  {:else}
-                    <span class="opacity-30">—</span>
-                  {/if}
-                </td>
-
-                <!-- Date -->
-                <td>
-                  <div class="flex flex-col">
-                    <span class="text-sm font-medium">
-                      {formatShortDate(task.start_date)}
-                    </span>
-                    <span class="text-xs opacity-50 flex items-center gap-1">
-                      <Clock class="w-3 h-3" />
-                      {formatTime(task.start_date)} - {formatTime(
-                        task.end_date,
-                      )}
-                    </span>
                   </div>
-                </td>
+                {/if}
+              </div>
+            </td>
 
-                <!-- Priority -->
-                <td class="hidden md:table-cell">
-                  <span
-                    class={cn(
-                      "badge badge-sm",
-                      getPriorityColor(task.priority),
-                    )}
-                  >
-                    {getPriorityLabel(task.priority)}
-                  </span>
-                </td>
+            <!-- Category -->
+            <td class="hidden lg:table-cell">
+              {#if task.category}
+                <span
+                  class="badge"
+                  style="background-color: {task.category.color}20; color: {task
+                    .category.color};"
+                >
+                  {task.category.name}
+                </span>
+              {:else}
+                <span class="opacity-30">—</span>
+              {/if}
+            </td>
 
-                <!-- Actions -->
-                <td>
-                  <div
-                    class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <button
-                      class="btn btn-ghost btn-sm btn-square"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        openEditModal(task);
-                      }}
-                    >
-                      <SquarePen class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="btn btn-ghost btn-sm btn-square text-error"
-                      onclick={(e) => confirmDelete(task.id, e)}
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+            <!-- Date -->
+            <td>
+              <div class="flex flex-col">
+                <span class="text-sm font-medium">
+                  {formatShortDate(task.start_date)}
+                </span>
+                <span class="text-xs opacity-50 flex items-center gap-1">
+                  <Clock class="w-3 h-3" />
+                  {formatTime(task.start_date)} - {formatTime(task.end_date)}
+                </span>
+              </div>
+            </td>
 
-      <!-- Footer -->
-      <div
-        class="px-4 py-3 bg-base-200/50 border-t border-base-200 text-sm opacity-60 flex items-center justify-between"
-      >
+            <!-- Priority -->
+            <td class="hidden md:table-cell">
+              <span
+                class={cn("badge badge-sm", getPriorityColor(task.priority))}
+              >
+                {getPriorityLabel(task.priority)}
+              </span>
+            </td>
+
+            <!-- Actions -->
+            <td>
+              <div
+                class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <button
+                  class="btn btn-ghost btn-sm btn-square"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    openEditModal(task);
+                  }}
+                >
+                  <SquarePen class="w-4 h-4" />
+                </button>
+                <button
+                  class="btn btn-ghost btn-sm btn-square text-error"
+                  onclick={(e) => confirmDelete(task.id, e)}
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+
+      {#snippet footer()}
         <span>{tasks.length} tasks</span>
         {#if $tasksQuery.isFetching}
           <span class="flex items-center gap-2 text-primary">
@@ -758,8 +696,8 @@
             Loading...
           </span>
         {/if}
-      </div>
-    </div>
+      {/snippet}
+    </DataTable>
   {/if}
 </div>
 
@@ -771,24 +709,13 @@
 />
 
 <!-- Delete Dialog -->
-<dialog class="modal" class:modal-open={deleteConfirmOpen}>
-  <div class="modal-box max-w-sm">
-    <h3 class="font-bold text-lg">Delete Task?</h3>
-    <p class="py-4 opacity-70">This action cannot be undone.</p>
-    <div class="modal-action">
-      <button class="btn btn-ghost" onclick={() => (deleteConfirmOpen = false)}>
-        Cancel
-      </button>
-      <button
-        class="btn btn-error"
-        onclick={handleDelete}
-        disabled={$deleteMut.isPending}
-      >
-        Delete
-      </button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button onclick={() => (deleteConfirmOpen = false)}>close</button>
-  </form>
-</dialog>
+<ConfirmDialog
+  bind:open={deleteConfirmOpen}
+  title="Delete Task?"
+  message="This action cannot be undone."
+  confirmText="Delete"
+  destructive={true}
+  loading={$deleteMut.isPending}
+  onConfirm={handleDelete}
+  onCancel={() => (deleteConfirmOpen = false)}
+/>

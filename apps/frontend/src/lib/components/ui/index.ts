@@ -28,6 +28,18 @@ export { default as ErrorAlert } from "./ErrorAlert.svelte";
 export { default as LoadingCard } from "./LoadingCard.svelte";
 
 // -----------------------------------------------------------------------------
+// Modals & Dialogs
+// -----------------------------------------------------------------------------
+export { default as Modal } from "./Modal.svelte";
+export { default as ConfirmDialog } from "./ConfirmDialog.svelte";
+
+// -----------------------------------------------------------------------------
+// Tables
+// -----------------------------------------------------------------------------
+export { default as DataTable } from "./DataTable.svelte";
+export { default as SortableHeader } from "./SortableHeader.svelte";
+
+// -----------------------------------------------------------------------------
 // Primitives
 // -----------------------------------------------------------------------------
 export { default as IconBox } from "./IconBox.svelte";

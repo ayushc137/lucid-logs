@@ -11,7 +11,7 @@
         Pipette,
         CircleAlert,
     } from "lucide-svelte";
-    import { ErrorAlert } from "$lib/components/ui";
+    import { ErrorAlert, ConfirmDialog, ColorPicker } from "$lib/components/ui";
     import {
         createQuery,
         createMutation,
@@ -316,38 +316,10 @@
                             </button>
                         </label>
 
-                        {#if useCustomColor}
-                            <div class="flex items-center gap-3">
-                                <input
-                                    type="color"
-                                    class="w-12 h-10 rounded-lg cursor-pointer border-2 border-base-300"
-                                    bind:value={newColor}
-                                />
-                                <input
-                                    type="text"
-                                    class="input input-bordered input-sm flex-1 font-mono"
-                                    bind:value={newColor}
-                                    placeholder="#000000"
-                                />
-                            </div>
-                        {:else}
-                            <div class="grid grid-cols-8 gap-2">
-                                {#each COLOR_PRESETS as color}
-                                    <button
-                                        type="button"
-                                        class={cn(
-                                            "w-8 h-8 rounded-lg transition-all border-2",
-                                            newColor === color
-                                                ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 border-white scale-110"
-                                                : "border-transparent hover:scale-105",
-                                        )}
-                                        style="background-color: {color};"
-                                        onclick={() => (newColor = color)}
-                                        aria-label="Select color {color}"
-                                    ></button>
-                                {/each}
-                            </div>
-                        {/if}
+                        <ColorPicker
+                            bind:value={newColor}
+                            customMode={useCustomColor}
+                        />
                     </div>
                 </div>
 
@@ -513,48 +485,10 @@
                                                             Custom
                                                         </button>
                                                     </label>
-                                                    {#if editUseCustomColor}
-                                                        <div
-                                                            class="flex items-center gap-2"
-                                                        >
-                                                            <input
-                                                                type="color"
-                                                                class="w-10 h-8 rounded cursor-pointer"
-                                                                bind:value={
-                                                                    editColor
-                                                                }
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                class="input input-bordered input-sm flex-1 font-mono"
-                                                                bind:value={
-                                                                    editColor
-                                                                }
-                                                            />
-                                                        </div>
-                                                    {:else}
-                                                        <div
-                                                            class="grid grid-cols-8 gap-1.5"
-                                                        >
-                                                            {#each COLOR_PRESETS as color}
-                                                                <button
-                                                                    type="button"
-                                                                    class={cn(
-                                                                        "w-6 h-6 rounded transition-all border-2",
-                                                                        editColor ===
-                                                                            color
-                                                                            ? "ring-2 ring-primary ring-offset-1 border-white scale-110"
-                                                                            : "border-transparent hover:scale-105",
-                                                                    )}
-                                                                    style="background-color: {color};"
-                                                                    onclick={() =>
-                                                                        (editColor =
-                                                                            color)}
-                                                                    aria-label="Select color"
-                                                                ></button>
-                                                            {/each}
-                                                        </div>
-                                                    {/if}
+                                                    <ColorPicker
+                                                        bind:value={editColor}
+                                                        customMode={editUseCustomColor}
+                                                    />
                                                 </div>
                                             </div>
                                             <div class="flex justify-end gap-2">
@@ -667,44 +601,16 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-<dialog
-    class="modal modal-bottom sm:modal-middle"
-    class:modal-open={deleteConfirmOpen}
->
-    <div class="modal-box">
-        <h3 class="font-bold text-lg text-error">Delete Category</h3>
-        <p class="py-4 opacity-70">
-            Are you sure you want to delete this category? This action cannot be
-            undone. Tasks using this category will be unassigned.
-        </p>
-        <div class="modal-action">
-            <button
-                class="btn btn-ghost"
-                onclick={() => {
-                    deleteConfirmOpen = false;
-                    deleteTargetId = null;
-                }}
-            >
-                Cancel
-            </button>
-            <button
-                class="btn btn-error"
-                onclick={handleDelete}
-                disabled={$deleteMut.isPending}
-            >
-                {#if $deleteMut.isPending}
-                    <span class="loading loading-spinner loading-sm"></span>
-                {/if}
-                Delete
-            </button>
-        </div>
-    </div>
-    <form method="dialog" class="modal-backdrop bg-base-content/20">
-        <button
-            onclick={() => {
-                deleteConfirmOpen = false;
-                deleteTargetId = null;
-            }}>close</button
-        >
-    </form>
-</dialog>
+<ConfirmDialog
+    bind:open={deleteConfirmOpen}
+    title="Delete Category"
+    message="Are you sure you want to delete this category? This action cannot be undone. Tasks using this category will be unassigned."
+    confirmText="Delete"
+    destructive={true}
+    loading={$deleteMut.isPending}
+    onConfirm={handleDelete}
+    onCancel={() => {
+        deleteConfirmOpen = false;
+        deleteTargetId = null;
+    }}
+/>
