@@ -373,30 +373,31 @@
           />
         </div>
 
-        <!-- Clear Filters Button -->
-        {#if hasActiveFilters}
-          <button
-            class="btn btn-ghost text-error gap-2 hidden sm:flex"
-            onclick={clearFilters}
-          >
-            Clear
-          </button>
-        {/if}
-
         <!-- Filter Toggle Button -->
-        <button
-          class={cn(
-            "btn gap-2",
-            showFilters ? "btn-primary" : "btn-ghost border border-base-300",
-          )}
-          onclick={() => (showFilters = !showFilters)}
-        >
-          <Funnel class="w-4 h-4" />
-          Filters
+        <div class="flex items-center gap-2">
+          <button
+            class={cn(
+              "btn gap-2",
+              showFilters ? "btn-primary" : "btn-ghost border border-base-300",
+            )}
+            onclick={() => (showFilters = !showFilters)}
+          >
+            <Funnel class="w-4 h-4" />
+            Filters
+            {#if hasActiveFilters}
+              <span class="badge badge-sm badge-secondary">Active</span>
+            {/if}
+          </button>
           {#if hasActiveFilters}
-            <span class="badge badge-sm badge-secondary">Active</span>
+            <button
+              class="btn btn-ghost btn-sm gap-1 opacity-70 hover:opacity-100"
+              onclick={clearFilters}
+            >
+              <X class="w-4 h-4" />
+              Clear
+            </button>
           {/if}
-        </button>
+        </div>
       </div>
 
       <!-- Expanded Filters -->
