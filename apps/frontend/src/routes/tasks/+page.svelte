@@ -17,6 +17,7 @@
     CircleDot,
     Loader2,
     CalendarDays,
+    AlertCircle,
   } from "lucide-svelte";
   import {
     createQuery,
@@ -469,7 +470,14 @@
     </div>
   {:else if $tasksQuery.isError}
     <div class="alert alert-error shadow-lg">
+      <AlertCircle class="w-5 h-5" />
       <span>Failed to load tasks. Please try again.</span>
+      <button
+        class="btn btn-sm btn-ghost"
+        onclick={() => $tasksQuery.refetch()}
+      >
+        Retry
+      </button>
     </div>
   {:else if tasks.length === 0}
     <div class="card bg-base-100 shadow-lg border border-base-200">
