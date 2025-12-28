@@ -7,10 +7,11 @@
         Check,
         X,
         Search,
-        CircleAlert,
         LoaderCircle,
         Pipette,
+        CircleAlert,
     } from "lucide-svelte";
+    import { ErrorAlert } from "$lib/components/ui";
     import {
         createQuery,
         createMutation,
@@ -24,28 +25,13 @@
         type Category,
     } from "$lib/api/categories";
     import { cn } from "$lib/utils";
+    import {
+        COLOR_PRESETS,
+        DEFAULT_COLOR,
+        getContrastColor,
+    } from "$lib/constants";
 
     const queryClient = useQueryClient();
-
-    // 16 Color presets
-    const colorPresets = [
-        "#ef4444",
-        "#f97316",
-        "#eab308",
-        "#22c55e",
-        "#10b981",
-        "#06b6d4",
-        "#3b82f6",
-        "#6366f1",
-        "#8b5cf6",
-        "#a855f7",
-        "#ec4899",
-        "#f43f5e",
-        "#64748b",
-        "#78716c",
-        "#0ea5e9",
-        "#14b8a6",
-    ];
 
     // Search state
     let searchQuery = $state("");
@@ -100,7 +86,7 @@
 
     // Create form state
     let newName = $state("");
-    let newColor = $state("#6366f1");
+    let newColor = $state(DEFAULT_COLOR);
     let useCustomColor = $state(false);
     let createError = $state("");
 
@@ -157,7 +143,7 @@
 
     function resetCreateForm() {
         newName = "";
-        newColor = "#6366f1";
+        newColor = DEFAULT_COLOR;
         useCustomColor = false;
         createError = "";
         isCreating = false;
@@ -167,7 +153,9 @@
         editingId = cat.id;
         editName = cat.name;
         editColor = cat.color;
-        editUseCustomColor = !colorPresets.includes(cat.color);
+        editUseCustomColor = !COLOR_PRESETS.includes(
+            cat.color as (typeof COLOR_PRESETS)[number],
+        );
     }
 
     function saveEdit() {
@@ -200,15 +188,6 @@
         if (deleteTargetId) {
             $deleteMut.mutate(deleteTargetId);
         }
-    }
-
-    function getContrastColor(hexColor: string): string {
-        const hex = hexColor.replace("#", "");
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.5 ? "#1f2937" : "#ffffff";
     }
 
     const isSearching = $derived(searchQuery !== debouncedSearch);
@@ -353,7 +332,7 @@
                             </div>
                         {:else}
                             <div class="grid grid-cols-8 gap-2">
-                                {#each colorPresets as color}
+                                {#each COLOR_PRESETS as color}
                                     <button
                                         type="button"
                                         class={cn(
@@ -421,16 +400,10 @@
             </div>
         </div>
     {:else if $query.isError}
-        <div class="alert alert-error shadow-lg">
-            <CircleAlert class="w-5 h-5" />
-            <span>Failed to load categories. Please try again.</span>
-            <button
-                class="btn btn-sm btn-ghost"
-                onclick={() => $query.refetch()}
-            >
-                Retry
-            </button>
-        </div>
+        <ErrorAlert
+            message="Failed to load categories. Please try again."
+            onRetry={() => $query.refetch()}
+        />
     {:else if categories.length === 0}
         <div class="card bg-base-100 shadow-lg border border-base-200">
             <div class="card-body py-12 text-center">
@@ -563,7 +536,7 @@
                                                         <div
                                                             class="grid grid-cols-8 gap-1.5"
                                                         >
-                                                            {#each colorPresets as color}
+                                                            {#each COLOR_PRESETS as color}
                                                                 <button
                                                                     type="button"
                                                                     class={cn(

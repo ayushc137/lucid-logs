@@ -13,6 +13,7 @@
     import { RichEditor } from "$lib/components/rich-editor";
     import { CategoryDropdown } from "$lib/components/ui";
     import { cn } from "$lib/utils";
+    import { COLOR_PRESETS, DEFAULT_COLOR } from "$lib/constants";
     import {
         Sparkles,
         Check,
@@ -36,26 +37,6 @@
     let { open = $bindable(false), task = null, onClose }: Props = $props();
 
     const queryClient = useQueryClient();
-
-    // 16 Color presets - curated palette (smaller, squarish)
-    const colorPresets = [
-        "#ef4444",
-        "#f97316",
-        "#eab308",
-        "#22c55e",
-        "#10b981",
-        "#06b6d4",
-        "#3b82f6",
-        "#6366f1",
-        "#8b5cf6",
-        "#a855f7",
-        "#ec4899",
-        "#f43f5e",
-        "#64748b",
-        "#78716c",
-        "#0ea5e9",
-        "#14b8a6",
-    ];
 
     // Form state
     let title = $state("");
@@ -405,7 +386,7 @@
                             {:else}
                                 <!-- 16 Color Grid -->
                                 <div class="grid grid-cols-8 gap-1.5">
-                                    {#each colorPresets as color}
+                                    {#each COLOR_PRESETS as color}
                                         <button
                                             type="button"
                                             class={cn(

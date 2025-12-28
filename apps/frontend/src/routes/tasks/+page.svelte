@@ -10,14 +10,10 @@
     ChevronUp,
     ChevronDown,
     X,
-    Calendar,
     Clock,
-    Tag,
     ArrowUpDown,
-    CircleDot,
     LoaderCircle,
     CalendarDays,
-    CircleAlert,
   } from "lucide-svelte";
   import {
     createQuery,
@@ -30,7 +26,6 @@
     updateTask,
     getCategories,
     type Task,
-    type Category,
     type TaskFilterParams,
   } from "$lib/api";
   import { TaskModal } from "$lib/components/tasks";
@@ -38,6 +33,7 @@
     CategoryDropdown,
     StatusDropdown,
     PriorityDropdown,
+    ErrorAlert,
   } from "$lib/components/ui";
   import { cn } from "$lib/utils";
 
@@ -469,16 +465,10 @@
       </div>
     </div>
   {:else if $tasksQuery.isError}
-    <div class="alert alert-error shadow-lg">
-      <CircleAlert class="w-5 h-5" />
-      <span>Failed to load tasks. Please try again.</span>
-      <button
-        class="btn btn-sm btn-ghost"
-        onclick={() => $tasksQuery.refetch()}
-      >
-        Retry
-      </button>
-    </div>
+    <ErrorAlert
+      message="Failed to load tasks. Please try again."
+      onRetry={() => $tasksQuery.refetch()}
+    />
   {:else if tasks.length === 0}
     <div class="card bg-base-100 shadow-lg border border-base-200">
       <div class="card-body py-12 text-center">

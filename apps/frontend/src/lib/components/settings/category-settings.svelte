@@ -23,28 +23,9 @@
     useQueryClient,
   } from "@tanstack/svelte-query";
   import { cn } from "$lib/utils";
+  import { COLOR_PRESETS, DEFAULT_COLOR } from "$lib/constants";
 
   const queryClient = useQueryClient();
-
-  // 16 Color presets - same as TaskModal
-  const colorPresets = [
-    "#ef4444",
-    "#f97316",
-    "#eab308",
-    "#22c55e",
-    "#10b981",
-    "#06b6d4",
-    "#3b82f6",
-    "#6366f1",
-    "#8b5cf6",
-    "#a855f7",
-    "#ec4899",
-    "#f43f5e",
-    "#64748b",
-    "#78716c",
-    "#0ea5e9",
-    "#14b8a6",
-  ];
 
   // Queries
   const query = createQuery({
@@ -56,7 +37,7 @@
   // Local state
   let isCreating = $state(false);
   let newName = $state("");
-  let newColor = $state("#6366f1");
+  let newColor = $state(DEFAULT_COLOR);
   let useCustomColor = $state(false);
   let createError = $state("");
 
@@ -73,7 +54,7 @@
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["categories"] });
       newName = "";
-      newColor = "#6366f1";
+      newColor = DEFAULT_COLOR;
       useCustomColor = false;
       createError = "";
       isCreating = false;
@@ -108,7 +89,9 @@
     editingId = cat.id;
     editName = cat.name;
     editColor = cat.color;
-    editUseCustomColor = !colorPresets.includes(cat.color);
+    editUseCustomColor = !COLOR_PRESETS.includes(
+      cat.color as (typeof COLOR_PRESETS)[number],
+    );
   }
 
   function saveEdit() {
@@ -232,7 +215,7 @@
           {:else}
             <!-- 16 Colors in 8x2 grid -->
             <div class="grid grid-cols-8 gap-2 mt-2">
-              {#each colorPresets as color}
+              {#each COLOR_PRESETS as color}
                 <button
                   type="button"
                   class={cn(
@@ -334,7 +317,7 @@
             </div>
             {#if !editUseCustomColor}
               <div class="grid grid-cols-8 gap-1">
-                {#each colorPresets as color}
+                {#each COLOR_PRESETS as color}
                   <button
                     type="button"
                     class={cn(
