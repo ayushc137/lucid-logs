@@ -181,6 +181,10 @@
   let deleteConfirmOpen = $state(false);
   let deleteTaskId = $state<string | null>(null);
 
+  // Uncomplete confirmation state
+  let uncompleteConfirmOpen = $state(false);
+  let pendingUncompleteTask = $state<Task | null>(null);
+
   function openCreateModal() {
     editingTask = null;
     modalOpen = true;
@@ -213,7 +217,25 @@
 
   function toggleComplete(task: Task, e: Event) {
     e.stopPropagation();
-    $toggleCompleteMut.mutate({ id: task.id, completed: !task.completed });
+    if (task.completed) {
+      // Uncompleting - show confirmation
+      pendingUncompleteTask = task;
+      uncompleteConfirmOpen = true;
+    } else {
+      // Completing - just do it
+      $toggleCompleteMut.mutate({ id: task.id, completed: true });
+    }
+  }
+
+  function confirmUncomplete() {
+    if (pendingUncompleteTask) {
+      $toggleCompleteMut.mutate({
+        id: pendingUncompleteTask.id,
+        completed: false,
+      });
+      uncompleteConfirmOpen = false;
+      pendingUncompleteTask = null;
+    }
   }
 
   function formatTime(dateStr: string): string {
@@ -719,4 +741,20 @@
   loading={$deleteMut.isPending}
   onConfirm={handleDelete}
   onCancel={() => (deleteConfirmOpen = false)}
+/>
+
+<!-- Uncomplete Confirmation Dialog -->
+<ConfirmDialog
+  bind:open={uncompleteConfirmOpen}
+  title="Mark as Incomplete?"
+  message="Are you sure you want to mark this task as incomplete? This will remove the completion status."
+  confirmText="Mark Incomplete"
+  cancelText="Keep Complete"
+  destructive={false}
+  loading={$toggleCompleteMut.isPending}
+  onConfirm={confirmUncomplete}
+  onCancel={() => {
+    uncompleteConfirmOpen = false;
+    pendingUncompleteTask = null;
+  }}
 />

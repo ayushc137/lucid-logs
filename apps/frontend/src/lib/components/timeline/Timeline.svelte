@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Clock } from "lucide-svelte";
+    import { Clock, Check, Circle } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
 
     interface Task {
@@ -19,6 +19,7 @@
         startHour?: number;
         endHour?: number;
         onTaskClick?: (taskId: string) => void;
+        onToggleComplete?: (taskId: string, completed: boolean) => void;
     }
 
     let {
@@ -26,6 +27,7 @@
         startHour = 0,
         endHour = 24,
         onTaskClick,
+        onToggleComplete,
     }: Props = $props();
 
     // Default color for uncategorized tasks (neutral gray that works in both themes)
@@ -150,7 +152,7 @@
         currentHour >= startHour && currentHour <= endHour,
     );
 
-    // Group overlapping tasks into rows
+    // Group overlapping tasks into rows with improved overlap detection
     function getTaskRows(tasks: Task[]): Array<{ task: Task; row: number }> {
         if (tasks.length === 0) return [];
 
@@ -158,29 +160,40 @@
             (a, b) => a.startTime.getTime() - b.startTime.getTime(),
         );
         const result: Array<{ task: Task; row: number }> = [];
-        const rows: Array<{ endTime: Date }> = [];
+        // Track each row's visual end position (including min width consideration)
+        const rows: Array<{ visualEndTime: Date }> = [];
         const totalHours = endHour - startHour;
         const totalDurationMs = totalHours * 60 * 60 * 1000;
-        const minDurationMs = (3 / 100) * totalDurationMs;
+        // Minimum visual width as 3% of the timeline
+        const minVisualDurationMs = (3 / 100) * totalDurationMs;
+        // Add a small gap buffer between tasks (5 minutes in ms)
+        const gapBufferMs = 5 * 60 * 1000;
 
         for (const task of sorted) {
-            // Calculate effective duration based on min width
-            const durationMs =
+            // Calculate the visual duration (accounting for minimum width)
+            const actualDurationMs =
                 task.endTime.getTime() - task.startTime.getTime();
-            const effectiveDurationMs = Math.max(durationMs, minDurationMs);
+            const visualDurationMs = Math.max(
+                actualDurationMs,
+                minVisualDurationMs,
+            );
             const visualEndTime = new Date(
-                task.startTime.getTime() + effectiveDurationMs,
+                task.startTime.getTime() + visualDurationMs + gapBufferMs,
             );
 
+            // Find the first row where this task fits (doesn't overlap with visual end)
             let rowIndex = rows.findIndex(
-                (row) => row.endTime <= task.startTime,
+                (row) =>
+                    row.visualEndTime.getTime() <= task.startTime.getTime(),
             );
 
             if (rowIndex === -1) {
+                // No existing row can accommodate this task, create a new row
                 rowIndex = rows.length;
-                rows.push({ endTime: visualEndTime });
+                rows.push({ visualEndTime });
             } else {
-                rows[rowIndex].endTime = visualEndTime;
+                // Update the row's visual end time
+                rows[rowIndex].visualEndTime = visualEndTime;
             }
 
             result.push({ task, row: rowIndex });
@@ -321,14 +334,37 @@
                                 class="relative h-full px-4 py-2 flex items-center gap-3 overflow-hidden"
                                 style="color: {textColor};"
                             >
-                                {#if task.emoji}
-                                    <span
-                                        class="text-lg flex-shrink-0 drop-shadow"
-                                        >{task.emoji}</span
-                                    >
-                                {/if}
+                                <!-- Completion checkbox -->
+                                <button
+                                    class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110"
+                                    style="background: {task.completed
+                                        ? textColor
+                                        : `${textColor}20`}; color: {task.completed
+                                        ? color
+                                        : textColor};"
+                                    onclick={(e) => {
+                                        e.stopPropagation();
+                                        onToggleComplete?.(
+                                            task.id,
+                                            !task.completed,
+                                        );
+                                    }}
+                                    title={task.completed
+                                        ? "Mark as incomplete"
+                                        : "Mark as complete"}
+                                >
+                                    {#if task.completed}
+                                        <Check class="w-4 h-4" />
+                                    {:else}
+                                        <Circle class="w-4 h-4 opacity-50" />
+                                    {/if}
+                                </button>
                                 <div class="min-w-0 flex-1">
-                                    <h4 class="font-semibold text-sm truncate">
+                                    <h4
+                                        class="font-semibold text-sm truncate"
+                                        class:line-through={task.completed}
+                                        class:opacity-70={task.completed}
+                                    >
                                         {task.title}
                                     </h4>
                                     <div
@@ -353,14 +389,6 @@
                                         </span>
                                     </div>
                                 </div>
-                                {#if task.completed}
-                                    <div
-                                        class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-                                        style="background: {textColor}20;"
-                                    >
-                                        <span class="text-xs font-bold">✓</span>
-                                    </div>
-                                {/if}
                             </div>
 
                             <!-- Hover tooltip - position based on row -->
@@ -487,6 +515,9 @@
 
     .task-card {
         min-width: 120px;
+        /* Add right padding for horizontal separation between adjacent tasks */
+        padding-right: 4px;
+        box-sizing: border-box;
     }
 
     /* Tooltip positioning */

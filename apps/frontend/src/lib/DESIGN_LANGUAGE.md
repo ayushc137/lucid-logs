@@ -223,20 +223,46 @@ Sizes:
 ```
 
 ### 10. Confirm Dialog (`ConfirmDialog`)
-For delete/destructive action confirmations.
+Structured confirmation dialog with header/content/footer matching Modal design.
+
+**Two Variants:**
+- `destructive={true}` - Red styling for permanent actions (delete)
+- `destructive={false}` - Warning/amber styling for reversible actions (uncomplete)
 
 ```svelte
+<!-- Destructive example (delete) -->
 <ConfirmDialog
     bind:open={deleteOpen}
     title="Delete Task?"
-    message="This action cannot be undone."
+    message="This action cannot be undone. The task and all associated data will be permanently removed."
     confirmText="Delete"
     destructive={true}
     loading={isDeleting}
     onConfirm={handleDelete}
     onCancel={() => deleteOpen = false}
 />
+
+<!-- Warning example (uncomplete) -->
+<ConfirmDialog
+    bind:open={uncompleteOpen}
+    title="Mark as Incomplete?"
+    message="Are you sure you want to mark this task as incomplete? This will remove the completion status."
+    confirmText="Mark Incomplete"
+    cancelText="Keep Complete"
+    destructive={false}
+    loading={isPending}
+    onConfirm={handleUncomplete}
+    onCancel={() => uncompleteOpen = false}
+/>
 ```
+
+**Features:**
+- Header with icon box (error or warning themed)
+- Title with semantic color
+- Subtitle reflecting action type
+- Content area with message
+- Footer with cancel/confirm actions
+- Consistent with Modal component styling
 
 ---
 

@@ -11,7 +11,11 @@
     import { createQuery } from "@tanstack/svelte-query";
     import { getCategories, createCategory } from "$lib/api/categories";
     import { RichEditor } from "$lib/components/rich-editor";
-    import { CategoryDropdown, ColorPicker } from "$lib/components/ui";
+    import {
+        CategoryDropdown,
+        ColorPicker,
+        ConfirmDialog,
+    } from "$lib/components/ui";
     import { cn } from "$lib/utils";
 
     import {
@@ -26,6 +30,8 @@
         Save,
         Tag,
         Calendar,
+        CircleCheck,
+        Circle,
     } from "lucide-svelte";
 
     interface Props {
@@ -47,6 +53,7 @@
     let negatives = $state<TaskItem[]>([]);
     let newPositive = $state("");
     let newNegative = $state("");
+    let completed = $state(false);
 
     // Date/time state
     let startDate = $state("");
@@ -59,6 +66,9 @@
     let newCategoryColor = $state("#6366f1");
     let showNewCategory = $state(false);
     let useCustomCategoryColor = $state(false);
+
+    // Uncomplete confirmation
+    let showUncompleteConfirm = $state(false);
 
     const categoriesQuery = createQuery({
         queryKey: ["categories"],
@@ -120,6 +130,7 @@
             priority = task.priority || 3;
             positives = task.positives || [];
             negatives = task.negatives || [];
+            completed = task.completed || false;
 
             const startDateObj = new Date(task.start_date);
             const endDateObj = new Date(task.end_date);
@@ -156,10 +167,27 @@
         negatives = [];
         newPositive = "";
         newNegative = "";
+        completed = false;
         startDate = getTodayString();
         endDate = getTodayString();
         startTime = "09:00";
         endTime = "10:00";
+    }
+
+    // Handle completion toggle - show confirmation when uncompleting
+    function handleCompletionToggle() {
+        if (completed) {
+            // Uncompleting - show confirmation
+            showUncompleteConfirm = true;
+        } else {
+            // Completing - just toggle without confirmation
+            completed = true;
+        }
+    }
+
+    function confirmUncomplete() {
+        completed = false;
+        showUncompleteConfirm = false;
     }
 
     function addPositive() {
@@ -220,7 +248,8 @@
         };
 
         if (isEditing && task) {
-            $updateMut.mutate({ id: task.id, data });
+            // Include completed status when updating
+            $updateMut.mutate({ id: task.id, data: { ...data, completed } });
         } else {
             $createMut.mutate(data);
         }
@@ -270,14 +299,55 @@
             class="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-200/50"
         >
             <div class="flex items-center gap-3">
-                <div class="stat-icon bg-primary/10">
-                    <Sparkles class="w-5 h-5 text-primary" />
-                </div>
+                <!-- Completion Checkbox (only in edit mode) -->
+                {#if isEditing}
+                    <button
+                        class={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer",
+                            completed
+                                ? "bg-success text-success-content hover:bg-success/80"
+                                : "bg-base-300 hover:bg-primary/10 hover:text-primary",
+                        )}
+                        onclick={handleCompletionToggle}
+                        title={completed
+                            ? "Mark as incomplete"
+                            : "Mark as complete"}
+                    >
+                        {#if completed}
+                            <CircleCheck class="w-5 h-5" />
+                        {:else}
+                            <Circle class="w-5 h-5" />
+                        {/if}
+                    </button>
+                {:else}
+                    <div class="stat-icon bg-primary/10">
+                        <Sparkles class="w-5 h-5 text-primary" />
+                    </div>
+                {/if}
                 <div>
-                    <h3 class="font-bold text-lg">
-                        {isEditing ? "Edit Task" : "Create New Task"}
-                    </h3>
-                    <p class="text-xs opacity-50">Capture your moment</p>
+                    <div class="flex items-center gap-2">
+                        <h3
+                            class={cn(
+                                "font-bold text-lg",
+                                completed && isEditing && "text-success",
+                            )}
+                        >
+                            {isEditing ? "Edit Task" : "Create New Task"}
+                        </h3>
+                        {#if isEditing && completed}
+                            <span class="badge badge-success badge-sm gap-1">
+                                <Check class="w-3 h-3" />
+                                Completed
+                            </span>
+                        {/if}
+                    </div>
+                    <p class="text-xs opacity-50">
+                        {#if isEditing && completed}
+                            Task is complete
+                        {:else}
+                            Capture your moment
+                        {/if}
+                    </p>
                 </div>
             </div>
             <button
@@ -667,3 +737,15 @@
         <button onclick={handleClose}>close</button>
     </form>
 </dialog>
+
+<!-- Uncomplete Confirmation Dialog -->
+<ConfirmDialog
+    bind:open={showUncompleteConfirm}
+    title="Mark as Incomplete?"
+    message="Are you sure you want to mark this task as incomplete? This will remove the completion status."
+    confirmText="Mark Incomplete"
+    cancelText="Keep Complete"
+    destructive={false}
+    onConfirm={confirmUncomplete}
+    onCancel={() => (showUncompleteConfirm = false)}
+/>

@@ -12,9 +12,14 @@
   } from "lucide-svelte";
   import { Timeline } from "$lib/components/timeline";
   import { TaskModal } from "$lib/components/tasks";
-  import { Card, IconBox, SectionHeader } from "$lib/components/ui";
-  import { createQuery } from "@tanstack/svelte-query";
-  import { getTasks, type Task } from "$lib/api";
+  import {
+    Card,
+    IconBox,
+    SectionHeader,
+    ConfirmDialog,
+  } from "$lib/components/ui";
+  import { createQuery, createMutation } from "@tanstack/svelte-query";
+  import { getTasks, updateTask, type Task } from "$lib/api";
   import { getCategories, type Category } from "$lib/api/categories";
   import { cn } from "$lib/utils";
 
@@ -96,6 +101,19 @@
   let modalOpen = $state(false);
   let editingTask = $state<Task | null>(null);
 
+  // Uncomplete confirmation state
+  let showUncompleteConfirm = $state(false);
+  let pendingUncompleteTaskId = $state<string | null>(null);
+
+  // Toggle complete mutation
+  const toggleCompleteMut = createMutation({
+    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
+      updateTask(id, { completed }),
+    onSuccess: () => {
+      $tasksQuery.refetch();
+    },
+  });
+
   // Handle task click from timeline to open edit modal
   function handleTaskClick(taskId: string) {
     const task = $tasksQuery.data?.items?.find((t) => t.id === taskId);
@@ -109,6 +127,30 @@
   function handleModalClose() {
     modalOpen = false;
     editingTask = null;
+    $tasksQuery.refetch();
+  }
+
+  // Handle toggle complete from timeline
+  function handleToggleComplete(taskId: string, newCompleted: boolean) {
+    if (!newCompleted) {
+      // Uncompleting - show confirmation
+      pendingUncompleteTaskId = taskId;
+      showUncompleteConfirm = true;
+    } else {
+      // Completing - just do it
+      $toggleCompleteMut.mutate({ id: taskId, completed: true });
+    }
+  }
+
+  function confirmUncomplete() {
+    if (pendingUncompleteTaskId) {
+      $toggleCompleteMut.mutate({
+        id: pendingUncompleteTaskId,
+        completed: false,
+      });
+      pendingUncompleteTaskId = null;
+      showUncompleteConfirm = false;
+    }
   }
 
   // Quick logs data
@@ -339,6 +381,7 @@
               startHour={0}
               endHour={24}
               onTaskClick={handleTaskClick}
+              onToggleComplete={handleToggleComplete}
             />
           {/if}
         </div>
@@ -425,6 +468,22 @@
   bind:open={modalOpen}
   task={editingTask}
   onClose={handleModalClose}
+/>
+
+<!-- Uncomplete Confirmation Dialog -->
+<ConfirmDialog
+  bind:open={showUncompleteConfirm}
+  title="Mark as Incomplete?"
+  message="Are you sure you want to mark this task as incomplete? This will remove the completion status."
+  confirmText="Mark Incomplete"
+  cancelText="Keep Complete"
+  destructive={false}
+  loading={$toggleCompleteMut.isPending}
+  onConfirm={confirmUncomplete}
+  onCancel={() => {
+    showUncompleteConfirm = false;
+    pendingUncompleteTaskId = null;
+  }}
 />
 
 <style>

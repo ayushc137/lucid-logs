@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { TriangleAlert } from "lucide-svelte";
+    import { TriangleAlert, AlertCircle, X } from "lucide-svelte";
 
     interface Props {
         /** Control dialog visibility */
@@ -12,7 +12,7 @@
         confirmText?: string;
         /** Cancel button text */
         cancelText?: string;
-        /** Confirm button is destructive */
+        /** Confirm button is destructive (red) vs warning (amber) */
         destructive?: boolean;
         /** Loading state */
         loading?: boolean;
@@ -42,24 +42,58 @@
     function handleConfirm() {
         onConfirm?.();
     }
+
+    // Color schemes based on destructive prop
+    const iconBg = $derived(destructive ? "bg-error/10" : "bg-warning/10");
+    const iconColor = $derived(destructive ? "text-error" : "text-warning");
+    const titleColor = $derived(destructive ? "text-error" : "text-warning");
+    const buttonClass = $derived(destructive ? "btn-error" : "btn-warning");
 </script>
 
-<dialog class="modal" class:modal-open={open}>
-    <div class="modal-box max-w-sm">
-        <div class="flex items-start gap-4">
-            {#if destructive}
+<dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>
+    <div class="modal-box max-w-md p-0 overflow-hidden">
+        <!-- Header -->
+        <div
+            class="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-200/50"
+        >
+            <div class="flex items-center gap-3">
+                <!-- Icon Box - matching design language -->
                 <div
-                    class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center shrink-0"
+                    class="w-10 h-10 rounded-xl flex items-center justify-center {iconBg}"
                 >
-                    <TriangleAlert class="w-6 h-6 text-error" />
+                    {#if destructive}
+                        <TriangleAlert class="w-5 h-5 {iconColor}" />
+                    {:else}
+                        <AlertCircle class="w-5 h-5 {iconColor}" />
+                    {/if}
                 </div>
-            {/if}
-            <div>
-                <h3 class="font-bold text-lg">{title}</h3>
-                <p class="py-2 opacity-70">{message}</p>
+                <div>
+                    <h3 class="font-bold text-lg {titleColor}">{title}</h3>
+                    <p class="text-xs opacity-50">
+                        {destructive
+                            ? "This action is permanent"
+                            : "Please confirm your action"}
+                    </p>
+                </div>
             </div>
+            <button
+                class="btn btn-ghost btn-sm btn-circle"
+                onclick={handleCancel}
+                disabled={loading}
+            >
+                <X class="w-5 h-5" />
+            </button>
         </div>
-        <div class="modal-action">
+
+        <!-- Content -->
+        <div class="px-6 py-5">
+            <p class="text-base-content/80 leading-relaxed">{message}</p>
+        </div>
+
+        <!-- Footer -->
+        <div
+            class="flex items-center justify-end gap-2 px-6 py-4 border-t border-base-300 bg-base-200/50"
+        >
             <button
                 class="btn btn-ghost"
                 onclick={handleCancel}
@@ -68,7 +102,7 @@
                 {cancelText}
             </button>
             <button
-                class="btn {destructive ? 'btn-error' : 'btn-primary'}"
+                class="btn {buttonClass} min-w-[120px]"
                 onclick={handleConfirm}
                 disabled={loading}
             >
@@ -79,7 +113,10 @@
             </button>
         </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
+    <form
+        method="dialog"
+        class="modal-backdrop bg-base-content/20 backdrop-blur-sm"
+    >
         <button onclick={handleCancel}>close</button>
     </form>
 </dialog>
