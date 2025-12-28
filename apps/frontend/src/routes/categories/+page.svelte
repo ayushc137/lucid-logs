@@ -3,12 +3,12 @@
         Palette,
         Plus,
         Trash2,
-        Edit,
+        SquarePen,
         Check,
         X,
         Search,
-        AlertCircle,
-        Loader2,
+        CircleAlert,
+        LoaderCircle,
         Pipette,
     } from "lucide-svelte";
     import {
@@ -247,7 +247,7 @@
         <div class="card-body p-4">
             <div class="relative">
                 {#if isSearching || $query.isFetching}
-                    <Loader2
+                    <LoaderCircle
                         class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 animate-spin"
                     />
                 {:else}
@@ -288,7 +288,7 @@
 
                 {#if createError}
                     <div class="alert alert-error">
-                        <AlertCircle class="w-4 h-4" />
+                        <CircleAlert class="w-4 h-4" />
                         <span>{createError}</span>
                     </div>
                 {/if}
@@ -422,7 +422,7 @@
         </div>
     {:else if $query.isError}
         <div class="alert alert-error shadow-lg">
-            <AlertCircle class="w-5 h-5" />
+            <CircleAlert class="w-5 h-5" />
             <span>Failed to load categories. Please try again.</span>
             <button
                 class="btn btn-sm btn-ghost"
@@ -656,7 +656,7 @@
                                                 onclick={() =>
                                                     startEdit(category)}
                                             >
-                                                <Edit class="w-4 h-4" />
+                                                <SquarePen class="w-4 h-4" />
                                             </button>
                                             <button
                                                 class="btn btn-ghost btn-sm btn-square text-error"
@@ -684,7 +684,7 @@
                 <span>{categories.length} categories</span>
                 {#if $query.isFetching}
                     <span class="flex items-center gap-2 text-primary">
-                        <Loader2 class="w-4 h-4 animate-spin" />
+                        <LoaderCircle class="w-4 h-4 animate-spin" />
                         Loading...
                     </span>
                 {/if}

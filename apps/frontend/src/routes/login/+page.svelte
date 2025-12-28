@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { Mail, Lock, AlertCircle, Sparkles, ArrowRight } from "lucide-svelte";
+  import { Mail, Lock, CircleAlert, Sparkles, ArrowRight } from "lucide-svelte";
   import { login } from "$lib/api";
   import { authStore, isDevAuthBypassEnabled } from "$lib/stores/auth.svelte";
 
@@ -83,7 +83,7 @@
       <!-- Error Alert -->
       {#if error}
         <div class="alert alert-error">
-          <AlertCircle class="h-4 w-4" />
+          <CircleAlert class="h-4 w-4" />
           <span>{error}</span>
         </div>
       {/if}

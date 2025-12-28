@@ -5,7 +5,7 @@
     Trash2,
     X,
     Check,
-    AlertCircle,
+    CircleAlert,
     Palette,
     ExternalLink,
     Pipette,
@@ -176,7 +176,7 @@
     >
       {#if createError}
         <div class="alert alert-error alert-sm">
-          <AlertCircle class="w-4 h-4" />
+          <CircleAlert class="w-4 h-4" />
           <span>{createError}</span>
         </div>
       {/if}

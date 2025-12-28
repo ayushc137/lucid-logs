@@ -21,7 +21,7 @@
         ThumbsUp,
         ThumbsDown,
         Clock,
-        AlertCircle,
+        CircleAlert,
         Save,
         Tag,
         Calendar,
@@ -554,7 +554,7 @@
                         <span
                             class="label-text text-xs font-semibold uppercase opacity-50 flex items-center gap-1.5"
                         >
-                            <AlertCircle class="w-3 h-3" />
+                            <CircleAlert class="w-3 h-3" />
                             Priority
                         </span>
                         <span

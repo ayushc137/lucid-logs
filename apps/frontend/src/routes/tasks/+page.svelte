@@ -3,10 +3,10 @@
     ListTodo,
     Plus,
     Trash2,
-    Edit,
+    SquarePen,
     Check,
     Search,
-    Filter,
+    Funnel,
     ChevronUp,
     ChevronDown,
     X,
@@ -15,9 +15,9 @@
     Tag,
     ArrowUpDown,
     CircleDot,
-    Loader2,
+    LoaderCircle,
     CalendarDays,
-    AlertCircle,
+    CircleAlert,
   } from "lucide-svelte";
   import {
     createQuery,
@@ -336,7 +336,7 @@
         <!-- Search Input -->
         <div class="relative flex-1">
           {#if isSearching || $tasksQuery.isFetching}
-            <Loader2
+            <LoaderCircle
               class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 animate-spin"
             />
           {:else}
@@ -385,7 +385,7 @@
           )}
           onclick={() => (showFilters = !showFilters)}
         >
-          <Filter class="w-4 h-4" />
+          <Funnel class="w-4 h-4" />
           Filters
           {#if hasActiveFilters}
             <span class="badge badge-sm badge-secondary">Active</span>
@@ -470,7 +470,7 @@
     </div>
   {:else if $tasksQuery.isError}
     <div class="alert alert-error shadow-lg">
-      <AlertCircle class="w-5 h-5" />
+      <CircleAlert class="w-5 h-5" />
       <span>Failed to load tasks. Please try again.</span>
       <button
         class="btn btn-sm btn-ghost"
@@ -741,7 +741,7 @@
                         openEditModal(task);
                       }}
                     >
-                      <Edit class="w-4 h-4" />
+                      <SquarePen class="w-4 h-4" />
                     </button>
                     <button
                       class="btn btn-ghost btn-sm btn-square text-error"
@@ -764,7 +764,7 @@
         <span>{tasks.length} tasks</span>
         {#if $tasksQuery.isFetching}
           <span class="flex items-center gap-2 text-primary">
-            <Loader2 class="w-4 h-4 animate-spin" />
+            <LoaderCircle class="w-4 h-4 animate-spin" />
             Loading...
           </span>
         {/if}
