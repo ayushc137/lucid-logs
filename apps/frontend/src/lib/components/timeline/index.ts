@@ -1,6 +1,3 @@
-// Original Timeline (kept for backward compatibility)
-export { default as Timeline } from './Timeline.svelte';
-
 // Multi-view timeline (recommended)
 export { default as TimelineMultiView, type TimelineView } from './TimelineMultiView.svelte';
 

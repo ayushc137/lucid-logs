@@ -17,4 +17,7 @@ export interface TimelineProps {
     onToggleComplete?: (taskId: string, completed: boolean) => void;
     onCategoryClick?: (categoryId: string) => void;
     onDateChange?: (date: Date) => void;
+    onTaskTimeUpdate?: (taskId: string, startTime: Date, endTime: Date) => void;
+    editMode?: boolean;
+    onEditModeChange?: (enabled: boolean) => void;
 }
