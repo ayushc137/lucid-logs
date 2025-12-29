@@ -355,7 +355,7 @@
                                           ? 'bg-base-100/60 border-success/30'
                                           : 'bg-base-100 border-base-300 hover:border-primary/30 hover:shadow-md'}
                                         {status === 'past' && !task.completed
-                                        ? 'opacity-50'
+                                        ? 'opacity-70'
                                         : ''}"
                                     role="button"
                                     onclick={() => onTaskClick?.(task.id)}
@@ -368,7 +368,7 @@
                                             class="text-sm font-bold {status ===
                                             'current'
                                                 ? 'text-primary'
-                                                : 'text-base-content/70'}"
+                                                : 'text-base-content'}"
                                         >
                                             {formatTime(task.startTime)}
                                         </span>
@@ -380,7 +380,7 @@
                                             ></div>
                                         </div>
                                         <span
-                                            class="text-xs text-base-content/40"
+                                            class="text-xs text-base-content/60"
                                         >
                                             {formatTime(task.endTime)}
                                         </span>
@@ -403,14 +403,14 @@
                                             <div class="flex-1 min-w-0">
                                                 <h4
                                                     class="font-semibold text-base truncate {task.completed
-                                                        ? 'line-through opacity-60'
+                                                        ? 'line-through opacity-70'
                                                         : ''}"
                                                 >
                                                     {task.title}
                                                 </h4>
                                                 {#if task.categoryName}
                                                     <p
-                                                        class="text-xs text-base-content/50 mt-0.5 flex items-center gap-1"
+                                                        class="text-xs text-base-content/60 mt-0.5 flex items-center gap-1"
                                                     >
                                                         <span
                                                             class="w-2 h-2 rounded-full"

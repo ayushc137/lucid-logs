@@ -131,8 +131,8 @@
         }
     });
 
-    const ROW_HEIGHT = 32;
-    const ROW_GAP = 4;
+    const ROW_HEIGHT = 40;
+    const ROW_GAP = 6;
     const MIN_TASK_WIDTH_PX = 6; // Minimum pixel width for very short tasks
 
     let currentTime = $state(new Date());
@@ -385,7 +385,7 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <span class="text-[9px] text-base-content/30 hidden lg:inline"
+            <span class="text-[9px] text-base-content/50 hidden lg:inline"
                 >Ctrl+Scroll</span
             >
             <div
@@ -458,7 +458,7 @@
                         >
                             {#if showLabel}
                                 <span
-                                    class="text-[9px] font-medium text-base-content/40 pl-1"
+                                    class="text-[9px] font-medium text-base-content/60 pl-1"
                                 >
                                     {formatHour(hour)}
                                 </span>
@@ -471,8 +471,19 @@
             <!-- Grid and tasks -->
             <div
                 class="relative"
-                style="min-height: max({packed.height}px, calc(100vh - 220px));"
+                style="min-height: {Math.max(packed.height + 24, 180)}px;"
             >
+                <!-- Alternating hour backgrounds -->
+                <div class="absolute inset-0 pointer-events-none flex">
+                    {#each Array.from({ length: 24 }, (_, i) => i) as hour}
+                        <div
+                            class="flex-1 {hour % 2 === 0
+                                ? 'bg-base-200/20'
+                                : 'bg-transparent'}"
+                        ></div>
+                    {/each}
+                </div>
+
                 <!-- Grid lines -->
                 <div class="absolute inset-0 pointer-events-none">
                     {#each Array.from({ length: 25 }, (_, i) => i) as hour}
@@ -480,16 +491,10 @@
                             class="absolute top-0 bottom-0 w-px {hour === 0 ||
                             hour === 24
                                 ? 'bg-base-300/60'
-                                : 'bg-base-200/40'}"
+                                : hour % 6 === 0
+                                  ? 'bg-base-300/40'
+                                  : 'bg-base-200/40'}"
                             style="left: {(hour / 24) * 100}%;"
-                        ></div>
-                    {/each}
-
-                    <!-- Quarter-hour lines (subtle) -->
-                    {#each Array.from({ length: 24 }, (_, i) => i) as hour}
-                        <div
-                            class="absolute top-0 bottom-0 w-px bg-base-200/20"
-                            style="left: {((hour + 0.5) / 24) * 100}%;"
                         ></div>
                     {/each}
 
@@ -520,7 +525,7 @@
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <div
                             class="task-wrapper absolute transition-all duration-100 {isFaded
-                                ? 'opacity-30'
+                                ? 'opacity-50'
                                 : ''} {isHov ? 'z-50' : 'z-10'}"
                             style="left: {pos.left}%; width: {pos.width}%; top: {row *
                                 (ROW_HEIGHT +
@@ -534,24 +539,22 @@
                             onclick={() => onTaskClick?.(task.id)}
                         >
                             <div
-                                class="task-bar relative h-full rounded cursor-pointer overflow-hidden
+                                class="task-bar relative h-full rounded-md cursor-pointer overflow-hidden
                                     {task.completed ? 'task-completed' : ''} 
                                     {isHov
-                                    ? 'ring-2 ring-base-content/20 shadow-lg scale-y-110'
-                                    : 'shadow-sm'}"
+                                    ? 'ring-2 ring-base-content/30 shadow-lg scale-y-105'
+                                    : 'shadow-md hover:shadow-lg'}"
                                 style="background-color: {bg};"
                                 title={task.title}
                             >
                                 <!-- Content -->
                                 <div
-                                    class="relative h-full flex items-center px-1.5 overflow-hidden"
+                                    class="relative h-full flex items-center px-2 overflow-hidden"
                                     style="color: {txt};"
                                 >
                                     {#if textMode === "full"}
                                         <span
-                                            class="text-[10px] font-semibold truncate leading-tight {task.completed
-                                                ? 'opacity-70'
-                                                : ''}"
+                                            class="text-xs font-semibold truncate"
                                         >
                                             {task.title}
                                         </span>
@@ -639,7 +642,7 @@
 
 <style>
     .task-completed {
-        opacity: 0.65;
+        opacity: 0.75;
     }
 
     .completed-overlay {
