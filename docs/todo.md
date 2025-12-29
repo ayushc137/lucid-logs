@@ -1,5 +1,7 @@
 
-SET default states in setting for : completed staate, last task, from last task etc 
+SET default states in setting for : completed staate, last task, from last task 
+set default time for retro and based ont hat update timeline with default time there as well 
+etc 
 
 
 

@@ -72,6 +72,48 @@
     // Track if we're currently in a drag operation (to prevent click)
     let hasDragged = $state(false);
 
+    // Optimistic updates to prevent snap-back while saving
+    let optimisticOverrides = $state<
+        Record<string, { startTime: Date; endTime: Date }>
+    >({});
+
+    // Clear overrides when tasks prop updates (reconciliation)
+    $effect(() => {
+        let changed = false;
+        const nextOverrides = { ...optimisticOverrides };
+        const currentIds = new Set(tasks.map((t) => t.id));
+
+        // 1. Remove overrides for deleted tasks
+        for (const id in nextOverrides) {
+            if (!currentIds.has(id)) {
+                delete nextOverrides[id];
+                changed = true;
+            }
+        }
+
+        // 2. Remove overrides that match the current server state
+        for (const task of tasks) {
+            const override = nextOverrides[task.id];
+            if (override) {
+                const startDiff = Math.abs(
+                    task.startTime.getTime() - override.startTime.getTime(),
+                );
+                const endDiff = Math.abs(
+                    task.endTime.getTime() - override.endTime.getTime(),
+                );
+                // If reasonably close (within 5s to account for precision loss), assume synced
+                if (startDiff < 5000 && endDiff < 5000) {
+                    delete nextOverrides[task.id];
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+            optimisticOverrides = nextOverrides;
+        }
+    });
+
     // Snap to minutes (1 = every minute, 5 = every 5 minutes, etc.)
     const SNAP_MINUTES = 1;
 
@@ -101,6 +143,13 @@
         const minutes = Math.round((hour - hours) * 60);
         date.setHours(hours, minutes, 0, 0);
         return date;
+    }
+
+    function getRelativeHour(date: Date): number {
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        // Calculate difference in milliseconds and convert to hours
+        return (date.getTime() - startOfDay.getTime()) / (1000 * 60 * 60);
     }
 
     function handleDragStart(
@@ -147,11 +196,8 @@
 
         if (dragMode === "move") {
             // Move the entire task
-            const originalStartHour =
-                originalStartTime.getHours() +
-                originalStartTime.getMinutes() / 60;
-            const originalEndHour =
-                originalEndTime.getHours() + originalEndTime.getMinutes() / 60;
+            const originalStartHour = getRelativeHour(originalStartTime);
+            const originalEndHour = getRelativeHour(originalEndTime);
             const duration = originalEndHour - originalStartHour;
 
             let newStartHour = originalStartHour + deltaHours;
@@ -171,12 +217,9 @@
             previewEndTime = snapToMinutes(hourToDate(newEndHour));
         } else if (dragMode === "resize-start") {
             // Resize from start
-            const originalStartHour =
-                originalStartTime.getHours() +
-                originalStartTime.getMinutes() / 60;
+            const originalStartHour = getRelativeHour(originalStartTime);
             let newStartHour = originalStartHour + deltaHours;
-            const originalEndHour =
-                originalEndTime.getHours() + originalEndTime.getMinutes() / 60;
+            const originalEndHour = getRelativeHour(originalEndTime);
 
             // Ensure minimum duration of 5 minutes
             const minEndHour = originalEndHour - 5 / 60;
@@ -186,12 +229,9 @@
             previewEndTime = new Date(originalEndTime);
         } else if (dragMode === "resize-end") {
             // Resize from end
-            const originalEndHour =
-                originalEndTime.getHours() + originalEndTime.getMinutes() / 60;
+            const originalEndHour = getRelativeHour(originalEndTime);
             let newEndHour = originalEndHour + deltaHours;
-            const originalStartHour =
-                originalStartTime.getHours() +
-                originalStartTime.getMinutes() / 60;
+            const originalStartHour = getRelativeHour(originalStartTime);
 
             // Ensure minimum duration of 5 minutes
             const minStartHour = originalStartHour + 5 / 60;
@@ -217,6 +257,16 @@
                 originalEndTime?.getTime() !== previewEndTime.getTime();
 
             if (startChanged || endChanged) {
+                // 1. Optimistic Update
+                optimisticOverrides = {
+                    ...optimisticOverrides,
+                    [draggedTaskId]: {
+                        startTime: previewStartTime,
+                        endTime: previewEndTime,
+                    },
+                };
+
+                // 2. Trigger Callback
                 onTaskTimeUpdate(
                     draggedTaskId,
                     previewStartTime,
@@ -530,31 +580,30 @@
         };
     }
 
-    // Pack tasks with live preview support
+    // Pack tasks - modified to prevent vertical jitter during drag
+    // 1. Apply optimistic overrides FIRST
+    // 2. Ignore drag previews for sorting/lanes (keeps rows stable during drag)
     function packTasks(list: TimelineTask[]) {
         const valid = list.filter(
             (t) => t.startTime instanceof Date && t.endTime instanceof Date,
         );
 
-        // Create modified list with preview positions
-        const modifiedList = valid.map((task) => {
-            if (
-                draggedTaskId === task.id &&
-                previewStartTime &&
-                previewEndTime
-            ) {
+        // Apply optimistic overrides
+        const effectiveTasks = valid.map((task) => {
+            if (optimisticOverrides[task.id]) {
                 return {
                     ...task,
-                    startTime: previewStartTime,
-                    endTime: previewEndTime,
+                    ...optimisticOverrides[task.id],
                 };
             }
             return task;
         });
 
-        const sorted = [...modifiedList].sort(
+        // Sort by effective time
+        const sorted = [...effectiveTasks].sort(
             (a, b) => a.startTime.getTime() - b.startTime.getTime(),
         );
+
         const rows: Array<{ task: TimelineTask; row: number }> = [];
         const lanes: number[] = [];
 
@@ -570,8 +619,10 @@
             } else {
                 lanes[lane] = right;
             }
-            // Find original task to preserve ID
-            const originalTask = valid.find((t) => t.id === task.id) || task;
+            // Find original task to preserve ID (we want the original object ref if possible, but updated times logic handled nicely inside loop)
+            // Actually map back to the original task object but we need the calculated row
+            // The template will handle the display position (preview vs optimistic vs original)
+            const originalTask = list.find((t) => t.id === task.id) || task;
             rows.push({ task: originalTask, row: lane });
         }
 
@@ -643,7 +694,9 @@
 
         for (let h = 0; h <= 24; h++) {
             // Major hour lines
-            lines.push({ hour: h, type: "major", label: formatHour(h) });
+            // Don't show label for 24h (end of day) if it's 12 AM
+            const label = h === 24 ? undefined : formatHour(h);
+            lines.push({ hour: h, type: "major", label });
 
             if (h < 24) {
                 // Half-hour lines
@@ -680,9 +733,12 @@
     }
 
     function updateTooltipPosition(e: MouseEvent) {
-        // Position tooltip above and to the right, ensuring it stays visible
-        const x = e.clientX + 12;
-        const y = Math.max(80, e.clientY - 80); // Keep above the mouse, min 80px from top
+        // Position tooltip below and to the right of the mouse
+        const x = e.clientX + 16;
+        const y = e.clientY + 16;
+
+        // Simple bounds check to prevent going off screen could be added here if needed
+        // but for now, following user request strictly for "bottom right"
         tooltipPosition = { x, y };
     }
 
@@ -704,6 +760,27 @@
             return;
         }
         onTaskClick?.(taskId);
+    }
+
+    function getEffectiveTime(
+        task: TimelineTask,
+        overrides: Record<string, { startTime: Date; endTime: Date }>,
+        isDragging: boolean,
+        previewStart: Date | null,
+        previewEnd: Date | null,
+        type: "start" | "end",
+    ): Date {
+        // use preview times if dragging THIS task
+        if (isDragging && previewStart && previewEnd) {
+            return type === "start" ? previewStart : previewEnd;
+        }
+        // use optimistic override if strictly present
+        const override = overrides[task.id];
+        if (override) {
+            return type === "start" ? override.startTime : override.endTime;
+        }
+        // fallback to task time
+        return type === "start" ? task.startTime : task.endTime;
     }
 </script>
 
@@ -911,26 +988,49 @@
                 <!-- Tasks -->
                 <div class="relative py-3 px-1">
                     {#each packed.rows as { task, row } (task.id)}
-                        {@const originalPos = getTaskPosition(task)}
-                        {@const previewPos = getPreviewPosition(task)}
-                        {@const pos = previewPos || originalPos}
                         {@const bg = task.categoryColor || "#6b7280"}
                         {@const txt = getTextColor(bg)}
                         {@const txtSecondary = getSecondaryTextColor(bg)}
                         {@const isHov = hoveredTaskId === task.id}
-                        {@const isFaded = hoveredTaskId && !isHov && !dragMode}
-                        {@const contentMode = canShowContent(pos.width)}
                         {@const isDragging = draggedTaskId === task.id}
-                        {@const showPreviewTimes =
+                        <!-- Keep spotlight effect: Fade if we are hovering OR dragging something, and this is NOT it -->
+                        {@const isFaded =
+                            (hoveredTaskId || draggedTaskId) &&
+                            !isHov &&
+                            !isDragging}
+
+                        <!-- Calculate effective times -->
+                        {@const previewTimes =
                             isDragging && previewStartTime && previewEndTime}
-                        {@const taskStartTime =
-                            isDragging && previewStartTime
-                                ? previewStartTime
-                                : task.startTime}
-                        {@const taskEndTime =
-                            isDragging && previewEndTime
-                                ? previewEndTime
-                                : task.endTime}
+                        {@const taskStartTime = getEffectiveTime(
+                            task,
+                            optimisticOverrides,
+                            isDragging,
+                            previewStartTime,
+                            previewEndTime,
+                            "start",
+                        )}
+                        {@const taskEndTime = getEffectiveTime(
+                            task,
+                            optimisticOverrides,
+                            isDragging,
+                            previewStartTime,
+                            previewEndTime,
+                            "end",
+                        )}
+
+                        <!-- Calculate Position -->
+                        {@const pos = getTaskPosition({
+                            ...task,
+                            startTime: taskStartTime,
+                            endTime: taskEndTime,
+                        })}
+
+                        <!-- Now we can use pos -->
+                        {@const contentMode = canShowContent(pos.width)}
+                        {@const showPreviewTimes = previewTimes}
+                        {@const isLeftEdge = pos.left <= 0.05}
+                        {@const isRightEdge = pos.left + pos.width >= 99.95}
 
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
@@ -953,13 +1053,13 @@
                             onmouseleave={onMouseLeave}
                             onclick={(e) => handleTaskClick(e, task.id)}
                         >
-                            <!-- Time preview bubble during drag - positioned ABOVE the task bar -->
+                            <!-- Time preview bubble during drag -->
                             {#if showPreviewTimes && previewStartTime && previewEndTime}
                                 <div
-                                    class="absolute -top-9 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
+                                    class="absolute -top-10 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
                                 >
                                     <div
-                                        class="time-preview-badge bg-warning text-warning-content px-3 py-1 rounded-full text-xs font-bold shadow-xl whitespace-nowrap flex items-center gap-2"
+                                        class="time-preview-badge bg-warning text-warning-content px-3 py-1.5 rounded-full text-xs font-bold shadow-xl shadow-warning/20 whitespace-nowrap flex items-center gap-2"
                                     >
                                         <span
                                             >{formatTimeCompact(
@@ -973,7 +1073,7 @@
                                             )}</span
                                         >
                                         <span
-                                            class="ml-1 px-1.5 py-0.5 bg-warning-content/20 rounded text-[10px]"
+                                            class="ml-1 px-1.5 py-0.5 bg-black/10 rounded text-[10px]"
                                         >
                                             {formatDuration(
                                                 previewStartTime,
@@ -989,14 +1089,20 @@
                                 class="task-bar relative h-full rounded-lg overflow-visible shadow-md
                                     {task.completed ? 'task-completed' : ''} 
                                     {isHov && !isDragging
-                                    ? 'ring-2 ring-base-content/25 shadow-xl scale-[1.02]'
+                                    ? 'ring-2 ring-base-content/25 shadow-xl scale-[1.02] z-50'
                                     : ''}
                                     {isDragging
-                                    ? 'ring-2 ring-warning shadow-2xl scale-[1.03] cursor-grabbing'
+                                    ? 'ring-2 ring-warning shadow-2xl shadow-warning/20 scale-[1.02] cursor-grabbing z-[100]'
                                     : ''}
                                     {isEditMode && !isDragging
                                     ? 'edit-mode-task cursor-grab'
-                                    : 'cursor-pointer'}"
+                                    : 'cursor-pointer'}
+                                    {isLeftEdge
+                                    ? '!rounded-l-none !border-l-0'
+                                    : ''} 
+                                    {isRightEdge
+                                    ? '!rounded-r-none !border-r-0'
+                                    : ''}"
                                 style="background: linear-gradient(135deg, {bg} 0%, {bg}dd 100%); border: 1px solid rgba(0,0,0,0.1);"
                                 onmousedown={(e) =>
                                     isEditMode &&
@@ -1005,38 +1111,42 @@
                                 <!-- Edit mode resize handles -->
                                 {#if isEditMode}
                                     <!-- Left resize handle -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div
-                                        class="resize-handle resize-left absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-center rounded-l-lg"
-                                        role="presentation"
-                                        onmousedown={(e) =>
-                                            handleDragStart(
-                                                e,
-                                                task,
-                                                "resize-start",
-                                            )}
-                                    >
+                                    {#if !isLeftEdge}
+                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                                         <div
-                                            class="w-1 h-6 rounded-full bg-white/40 group-hover:bg-white/60"
-                                        ></div>
-                                    </div>
+                                            class="resize-handle resize-left absolute -left-1 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-center group/handle"
+                                            role="presentation"
+                                            onmousedown={(e) =>
+                                                handleDragStart(
+                                                    e,
+                                                    task,
+                                                    "resize-start",
+                                                )}
+                                        >
+                                            <div
+                                                class="w-1 h-3.5 rounded-full bg-base-100 shadow-sm ring-1 ring-base-content/10 transition-all duration-200 group-hover/handle:h-6 group-hover/handle:w-1.5 group-hover/handle:bg-warning group-hover/handle:shadow-warning/50"
+                                            ></div>
+                                        </div>
+                                    {/if}
 
                                     <!-- Right resize handle -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div
-                                        class="resize-handle resize-right absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-center rounded-r-lg"
-                                        role="presentation"
-                                        onmousedown={(e) =>
-                                            handleDragStart(
-                                                e,
-                                                task,
-                                                "resize-end",
-                                            )}
-                                    >
+                                    {#if !isRightEdge}
+                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                                         <div
-                                            class="w-1 h-6 rounded-full bg-white/40 group-hover:bg-white/60"
-                                        ></div>
-                                    </div>
+                                            class="resize-handle resize-right absolute -right-1 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-center group/handle"
+                                            role="presentation"
+                                            onmousedown={(e) =>
+                                                handleDragStart(
+                                                    e,
+                                                    task,
+                                                    "resize-end",
+                                                )}
+                                        >
+                                            <div
+                                                class="w-1 h-3.5 rounded-full bg-base-100 shadow-sm ring-1 ring-base-content/10 transition-all duration-200 group-hover/handle:h-6 group-hover/handle:w-1.5 group-hover/handle:bg-warning group-hover/handle:shadow-warning/50"
+                                            ></div>
+                                        </div>
+                                    {/if}
                                 {/if}
 
                                 <!-- Content - Clean and minimal -->
@@ -1113,7 +1223,8 @@
 </div>
 
 <!-- Tooltip - High z-index to ensure visibility -->
-{#if hovered && tooltipPosition && !dragMode && !isEditMode}
+<!-- Tooltip - High z-index to ensure visibility -->
+{#if hovered && tooltipPosition && !dragMode}
     <div
         class="fixed z-[9999] pointer-events-none"
         style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"

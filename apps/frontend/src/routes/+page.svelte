@@ -372,6 +372,39 @@
     initialCategoryId = undefined;
     modalOpen = true;
   }
+
+  // Update task time mutation
+  const updateTaskTimeMut = createMutation({
+    mutationFn: ({
+      id,
+      start_date,
+      end_date,
+    }: {
+      id: string;
+      start_date: string;
+      end_date: string;
+    }) => updateTask(id, { start_date, end_date }),
+    onSuccess: () => {
+      // Invalidate both queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["tasks", "timeline"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks", "timeline-prev"] });
+    },
+  });
+
+  function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
+    // Optimistically update is handled in the component
+    // Here we just fire the API request
+    const { startOfDay: startDateStr } = formatDateForApi(start);
+    // Be careful with timezones. The API expects ISO strings.
+    // The previous transform used new Date(task.start_date), so we should send back ISO.
+
+    // We need to preserve the full timestamp
+    $updateTaskTimeMut.mutate({
+      id: taskId,
+      start_date: start.toISOString(),
+      end_date: end.toISOString(),
+    });
+  }
 </script>
 
 <svelte:head>
@@ -585,6 +618,7 @@
               onCategoryClick={handleCategoryClick}
               onToggleComplete={handleToggleComplete}
               onDateChange={handleDateChange}
+              onTaskTimeUpdate={handleTaskTimeUpdate}
             />
           {/if}
         </div>
