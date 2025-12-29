@@ -126,9 +126,9 @@
         }
     });
 
-    const ROW_HEIGHT = 38;
-    const ROW_GAP = 2;
-    const MIN_WIDTH_FOR_TEXT = 40; // pixels
+    const ROW_HEIGHT = 34;
+    const ROW_GAP = 6;
+    const MIN_WIDTH_FOR_TEXT = 45; // pixels
 
     let currentTime = $state(new Date());
     let timeInterval: ReturnType<typeof setInterval>;
@@ -479,7 +479,7 @@
                 </div>
 
                 <!-- Tasks -->
-                <div class="relative py-1 px-0.5">
+                <div class="relative py-2 px-1">
                     {#each packed.rows as { task, row } (task.id)}
                         {@const pos = getTaskPosition(task)}
                         {@const bg = task.categoryColor || "#6b7280"}
@@ -491,12 +491,12 @@
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <div
-                            class="absolute transition-opacity duration-100 {isFaded
+                            class="absolute transition-all duration-100 {isFaded
                                 ? 'opacity-30'
-                                : ''} {isHov ? 'z-40' : 'z-10'}"
+                                : ''} {isHov ? 'z-40 scale-[1.02]' : 'z-10'}"
                             style="left: {pos.left}%; width: {pos.width}%; top: {row *
                                 (ROW_HEIGHT +
-                                    ROW_GAP)}px; height: {ROW_HEIGHT}px;"
+                                    ROW_GAP)}px; height: {ROW_HEIGHT}px; padding: 1px;"
                             role="button"
                             onmouseenter={(e) => onMouseEnter(e, task.id)}
                             onmousemove={onMouseMove}
@@ -504,21 +504,21 @@
                             onclick={() => onTaskClick?.(task.id)}
                         >
                             <div
-                                class="task-bar h-full rounded cursor-pointer transition-shadow {task.completed
+                                class="task-bar h-full rounded-md cursor-pointer transition-all border border-black/10 {task.completed
                                     ? 'completed'
-                                    : ''} {isHov
-                                    ? 'shadow-md ring-1 ring-white/20'
+                                    : 'shadow-sm'} {isHov
+                                    ? 'shadow-lg ring-2 ring-white/30 border-white/20'
                                     : ''}"
                                 style="background-color: {bg};"
                                 title={task.title}
                             >
                                 {#if showText}
                                     <div
-                                        class="h-full px-1.5 flex items-center overflow-hidden"
+                                        class="h-full px-2 flex items-center overflow-hidden"
                                         style="color: {txt};"
                                     >
                                         <span
-                                            class="text-[10px] font-medium truncate {task.completed
+                                            class="text-[11px] font-semibold truncate {task.completed
                                                 ? 'opacity-60'
                                                 : ''}"
                                         >
