@@ -742,7 +742,7 @@
         <div class="flex items-center gap-3">
             <!-- Edit Mode Toggle -->
             <div
-                class="tooltip tooltip-top"
+                class="tooltip tooltip-left"
                 data-tip={isEditMode
                     ? "Exit Edit Mode"
                     : "Edit Mode - Drag & Resize"}
