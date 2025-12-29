@@ -756,9 +756,6 @@
         // Position tooltip below and to the right of the mouse
         const x = e.clientX + 16;
         const y = e.clientY + 16;
-
-        // Simple bounds check to prevent going off screen could be added here if needed
-        // but for now, following user request strictly for "bottom right"
         tooltipPosition = { x, y };
     }
 
@@ -805,32 +802,37 @@
 </script>
 
 <div
-    class="timeline-gantt h-full flex flex-col bg-base-100 rounded-xl border border-base-300/40 overflow-hidden"
+    class="timeline-gantt h-full flex flex-col bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden select-none"
     class:edit-active={isEditMode}
     onwheel={handleWheel}
 >
     <!-- Header -->
     <div
-        class="flex items-center justify-between px-4 py-3 bg-base-100 border-b border-base-200/50 backdrop-blur-sm sticky top-0 z-40"
+        class="flex items-center justify-between px-5 py-3 bg-base-100/90 backdrop-blur-md border-b border-base-200 z-40 sticky top-0 transition-all duration-300"
     >
-        <div class="flex items-center gap-2">
-            <div class="join shadow-sm border border-base-200/60 rounded-lg">
+        <div class="flex items-center gap-3">
+            <div class="join bg-base-200/50 p-1 rounded-xl shadow-inner">
                 <button
-                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 px-2"
+                    class="btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
                     onclick={goToPreviousDay}
                     aria-label="Previous Day"
                 >
                     <ChevronLeft class="w-4 h-4" />
                 </button>
-                <button
-                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 min-w-[140px] font-semibold text-base-content"
-                    class:text-primary={isToday()}
-                    onclick={goToToday}
+                <div
+                    class="flex flex-col items-center justify-center px-4 min-w-[140px] cursor-default"
                 >
-                    {dateLabel()}
-                </button>
+                    <span
+                        class="text-[10px] font-bold uppercase tracking-wider text-base-content/40 mb-[-2px]"
+                        >{selectedDate.getFullYear()}</span
+                    >
+                    <span
+                        class="font-bold text-sm text-base-content leading-tight"
+                        class:text-primary={isToday()}>{dateLabel()}</span
+                    >
+                </div>
                 <button
-                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 px-2"
+                    class="btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
                     onclick={goToNextDay}
                     aria-label="Next Day"
                 >
@@ -840,7 +842,7 @@
 
             {#if !isToday()}
                 <button
-                    class="btn btn-xs btn-ghost text-xs font-medium text-primary ml-1"
+                    class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 rounded-full px-3 transition-all"
                     onclick={goToToday}
                     in:fade={{ duration: 200 }}
                 >
@@ -849,46 +851,22 @@
             {/if}
         </div>
 
-        <div class="flex items-center gap-4">
-            <!-- Time Indicator (if visible) -->
-            {#if showNow}
-                <div
-                    class="flex items-center gap-2 px-3 py-1 bg-error/5 border border-error/10 rounded-full"
-                >
-                    <div class="relative flex h-2 w-2">
-                        <span
-                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"
-                        ></span>
-                        <span
-                            class="relative inline-flex rounded-full h-2 w-2 bg-error"
-                        ></span>
-                    </div>
-                    <span class="text-xs font-mono font-bold text-error"
-                        >{nowFormatted}</span
-                    >
-                </div>
-            {/if}
-
-            <div class="h-6 w-px bg-base-300/60"></div>
-
-            <!-- Category Legend -->
+        <div class="flex items-center gap-3">
+            <!-- Legend -->
             {#if categories.length > 0}
                 <div class="relative">
                     <button
-                        class="btn btn-sm btn-ghost gap-2 text-base-content/70"
+                        class="btn btn-sm btn-square btn-ghost text-base-content/60 hover:text-primary hover:bg-base-200 rounded-lg"
                         class:bg-base-200={showLegend}
                         onclick={() => (showLegend = !showLegend)}
                         title="Show Category Legend"
                     >
-                        <Palette class="w-3.5 h-3.5" />
-                        <span class="text-xs font-medium hidden sm:inline"
-                            >Legend</span
-                        >
+                        <Palette class="w-4 h-4" />
                     </button>
 
                     {#if showLegend}
                         <div
-                            class="absolute top-full right-0 mt-2 p-3 bg-base-100 rounded-xl shadow-xl border border-base-300 z-[100] min-w-[200px]"
+                            class="absolute top-full right-0 mt-3 p-3 bg-base-100/95 backdrop-blur-xl rounded-xl shadow-xl border border-base-200 z-[100] min-w-[200px]"
                             in:scale={{ duration: 200, start: 0.95 }}
                         >
                             <div
@@ -901,14 +879,14 @@
                                 >
                             </div>
                             <div
-                                class="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1"
+                                class="space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-1"
                             >
                                 {#each categories as cat}
                                     <div
-                                        class="flex items-center gap-2.5 group cursor-default"
+                                        class="flex items-center gap-2.5 group cursor-default p-1 hover:bg-base-200/50 rounded-lg transition-colors"
                                     >
                                         <div
-                                            class="w-3 h-3 rounded-full ring-2 ring-white/20 shadow-sm group-hover:scale-110 transition-transform"
+                                            class="w-3 h-3 rounded-full ring-2 ring-white/20 shadow-sm"
                                             style="background-color: {cat.color}"
                                         ></div>
                                         <span
@@ -919,29 +897,25 @@
                                 {/each}
                             </div>
                         </div>
-                    {/if}
-
-                    <!-- Click outside to close (simple overlay) -->
-                    {#if showLegend}
                         <div
                             class="fixed inset-0 z-[90]"
                             onclick={() => (showLegend = false)}
                         ></div>
                     {/if}
                 </div>
-
-                <div class="h-6 w-px bg-base-300/60"></div>
             {/if}
+
+            <div class="h-6 w-px bg-base-300/60"></div>
 
             <!-- Edit Mode Toggle -->
             <button
-                class="btn btn-sm gap-2 transition-all duration-200 {isEditMode
-                    ? 'btn-warning shadow-warning/20 shadow-lg'
+                class="btn btn-sm gap-2 transition-all duration-300 rounded-lg {isEditMode
+                    ? 'btn-warning text-warning-content shadow-lg shadow-warning/20'
                     : 'btn-ghost hover:bg-base-200 text-base-content/70'}"
                 onclick={toggleEditMode}
             >
                 <Pencil class="w-3.5 h-3.5" />
-                <span class="font-medium text-xs"
+                <span class="font-medium text-xs hidden sm:inline"
                     >{isEditMode ? "Done Editing" : "Edit Tasks"}</span
                 >
             </button>
@@ -959,7 +933,7 @@
                     <Minus class="w-3 h-3" />
                 </button>
                 <span
-                    class="text-[10px] font-bold w-8 text-center tabular-nums opacity-60 select-none"
+                    class="text-[10px] font-bold w-6 text-center tabular-nums opacity-60 select-none px-1"
                 >
                     {hoursInView}h
                 </span>
@@ -978,13 +952,13 @@
     <!-- Edit Mode Info Bar -->
     {#if isEditMode}
         <div
-            class="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-warning/10 to-transparent border-b border-warning/10"
+            class="flex items-center justify-between px-5 py-2 bg-warning/10 border-b border-warning/10 text-warning-content"
             transition:slide={{ axis: "y", duration: 200 }}
         >
-            <div class="flex items-center gap-6 text-warning-content/80">
+            <div class="flex items-center gap-6">
                 <div class="flex items-center gap-2">
-                    <GripVertical class="w-4 h-4" />
-                    <span class="text-xs font-medium">Drag to move</span>
+                    <GripVertical class="w-4 h-4 opacity-70" />
+                    <span class="text-xs font-semibold">Drag to move</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <div
@@ -992,20 +966,21 @@
                     >
                         <div class="w-3 h-px bg-current"></div>
                     </div>
-                    <span class="text-xs font-medium">Drag edges to resize</span
+                    <span class="text-xs font-semibold"
+                        >Drag edges to resize</span
                     >
                 </div>
             </div>
             <span
-                class="text-[10px] font-semibold tracking-wider uppercase opacity-50"
-                >Auto-saving changes</span
+                class="text-[10px] font-bold tracking-wider uppercase opacity-60"
+                >Auto-saving</span
             >
         </div>
     {/if}
 
     <!-- Timeline Grid -->
     <div
-        class="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-base-50/50 relative"
+        class="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-base-50/30 relative"
         bind:this={timelineRef}
         onscroll={handleScroll}
     >
@@ -1016,7 +991,7 @@
         >
             <!-- Hour labels -->
             <div
-                class="sticky top-0 z-30 h-8 bg-base-100/95 backdrop-blur border-b border-base-200 shadow-sm"
+                class="sticky top-0 z-30 h-9 bg-base-100/90 backdrop-blur-sm border-b border-base-200 shadow-sm"
             >
                 <div class="relative h-full">
                     {#each gridLines.filter((l) => l.type === "major" || (l.type === "half" && l.label)) as line}
@@ -1025,10 +1000,10 @@
                             style="left: {(line.hour / 24) * 100}%;"
                         >
                             <span
-                                class="text-[10px] font-semibold whitespace-nowrap pl-1.5 {line.type ===
+                                class="text-[10px] font-bold whitespace-nowrap pl-1.5 select-none {line.type ===
                                 'major'
-                                    ? 'text-base-content/60'
-                                    : 'text-base-content/30'}"
+                                    ? 'text-base-content/70'
+                                    : 'text-base-content/40'}"
                             >
                                 {line.label || ""}
                             </span>
@@ -1039,8 +1014,8 @@
 
             <!-- Grid and tasks -->
             <div
-                class="relative pt-2"
-                style="min-height: max({packed.height}px, calc(100vh - 240px));"
+                class="relative pt-4 pb-12"
+                style="min-height: max({packed.height}px, calc(100vh - 280px));"
             >
                 <!-- Grid lines -->
                 <div class="absolute inset-0 pointer-events-none">
@@ -1048,7 +1023,7 @@
                         <div
                             class="absolute top-0 bottom-0 {line.type ===
                             'major'
-                                ? 'w-px bg-base-300/40' // Lighter lines
+                                ? 'w-px bg-base-300/50'
                                 : line.type === 'half'
                                   ? 'w-px bg-base-200/50'
                                   : 'w-px bg-base-200/20'}"
@@ -1059,18 +1034,22 @@
                     <!-- Now line -->
                     {#if showNow}
                         <div
-                            class="absolute top-0 bottom-0 w-px bg-error z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                            class="absolute top-0 bottom-0 w-px bg-error z-20 shadow-[0_0_12px_rgba(239,68,68,0.5)] opacity-80"
                             style="left: {nowPercent}%;"
                         >
                             <div
-                                class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-error shadow-sm"
-                            ></div>
+                                class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-error shadow-sm grid place-items-center"
+                            >
+                                <div
+                                    class="w-1.5 h-1.5 rounded-full bg-white/80"
+                                ></div>
+                            </div>
                         </div>
                     {/if}
                 </div>
 
                 <!-- Tasks -->
-                <div class="relative py-4 px-1">
+                <div class="relative px-2">
                     {#each packed.rows as { task, row } (task.id)}
                         {@const bg = task.categoryColor || "#6b7280"}
                         {@const txt = getTextColor(bg)}
@@ -1117,7 +1096,7 @@
                         <div
                             class="task-wrapper absolute will-change-transform
                                 {isDimmed
-                                ? 'opacity-40 grayscale-[30%]'
+                                ? 'opacity-30 grayscale-[50%] blur-[1px]'
                                 : 'opacity-100'} 
                                 {isHov && !isDragging ? 'z-50' : 'z-10'} 
                                 {isDragging ? 'z-[100]' : ''}"
@@ -1142,11 +1121,11 @@
                             <!-- Time preview badge during drag -->
                             {#if previewTimes}
                                 <div
-                                    class="absolute -top-14 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
+                                    class="absolute -top-16 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
                                     in:scale={{ duration: 150, start: 0.9 }}
                                 >
                                     <div
-                                        class="bg-primary text-primary-content px-4 py-2 rounded-xl text-xs font-bold shadow-xl shadow-primary/20 backdrop-blur-md flex flex-col items-center gap-0.5 border border-primary-content/10 min-w-[120px]"
+                                        class="bg-base-100 text-base-content px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xl border border-primary/20 flex flex-col items-center gap-0.5 min-w-[120px]"
                                     >
                                         <div
                                             class="flex items-center gap-2 text-sm justify-center w-full"
@@ -1157,8 +1136,8 @@
                                                     previewStartTime!,
                                                 )}</span
                                             >
-                                            <span class="opacity-60 text-[10px]"
-                                                >TO</span
+                                            <span class="opacity-40 text-[10px]"
+                                                >→</span
                                             >
                                             <span
                                                 class="font-mono tracking-tight"
@@ -1168,11 +1147,11 @@
                                             >
                                         </div>
                                         <div
-                                            class="flex items-center gap-1.5 opacity-90"
+                                            class="flex items-center gap-1.5 opacity-60"
                                         >
                                             <Clock class="w-3 h-3" />
                                             <span
-                                                class="text-[10px] font-medium uppercase tracking-wide"
+                                                class="text-[10px] font-bold uppercase tracking-wide"
                                             >
                                                 {formatDuration(
                                                     previewStartTime!,
@@ -1183,7 +1162,7 @@
                                     </div>
                                     <!-- Triangle -->
                                     <div
-                                        class="w-2.5 h-2.5 bg-primary rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2 shadow-sm"
+                                        class="w-3 h-3 bg-base-100 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 shadow-sm border-r border-b border-primary/20"
                                     ></div>
                                 </div>
                             {/if}
@@ -1191,10 +1170,10 @@
                             <!-- Task Bar -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
-                                class="task-bar relative h-full rounded-md overflow-hidden transition-all duration-200
+                                class="task-bar relative h-full rounded-lg overflow-hidden transition-all duration-300
                                     {isHov && !isDragging
-                                    ? 'shadow-lg ring-2 ring-white/40 scale-[1.01]'
-                                    : 'shadow-sm'}
+                                    ? 'shadow-xl ring-2 ring-white/60 scale-[1.01] -translate-y-0.5'
+                                    : 'shadow-md'}
                                     {isDragging
                                     ? 'shadow-2xl ring-2 ring-warning scale-[1.02] cursor-grabbing'
                                     : ''}
@@ -1202,7 +1181,7 @@
                                     ? 'cursor-grab hover:ring-2 hover:ring-warning/50'
                                     : 'cursor-pointer'}
                                     {task.completed
-                                    ? 'ring-1 ring-base-content/10'
+                                    ? 'ring-1 ring-base-content/5 opacity-85 saturate-[0.8]'
                                     : ''}
                                     {isLeftEdge ? '!rounded-l-none' : ''} 
                                     {isRightEdge ? '!rounded-r-none' : ''}"
@@ -1213,7 +1192,7 @@
                             >
                                 <!-- Interactive Gradient & Sheen -->
                                 <div
-                                    class="absolute inset-0 bg-gradient-to-br from-white/20 to-black/5 pointer-events-none"
+                                    class="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/10 pointer-events-none"
                                 ></div>
                                 {#if isHov && !isDragging}
                                     <div
@@ -1225,7 +1204,7 @@
                                 {#if isEditMode}
                                     {#if !isLeftEdge}
                                         <div
-                                            class="absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize z-20 flex items-center justify-start pl-1 opacity-0 hover:opacity-100 transition-opacity"
+                                            class="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-start pl-0.5 opacity-0 hover:opacity-100 transition-opacity bg-black/10 hover:bg-black/20"
                                             onmousedown={(e) =>
                                                 handleDragStart(
                                                     e,
@@ -1234,13 +1213,13 @@
                                                 )}
                                         >
                                             <div
-                                                class="w-1 h-4 rounded-full bg-white/50 shadow-sm"
+                                                class="w-1 h-3 rounded-full bg-white/80 shadow-sm"
                                             ></div>
                                         </div>
                                     {/if}
                                     {#if !isRightEdge}
                                         <div
-                                            class="absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize z-20 flex items-center justify-end pr-1 opacity-0 hover:opacity-100 transition-opacity"
+                                            class="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-end pr-0.5 opacity-0 hover:opacity-100 transition-opacity bg-black/10 hover:bg-black/20"
                                             onmousedown={(e) =>
                                                 handleDragStart(
                                                     e,
@@ -1249,7 +1228,7 @@
                                                 )}
                                         >
                                             <div
-                                                class="w-1 h-4 rounded-full bg-white/50 shadow-sm"
+                                                class="w-1 h-3 rounded-full bg-white/80 shadow-sm"
                                             ></div>
                                         </div>
                                     {/if}
@@ -1268,22 +1247,22 @@
                                                 class="flex items-center gap-2"
                                             >
                                                 <span
-                                                    class="font-bold text-sm truncate drop-shadow-sm {task.completed
-                                                        ? 'opacity-90'
+                                                    class="font-extrabold text-sm truncate drop-shadow-md {task.completed
+                                                        ? 'line-through opacity-80 decoration-white/50'
                                                         : ''}"
                                                     >{task.title}</span
                                                 >
                                             </div>
                                             {#if task.categoryName && ROW_HEIGHT > 40}
                                                 <span
-                                                    class="text-[10px] opacity-80 truncate uppercase tracking-wider"
+                                                    class="text-[10px] opacity-90 truncate uppercase tracking-wider font-semibold"
                                                     >{task.categoryName}</span
                                                 >
                                             {/if}
                                         </div>
                                         <div class="ml-auto pl-2">
                                             <span
-                                                class="text-[10px] font-bold bg-black/20 px-1.5 py-0.5 rounded backdrop-blur-sm whitespace-nowrap"
+                                                class="text-[10px] font-bold bg-black/20 px-1.5 py-0.5 rounded-md backdrop-blur-sm whitespace-nowrap border border-white/10"
                                             >
                                                 {formatDuration(
                                                     taskStartTime,
@@ -1293,8 +1272,8 @@
                                         </div>
                                     {:else if contentMode === "title-only"}
                                         <span
-                                            class="font-bold text-xs truncate drop-shadow-sm {task.completed
-                                                ? 'opacity-90'
+                                            class="font-bold text-xs truncate drop-shadow-md {task.completed
+                                                ? 'line-through opacity-80'
                                                 : ''}">{task.title}</span
                                         >
                                     {:else}
@@ -1306,9 +1285,14 @@
                                 {#if task.completed}
                                     <!-- Subtle striped pattern for completed tasks -->
                                     <div
-                                        class="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay"
-                                        style="background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent); background-size: 8px 8px;"
+                                        class="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30"
+                                        style="background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.2) 5px, rgba(0,0,0,0.2) 10px);"
                                     ></div>
+                                    <div
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-white/40"
+                                    >
+                                        <Check class="w-4 h-4" />
+                                    </div>
                                 {/if}
                             </div>
                         </div>
@@ -1317,20 +1301,19 @@
 
                 {#if packed.rows.length === 0}
                     <div
-                        class="absolute inset-0 flex items-center justify-center p-8"
+                        class="absolute inset-0 flex items-center justify-center p-8 pointer-events-none"
                     >
                         <div
-                            class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-base-300 rounded-2xl bg-base-50/50 max-w-sm"
+                            class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-base-300 rounded-3xl bg-base-100/40 backdrop-blur-sm max-w-sm"
                         >
                             <div class="bg-base-200/50 p-4 rounded-full mb-4">
-                                <Clock class="w-8 h-8 text-base-content/30" />
+                                <Clock class="w-8 h-8 text-base-content/20" />
                             </div>
-                            <h3 class="font-semibold text-base-content/70">
+                            <h3 class="font-bold text-base-content/60">
                                 No tasks for today
                             </h3>
-                            <p class="text-xs text-base-content/50 mt-1 mb-4">
-                                You're all clear! Click 'New Task' to get
-                                started.
+                            <p class="text-xs text-base-content/40 mt-1">
+                                Click 'New Task' to get started.
                             </p>
                         </div>
                     </div>
@@ -1345,44 +1328,52 @@
     <div
         class="fixed z-[9999] pointer-events-none"
         style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"
-        in:scale={{ duration: 100, start: 0.95 }}
+        in:scale={{ duration: 150, start: 0.95, opacity: 0 }}
     >
         <div
-            class="bg-base-100 rounded-xl shadow-2xl border border-base-300 p-3 min-w-[160px] max-w-[240px]"
+            class="bg-base-100/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-200/60 p-4 min-w-[180px] max-w-[260px]"
         >
-            <div class="flex gap-2.5">
+            <div class="flex gap-3">
                 <div
-                    class="w-1.5 rounded-full shrink-0"
+                    class="w-2 h-2 rounded-full shrink-0 mt-1.5 ring-2 ring-base-200"
                     style="background-color: {hovered.categoryColor ||
                         '#6b7280'}"
                 ></div>
                 <div class="min-w-0 flex-1">
-                    <p class="font-semibold text-sm leading-tight">
+                    <p class="font-bold text-sm leading-snug">
                         {hovered.title}
                     </p>
                     {#if hovered.categoryName}
-                        <p class="text-xs text-base-content/50 mt-0.5">
+                        <p
+                            class="text-[10px] font-bold uppercase tracking-wider text-base-content/40 mt-1"
+                        >
                             {hovered.categoryName}
                         </p>
                     {/if}
                 </div>
             </div>
             <div
-                class="flex justify-between items-center mt-2.5 pt-2 border-t border-base-200 text-xs"
+                class="flex justify-between items-center mt-3 pt-3 border-t border-base-200/50 text-xs"
             >
-                <span class="text-base-content/60">
+                <span class="text-base-content/50 font-medium">
                     {formatTime(hovered.startTime)} – {formatTime(
                         hovered.endTime,
                     )}
                 </span>
-                <span class="font-bold text-primary">
+                <span
+                    class="font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md"
+                >
                     {formatDuration(hovered.startTime, hovered.endTime)}
                 </span>
             </div>
             {#if hovered.completed}
-                <div class="flex items-center gap-1.5 mt-2 text-success">
-                    <Check class="w-3.5 h-3.5" />
-                    <span class="text-xs font-medium">Completed</span>
+                <div
+                    class="flex items-center gap-1.5 mt-2 text-success px-2 py-1 bg-success/5 rounded-md w-fit"
+                >
+                    <Check class="w-3 h-3" />
+                    <span class="text-[10px] font-bold uppercase tracking-wide"
+                        >Completed</span
+                    >
                 </div>
             {/if}
         </div>
@@ -1390,26 +1381,22 @@
 {/if}
 
 <style>
-    .timeline-gantt ::-webkit-scrollbar {
-        height: 8px;
-        width: 8px;
+    .custom-scrollbar::-webkit-scrollbar {
+        height: 6px;
+        width: 6px;
     }
-    .timeline-gantt ::-webkit-scrollbar-corner {
+    .custom-scrollbar::-webkit-scrollbar-corner {
         background: transparent;
     }
 
-    .timeline-gantt ::-webkit-scrollbar-thumb {
+    .custom-scrollbar::-webkit-scrollbar-thumb {
         background: oklch(var(--bc) / 0.1);
-        border: 2px solid transparent;
-        background-clip: content-box;
-        border-radius: 4px;
+        border-radius: 10px;
     }
-    .timeline-gantt ::-webkit-scrollbar-thumb:hover {
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: oklch(var(--bc) / 0.2);
-        border: 2px solid transparent;
-        background-clip: content-box;
     }
-    .timeline-gantt ::-webkit-scrollbar-track {
+    .custom-scrollbar::-webkit-scrollbar-track {
         background: transparent;
     }
 

@@ -1,6 +1,5 @@
 <script lang="ts">
     import {
-        Clock,
         ChevronLeft,
         ChevronRight,
         Calendar,
@@ -9,6 +8,7 @@
         Sunset,
         Moon,
         Coffee,
+        Check,
     } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
     import { fade, slide } from "svelte/transition";
@@ -69,7 +69,7 @@
         if (selectedDate.toDateString() === tm.toDateString())
             return "Tomorrow";
         return selectedDate.toLocaleDateString("en-US", {
-            weekday: "long",
+            weekday: "short",
             month: "short",
             day: "numeric",
         });
@@ -201,30 +201,40 @@
 </script>
 
 <div
-    class="h-full flex flex-col bg-base-100/50 rounded-xl border border-base-300/40 overflow-hidden"
+    class="h-full flex flex-col bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden select-none"
 >
     <!-- Header -->
     <div
-        class="flex items-center justify-between px-4 py-3 bg-base-100 border-b border-base-200/50 backdrop-blur-sm sticky top-0 z-40"
+        class="flex items-center justify-between px-5 py-3 bg-base-100/90 backdrop-blur-md border-b border-base-200 sticky top-0 z-40 transition-all duration-300"
     >
-        <div class="flex items-center gap-2">
-            <div class="join shadow-sm border border-base-200/60 rounded-lg">
+        <div class="flex items-center gap-3">
+            <div class="join bg-base-200/50 p-1 rounded-xl shadow-inner">
                 <button
-                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 px-2"
+                    class="join-item btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
                     onclick={goToPreviousDay}
                     aria-label="Previous Day"
                 >
                     <ChevronLeft class="w-4 h-4" />
                 </button>
-                <button
-                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 min-w-[140px] font-semibold text-base-content"
-                    class:text-primary={isToday()}
+                <!-- Richer Date Display matching Gantt -->
+                <div
+                    class="flex flex-col items-center justify-center px-4 min-w-[140px] cursor-pointer hover:opacity-70 transition-opacity"
                     onclick={goToToday}
+                    role="button"
+                    tabindex="0"
+                    onkeydown={(e) => e.key === "Enter" && goToToday()}
                 >
-                    {dateLabel()}
-                </button>
+                    <span
+                        class="text-[10px] font-bold uppercase tracking-wider text-base-content/40 mb-[-2px]"
+                        >{selectedDate.getFullYear()}</span
+                    >
+                    <span
+                        class="font-bold text-sm text-base-content leading-tight"
+                        class:text-primary={isToday()}>{dateLabel()}</span
+                    >
+                </div>
                 <button
-                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 px-2"
+                    class="join-item btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
                     onclick={goToNextDay}
                     aria-label="Next Day"
                 >
@@ -233,7 +243,7 @@
             </div>
             {#if !isToday()}
                 <button
-                    class="btn btn-xs btn-ghost text-xs font-medium text-primary ml-1"
+                    class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 rounded-full px-3 transition-all"
                     onclick={goToToday}
                     in:fade={{ duration: 200 }}
                 >
@@ -244,11 +254,13 @@
 
         {#if isToday()}
             <div
-                class="flex items-center gap-2 px-3 py-1 bg-primary/5 border border-primary/10 rounded-full"
+                class="flex items-center gap-2 px-3 py-1.5 bg-base-200/50 rounded-full border border-base-200/60"
                 in:fade
             >
-                <Clock class="w-3.5 h-3.5 text-primary" />
-                <span class="text-xs font-mono font-bold text-primary"
+                <div
+                    class="w-2 h-2 rounded-full bg-primary animate-pulse"
+                ></div>
+                <span class="text-xs font-mono font-bold text-base-content/70"
                     >{nowFormatted}</span
                 >
             </div>
@@ -256,28 +268,30 @@
     </div>
 
     <!-- Agenda Content -->
-    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 relative">
+    <div
+        class="flex-1 overflow-y-auto custom-scrollbar p-6 relative bg-base-50/30"
+    >
         <!-- Spine Line -->
         <div
-            class="absolute left-[35px] top-6 bottom-0 w-px bg-base-200/60 z-0"
+            class="absolute left-[39px] top-6 bottom-0 w-px bg-gradient-to-b from-transparent via-base-300/60 to-transparent z-0"
         ></div>
 
         {#if activeBlocks.length === 0}
             <div
-                class="flex items-center justify-center h-full"
+                class="flex items-center justify-center h-full p-8"
                 in:fade={{ duration: 400 }}
             >
-                <div class="text-center py-12 px-6 opacity-60">
-                    <div
-                        class="bg-base-200/50 p-4 rounded-full mb-4 inline-block"
-                    >
-                        <Calendar class="w-8 h-8 text-base-content/30" />
+                <div
+                    class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-base-300 rounded-3xl bg-base-100/40 backdrop-blur-sm max-w-sm"
+                >
+                    <div class="bg-base-200/50 p-4 rounded-full mb-4">
+                        <Calendar class="w-8 h-8 text-base-content/20" />
                     </div>
-                    <h3 class="text-sm font-semibold text-base-content/60">
+                    <h3 class="font-bold text-base-content/60">
                         No tasks for {dateLabel()}
                     </h3>
                     <p class="text-xs text-base-content/40 mt-1">
-                        Use the "New Task" button to plan your day.
+                        Enjoy your free time or add new tasks to get started.
                     </p>
                 </div>
             </div>
@@ -288,50 +302,52 @@
                 {@const isCurrentBlock = isToday() && block === currentBlock}
 
                 <div
-                    class="relative z-10 mb-5 last:mb-0"
+                    class="relative z-10 mb-8 last:mb-2"
                     in:slide={{ duration: 400, delay: i * 50 }}
                 >
                     <!-- Block Header -->
-                    <div class="flex items-center gap-4 mb-2">
+                    <div class="flex items-center gap-4 mb-4">
                         <div
-                            class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm z-20 border-4 border-base-100
+                            class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm z-20 border-[3px] border-base-100 transition-colors
                              {isCurrentBlock
                                 ? 'bg-primary text-primary-content ring-2 ring-primary/20'
-                                : 'bg-base-200 text-base-content/50'}"
+                                : 'bg-base-200 text-base-content/60'}"
                         >
                             <BlockIcon class="w-4 h-4" />
                         </div>
-                        <div>
+                        <div class="flex items-baseline gap-3">
                             <h3
                                 class="text-sm font-bold tracking-wide uppercase {isCurrentBlock
                                     ? 'text-primary'
-                                    : 'text-base-content/60'}"
+                                    : 'text-base-content/70'}"
                             >
                                 {getTimeBlockLabel(block)}
                             </h3>
-                            <p
-                                class="text-[10px] text-base-content/40 font-medium"
+                            <span
+                                class="text-xs text-base-content/40 font-medium"
                             >
                                 {blockTasks.length}
                                 {blockTasks.length === 1 ? "Task" : "Tasks"}
-                            </p>
+                            </span>
                         </div>
                     </div>
 
                     <!-- Tasks List -->
-                    <div class="pl-[44px] space-y-1.5">
+                    <div class="pl-[48px] space-y-3">
                         {#each blockTasks as task, j (task.id)}
                             {@const status = getTaskStatus(task)}
                             {@const bg = task.categoryColor || "#6b7280"}
+                            {@const isCompleted = task.completed}
 
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_interactive_supports_focus -->
                             <div
-                                class="group relative flex items-stretch gap-0 rounded-xl border transition-all duration-200 hover:scale-[1.01] hover:shadow-lg overflow-hidden w-full
-                                    bg-base-100 shadow-sm
-                                    {status === 'current'
-                                    ? 'border-primary/40 ring-1 ring-primary/10 shadow-md'
-                                    : 'border-base-200/60 hover:border-base-300'}"
+                                class="group relative flex flex-col sm:flex-row items-stretch gap-0 rounded-xl border transition-all duration-300 w-full overflow-hidden bg-base-100
+                                    {isCompleted
+                                    ? 'opacity-80 border-base-200 hover:opacity-100'
+                                    : status === 'current'
+                                      ? 'shadow-lg ring-1 ring-primary/20 border-primary/30 -translate-x-1'
+                                      : 'shadow-sm border-base-200/80 hover:shadow-md hover:border-base-300 hover:scale-[1.01]'}"
                                 role="button"
                                 onclick={() => onTaskClick?.(task.id)}
                                 in:slide={{
@@ -339,38 +355,36 @@
                                     delay: i * 30 + j * 50,
                                 }}
                             >
-                                <!-- Left Color Strip -->
+                                <!-- Left Color Indicator -->
                                 <div
-                                    class="w-1.5 shrink-0"
+                                    class="w-1.5 shrink-0 transition-colors"
+                                    class:opacity-50={isCompleted}
                                     style="background-color: {bg};"
                                 ></div>
 
-                                <!-- Main Content -->
+                                <!-- Main Card Content -->
                                 <div
-                                    class="flex-1 flex items-center p-3 relative"
+                                    class="flex-1 flex items-center p-3 sm:px-4 sm:py-3.5 relative"
                                 >
                                     <!-- Background Pattern for Completed -->
-                                    {#if task.completed}
+                                    {#if isCompleted}
                                         <div
                                             class="absolute inset-0 opacity-[0.03] pointer-events-none"
-                                            style="background-image: repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%); background-size: 10px 10px;"
+                                            style="background-image: repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%); background-size: 8px 8px;"
                                         ></div>
                                     {/if}
 
-                                    <!-- Time & Status -->
+                                    <!-- Time column -->
                                     <div
-                                        class="flex flex-col min-w-[70px] mr-3 text-right justify-center"
+                                        class="flex flex-col w-[70px] shrink-0 mr-4 text-right justify-center border-r border-base-200/50 pr-4"
                                     >
                                         <span
-                                            class="text-sm font-bold font-mono tracking-tight {status ===
-                                            'current'
-                                                ? 'text-primary'
-                                                : 'text-base-content/80'}"
+                                            class="text-sm font-bold font-mono tracking-tight text-base-content/90"
                                         >
                                             {formatTime(task.startTime)}
                                         </span>
                                         <span
-                                            class="text-[10px] text-base-content/40 font-medium mt-0.5"
+                                            class="text-[10px] text-base-content/40 font-medium"
                                         >
                                             {formatDuration(
                                                 task.startTime,
@@ -379,24 +393,25 @@
                                         </span>
                                     </div>
 
-                                    <!-- Title & Category -->
+                                    <!-- Task Info -->
                                     <div
-                                        class="flex-1 min-w-0 flex flex-col justify-center border-l border-base-100 pl-3 py-0.5"
+                                        class="flex-1 min-w-0 flex flex-col justify-center py-0.5"
                                     >
                                         <h4
-                                            class="text-sm font-bold truncate leading-snug {task.completed
-                                                ? 'opacity-50'
+                                            class="text-sm font-semibold truncate leading-tight transition-colors
+                                                {isCompleted
+                                                ? 'text-base-content/60 line-through decoration-base-content/20'
                                                 : 'text-base-content'}"
                                         >
                                             {task.title}
                                         </h4>
                                         {#if task.categoryName}
                                             <div
-                                                class="flex items-center gap-2 mt-1"
+                                                class="flex items-center gap-2 mt-1.5"
                                             >
                                                 <span
-                                                    class="text-[10px] font-medium uppercase tracking-wider opacity-60"
-                                                    style="color: {bg}"
+                                                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-base-200/50"
+                                                    style="color: {bg}; background-color: {bg}15;"
                                                 >
                                                     {task.categoryName}
                                                 </span>
@@ -404,19 +419,30 @@
                                         {/if}
                                     </div>
 
-                                    <!-- Right Status Indicator -->
+                                    <!-- Status / Action -->
                                     <div class="flex items-center pl-3">
-                                        {#if task.completed}
+                                        {#if isCompleted}
                                             <div
-                                                class="badge badge-sm badge-ghost gap-1 opacity-70"
+                                                class="badge badge-sm badge-ghost gap-1 opacity-70 font-medium bg-base-200/80"
                                             >
-                                                Done
+                                                <Check class="w-3 h-3" /> Done
                                             </div>
                                         {:else if status === "current"}
                                             <div
-                                                class="badge badge-sm badge-primary badge-outline gap-1 animate-pulse"
+                                                class="flex items-center gap-1.5 text-primary text-xs font-bold animate-pulse"
                                             >
+                                                <div
+                                                    class="w-1.5 h-1.5 rounded-full bg-primary"
+                                                ></div>
                                                 Now
+                                            </div>
+                                        {:else}
+                                            <div
+                                                class="opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <ChevronRight
+                                                    class="w-4 h-4 text-base-content/30"
+                                                />
                                             </div>
                                         {/if}
                                     </div>
@@ -432,16 +458,21 @@
 
 <style>
     .custom-scrollbar::-webkit-scrollbar {
+        height: 6px;
         width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: oklch(var(--bc) / 0.1);
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: oklch(var(--bc) / 0.2);
     }
     .custom-scrollbar::-webkit-scrollbar-track {
         background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background-color: rgb(0 0 0 / 0.1);
-        border-radius: 20px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: rgb(0 0 0 / 0.2);
     }
 </style>
