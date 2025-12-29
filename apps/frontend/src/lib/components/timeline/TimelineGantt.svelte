@@ -131,8 +131,8 @@
         }
     });
 
-    const ROW_HEIGHT = 40;
-    const ROW_GAP = 6;
+    const ROW_HEIGHT = 32;
+    const ROW_GAP = 4;
     const MIN_TASK_WIDTH_PX = 6; // Minimum pixel width for very short tasks
 
     let currentTime = $state(new Date());
@@ -471,19 +471,8 @@
             <!-- Grid and tasks -->
             <div
                 class="relative"
-                style="min-height: {Math.max(packed.height + 24, 180)}px;"
+                style="min-height: max({packed.height}px, calc(100vh - 220px));"
             >
-                <!-- Alternating hour backgrounds -->
-                <div class="absolute inset-0 pointer-events-none flex">
-                    {#each Array.from({ length: 24 }, (_, i) => i) as hour}
-                        <div
-                            class="flex-1 {hour % 2 === 0
-                                ? 'bg-base-200/20'
-                                : 'bg-transparent'}"
-                        ></div>
-                    {/each}
-                </div>
-
                 <!-- Grid lines -->
                 <div class="absolute inset-0 pointer-events-none">
                     {#each Array.from({ length: 25 }, (_, i) => i) as hour}
@@ -491,10 +480,16 @@
                             class="absolute top-0 bottom-0 w-px {hour === 0 ||
                             hour === 24
                                 ? 'bg-base-300/60'
-                                : hour % 6 === 0
-                                  ? 'bg-base-300/40'
-                                  : 'bg-base-200/40'}"
+                                : 'bg-base-200/50'}"
                             style="left: {(hour / 24) * 100}%;"
+                        ></div>
+                    {/each}
+
+                    <!-- Quarter-hour lines (subtle) -->
+                    {#each Array.from({ length: 24 }, (_, i) => i) as hour}
+                        <div
+                            class="absolute top-0 bottom-0 w-px bg-base-200/30"
+                            style="left: {((hour + 0.5) / 24) * 100}%;"
                         ></div>
                     {/each}
 
@@ -539,22 +534,22 @@
                             onclick={() => onTaskClick?.(task.id)}
                         >
                             <div
-                                class="task-bar relative h-full rounded-md cursor-pointer overflow-hidden
+                                class="task-bar relative h-full rounded cursor-pointer overflow-hidden
                                     {task.completed ? 'task-completed' : ''} 
                                     {isHov
-                                    ? 'ring-2 ring-base-content/30 shadow-lg scale-y-105'
-                                    : 'shadow-md hover:shadow-lg'}"
+                                    ? 'ring-2 ring-base-content/20 shadow-lg scale-y-110'
+                                    : 'shadow-sm'}"
                                 style="background-color: {bg};"
                                 title={task.title}
                             >
                                 <!-- Content -->
                                 <div
-                                    class="relative h-full flex items-center px-2 overflow-hidden"
+                                    class="relative h-full flex items-center px-1.5 overflow-hidden"
                                     style="color: {txt};"
                                 >
                                     {#if textMode === "full"}
                                         <span
-                                            class="text-xs font-semibold truncate"
+                                            class="text-[10px] font-semibold truncate leading-tight"
                                         >
                                             {task.title}
                                         </span>
