@@ -8,8 +8,10 @@
         Check,
         Pencil,
         GripVertical,
+        Palette,
     } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
+    import { fade, scale, slide } from "svelte/transition";
     import type { TimelineTask, TimelineProps } from "./types";
 
     let {
@@ -483,6 +485,21 @@
         });
     });
 
+    // Extract unique categories for legend
+    const categories = $derived.by(() => {
+        const unique = new Map<string, string>();
+        tasks.forEach((t) => {
+            if (t.categoryName && t.categoryColor) {
+                unique.set(t.categoryName, t.categoryColor);
+            }
+        });
+        return Array.from(unique.entries())
+            .map(([name, color]) => ({ name, color }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    let showLegend = $state(false);
+
     // Better time formatting based on zoom level
     function formatHour(h: number): string {
         const hour = h % 24;
@@ -648,13 +665,8 @@
     const packed = $derived.by(() => packTasks(tasks));
 
     function getTextColor(bg: string): string {
-        if (!bg?.startsWith("#") || bg.length !== 7) return "#fff";
-        const r = parseInt(bg.slice(1, 3), 16);
-        const g = parseInt(bg.slice(3, 5), 16);
-        const b = parseInt(bg.slice(5, 7), 16);
-        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55
-            ? "#1f2937"
-            : "#fff";
+        // Always white for clean, consistent look on vibrant/dark colors
+        return "#fff";
     }
 
     function getSecondaryTextColor(bg: string): string {
@@ -799,135 +811,201 @@
 >
     <!-- Header -->
     <div
-        class="flex items-center justify-between px-3 py-2.5 border-b border-base-200/80 bg-base-100"
+        class="flex items-center justify-between px-4 py-3 bg-base-100 border-b border-base-200/50 backdrop-blur-sm sticky top-0 z-40"
     >
-        <div class="flex items-center gap-1">
-            <button
-                class="btn btn-ghost btn-sm btn-square"
-                onclick={goToPreviousDay}
-            >
-                <ChevronLeft class="w-4 h-4" />
-            </button>
-            <button
-                class="btn btn-sm px-4 min-w-[100px] font-semibold {isToday()
-                    ? 'btn-primary'
-                    : 'btn-ghost'}"
-                onclick={goToToday}
-            >
-                {dateLabel()}
-            </button>
-            <button
-                class="btn btn-ghost btn-sm btn-square"
-                onclick={goToNextDay}
-            >
-                <ChevronRight class="w-4 h-4" />
-            </button>
-        </div>
-
-        <div class="flex items-center gap-3">
-            <!-- Edit Mode Toggle -->
-            <div
-                class="tooltip tooltip-left"
-                data-tip={isEditMode
-                    ? "Exit Edit Mode"
-                    : "Edit Mode - Drag & Resize"}
-            >
+        <div class="flex items-center gap-2">
+            <div class="join shadow-sm border border-base-200/60 rounded-lg">
                 <button
-                    class="btn btn-sm gap-2 {isEditMode
-                        ? 'btn-warning'
-                        : 'btn-ghost border-base-300'}"
-                    onclick={toggleEditMode}
+                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 px-2"
+                    onclick={goToPreviousDay}
+                    aria-label="Previous Day"
                 >
-                    <Pencil class="w-4 h-4" />
-                    <span class="text-xs font-medium"
-                        >{isEditMode ? "Done" : "Edit"}</span
-                    >
+                    <ChevronLeft class="w-4 h-4" />
+                </button>
+                <button
+                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 min-w-[140px] font-semibold text-base-content"
+                    class:text-primary={isToday()}
+                    onclick={goToToday}
+                >
+                    {dateLabel()}
+                </button>
+                <button
+                    class="join-item btn btn-sm btn-ghost hover:bg-base-200 px-2"
+                    onclick={goToNextDay}
+                    aria-label="Next Day"
+                >
+                    <ChevronRight class="w-4 h-4" />
                 </button>
             </div>
 
-            <div class="h-5 w-px bg-base-300/60"></div>
-
-            <div class="flex items-center gap-2">
-                <span class="text-[10px] text-base-content/40 hidden lg:inline"
-                    >Ctrl+Scroll to zoom</span
+            {#if !isToday()}
+                <button
+                    class="btn btn-xs btn-ghost text-xs font-medium text-primary ml-1"
+                    onclick={goToToday}
+                    in:fade={{ duration: 200 }}
                 >
-                <div
-                    class="join border border-base-300/60 rounded-lg overflow-hidden"
-                >
-                    <button
-                        class="join-item btn btn-ghost btn-xs px-2"
-                        onclick={() => zoomOut()}
-                        disabled={zoomIndex === 0}
-                    >
-                        <Minus class="w-3.5 h-3.5" />
-                    </button>
-                    <span
-                        class="join-item flex items-center px-3 text-xs font-semibold bg-base-200/50 min-w-[40px] justify-center"
-                    >
-                        {hoursInView}h
-                    </span>
-                    <button
-                        class="join-item btn btn-ghost btn-xs px-2"
-                        onclick={() => zoomIn()}
-                        disabled={zoomIndex === ZOOM_LEVELS.length - 1}
-                    >
-                        <Plus class="w-3.5 h-3.5" />
-                    </button>
-                </div>
-                {#if isZoomed}
-                    <button
-                        class="btn btn-ghost btn-xs text-xs px-2"
-                        onclick={resetZoom}>Reset</button
-                    >
-                {/if}
-            </div>
+                    Return to Today
+                </button>
+            {/if}
         </div>
 
-        {#if showNow}
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-error animate-pulse"
-                ></span>
-                <span class="text-xs font-mono font-semibold text-error"
-                    >{nowFormatted}</span
+        <div class="flex items-center gap-4">
+            <!-- Time Indicator (if visible) -->
+            {#if showNow}
+                <div
+                    class="flex items-center gap-2 px-3 py-1 bg-error/5 border border-error/10 rounded-full"
                 >
+                    <div class="relative flex h-2 w-2">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"
+                        ></span>
+                        <span
+                            class="relative inline-flex rounded-full h-2 w-2 bg-error"
+                        ></span>
+                    </div>
+                    <span class="text-xs font-mono font-bold text-error"
+                        >{nowFormatted}</span
+                    >
+                </div>
+            {/if}
+
+            <div class="h-6 w-px bg-base-300/60"></div>
+
+            <!-- Category Legend -->
+            {#if categories.length > 0}
+                <div class="relative">
+                    <button
+                        class="btn btn-sm btn-ghost gap-2 text-base-content/70"
+                        class:bg-base-200={showLegend}
+                        onclick={() => (showLegend = !showLegend)}
+                        title="Show Category Legend"
+                    >
+                        <Palette class="w-3.5 h-3.5" />
+                        <span class="text-xs font-medium hidden sm:inline"
+                            >Legend</span
+                        >
+                    </button>
+
+                    {#if showLegend}
+                        <div
+                            class="absolute top-full right-0 mt-2 p-3 bg-base-100 rounded-xl shadow-xl border border-base-300 z-[100] min-w-[200px]"
+                            in:scale={{ duration: 200, start: 0.95 }}
+                        >
+                            <div
+                                class="text-[10px] font-bold text-base-content/50 mb-2.5 uppercase tracking-wider flex justify-between items-center"
+                            >
+                                <span>Categories</span>
+                                <span
+                                    class="bg-base-200 px-1.5 py-0.5 rounded text-base-content/70"
+                                    >{categories.length}</span
+                                >
+                            </div>
+                            <div
+                                class="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1"
+                            >
+                                {#each categories as cat}
+                                    <div
+                                        class="flex items-center gap-2.5 group cursor-default"
+                                    >
+                                        <div
+                                            class="w-3 h-3 rounded-full ring-2 ring-white/20 shadow-sm group-hover:scale-110 transition-transform"
+                                            style="background-color: {cat.color}"
+                                        ></div>
+                                        <span
+                                            class="text-xs font-medium text-base-content/80 group-hover:text-base-content transition-colors"
+                                            >{cat.name}</span
+                                        >
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    <!-- Click outside to close (simple overlay) -->
+                    {#if showLegend}
+                        <div
+                            class="fixed inset-0 z-[90]"
+                            onclick={() => (showLegend = false)}
+                        ></div>
+                    {/if}
+                </div>
+
+                <div class="h-6 w-px bg-base-300/60"></div>
+            {/if}
+
+            <!-- Edit Mode Toggle -->
+            <button
+                class="btn btn-sm gap-2 transition-all duration-200 {isEditMode
+                    ? 'btn-warning shadow-warning/20 shadow-lg'
+                    : 'btn-ghost hover:bg-base-200 text-base-content/70'}"
+                onclick={toggleEditMode}
+            >
+                <Pencil class="w-3.5 h-3.5" />
+                <span class="font-medium text-xs"
+                    >{isEditMode ? "Done Editing" : "Edit Tasks"}</span
+                >
+            </button>
+
+            <!-- Zoom Controls -->
+            <div
+                class="flex items-center gap-1 bg-base-200/50 p-1 rounded-lg border border-base-200/60"
+            >
+                <button
+                    class="btn btn-xs btn-square btn-ghost hover:bg-base-100 rounded-md"
+                    onclick={() => zoomOut()}
+                    disabled={zoomIndex === 0}
+                    aria-label="Zoom Out"
+                >
+                    <Minus class="w-3 h-3" />
+                </button>
+                <span
+                    class="text-[10px] font-bold w-8 text-center tabular-nums opacity-60 select-none"
+                >
+                    {hoursInView}h
+                </span>
+                <button
+                    class="btn btn-xs btn-square btn-ghost hover:bg-base-100 rounded-md"
+                    onclick={() => zoomIn()}
+                    disabled={zoomIndex === ZOOM_LEVELS.length - 1}
+                    aria-label="Zoom In"
+                >
+                    <Plus class="w-3 h-3" />
+                </button>
             </div>
-        {:else}
-            <div class="w-20"></div>
-        {/if}
+        </div>
     </div>
 
     <!-- Edit Mode Info Bar -->
     {#if isEditMode}
         <div
-            class="flex items-center gap-4 px-4 py-2 bg-warning/10 border-b border-warning/20"
+            class="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-warning/10 to-transparent border-b border-warning/10"
+            transition:slide={{ axis: "y", duration: 200 }}
         >
-            <div class="flex items-center gap-2">
-                <GripVertical class="w-4 h-4 text-warning" />
-                <span class="text-xs font-medium text-warning"
-                    >Drag tasks to move</span
-                >
-            </div>
-            <div class="h-4 w-px bg-warning/30"></div>
-            <div class="flex items-center gap-2">
-                <div class="flex items-center">
-                    <div class="w-1 h-4 bg-warning/60 rounded-full"></div>
-                    <div class="w-3 h-0.5 bg-warning/40"></div>
-                    <div class="w-1 h-4 bg-warning/60 rounded-full"></div>
+            <div class="flex items-center gap-6 text-warning-content/80">
+                <div class="flex items-center gap-2">
+                    <GripVertical class="w-4 h-4" />
+                    <span class="text-xs font-medium">Drag to move</span>
                 </div>
-                <span class="text-xs font-medium text-warning"
-                    >Drag edges to resize</span
-                >
+                <div class="flex items-center gap-2">
+                    <div
+                        class="flex h-3 w-4 items-center justify-between border-x border-current opacity-60"
+                    >
+                        <div class="w-3 h-px bg-current"></div>
+                    </div>
+                    <span class="text-xs font-medium">Drag edges to resize</span
+                    >
+                </div>
             </div>
-            <div class="flex-1"></div>
-            <span class="text-xs text-base-content/50"
-                >Changes save automatically</span
+            <span
+                class="text-[10px] font-semibold tracking-wider uppercase opacity-50"
+                >Auto-saving changes</span
             >
         </div>
     {/if}
 
     <!-- Timeline Grid -->
     <div
-        class="flex-1 overflow-x-auto overflow-y-hidden"
+        class="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar bg-base-50/50 relative"
         bind:this={timelineRef}
         onscroll={handleScroll}
     >
@@ -938,19 +1016,19 @@
         >
             <!-- Hour labels -->
             <div
-                class="sticky top-0 z-20 h-8 bg-base-100 border-b border-base-200"
+                class="sticky top-0 z-30 h-8 bg-base-100/95 backdrop-blur border-b border-base-200 shadow-sm"
             >
                 <div class="relative h-full">
                     {#each gridLines.filter((l) => l.type === "major" || (l.type === "half" && l.label)) as line}
                         <div
-                            class="absolute top-0 bottom-0 flex items-end pb-1"
+                            class="absolute top-0 bottom-0 flex items-end pb-1.5 transition-all duration-300"
                             style="left: {(line.hour / 24) * 100}%;"
                         >
                             <span
-                                class="text-[10px] font-medium whitespace-nowrap pl-1 {line.type ===
+                                class="text-[10px] font-semibold whitespace-nowrap pl-1.5 {line.type ===
                                 'major'
-                                    ? 'text-base-content/70'
-                                    : 'text-base-content/40'}"
+                                    ? 'text-base-content/60'
+                                    : 'text-base-content/30'}"
                             >
                                 {line.label || ""}
                             </span>
@@ -961,7 +1039,7 @@
 
             <!-- Grid and tasks -->
             <div
-                class="relative"
+                class="relative pt-2"
                 style="min-height: max({packed.height}px, calc(100vh - 240px));"
             >
                 <!-- Grid lines -->
@@ -970,12 +1048,10 @@
                         <div
                             class="absolute top-0 bottom-0 {line.type ===
                             'major'
-                                ? 'w-px bg-base-300/80'
+                                ? 'w-px bg-base-300/40' // Lighter lines
                                 : line.type === 'half'
-                                  ? 'w-px bg-base-200/60'
-                                  : line.type === 'quarter'
-                                    ? 'w-px bg-base-200/40'
-                                    : 'w-px bg-base-200/25'}"
+                                  ? 'w-px bg-base-200/50'
+                                  : 'w-px bg-base-200/20'}"
                             style="left: {(line.hour / 24) * 100}%;"
                         ></div>
                     {/each}
@@ -983,31 +1059,31 @@
                     <!-- Now line -->
                     {#if showNow}
                         <div
-                            class="absolute top-0 bottom-0 w-0.5 bg-error z-30"
+                            class="absolute top-0 bottom-0 w-px bg-error z-20 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
                             style="left: {nowPercent}%;"
                         >
                             <div
-                                class="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-error shadow-lg"
+                                class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-error shadow-sm"
                             ></div>
                         </div>
                     {/if}
                 </div>
 
                 <!-- Tasks -->
-                <div class="relative py-3 px-1">
+                <div class="relative py-4 px-1">
                     {#each packed.rows as { task, row } (task.id)}
                         {@const bg = task.categoryColor || "#6b7280"}
                         {@const txt = getTextColor(bg)}
-                        {@const txtSecondary = getSecondaryTextColor(bg)}
                         {@const isHov = hoveredTaskId === task.id}
                         {@const isDragging = draggedTaskId === task.id}
-                        <!-- Keep spotlight effect: Fade if we are hovering OR dragging something, and this is NOT it -->
-                        {@const isFaded =
+
+                        <!-- Dim other tasks when focusing on one -->
+                        {@const isDimmed =
                             (hoveredTaskId || draggedTaskId) &&
                             !isHov &&
                             !isDragging}
 
-                        <!-- Calculate effective times -->
+                        <!-- Calculate times & Dragging Logic -->
                         {@const previewTimes =
                             isDragging && previewStartTime && previewEndTime}
                         {@const taskStartTime = getEffectiveTime(
@@ -1026,104 +1102,130 @@
                             previewEndTime,
                             "end",
                         )}
-
-                        <!-- Calculate Position -->
                         {@const pos = getTaskPosition({
                             ...task,
                             startTime: taskStartTime,
                             endTime: taskEndTime,
                         })}
 
-                        <!-- Now we can use pos -->
                         {@const contentMode = canShowContent(pos.width)}
-                        {@const showPreviewTimes = previewTimes}
                         {@const isLeftEdge = pos.left <= 0.05}
                         {@const isRightEdge = pos.left + pos.width >= 99.95}
 
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <div
-                            class="task-wrapper absolute {isFaded
-                                ? 'opacity-40'
-                                : ''} {isHov && !isDragging
-                                ? 'z-50'
-                                : 'z-10'} {isDragging ? 'z-[100]' : ''}"
-                            style="left: {pos.left}%; width: {pos.width}%; top: {row *
-                                (ROW_HEIGHT +
-                                    ROW_GAP)}px; height: {ROW_HEIGHT}px; {pos.minWidth
+                            class="task-wrapper absolute will-change-transform
+                                {isDimmed
+                                ? 'opacity-40 grayscale-[30%]'
+                                : 'opacity-100'} 
+                                {isHov && !isDragging ? 'z-50' : 'z-10'} 
+                                {isDragging ? 'z-[100]' : ''}"
+                            style="
+                                left: {pos.left}%; 
+                                width: {pos.width}%; 
+                                top: {row * (ROW_HEIGHT + ROW_GAP)}px; 
+                                height: {ROW_HEIGHT}px; 
+                                {pos.minWidth
                                 ? `min-width: ${MIN_TASK_WIDTH_PX}px;`
-                                : ''} transition: {isDragging
+                                : ''} 
+                                transition: {isDragging
                                 ? 'none'
-                                : 'opacity 0.15s ease, transform 0.15s ease'};"
+                                : 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'};
+                            "
                             role="button"
                             onmouseenter={(e) => onMouseEnter(e, task.id)}
                             onmousemove={onMouseMove}
                             onmouseleave={onMouseLeave}
                             onclick={(e) => handleTaskClick(e, task.id)}
                         >
-                            <!-- Time preview bubble during drag -->
-                            {#if showPreviewTimes && previewStartTime && previewEndTime}
+                            <!-- Time preview badge during drag -->
+                            {#if previewTimes}
                                 <div
-                                    class="absolute -top-10 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
+                                    class="absolute -top-14 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
+                                    in:scale={{ duration: 150, start: 0.9 }}
                                 >
                                     <div
-                                        class="time-preview-badge bg-warning text-warning-content px-3 py-1.5 rounded-full text-xs font-bold shadow-xl shadow-warning/20 whitespace-nowrap flex items-center gap-2"
+                                        class="bg-primary text-primary-content px-4 py-2 rounded-xl text-xs font-bold shadow-xl shadow-primary/20 backdrop-blur-md flex flex-col items-center gap-0.5 border border-primary-content/10 min-w-[120px]"
                                     >
-                                        <span
-                                            >{formatTimeCompact(
-                                                previewStartTime,
-                                            )}</span
+                                        <div
+                                            class="flex items-center gap-2 text-sm justify-center w-full"
                                         >
-                                        <span class="opacity-60">→</span>
-                                        <span
-                                            >{formatTimeCompact(
-                                                previewEndTime,
-                                            )}</span
+                                            <span
+                                                class="font-mono tracking-tight"
+                                                >{formatTimeCompact(
+                                                    previewStartTime!,
+                                                )}</span
+                                            >
+                                            <span class="opacity-60 text-[10px]"
+                                                >TO</span
+                                            >
+                                            <span
+                                                class="font-mono tracking-tight"
+                                                >{formatTimeCompact(
+                                                    previewEndTime!,
+                                                )}</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="flex items-center gap-1.5 opacity-90"
                                         >
-                                        <span
-                                            class="ml-1 px-1.5 py-0.5 bg-black/10 rounded text-[10px]"
-                                        >
-                                            {formatDuration(
-                                                previewStartTime,
-                                                previewEndTime,
-                                            )}
-                                        </span>
+                                            <Clock class="w-3 h-3" />
+                                            <span
+                                                class="text-[10px] font-medium uppercase tracking-wide"
+                                            >
+                                                {formatDuration(
+                                                    previewStartTime!,
+                                                    previewEndTime!,
+                                                )}
+                                            </span>
+                                        </div>
                                     </div>
+                                    <!-- Triangle -->
+                                    <div
+                                        class="w-2.5 h-2.5 bg-primary rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2 shadow-sm"
+                                    ></div>
                                 </div>
                             {/if}
 
+                            <!-- Task Bar -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
-                                class="task-bar relative h-full rounded-lg overflow-visible shadow-md
-                                    {task.completed ? 'task-completed' : ''} 
+                                class="task-bar relative h-full rounded-md overflow-hidden transition-all duration-200
                                     {isHov && !isDragging
-                                    ? 'ring-2 ring-base-content/25 shadow-xl scale-[1.02] z-50'
-                                    : ''}
+                                    ? 'shadow-lg ring-2 ring-white/40 scale-[1.01]'
+                                    : 'shadow-sm'}
                                     {isDragging
-                                    ? 'ring-2 ring-warning shadow-2xl shadow-warning/20 scale-[1.02] cursor-grabbing z-[100]'
+                                    ? 'shadow-2xl ring-2 ring-warning scale-[1.02] cursor-grabbing'
                                     : ''}
                                     {isEditMode && !isDragging
-                                    ? 'edit-mode-task cursor-grab'
+                                    ? 'cursor-grab hover:ring-2 hover:ring-warning/50'
                                     : 'cursor-pointer'}
-                                    {isLeftEdge
-                                    ? '!rounded-l-none !border-l-0'
-                                    : ''} 
-                                    {isRightEdge
-                                    ? '!rounded-r-none !border-r-0'
-                                    : ''}"
-                                style="background: linear-gradient(135deg, {bg} 0%, {bg}dd 100%); border: 1px solid rgba(0,0,0,0.1);"
+                                    {task.completed
+                                    ? 'ring-1 ring-base-content/10'
+                                    : ''}
+                                    {isLeftEdge ? '!rounded-l-none' : ''} 
+                                    {isRightEdge ? '!rounded-r-none' : ''}"
+                                style="background-color: {bg} !important;"
                                 onmousedown={(e) =>
                                     isEditMode &&
                                     handleDragStart(e, task, "move")}
                             >
-                                <!-- Edit mode resize handles -->
+                                <!-- Interactive Gradient & Sheen -->
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-br from-white/20 to-black/5 pointer-events-none"
+                                ></div>
+                                {#if isHov && !isDragging}
+                                    <div
+                                        class="absolute inset-0 bg-white/10 pointer-events-none transition-opacity duration-200"
+                                    ></div>
+                                {/if}
+
+                                <!-- Edit Handles -->
                                 {#if isEditMode}
-                                    <!-- Left resize handle -->
                                     {#if !isLeftEdge}
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                                         <div
-                                            class="resize-handle resize-left absolute -left-1 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-center group/handle"
-                                            role="presentation"
+                                            class="absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize z-20 flex items-center justify-start pl-1 opacity-0 hover:opacity-100 transition-opacity"
                                             onmousedown={(e) =>
                                                 handleDragStart(
                                                     e,
@@ -1132,17 +1234,13 @@
                                                 )}
                                         >
                                             <div
-                                                class="w-1 h-3.5 rounded-full bg-base-100 shadow-sm ring-1 ring-base-content/10 transition-all duration-200 group-hover/handle:h-6 group-hover/handle:w-1.5 group-hover/handle:bg-warning group-hover/handle:shadow-warning/50"
+                                                class="w-1 h-4 rounded-full bg-white/50 shadow-sm"
                                             ></div>
                                         </div>
                                     {/if}
-
-                                    <!-- Right resize handle -->
                                     {#if !isRightEdge}
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
                                         <div
-                                            class="resize-handle resize-right absolute -right-1 top-0 bottom-0 w-3 cursor-ew-resize z-20 flex items-center justify-center group/handle"
-                                            role="presentation"
+                                            class="absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize z-20 flex items-center justify-end pr-1 opacity-0 hover:opacity-100 transition-opacity"
                                             onmousedown={(e) =>
                                                 handleDragStart(
                                                     e,
@@ -1151,31 +1249,41 @@
                                                 )}
                                         >
                                             <div
-                                                class="w-1 h-3.5 rounded-full bg-base-100 shadow-sm ring-1 ring-base-content/10 transition-all duration-200 group-hover/handle:h-6 group-hover/handle:w-1.5 group-hover/handle:bg-warning group-hover/handle:shadow-warning/50"
+                                                class="w-1 h-4 rounded-full bg-white/50 shadow-sm"
                                             ></div>
                                         </div>
                                     {/if}
                                 {/if}
 
-                                <!-- Content - Clean and minimal -->
+                                <!-- Content -->
                                 <div
-                                    class="relative h-full flex items-center px-2.5 overflow-hidden"
+                                    class="relative h-full flex items-center px-3 z-10"
                                     style="color: {txt};"
                                 >
                                     {#if contentMode === "full"}
-                                        <!-- Full: Title + Duration -->
                                         <div
-                                            class="flex-1 min-w-0 flex items-center gap-3"
+                                            class="flex flex-col justify-center min-w-0 w-full"
                                         >
-                                            <p
-                                                class="text-sm font-semibold truncate flex-1 {task.completed
-                                                    ? 'opacity-60'
-                                                    : ''}"
+                                            <div
+                                                class="flex items-center gap-2"
                                             >
-                                                {task.title}
-                                            </p>
+                                                <span
+                                                    class="font-bold text-sm truncate drop-shadow-sm {task.completed
+                                                        ? 'opacity-90'
+                                                        : ''}"
+                                                    >{task.title}</span
+                                                >
+                                            </div>
+                                            {#if task.categoryName && ROW_HEIGHT > 40}
+                                                <span
+                                                    class="text-[10px] opacity-80 truncate uppercase tracking-wider"
+                                                    >{task.categoryName}</span
+                                                >
+                                            {/if}
+                                        </div>
+                                        <div class="ml-auto pl-2">
                                             <span
-                                                class="text-xs font-medium px-2 py-0.5 rounded bg-black/10 shrink-0"
+                                                class="text-[10px] font-bold bg-black/20 px-1.5 py-0.5 rounded backdrop-blur-sm whitespace-nowrap"
                                             >
                                                 {formatDuration(
                                                     taskStartTime,
@@ -1184,23 +1292,22 @@
                                             </span>
                                         </div>
                                     {:else if contentMode === "title-only"}
-                                        <!-- Title only -->
-                                        <p
-                                            class="text-xs font-semibold truncate {task.completed
-                                                ? 'opacity-60'
-                                                : ''}"
+                                        <span
+                                            class="font-bold text-xs truncate drop-shadow-sm {task.completed
+                                                ? 'opacity-90'
+                                                : ''}">{task.title}</span
                                         >
-                                            {task.title}
-                                        </p>
                                     {:else}
-                                        <!-- Too small - empty, just shows the colored bar -->
+                                        <!-- Minimal View -->
                                     {/if}
                                 </div>
 
-                                <!-- Completed overlay -->
+                                <!-- Completed Overlay with Icon -->
                                 {#if task.completed}
+                                    <!-- Subtle striped pattern for completed tasks -->
                                     <div
-                                        class="completed-overlay absolute inset-0 pointer-events-none rounded-lg overflow-hidden"
+                                        class="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay"
+                                        style="background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent); background-size: 8px 8px;"
                                     ></div>
                                 {/if}
                             </div>
@@ -1210,17 +1317,20 @@
 
                 {#if packed.rows.length === 0}
                     <div
-                        class="absolute inset-0 flex items-center justify-center"
+                        class="absolute inset-0 flex items-center justify-center p-8"
                     >
-                        <div class="text-center py-12 opacity-60">
-                            <Clock
-                                class="w-12 h-12 mx-auto text-base-content/20 mb-3"
-                            />
-                            <p class="text-sm font-medium text-base-content/40">
-                                No tasks for {dateLabel()}
-                            </p>
-                            <p class="text-xs text-base-content/30 mt-1">
-                                Click "New Task" to add one
+                        <div
+                            class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-base-300 rounded-2xl bg-base-50/50 max-w-sm"
+                        >
+                            <div class="bg-base-200/50 p-4 rounded-full mb-4">
+                                <Clock class="w-8 h-8 text-base-content/30" />
+                            </div>
+                            <h3 class="font-semibold text-base-content/70">
+                                No tasks for today
+                            </h3>
+                            <p class="text-xs text-base-content/50 mt-1 mb-4">
+                                You're all clear! Click 'New Task' to get
+                                started.
                             </p>
                         </div>
                     </div>
@@ -1231,11 +1341,11 @@
 </div>
 
 <!-- Tooltip - High z-index to ensure visibility -->
-<!-- Tooltip - High z-index to ensure visibility -->
 {#if hovered && tooltipPosition && !dragMode}
     <div
         class="fixed z-[9999] pointer-events-none"
         style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"
+        in:scale={{ duration: 100, start: 0.95 }}
     >
         <div
             class="bg-base-100 rounded-xl shadow-2xl border border-base-300 p-3 min-w-[160px] max-w-[240px]"
@@ -1280,30 +1390,24 @@
 {/if}
 
 <style>
-    .task-completed {
-        opacity: 0.8;
-    }
-
-    .completed-overlay {
-        background: repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 4px,
-            rgba(255, 255, 255, 0.08) 4px,
-            rgba(255, 255, 255, 0.08) 6px
-        );
-    }
-
     .timeline-gantt ::-webkit-scrollbar {
-        height: 6px;
-        width: 6px;
+        height: 8px;
+        width: 8px;
     }
+    .timeline-gantt ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
     .timeline-gantt ::-webkit-scrollbar-thumb {
-        background: oklch(var(--bc) / 0.15);
-        border-radius: 3px;
+        background: oklch(var(--bc) / 0.1);
+        border: 2px solid transparent;
+        background-clip: content-box;
+        border-radius: 4px;
     }
     .timeline-gantt ::-webkit-scrollbar-thumb:hover {
-        background: oklch(var(--bc) / 0.25);
+        background: oklch(var(--bc) / 0.2);
+        border: 2px solid transparent;
+        background-clip: content-box;
     }
     .timeline-gantt ::-webkit-scrollbar-track {
         background: transparent;
@@ -1312,57 +1416,5 @@
     /* Edit mode styles */
     .edit-active {
         --edit-border-color: oklch(var(--wa));
-    }
-
-    .edit-mode-task:hover .resize-handle {
-        opacity: 1;
-        background: rgba(255, 255, 255, 0.15);
-    }
-
-    .resize-handle {
-        opacity: 0;
-        transition:
-            opacity 0.15s ease,
-            background 0.15s ease;
-    }
-
-    .resize-handle:hover {
-        opacity: 1;
-        background: rgba(255, 255, 255, 0.25) !important;
-    }
-
-    .resize-left:hover {
-        border-radius: 8px 0 0 8px;
-    }
-
-    .resize-right:hover {
-        border-radius: 0 8px 8px 0;
-    }
-
-    .time-preview-badge {
-        animation: pop-in 0.12s ease-out;
-    }
-
-    @keyframes pop-in {
-        0% {
-            transform: translateX(-50%) scale(0.9);
-            opacity: 0;
-        }
-        100% {
-            transform: translateX(-50%) scale(1);
-            opacity: 1;
-        }
-    }
-
-    /* Task hover effects */
-    .task-bar {
-        transition:
-            transform 0.15s ease,
-            box-shadow 0.15s ease,
-            ring 0.15s ease;
-    }
-
-    .task-wrapper {
-        transition: opacity 0.15s ease;
     }
 </style>
