@@ -34,10 +34,13 @@
         Circle,
     } from "lucide-svelte";
 
+    import { onMount, onDestroy } from "svelte";
+
     interface Props {
         open?: boolean;
         task?: Task | null;
         initialCategoryId?: string;
+        lastTaskEndTime?: Date | null;
         onClose?: () => void;
     }
 
@@ -45,6 +48,7 @@
         open = $bindable(false),
         task = null,
         initialCategoryId,
+        lastTaskEndTime = null,
         onClose,
     }: Props = $props();
 
@@ -75,6 +79,49 @@
 
     // Uncomplete confirmation
     let showUncompleteConfirm = $state(false);
+
+    // Live time tracking (only for create mode)
+    let liveEndTime = $state(false);
+    let useLastTaskStart = $state(false);
+    let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
+
+    // Function to update end time/date to now
+    function updateEndTimeToNow() {
+        const now = new Date();
+        endDate = now.toISOString().split("T")[0];
+        endTime = now.toTimeString().slice(0, 8);
+    }
+
+    // Effect to manage the live time interval
+    $effect(() => {
+        if (open && !task && liveEndTime) {
+            // Start the interval
+            updateEndTimeToNow();
+            timeUpdateInterval = setInterval(updateEndTimeToNow, 1000);
+        } else {
+            // Clear the interval
+            if (timeUpdateInterval) {
+                clearInterval(timeUpdateInterval);
+                timeUpdateInterval = null;
+            }
+        }
+    });
+
+    // Clean up interval on destroy
+    onDestroy(() => {
+        if (timeUpdateInterval) {
+            clearInterval(timeUpdateInterval);
+        }
+    });
+
+    // Effect to set start from last task
+    $effect(() => {
+        if (open && !task && useLastTaskStart && lastTaskEndTime) {
+            const lastEnd = new Date(lastTaskEndTime);
+            startDate = lastEnd.toISOString().split("T")[0];
+            startTime = lastEnd.toTimeString().slice(0, 8);
+        }
+    });
 
     const categoriesQuery = createQuery({
         queryKey: ["categories"],
@@ -183,6 +230,8 @@
         endDate = getTodayString();
         startTime = "09:00:00";
         endTime = "10:00:00";
+        liveEndTime = false;
+        useLastTaskStart = false;
     }
 
     // Handle completion toggle
@@ -503,6 +552,53 @@
                     <div
                         class="bg-base-100 rounded-lg border border-base-300 p-3 space-y-3"
                     >
+                        <!-- Quick toggles (only in create mode) -->
+                        {#if !isEditing}
+                            <div
+                                class="flex flex-wrap gap-2 pb-2 border-b border-base-200"
+                            >
+                                {#if lastTaskEndTime}
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="toggle toggle-xs toggle-primary"
+                                            bind:checked={useLastTaskStart}
+                                        />
+                                        <span
+                                            class="text-xs {useLastTaskStart
+                                                ? 'text-primary font-medium'
+                                                : 'opacity-60'}"
+                                        >
+                                            From last task
+                                        </span>
+                                    </label>
+                                {/if}
+                                <label
+                                    class="flex items-center gap-2 cursor-pointer ml-auto"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="toggle toggle-xs toggle-success"
+                                        bind:checked={liveEndTime}
+                                    />
+                                    <span
+                                        class="text-xs flex items-center gap-1 {liveEndTime
+                                            ? 'text-success font-medium'
+                                            : 'opacity-60'}"
+                                    >
+                                        {#if liveEndTime}
+                                            <span
+                                                class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
+                                            ></span>
+                                        {/if}
+                                        End at Now
+                                    </span>
+                                </label>
+                            </div>
+                        {/if}
+
                         <div class="grid grid-cols-2 gap-3">
                             <div class="form-control">
                                 <label class="label py-0 pb-1" for="start-date">
@@ -515,6 +611,7 @@
                                     type="date"
                                     bind:value={startDate}
                                     class="input input-sm input-bordered w-full"
+                                    disabled={useLastTaskStart}
                                 />
                             </div>
                             <div class="form-control">
@@ -527,7 +624,10 @@
                                     id="end-date"
                                     type="date"
                                     bind:value={endDate}
-                                    class="input input-sm input-bordered w-full"
+                                    class="input input-sm input-bordered w-full {liveEndTime
+                                        ? 'input-success'
+                                        : ''}"
+                                    disabled={liveEndTime}
                                 />
                             </div>
                         </div>
@@ -547,6 +647,7 @@
                                     step="1"
                                     bind:value={startTime}
                                     class="input input-sm input-bordered w-full"
+                                    disabled={useLastTaskStart}
                                 />
                             </div>
                             <div class="form-control">
@@ -556,6 +657,12 @@
                                     >
                                         <Clock class="w-3 h-3" />
                                         To
+                                        {#if liveEndTime}
+                                            <span
+                                                class="badge badge-xs badge-success"
+                                                >LIVE</span
+                                            >
+                                        {/if}
                                     </span>
                                 </label>
                                 <input
@@ -563,7 +670,10 @@
                                     type="time"
                                     step="1"
                                     bind:value={endTime}
-                                    class="input input-sm input-bordered w-full"
+                                    class="input input-sm input-bordered w-full {liveEndTime
+                                        ? 'input-success font-mono'
+                                        : ''}"
+                                    disabled={liveEndTime}
                                 />
                             </div>
                         </div>

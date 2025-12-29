@@ -10,7 +10,11 @@
     X,
     ClipboardList,
   } from "lucide-svelte";
-  import { Timeline } from "$lib/components/timeline";
+  import {
+    TimelineMultiView,
+    type TimelineView,
+  } from "$lib/components/timeline";
+  import { AlignHorizontalJustifyStart, List } from "lucide-svelte";
   import { TaskModal } from "$lib/components/tasks";
   import {
     Card,
@@ -123,6 +127,16 @@
   // Filter state
   let selectedCategoryId = $state<string | null>(null);
 
+  // Timeline view state
+  let currentTimelineView = $state<TimelineView>("timeline");
+
+  function handleViewChange(view: TimelineView) {
+    currentTimelineView = view;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("timeline-view-preference", view);
+    }
+  }
+
   // FAB menu state
   let fabOpen = $state(false);
 
@@ -216,6 +230,24 @@
       selectedDate.getMonth() === today.getMonth() &&
       selectedDate.getDate() === today.getDate()
     );
+  });
+
+  // Get the end time of the last task that ended before now (for "start from last task" feature)
+  const lastTaskEndTime = $derived(() => {
+    const tasks = allTasks();
+    if (tasks.length === 0) return null;
+
+    const now = new Date();
+
+    // Filter to only tasks that have ended before now
+    const pastTasks = tasks.filter((t) => t.endTime.getTime() <= now.getTime());
+    if (pastTasks.length === 0) return null;
+
+    // Sort by end time and get the most recent
+    const sorted = [...pastTasks].sort(
+      (a, b) => b.endTime.getTime() - a.endTime.getTime(),
+    );
+    return sorted[0]?.endTime || null;
   });
 
   // Task modal state
@@ -472,37 +504,68 @@
       class="card bg-base-100 shadow-sm border border-base-200/50 h-full flex flex-col"
     >
       <div class="card-body p-3 lg:p-4 flex flex-col h-full gap-3">
-        <!-- Category Filters -->
-        <div class="flex items-center gap-2 flex-wrap flex-shrink-0">
-          <span class="text-xs font-semibold uppercase text-base-content/50"
-            >Filter:</span
-          >
-          <button
-            class={cn(
-              "btn btn-xs",
-              selectedCategoryId === null ? "btn-primary" : "btn-ghost",
-            )}
-            onclick={() => (selectedCategoryId = null)}
-          >
-            All
-          </button>
-          {#each categories as category}
+        <!-- Filter Row with View Toggle -->
+        <div class="flex items-center justify-between gap-2 flex-shrink-0">
+          <!-- Category Filters -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-semibold uppercase text-base-content/50"
+              >Filter:</span
+            >
             <button
               class={cn(
-                "btn btn-xs gap-1.5",
-                selectedCategoryId === category.id
-                  ? "btn-primary btn-outline"
-                  : "btn-ghost",
+                "btn btn-xs",
+                selectedCategoryId === null ? "btn-primary" : "btn-ghost",
               )}
-              onclick={() => (selectedCategoryId = category.id)}
+              onclick={() => (selectedCategoryId = null)}
             >
-              <span
-                class="w-2 h-2 rounded-full ring-1 ring-black/10"
-                style="background-color: {category.color};"
-              ></span>
-              {category.name}
+              All
             </button>
-          {/each}
+            {#each categories as category}
+              <button
+                class={cn(
+                  "btn btn-xs gap-1.5",
+                  selectedCategoryId === category.id
+                    ? "btn-primary btn-outline"
+                    : "btn-ghost",
+                )}
+                onclick={() => (selectedCategoryId = category.id)}
+              >
+                <span
+                  class="w-2 h-2 rounded-full ring-1 ring-black/10"
+                  style="background-color: {category.color};"
+                ></span>
+                {category.name}
+              </button>
+            {/each}
+          </div>
+
+          <!-- View Toggle -->
+          <div class="join border border-base-300/60 rounded-lg">
+            <div class="tooltip tooltip-bottom" data-tip="Timeline View">
+              <button
+                type="button"
+                class="join-item btn btn-xs btn-square {currentTimelineView ===
+                'timeline'
+                  ? 'btn-primary'
+                  : 'btn-ghost'}"
+                onclick={() => handleViewChange("timeline")}
+              >
+                <AlignHorizontalJustifyStart class="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div class="tooltip tooltip-bottom" data-tip="Agenda View">
+              <button
+                type="button"
+                class="join-item btn btn-xs btn-square {currentTimelineView ===
+                'agenda'
+                  ? 'btn-primary'
+                  : 'btn-ghost'}"
+                onclick={() => handleViewChange("agenda")}
+              >
+                <List class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Timeline -->
@@ -514,11 +577,10 @@
               <p class="text-sm opacity-50">Loading your day...</p>
             </div>
           {:else}
-            <Timeline
+            <TimelineMultiView
               tasks={timelineTasks}
-              startHour={0}
-              endHour={24}
               {selectedDate}
+              currentView={currentTimelineView}
               onTaskClick={handleTaskClick}
               onCategoryClick={handleCategoryClick}
               onToggleComplete={handleToggleComplete}
@@ -609,6 +671,7 @@
   bind:open={modalOpen}
   task={editingTask}
   {initialCategoryId}
+  lastTaskEndTime={lastTaskEndTime()}
   onClose={handleModalClose}
 />
 <ConfirmDialog

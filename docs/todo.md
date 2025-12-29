@@ -1,4 +1,6 @@
 
+SET default states in setting for : completed staate, last task, from last task etc 
+
 
 
 lets use 
