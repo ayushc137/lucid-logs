@@ -1,7 +1,12 @@
 <script lang="ts">
-    import { Clock, Check, Circle, Plus, CheckCircle2 } from "lucide-svelte";
+    import {
+        Clock,
+        ChevronLeft,
+        ChevronRight,
+        Minus,
+        Plus,
+    } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
-    import { fade } from "svelte/transition";
 
     interface Task {
         id: string;
@@ -17,534 +22,607 @@
 
     interface Props {
         tasks?: Task[];
-        startHour?: number;
-        endHour?: number;
+        selectedDate?: Date;
         onTaskClick?: (taskId: string) => void;
         onToggleComplete?: (taskId: string, completed: boolean) => void;
         onCategoryClick?: (categoryId: string) => void;
+        onDateChange?: (date: Date) => void;
     }
 
     let {
         tasks = [],
-        startHour = 0,
-        endHour = 24,
+        selectedDate = new Date(),
         onTaskClick,
         onToggleComplete,
         onCategoryClick,
+        onDateChange,
     }: Props = $props();
 
-    const UNCATEGORIZED_COLOR = "#9ca3af"; // Gray-400
-    const ROW_HEIGHT = 56;
-    const ROW_GAP = 8;
-    const GROUP_PADDING = 16; // Top/bottom padding for each category group
+    // Zoom levels (hours visible)
+    const ZOOM_LEVELS = [24, 18, 12, 8, 6, 4];
+    let zoomIndex = $state(0);
+    const hoursInView = $derived(ZOOM_LEVELS[zoomIndex]);
+    const isZoomed = $derived(zoomIndex > 0);
 
-    // Current time state
+    // Scroll offset for panning
+    let scrollOffsetHours = $state(0);
+    const maxScrollOffset = $derived(Math.max(0, 24 - hoursInView));
+    const clampedOffset = $derived(
+        Math.min(Math.max(0, scrollOffsetHours), maxScrollOffset),
+    );
+    const viewStartHour = $derived(clampedOffset);
+    const viewEndHour = $derived(clampedOffset + hoursInView);
+
+    let timelineRef: HTMLDivElement;
+    let containerWidth = $state(800);
+
+    function zoomIn(centerHour?: number) {
+        if (zoomIndex < ZOOM_LEVELS.length - 1) {
+            const center = centerHour ?? viewStartHour + hoursInView / 2;
+            zoomIndex++;
+            const newHours = ZOOM_LEVELS[zoomIndex];
+            scrollOffsetHours = Math.max(
+                0,
+                Math.min(24 - newHours, center - newHours / 2),
+            );
+        }
+    }
+
+    function zoomOut(centerHour?: number) {
+        if (zoomIndex > 0) {
+            const center = centerHour ?? viewStartHour + hoursInView / 2;
+            zoomIndex--;
+            const newHours = ZOOM_LEVELS[zoomIndex];
+            scrollOffsetHours = Math.max(
+                0,
+                Math.min(24 - newHours, center - newHours / 2),
+            );
+        }
+    }
+
+    function resetZoom() {
+        zoomIndex = 0;
+        scrollOffsetHours = 0;
+    }
+
+    // Mouse wheel zoom (Ctrl + scroll)
+    function handleWheel(e: WheelEvent) {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+
+        const rect = timelineRef.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const hourAtMouse = viewStartHour + (mouseX / rect.width) * hoursInView;
+
+        if (e.deltaY < 0) {
+            zoomIn(hourAtMouse);
+        } else {
+            zoomOut(hourAtMouse);
+        }
+    }
+
+    // Horizontal scroll for panning
+    function handleScroll(e: Event) {
+        if (!isZoomed) return;
+        const target = e.target as HTMLDivElement;
+        const maxScroll = target.scrollWidth - target.clientWidth;
+        if (maxScroll > 0) {
+            scrollOffsetHours =
+                (target.scrollLeft / maxScroll) * maxScrollOffset;
+        }
+    }
+
+    // Keep scroll position synced
+    $effect(() => {
+        if (timelineRef && isZoomed) {
+            const maxScroll = timelineRef.scrollWidth - timelineRef.clientWidth;
+            if (maxScroll > 0) {
+                const targetScroll =
+                    (clampedOffset / maxScrollOffset) * maxScroll;
+                if (Math.abs(timelineRef.scrollLeft - targetScroll) > 10) {
+                    timelineRef.scrollLeft = targetScroll;
+                }
+            }
+        }
+    });
+
+    const ROW_HEIGHT = 38;
+    const ROW_GAP = 2;
+    const MIN_WIDTH_FOR_TEXT = 40; // pixels
+
     let currentTime = $state(new Date());
     let timeInterval: ReturnType<typeof setInterval>;
 
-    // Hover state
     let hoveredTaskId = $state<string | null>(null);
     let tooltipPosition = $state<{ x: number; y: number } | null>(null);
 
     onMount(() => {
-        timeInterval = setInterval(() => {
-            currentTime = new Date();
-        }, 1000);
+        timeInterval = setInterval(() => (currentTime = new Date()), 1000);
+        if (timelineRef) {
+            containerWidth = timelineRef.clientWidth;
+            const observer = new ResizeObserver(() => {
+                containerWidth = timelineRef?.clientWidth ?? 800;
+            });
+            observer.observe(timelineRef);
+            return () => observer.disconnect();
+        }
     });
 
     onDestroy(() => {
         if (timeInterval) clearInterval(timeInterval);
     });
 
-    // --- Helpers ---
-
-    const allHours = $derived(
-        Array.from(
-            { length: endHour - startHour + 1 },
-            (_, i) => startHour + i,
-        ),
-    );
-
-    function formatHour(hour: number): string {
-        if (hour === 0 || hour === 24) return "12 AM";
-        if (hour === 12) return "12 PM";
-        if (hour < 12) return `${hour} AM`;
-        return `${hour - 12} PM`;
+    // Date navigation
+    function goToPreviousDay() {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() - 1);
+        onDateChange?.(d);
     }
 
-    function formatExactTime(date: Date): string {
-        if (!isValidDate(date)) return "--:--";
-        return date.toLocaleTimeString([], {
+    function goToNextDay() {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + 1);
+        onDateChange?.(d);
+    }
+
+    function goToToday() {
+        onDateChange?.(new Date());
+    }
+
+    const isToday = $derived(() => {
+        const t = new Date();
+        return (
+            selectedDate.getFullYear() === t.getFullYear() &&
+            selectedDate.getMonth() === t.getMonth() &&
+            selectedDate.getDate() === t.getDate()
+        );
+    });
+
+    const dateLabel = $derived(() => {
+        const t = new Date();
+        const y = new Date(t);
+        y.setDate(y.getDate() - 1);
+        const tm = new Date(t);
+        tm.setDate(tm.getDate() + 1);
+        if (isToday()) return "Today";
+        if (selectedDate.toDateString() === y.toDateString())
+            return "Yesterday";
+        if (selectedDate.toDateString() === tm.toDateString())
+            return "Tomorrow";
+        return selectedDate.toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+        });
+    });
+
+    function formatHour(h: number): string {
+        const hour = h % 24;
+        if (hour === 0) return "12 AM";
+        if (hour === 12) return "12 PM";
+        return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+    }
+
+    function formatTime(d: Date): string {
+        if (!(d instanceof Date) || isNaN(d.getTime())) return "--:--";
+        return d.toLocaleTimeString([], {
             hour: "numeric",
             minute: "2-digit",
             hour12: true,
         });
     }
 
-    function isValidDate(date: any): boolean {
-        return date instanceof Date && !isNaN(date.getTime());
+    function formatDuration(s: Date, e: Date): string {
+        if (!(s instanceof Date) || !(e instanceof Date)) return "";
+        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+        if (mins < 1)
+            return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
+        if (mins < 60) return `${mins}m`;
+        const h = Math.floor(mins / 60),
+            m = mins % 60;
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
     }
 
-    function getDecimalHour(date: Date): number {
-        if (!isValidDate(date)) return startHour;
-        return date.getHours() + date.getMinutes() / 60;
+    function getDecimalHour(d: Date): number {
+        return d instanceof Date && !isNaN(d.getTime())
+            ? d.getHours() + d.getMinutes() / 60
+            : 0;
     }
 
-    // --- Layout Logic ---
-
-    // Calculate position/width for a single task
-    function getTaskStyle(task: Task): { left: number; width: number } {
-        if (!isValidDate(task.startTime) || !isValidDate(task.endTime)) {
+    function getTaskPosition(task: Task): { left: number; width: number } {
+        const s = task.startTime,
+            e = task.endTime;
+        if (!(s instanceof Date) || !(e instanceof Date))
             return { left: 0, width: 0 };
-        }
 
-        const startDecimal = getDecimalHour(task.startTime);
-        let endDecimal = getDecimalHour(task.endTime);
-        const totalHours = endHour - startHour;
+        let startH = getDecimalHour(s);
+        let endH = getDecimalHour(e);
 
-        if (endDecimal < startDecimal) endDecimal += 24; // Crosses midnight
-        // Cap visual end for very long tasks to keep them sane in day view
-        if (endDecimal - startDecimal > 24) endDecimal = startDecimal + 24;
-
-        const leftPercent = ((startDecimal - startHour) / totalHours) * 100;
-        const widthPercent = ((endDecimal - startDecimal) / totalHours) * 100;
+        const sameDay = (a: Date, b: Date) =>
+            a.toDateString() === b.toDateString();
+        if (!sameDay(s, selectedDate) && s < selectedDate) startH = 0;
+        if (!sameDay(e, selectedDate) && e > selectedDate) endH = 24;
+        if (endH < startH) endH = 24;
 
         return {
-            left: Math.max(0, leftPercent),
-            width: Math.max(1, Math.min(widthPercent, 100 - leftPercent)), // Clamp to container
+            left: (startH / 24) * 100,
+            width: Math.max(0.2, ((endH - startH) / 24) * 100),
         };
     }
 
-    // Packing algorithm: Assigns a 'row' index to each task in a list to prevent overlap
-    function packTasks(taskList: Task[]) {
-        if (taskList.length === 0)
-            return { rows: [], height: ROW_HEIGHT + GROUP_PADDING * 2 };
-
-        const validTasks = taskList.filter(
-            (t) => isValidDate(t.startTime) && isValidDate(t.endTime),
+    function packTasks(list: Task[]) {
+        const valid = list.filter(
+            (t) => t.startTime instanceof Date && t.endTime instanceof Date,
         );
-        const sorted = [...validTasks].sort(
+        const sorted = [...valid].sort(
             (a, b) => a.startTime.getTime() - b.startTime.getTime(),
         );
-
-        const packedRows: Array<{ task: Task; row: number }> = [];
-        const lanes: number[] = []; // stores 'endTime' timestamp of the last task in each lane
-
-        const gapBufferMs = 15 * 60 * 1000; // 15 min buffer prevents tight visual squeezing
+        const rows: Array<{ task: Task; row: number }> = [];
+        const lanes: number[] = [];
 
         for (const task of sorted) {
-            const startMs = task.startTime.getTime();
-            const endMs = task.endTime.getTime();
-            let effectiveEndMs = endMs;
-
-            // Enforce minimum visual width rules impact on stacking
-            // If task is super short (e.g. 5 mins), visually it might be 30px wide
-            // So we treat it as effectively longer for collision detection
-            const minVisualDurationMs = 30 * 60 * 1000;
-            if (effectiveEndMs - startMs < minVisualDurationMs) {
-                effectiveEndMs = startMs + minVisualDurationMs;
-            }
-
-            // Find first lane where this task fits
-            let laneIndex = lanes.findIndex(
-                (laneEnd) => laneEnd + gapBufferMs <= startMs,
-            );
-
-            if (laneIndex === -1) {
-                // New lane
-                laneIndex = lanes.length;
-                lanes.push(effectiveEndMs);
+            const pos = getTaskPosition(task);
+            const left = pos.left,
+                right = pos.left + pos.width;
+            let lane = lanes.findIndex((end) => end <= left);
+            if (lane === -1) {
+                lane = lanes.length;
+                lanes.push(right);
             } else {
-                // Update existing lane
-                lanes[laneIndex] = effectiveEndMs;
+                lanes[lane] = right;
             }
-
-            packedRows.push({ task, row: laneIndex });
+            rows.push({ task, row: lane });
         }
 
-        const maxLane = lanes.length > 0 ? lanes.length : 1;
-        const totalHeight =
-            maxLane * ROW_HEIGHT + (maxLane - 1) * ROW_GAP + GROUP_PADDING * 2;
-
-        return { rows: packedRows, height: totalHeight };
+        return {
+            rows,
+            height:
+                Math.max(1, lanes.length) * ROW_HEIGHT +
+                (lanes.length - 1) * ROW_GAP +
+                12,
+        };
     }
 
-    // Group tasks by category and calculate layout for each group
-    const categoryGroups = $derived.by(() => {
-        const groups = new Map<
-            string,
-            { id: string; name: string; color: string; tasks: Task[] }
-        >();
-        const uncategorizedTasks: Task[] = [];
+    const packed = $derived.by(() => packTasks(tasks));
 
-        for (const task of tasks) {
-            if (task.categoryId && task.categoryName) {
-                if (!groups.has(task.categoryId)) {
-                    groups.set(task.categoryId, {
-                        id: task.categoryId,
-                        name: task.categoryName,
-                        color: task.categoryColor || UNCATEGORIZED_COLOR,
-                        tasks: [],
-                    });
-                }
-                groups.get(task.categoryId)!.tasks.push(task);
-            } else {
-                uncategorizedTasks.push(task);
-            }
-        }
-
-        // Process categorized groups
-        const result = Array.from(groups.values()).map((group) => {
-            const { rows, height } = packTasks(group.tasks);
-            return { ...group, rows, height };
-        });
-
-        // Add uncategorized if any
-        if (uncategorizedTasks.length > 0) {
-            const { rows, height } = packTasks(uncategorizedTasks);
-            result.push({
-                id: "uncategorized",
-                name: "Uncategorized",
-                color: UNCATEGORIZED_COLOR,
-                tasks: uncategorizedTasks,
-                rows,
-                height,
-            });
-        }
-
-        // Sort by name for consistency
-        result.sort((a, b) => a.name.localeCompare(b.name));
-
-        return result;
-    });
-
-    // --- Styling Helpers ---
-
-    function getContrastTextColor(hexColor: string): string {
-        if (!hexColor || !hexColor.startsWith("#")) return "#ffffff";
-        const hex = hexColor.replace("#", "");
-        if (hex.length !== 6) return "#ffffff";
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        // Custom logic: darker threshold for better readability on pastels
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.6 ? "#1f2937" : "#ffffff";
+    function getTextColor(bg: string): string {
+        if (!bg?.startsWith("#") || bg.length !== 7) return "#fff";
+        const r = parseInt(bg.slice(1, 3), 16);
+        const g = parseInt(bg.slice(3, 5), 16);
+        const b = parseInt(bg.slice(5, 7), 16);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55
+            ? "#1f2937"
+            : "#fff";
     }
 
-    function getShadowColor(hexColor: string): string {
-        if (!hexColor || !hexColor.startsWith("#"))
-            return "rgba(107, 114, 128, 0.25)";
-        return `${hexColor}40`;
+    // Calculate if task is wide enough for text
+    function canShowText(widthPercent: number): boolean {
+        const totalWidth = containerWidth * (isZoomed ? 24 / hoursInView : 1);
+        const taskPixelWidth = (widthPercent / 100) * totalWidth;
+        return taskPixelWidth >= MIN_WIDTH_FOR_TEXT;
     }
 
-    // --- Current Time Indicator ---
-
-    const currentHour = $derived(
-        currentTime.getHours() +
-            currentTime.getMinutes() / 60 +
-            currentTime.getSeconds() / 3600,
+    const nowHour = $derived(
+        currentTime.getHours() + currentTime.getMinutes() / 60,
     );
-    const nowPosition = $derived(
-        ((currentHour - startHour) / (endHour - startHour)) * 100,
+    const nowPercent = $derived((nowHour / 24) * 100);
+    const showNow = $derived(
+        isToday() && nowHour >= viewStartHour && nowHour <= viewEndHour,
     );
-    const showNowLine = $derived(
-        currentHour >= startHour && currentHour <= endHour,
+    const nowFormatted = $derived(
+        currentTime.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        }),
     );
 
-    // --- Interaction ---
-
-    function handleMouseEnter(e: MouseEvent, taskId: string) {
-        hoveredTaskId = taskId;
-        updateTooltipPosition(e);
+    function onMouseEnter(e: MouseEvent, id: string) {
+        hoveredTaskId = id;
+        tooltipPosition = { x: e.clientX + 10, y: e.clientY + 10 };
     }
-    function handleMouseMove(e: MouseEvent) {
-        if (hoveredTaskId) updateTooltipPosition(e);
+    function onMouseMove(e: MouseEvent) {
+        if (hoveredTaskId)
+            tooltipPosition = { x: e.clientX + 10, y: e.clientY + 10 };
     }
-    function handleMouseLeave() {
+    function onMouseLeave() {
         hoveredTaskId = null;
     }
-    function updateTooltipPosition(e: MouseEvent) {
-        tooltipPosition = { x: e.clientX + 16, y: e.clientY + 16 };
-    }
-    const hoveredTask = $derived(tasks.find((t) => t.id === hoveredTaskId));
+    const hovered = $derived(tasks.find((t) => t.id === hoveredTaskId));
 </script>
 
 <div
-    class="timeline-wrapper h-full flex flex-col relative bg-base-100/50 rounded-xl border border-base-200 shadow-inner"
+    class="timeline h-full flex flex-col bg-base-100 rounded-xl border border-base-300/50 overflow-hidden"
+    onwheel={handleWheel}
 >
-    <!-- CHANGED: overflow-x-hidden to force hide horizontal scroll -->
+    <!-- Header -->
     <div
-        class="timeline-container flex-1 overflow-x-hidden overflow-y-auto rounded-xl"
+        class="flex items-center justify-between px-3 py-2 border-b border-base-200 bg-base-100"
     >
-        <!-- CHANGED: w-full instead of min-w-full to avoid scrollbar conflict -->
-        <div class="timeline-inner w-full h-full flex flex-col">
-            <!-- Header: Time Labels -->
-            <div
-                class="sticky top-0 z-30 bg-base-100/95 backdrop-blur-sm border-b border-base-200"
+        <div class="flex items-center gap-0.5">
+            <button
+                class="btn btn-ghost btn-sm btn-square"
+                onclick={goToPreviousDay}
             >
-                <div class="h-10 relative">
-                    {#each allHours as hour}
-                        {@const leftPos =
-                            ((hour - startHour) / (endHour - startHour)) * 100}
+                <ChevronLeft class="w-4 h-4" />
+            </button>
+            <button
+                class="btn btn-sm px-4 min-w-[90px] {isToday()
+                    ? 'btn-primary'
+                    : 'btn-ghost'}"
+                onclick={goToToday}
+            >
+                {dateLabel()}
+            </button>
+            <button
+                class="btn btn-ghost btn-sm btn-square"
+                onclick={goToNextDay}
+            >
+                <ChevronRight class="w-4 h-4" />
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] text-base-content/40 hidden md:inline"
+                >Ctrl+Scroll to zoom</span
+            >
+            <div class="join border border-base-300 rounded-md overflow-hidden">
+                <button
+                    class="join-item btn btn-ghost btn-xs px-2"
+                    onclick={() => zoomOut()}
+                    disabled={zoomIndex === 0}
+                >
+                    <Minus class="w-3 h-3" />
+                </button>
+                <span
+                    class="join-item flex items-center px-2.5 text-xs font-medium bg-base-200/60"
+                    >{hoursInView}h</span
+                >
+                <button
+                    class="join-item btn btn-ghost btn-xs px-2"
+                    onclick={() => zoomIn()}
+                    disabled={zoomIndex === ZOOM_LEVELS.length - 1}
+                >
+                    <Plus class="w-3 h-3" />
+                </button>
+            </div>
+            {#if isZoomed}
+                <button
+                    class="btn btn-ghost btn-xs text-[10px]"
+                    onclick={resetZoom}>Reset</button
+                >
+            {/if}
+        </div>
+
+        {#if showNow}
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"
+                ></span>
+                <span class="text-[10px] font-mono font-medium text-error"
+                    >{nowFormatted}</span
+                >
+            </div>
+        {:else}
+            <div class="w-14"></div>
+        {/if}
+    </div>
+
+    <!-- Timeline -->
+    <div
+        class="flex-1 overflow-x-auto overflow-y-auto"
+        bind:this={timelineRef}
+        onscroll={handleScroll}
+    >
+        <div
+            class="relative min-h-full"
+            style="width: {isZoomed ? (24 / hoursInView) * 100 : 100}%;"
+        >
+            <!-- Hour labels -->
+            <div
+                class="sticky top-0 z-20 h-6 bg-base-100/95 backdrop-blur-sm border-b border-base-200/60"
+            >
+                <div class="relative h-full">
+                    {#each Array.from({ length: 25 }, (_, i) => i) as hour}
+                        {@const showLabel =
+                            hoursInView <= 8 || hour % 2 === 0 || hour === 24}
                         <div
-                            class="absolute top-1/2 -translate-y-1/2 text-[10px] font-bold text-base-content/40 uppercase tracking-widest transform -translate-x-1/2 whitespace-nowrap"
-                            style="left: {leftPos}%;"
+                            class="absolute top-0 bottom-0 flex items-center justify-center"
+                            style="left: {(hour / 24) * 100}%; width: {(1 /
+                                24) *
+                                100}%;"
                         >
-                            {formatHour(hour)}
+                            {#if showLabel}
+                                <span
+                                    class="text-[9px] font-medium text-base-content/50"
+                                    >{formatHour(hour)}</span
+                                >
+                            {/if}
                         </div>
                     {/each}
                 </div>
             </div>
 
-            <!-- Body: Swimlanes -->
-            <div class="relative flex-1 min-h-[300px]">
-                <!-- Background Grid Lines (Absolute) -->
+            <!-- Grid and tasks - use flex-1 and min-h-full to fill available space -->
+            <div
+                class="grid-container relative flex-1"
+                style="min-height: max({packed.height}px, calc(100vh - 200px));"
+            >
+                <!-- Grid lines container - full height -->
                 <div class="absolute inset-0 pointer-events-none">
-                    {#each allHours as hour}
-                        {@const leftPos =
-                            ((hour - startHour) / (endHour - startHour)) * 100}
+                    <!-- Hour grid lines -->
+                    {#each Array.from({ length: 25 }, (_, i) => i) as hour}
                         <div
-                            class="absolute top-0 bottom-0 w-px bg-base-content/5 border-r border-dashed border-base-content/5"
-                            style="left: {leftPos}%;"
+                            class="absolute top-0 bottom-0 w-px bg-base-300/70"
+                            style="left: {(hour / 24) * 100}%;"
                         ></div>
                     {/each}
-                </div>
 
-                <!-- Current Time Indicator -->
-                {#if showNowLine}
-                    <div
-                        class="absolute top-0 bottom-0 z-20 pointer-events-none"
-                        style="left: {nowPosition}%;"
-                    >
+                    <!-- Half-hour grid lines -->
+                    {#each Array.from({ length: 24 }, (_, i) => i) as hour}
                         <div
-                            class="absolute top-0 bottom-0 left-0 w-px bg-error shadow-[0_0_8px_rgba(255,0,0,0.6)]"
+                            class="absolute top-0 bottom-0 w-px bg-base-200/50"
+                            style="left: {((hour + 0.5) / 24) * 100}%;"
                         ></div>
-                        <div
-                            class="absolute -top-1 left-0 -translate-x-1/2 w-2 h-2 rounded-full bg-error animate-pulse"
-                        ></div>
-                    </div>
-                {/if}
+                    {/each}
 
-                <!-- Swimlanes (Groups) -->
-                <div class="flex flex-col">
-                    {#each categoryGroups as group, i}
+                    <!-- Now line -->
+                    {#if showNow}
                         <div
-                            class="group-track relative border-b border-base-content/5 hover:bg-base-content/[0.02] transition-colors duration-300"
-                            style="height: {group.height}px;"
+                            class="absolute top-0 bottom-0 w-0.5 bg-error z-30"
+                            style="left: {nowPercent}%;"
                         >
-                            <!-- Sticky Category Header (Interactive) -->
                             <div
-                                class="sticky left-0 z-20 inline-flex items-start pt-4 pl-4 pr-6 w-48 pointer-events-none"
-                            >
-                                <button
-                                    class="bg-base-100/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-base-content/10 flex items-center gap-2 shadow-sm transition-all duration-200 pointer-events-auto group/label {group.id !==
-                                    'uncategorized'
-                                        ? 'cursor-pointer hover:scale-105 active:scale-95 hover:shadow-md hover:ring-1 ring-primary/20'
-                                        : ''}"
-                                    onclick={() =>
-                                        group.id !== "uncategorized" &&
-                                        onCategoryClick?.(group.id)}
-                                    title={group.id !== "uncategorized"
-                                        ? "Click to add task"
-                                        : ""}
-                                >
-                                    <div
-                                        class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm transition-transform group-hover/label:scale-125"
-                                        style="background-color: {group.color};"
-                                    ></div>
-                                    <span
-                                        class="text-xs font-bold truncate max-w-[100px]"
-                                        >{group.name}</span
-                                    >
-                                    {#if group.id !== "uncategorized"}
-                                        <Plus
-                                            class="w-3 h-3 opacity-0 group-hover/label:opacity-100 -mr-1 transition-opacity text-base-content/50"
-                                        />
-                                    {/if}
-                                </button>
-                            </div>
-
-                            <!-- Tasks Grid -->
-                            <div class="absolute inset-0 top-4">
-                                <!-- Offset matching top padding -->
-                                {#each group.rows as { task, row }}
-                                    {@const style = getTaskStyle(task)}
-                                    {@const textColor = getContrastTextColor(
-                                        group.color,
-                                    )}
-                                    {@const shadowColor = getShadowColor(
-                                        group.color,
-                                    )}
-                                    {@const isFiltered =
-                                        hoveredTaskId &&
-                                        hoveredTaskId !== task.id}
-
-                                    <!-- svelte-ignore a11y_interactive_supports_focus -->
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <div
-                                        class="absolute transition-all duration-300 ease-out"
-                                        class:z-40={hoveredTaskId === task.id}
-                                        class:z-10={hoveredTaskId !== task.id}
-                                        class:opacity-30={isFiltered}
-                                        class:scale-[1.02]={hoveredTaskId ===
-                                            task.id}
-                                        style="
-                                            left: {style.left}%;
-                                            width: {style.width}%;
-                                            top: {row *
-                                            (ROW_HEIGHT + ROW_GAP)}px;
-                                            height: {ROW_HEIGHT}px;
-                                        "
-                                        role="button"
-                                        onmouseenter={(e) =>
-                                            handleMouseEnter(e, task.id)}
-                                        onmousemove={handleMouseMove}
-                                        onmouseleave={handleMouseLeave}
-                                        onclick={(e) => onTaskClick?.(task.id)}
-                                    >
-                                        <div
-                                            class="absolute inset-0 rounded-xl overflow-hidden transition-all duration-300 ring-1 ring-black/5 dark:ring-white/10"
-                                            class:shadow-sm={!task.completed}
-                                            class:hover:shadow-lg={!task.completed}
-                                            class:shadow-inner={task.completed}
-                                            class:opacity-90={task.completed}
-                                            class:saturate-[0.75]={task.completed}
-                                            style="background-color: {group.color}; {task.completed
-                                                ? ''
-                                                : `box-shadow: 0 4px 6px -2px ${shadowColor};`}"
-                                        >
-                                            <!-- Completed Texture Overlay -->
-                                            {#if task.completed}
-                                                <div
-                                                    class="absolute inset-0 bg-striped opacity-30 pointer-events-none z-10"
-                                                ></div>
-                                                <div
-                                                    class="absolute inset-0 bg-black/10 pointer-events-none z-0"
-                                                ></div>
-                                            {/if}
-
-                                            <div
-                                                class="relative z-20 h-full px-3 flex items-center justify-center gap-2"
-                                                style="color: {textColor};"
-                                            >
-                                                <div
-                                                    class="min-w-0 flex-1 flex flex-col justify-center"
-                                                >
-                                                    <span
-                                                        class="font-bold text-xs truncate leading-snug"
-                                                        class:opacity-60={task.completed}
-                                                    >
-                                                        {task.title}
-                                                    </span>
-                                                    <span
-                                                        class="text-[10px] opacity-80 font-medium font-mono"
-                                                    >
-                                                        {formatExactTime(
-                                                            task.startTime,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {/each}
-                            </div>
-                        </div>
-                    {/each}
-
-                    <!-- Empty State -->
-                    {#if categoryGroups.length === 0}
-                        <div
-                            class="h-64 flex flex-col items-center justify-center opacity-50"
-                        >
-                            <Clock class="w-10 h-10 mb-3" />
-                            <p class="text-sm font-medium">
-                                No tasks scheduled for today
-                            </p>
+                                class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-error"
+                            ></div>
                         </div>
                     {/if}
                 </div>
+
+                <!-- Tasks -->
+                <div class="relative py-1 px-0.5">
+                    {#each packed.rows as { task, row } (task.id)}
+                        {@const pos = getTaskPosition(task)}
+                        {@const bg = task.categoryColor || "#6b7280"}
+                        {@const txt = getTextColor(bg)}
+                        {@const isHov = hoveredTaskId === task.id}
+                        {@const isFaded = hoveredTaskId && !isHov}
+                        {@const showText = canShowText(pos.width)}
+
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_interactive_supports_focus -->
+                        <div
+                            class="absolute transition-opacity duration-100 {isFaded
+                                ? 'opacity-30'
+                                : ''} {isHov ? 'z-40' : 'z-10'}"
+                            style="left: {pos.left}%; width: {pos.width}%; top: {row *
+                                (ROW_HEIGHT +
+                                    ROW_GAP)}px; height: {ROW_HEIGHT}px;"
+                            role="button"
+                            onmouseenter={(e) => onMouseEnter(e, task.id)}
+                            onmousemove={onMouseMove}
+                            onmouseleave={onMouseLeave}
+                            onclick={() => onTaskClick?.(task.id)}
+                        >
+                            <div
+                                class="task-bar h-full rounded cursor-pointer transition-shadow {task.completed
+                                    ? 'completed'
+                                    : ''} {isHov
+                                    ? 'shadow-md ring-1 ring-white/20'
+                                    : ''}"
+                                style="background-color: {bg};"
+                                title={task.title}
+                            >
+                                {#if showText}
+                                    <div
+                                        class="h-full px-1.5 flex items-center overflow-hidden"
+                                        style="color: {txt};"
+                                    >
+                                        <span
+                                            class="text-[10px] font-medium truncate {task.completed
+                                                ? 'opacity-60'
+                                                : ''}"
+                                        >
+                                            {task.title}
+                                        </span>
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+
+                {#if packed.rows.length === 0}
+                    <div
+                        class="absolute inset-0 flex items-center justify-center"
+                    >
+                        <div class="text-center py-8">
+                            <Clock
+                                class="w-8 h-8 mx-auto text-base-content/15 mb-2"
+                            />
+                            <p class="text-sm text-base-content/35">
+                                No tasks for {dateLabel()}
+                            </p>
+                        </div>
+                    </div>
+                {/if}
             </div>
         </div>
     </div>
-
-    <!-- Tooltip (Portal) -->
-    {#if hoveredTask && tooltipPosition}
-        <div
-            class="fixed z-[100] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
-            style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"
-        >
-            <div
-                class="bg-base-100/95 backdrop-blur-md text-base-content rounded-xl shadow-2xl border border-base-200/50 p-4 min-w-[220px] max-w-xs"
-            >
-                <div class="flex items-start gap-3">
-                    {#if hoveredTask.emoji}
-                        <span class="text-2xl pt-1">{hoveredTask.emoji}</span>
-                    {/if}
-                    <div>
-                        <h4 class="font-bold text-sm leading-snug">
-                            {hoveredTask.title}
-                        </h4>
-                        {#if hoveredTask.categoryName}
-                            <div class="flex items-center gap-1.5 mt-1.5">
-                                <span
-                                    class="w-2 h-2 rounded-full"
-                                    style="background-color: {hoveredTask.categoryColor}"
-                                ></span>
-                                <span
-                                    class="text-[10px] font-semibold opacity-60 uppercase"
-                                    >{hoveredTask.categoryName}</span
-                                >
-                            </div>
-                        {/if}
-                    </div>
-                </div>
-                <div class="h-px bg-base-content/10 my-3"></div>
-                <div
-                    class="flex items-center gap-2 text-xs font-mono opacity-70"
-                >
-                    <Clock class="w-3.5 h-3.5" />
-                    <span>
-                        {formatExactTime(hoveredTask.startTime)} — {formatExactTime(
-                            hoveredTask.endTime,
-                        )}
-                    </span>
-                </div>
-            </div>
-        </div>
-    {/if}
 </div>
 
+<!-- Tooltip -->
+{#if hovered && tooltipPosition}
+    <div
+        class="fixed z-[200] pointer-events-none"
+        style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"
+    >
+        <div
+            class="bg-base-100 rounded-lg shadow-xl border border-base-300 p-2.5 min-w-[140px] max-w-[200px]"
+        >
+            <div class="flex gap-2">
+                <div
+                    class="w-1 rounded-full shrink-0"
+                    style="background-color: {hovered.categoryColor ||
+                        '#6b7280'}"
+                ></div>
+                <div class="min-w-0 flex-1">
+                    <p class="font-semibold text-xs">{hovered.title}</p>
+                    {#if hovered.categoryName}
+                        <p class="text-[9px] text-base-content/50">
+                            {hovered.categoryName}
+                        </p>
+                    {/if}
+                </div>
+            </div>
+            <div
+                class="flex justify-between items-center mt-2 pt-1.5 border-t border-base-200 text-[9px]"
+            >
+                <span class="text-base-content/50"
+                    >{formatTime(hovered.startTime)} – {formatTime(
+                        hovered.endTime,
+                    )}</span
+                >
+                <span class="font-semibold text-primary"
+                    >{formatDuration(hovered.startTime, hovered.endTime)}</span
+                >
+            </div>
+            {#if hovered.completed}
+                <p class="text-[9px] text-success font-medium mt-1">
+                    ✓ Completed
+                </p>
+            {/if}
+        </div>
+    </div>
+{/if}
+
 <style>
-    /* Sleek Scrollbar */
-    .timeline-container {
-        scrollbar-width: thin;
-        scrollbar-color: oklch(var(--bc) / 0.1) transparent;
-    }
-    .timeline-container::-webkit-scrollbar {
-        height: 6px;
-    }
-    .timeline-container::-webkit-scrollbar-thumb {
-        background: oklch(var(--bc) / 0.1);
-        border-radius: 10px;
-    }
-    .timeline-container::-webkit-scrollbar-track {
-        background: transparent;
+    .task-bar.completed::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: repeating-linear-gradient(
+            -45deg,
+            rgba(0, 0, 0, 0.1),
+            rgba(0, 0, 0, 0.1) 2px,
+            transparent 2px,
+            transparent 5px
+        );
+        pointer-events: none;
     }
 
-    /* Striped Pattern for Completed Tasks */
-    .bg-striped {
-        background-image: linear-gradient(
-            45deg,
-            rgba(0, 0, 0, 0.1) 25%,
-            transparent 25%,
-            transparent 50%,
-            rgba(0, 0, 0, 0.1) 50%,
-            rgba(0, 0, 0, 0.1) 75%,
-            transparent 75%,
-            transparent
-        );
-        background-size: 8px 8px;
+    .timeline ::-webkit-scrollbar {
+        height: 5px;
+        width: 5px;
+    }
+    .timeline ::-webkit-scrollbar-thumb {
+        background: oklch(var(--bc) / 0.12);
+        border-radius: 3px;
+    }
+    .timeline ::-webkit-scrollbar-thumb:hover {
+        background: oklch(var(--bc) / 0.2);
+    }
+    .timeline ::-webkit-scrollbar-track {
+        background: transparent;
     }
 </style>

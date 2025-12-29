@@ -61,11 +61,11 @@
     let newNegative = $state("");
     let completed = $state(false);
 
-    // Date/time state
+    // Date/time state (times include seconds HH:MM:SS)
     let startDate = $state("");
     let endDate = $state("");
-    let startTime = $state("09:00");
-    let endTime = $state("10:00");
+    let startTime = $state("09:00:00");
+    let endTime = $state("10:00:00");
 
     // Category creation
     let newCategoryName = $state("");
@@ -143,8 +143,9 @@
 
             startDate = startDateObj.toISOString().split("T")[0];
             endDate = endDateObj.toISOString().split("T")[0];
-            startTime = startDateObj.toTimeString().slice(0, 5);
-            endTime = endDateObj.toTimeString().slice(0, 5);
+            // Include seconds in time (HH:MM:SS)
+            startTime = startDateObj.toTimeString().slice(0, 8);
+            endTime = endDateObj.toTimeString().slice(0, 8);
         } else if (open) {
             resetForm();
             // Apply initial category if provided
@@ -180,8 +181,8 @@
         completed = false;
         startDate = getTodayString();
         endDate = getTodayString();
-        startTime = "09:00";
-        endTime = "10:00";
+        startTime = "09:00:00";
+        endTime = "10:00:00";
     }
 
     // Handle completion toggle
@@ -216,9 +217,16 @@
         const [startYear, startMonth, startDay] = startDate
             .split("-")
             .map(Number);
-        const [startHour, startMinute] = startTime.split(":").map(Number);
+        const startTimeParts = startTime.split(":").map(Number);
+        const startHour = startTimeParts[0] || 0;
+        const startMinute = startTimeParts[1] || 0;
+        const startSecond = startTimeParts[2] || 0;
+
         const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
-        const [endHour, endMinute] = endTime.split(":").map(Number);
+        const endTimeParts = endTime.split(":").map(Number);
+        const endHour = endTimeParts[0] || 0;
+        const endMinute = endTimeParts[1] || 0;
+        const endSecond = endTimeParts[2] || 0;
 
         const startDateObj = new Date(
             startYear,
@@ -226,6 +234,7 @@
             startDay,
             startHour,
             startMinute,
+            startSecond,
         );
         const endDateObj = new Date(
             endYear,
@@ -233,6 +242,7 @@
             endDay,
             endHour,
             endMinute,
+            endSecond,
         );
 
         const data = {
@@ -534,6 +544,7 @@
                                 <input
                                     id="start-time"
                                     type="time"
+                                    step="1"
                                     bind:value={startTime}
                                     class="input input-sm input-bordered w-full"
                                 />
@@ -550,6 +561,7 @@
                                 <input
                                     id="end-time"
                                     type="time"
+                                    step="1"
                                     bind:value={endTime}
                                     class="input input-sm input-bordered w-full"
                                 />
