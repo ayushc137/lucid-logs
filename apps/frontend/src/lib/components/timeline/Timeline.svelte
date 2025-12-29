@@ -56,27 +56,51 @@
     let timelineRef: HTMLDivElement;
     let containerWidth = $state(800);
 
-    function zoomIn(centerHour?: number) {
+    function zoomIn(mouseXRatio?: number, hourAtMouse?: number) {
         if (zoomIndex < ZOOM_LEVELS.length - 1) {
-            const center = centerHour ?? viewStartHour + hoursInView / 2;
+            const oldHours = hoursInView;
             zoomIndex++;
             const newHours = ZOOM_LEVELS[zoomIndex];
-            scrollOffsetHours = Math.max(
-                0,
-                Math.min(24 - newHours, center - newHours / 2),
-            );
+            
+            if (mouseXRatio !== undefined && hourAtMouse !== undefined) {
+                // Keep the hour under the mouse at the same visual position
+                // hourAtMouse = newOffset + mouseXRatio * newHours
+                // newOffset = hourAtMouse - mouseXRatio * newHours
+                scrollOffsetHours = Math.max(
+                    0,
+                    Math.min(24 - newHours, hourAtMouse - mouseXRatio * newHours),
+                );
+            } else {
+                // Center zoom
+                const center = viewStartHour + oldHours / 2;
+                scrollOffsetHours = Math.max(
+                    0,
+                    Math.min(24 - newHours, center - newHours / 2),
+                );
+            }
         }
     }
 
-    function zoomOut(centerHour?: number) {
+    function zoomOut(mouseXRatio?: number, hourAtMouse?: number) {
         if (zoomIndex > 0) {
-            const center = centerHour ?? viewStartHour + hoursInView / 2;
+            const oldHours = hoursInView;
             zoomIndex--;
             const newHours = ZOOM_LEVELS[zoomIndex];
-            scrollOffsetHours = Math.max(
-                0,
-                Math.min(24 - newHours, center - newHours / 2),
-            );
+            
+            if (mouseXRatio !== undefined && hourAtMouse !== undefined) {
+                // Keep the hour under the mouse at the same visual position
+                scrollOffsetHours = Math.max(
+                    0,
+                    Math.min(24 - newHours, hourAtMouse - mouseXRatio * newHours),
+                );
+            } else {
+                // Center zoom
+                const center = viewStartHour + oldHours / 2;
+                scrollOffsetHours = Math.max(
+                    0,
+                    Math.min(24 - newHours, center - newHours / 2),
+                );
+            }
         }
     }
 
@@ -92,12 +116,20 @@
 
         const rect = timelineRef.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
-        const hourAtMouse = viewStartHour + (mouseX / rect.width) * hoursInView;
+        
+        // Calculate the content width (may be wider than viewport when zoomed)
+        const contentWidth = timelineRef.scrollWidth;
+        // Mouse position in content space (accounting for scroll)
+        const mouseXInContent = mouseX + timelineRef.scrollLeft;
+        // Ratio of mouse position relative to visible viewport width
+        const mouseXRatio = mouseX / rect.width;
+        // Calculate the actual hour at mouse position
+        const hourAtMouse = (mouseXInContent / contentWidth) * 24;
 
         if (e.deltaY < 0) {
-            zoomIn(hourAtMouse);
+            zoomIn(mouseXRatio, hourAtMouse);
         } else {
-            zoomOut(hourAtMouse);
+            zoomOut(mouseXRatio, hourAtMouse);
         }
     }
 
@@ -409,7 +441,7 @@
 
     <!-- Timeline -->
     <div
-        class="flex-1 overflow-x-auto overflow-y-auto"
+        class="flex-1 overflow-x-auto overflow-y-hidden"
         bind:this={timelineRef}
         onscroll={handleScroll}
     >
