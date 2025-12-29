@@ -420,8 +420,34 @@
         <p class="text-xs uppercase font-medium opacity-50">{formatDate()}</p>
         <h1 class="text-2xl sm:text-3xl font-bold mt-1">{getGreeting()}! 👋</h1>
       </div>
-      <div class="flex items-center gap-2">
-        <button class="btn btn-primary gap-2" onclick={openTaskModal}>
+      <div class="flex items-center gap-3">
+        <!-- View Toggle moved here -->
+        <div class="join border border-base-300/60 rounded-lg bg-base-100 h-10">
+          <button
+            type="button"
+            class="join-item btn btn-sm h-full px-4 gap-2 {currentTimelineView ===
+            'timeline'
+              ? 'btn-primary'
+              : 'btn-ghost'}"
+            onclick={() => handleViewChange("timeline")}
+          >
+            <AlignHorizontalJustifyStart class="w-4 h-4" />
+            <span class="font-medium">Timeline</span>
+          </button>
+          <button
+            type="button"
+            class="join-item btn btn-sm h-full px-4 gap-2 {currentTimelineView ===
+            'agenda'
+              ? 'btn-primary'
+              : 'btn-ghost'}"
+            onclick={() => handleViewChange("agenda")}
+          >
+            <List class="w-4 h-4" />
+            <span class="font-medium">Agenda</span>
+          </button>
+        </div>
+
+        <button class="btn btn-primary gap-2 h-10" onclick={openTaskModal}>
           <Plus class="w-4 h-4" />
           <span class="hidden sm:inline">New Task</span>
         </button>
@@ -537,69 +563,7 @@
       class="card bg-base-100 shadow-sm border border-base-200/50 h-full flex flex-col"
     >
       <div class="card-body p-3 lg:p-4 flex flex-col h-full gap-3">
-        <!-- Filter Row with View Toggle -->
-        <div class="flex items-center justify-between gap-2 flex-shrink-0">
-          <!-- Category Filters -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-semibold uppercase text-base-content/50"
-              >Filter:</span
-            >
-            <button
-              class={cn(
-                "btn btn-xs",
-                selectedCategoryId === null ? "btn-primary" : "btn-ghost",
-              )}
-              onclick={() => (selectedCategoryId = null)}
-            >
-              All
-            </button>
-            {#each categories as category}
-              <button
-                class={cn(
-                  "btn btn-xs gap-1.5",
-                  selectedCategoryId === category.id
-                    ? "btn-primary btn-outline"
-                    : "btn-ghost",
-                )}
-                onclick={() => (selectedCategoryId = category.id)}
-              >
-                <span
-                  class="w-2 h-2 rounded-full ring-1 ring-black/10"
-                  style="background-color: {category.color};"
-                ></span>
-                {category.name}
-              </button>
-            {/each}
-          </div>
-
-          <!-- View Toggle -->
-          <div class="join border border-base-300/60 rounded-lg">
-            <div class="tooltip tooltip-bottom" data-tip="Timeline View">
-              <button
-                type="button"
-                class="join-item btn btn-xs btn-square {currentTimelineView ===
-                'timeline'
-                  ? 'btn-primary'
-                  : 'btn-ghost'}"
-                onclick={() => handleViewChange("timeline")}
-              >
-                <AlignHorizontalJustifyStart class="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div class="tooltip tooltip-bottom" data-tip="Agenda View">
-              <button
-                type="button"
-                class="join-item btn btn-xs btn-square {currentTimelineView ===
-                'agenda'
-                  ? 'btn-primary'
-                  : 'btn-ghost'}"
-                onclick={() => handleViewChange("agenda")}
-              >
-                <List class="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <!-- Timeline -->
 
         <!-- Timeline -->
         <div class="flex-1 min-h-0">

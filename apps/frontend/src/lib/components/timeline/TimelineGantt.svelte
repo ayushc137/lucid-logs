@@ -584,9 +584,19 @@
     // 1. Apply optimistic overrides FIRST
     // 2. Ignore drag previews for sorting/lanes (keeps rows stable during drag)
     function packTasks(list: TimelineTask[]) {
-        const valid = list.filter(
-            (t) => t.startTime instanceof Date && t.endTime instanceof Date,
-        );
+        const viewStart = new Date(selectedDate);
+        viewStart.setHours(0, 0, 0, 0);
+        const viewEnd = new Date(selectedDate);
+        viewEnd.setHours(23, 59, 59, 999);
+
+        // Filter valid AND visible tasks
+        const valid = list.filter((t) => {
+            if (!(t.startTime instanceof Date) || !(t.endTime instanceof Date))
+                return false;
+            // Must overlap with today
+            // Task ends after view starts AND starts before view ends
+            return t.endTime > viewStart && t.startTime < viewEnd;
+        });
 
         // Apply optimistic overrides
         const effectiveTasks = valid.map((task) => {
@@ -673,9 +683,7 @@
         currentTime.getHours() + currentTime.getMinutes() / 60,
     );
     const nowPercent = $derived((nowHour / 24) * 100);
-    const showNow = $derived(
-        isToday() && nowHour >= viewStartHour && nowHour <= viewEndHour,
-    );
+    const showNow = $derived(isToday());
     const nowFormatted = $derived(
         currentTime.toLocaleTimeString([], {
             hour: "numeric",
