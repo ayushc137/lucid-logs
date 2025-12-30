@@ -1,7 +1,5 @@
 <script lang="ts">
     import {
-        ChevronLeft,
-        ChevronRight,
         Calendar,
         Sunrise,
         Sun,
@@ -9,10 +7,16 @@
         Moon,
         Coffee,
         Check,
+        ArrowRight,
     } from "lucide-svelte";
-    import { onMount, onDestroy } from "svelte";
-    import { fade, slide } from "svelte/transition";
+    import { fade, fly } from "svelte/transition";
+    import { cubicOut } from "svelte/easing";
     import type { TimelineTask, TimelineProps } from "./types";
+
+    // Shared components
+    import DateNavigator from "./DateNavigator.svelte";
+    import CategoryFilter from "./CategoryFilter.svelte";
+    import LiveClock from "./LiveClock.svelte";
 
     let {
         tasks = [],
@@ -22,31 +26,15 @@
     }: TimelineProps = $props();
 
     let currentTime = $state(new Date());
-    let timeInterval: ReturnType<typeof setInterval>;
 
-    onMount(() => {
-        timeInterval = setInterval(() => (currentTime = new Date()), 1000);
+    // Category filter state
+    let selectedCategoryFilter = $state<string | null>(null);
+
+    // Update current time for task status
+    $effect(() => {
+        const interval = setInterval(() => (currentTime = new Date()), 1000);
+        return () => clearInterval(interval);
     });
-
-    onDestroy(() => {
-        if (timeInterval) clearInterval(timeInterval);
-    });
-
-    function goToPreviousDay() {
-        const d = new Date(selectedDate);
-        d.setDate(d.getDate() - 1);
-        onDateChange?.(d);
-    }
-
-    function goToNextDay() {
-        const d = new Date(selectedDate);
-        d.setDate(d.getDate() + 1);
-        onDateChange?.(d);
-    }
-
-    function goToToday() {
-        onDateChange?.(new Date());
-    }
 
     const isToday = $derived(() => {
         const t = new Date();
@@ -87,12 +75,47 @@
     function formatDuration(s: Date, e: Date): string {
         if (!(s instanceof Date) || !(e instanceof Date)) return "";
         const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-        if (mins < 1) return `Less than 1m`;
+        if (mins < 1) return `<1m`;
         if (mins < 60) return `${mins}m`;
         const h = Math.floor(mins / 60),
             m = mins % 60;
         return m > 0 ? `${h}h ${m}m` : `${h}h`;
     }
+
+    // --- Categories ---
+    const categories = $derived.by(() => {
+        const catMap = new Map<string, { color: string; count: number }>();
+        tasks.forEach((t) => {
+            if (t.categoryName && t.categoryColor) {
+                const existing = catMap.get(t.categoryName);
+                if (existing) {
+                    existing.count++;
+                } else {
+                    catMap.set(t.categoryName, {
+                        color: t.categoryColor,
+                        count: 1,
+                    });
+                }
+            }
+        });
+        return Array.from(catMap.entries())
+            .map(([name, data]) => ({ name, ...data }))
+            .sort((a, b) => b.count - a.count);
+    });
+
+    // Count uncategorized tasks
+    const uncategorizedCount = $derived(
+        tasks.filter((t) => !t.categoryName).length,
+    );
+
+    // Filtered tasks - handle "__uncategorized__" special filter
+    const filteredTasks = $derived(
+        selectedCategoryFilter === "__uncategorized__"
+            ? tasks.filter((t) => !t.categoryName)
+            : selectedCategoryFilter
+              ? tasks.filter((t) => t.categoryName === selectedCategoryFilter)
+              : tasks,
+    );
 
     // --- Time Block Logic ---
     function getHourFromDate(d: Date): number {
@@ -129,6 +152,21 @@
         }
     }
 
+    function getTimeBlockSubLabel(block: TimeBlock): string {
+        switch (block) {
+            case "early-morning":
+                return "5 AM – 9 AM";
+            case "morning":
+                return "9 AM – 12 PM";
+            case "afternoon":
+                return "12 PM – 5 PM";
+            case "evening":
+                return "5 PM – 9 PM";
+            case "night":
+                return "9 PM – 5 AM";
+        }
+    }
+
     function getTimeBlockIcon(block: TimeBlock) {
         switch (block) {
             case "early-morning":
@@ -144,10 +182,40 @@
         }
     }
 
-    // Group tasks by time block
+    function getTimeBlockGradient(block: TimeBlock): string {
+        switch (block) {
+            case "early-morning":
+                return "from-amber-500/15 to-orange-500/5";
+            case "morning":
+                return "from-sky-500/15 to-blue-500/5";
+            case "afternoon":
+                return "from-yellow-500/15 to-amber-500/5";
+            case "evening":
+                return "from-orange-500/15 to-rose-500/5";
+            case "night":
+                return "from-indigo-500/15 to-purple-500/5";
+        }
+    }
+
+    function getTimeBlockIconBg(block: TimeBlock): string {
+        switch (block) {
+            case "early-morning":
+                return "bg-gradient-to-br from-amber-400 to-orange-500";
+            case "morning":
+                return "bg-gradient-to-br from-sky-400 to-blue-500";
+            case "afternoon":
+                return "bg-gradient-to-br from-yellow-400 to-amber-500";
+            case "evening":
+                return "bg-gradient-to-br from-orange-400 to-rose-500";
+            case "night":
+                return "bg-gradient-to-br from-indigo-400 to-purple-500";
+        }
+    }
+
+    // Group tasks by time block (using filtered tasks)
     const tasksByBlock = $derived.by(() => {
         const blocks = new Map<TimeBlock, TimelineTask[]>();
-        const valid = tasks.filter(
+        const valid = filteredTasks.filter(
             (t) => t.startTime instanceof Date && t.endTime instanceof Date,
         );
         const sorted = [...valid].sort(
@@ -178,12 +246,10 @@
         blocksInOrder.filter((b) => tasksByBlock.has(b)),
     );
 
-    const nowFormatted = $derived(
-        currentTime.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        }),
+    // Stats (use filtered tasks)
+    const totalTasks = $derived(filteredTasks.length);
+    const completedTasks = $derived(
+        filteredTasks.filter((t) => t.completed).length,
     );
 
     const currentBlock = $derived(getTimeBlock(currentTime.getHours()));
@@ -201,257 +267,281 @@
 </script>
 
 <div
-    class="h-full flex flex-col bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden select-none"
+    class="h-full flex flex-col bg-base-100 rounded-2xl border border-base-200 shadow-xl overflow-hidden select-none"
 >
     <!-- Header -->
     <div
-        class="flex items-center justify-between px-5 py-3 bg-base-100/90 backdrop-blur-md border-b border-base-200 sticky top-0 z-40 transition-all duration-300"
+        class="flex items-center justify-between gap-4 px-5 py-3 bg-base-100/95 backdrop-blur-xl border-b border-base-200 sticky top-0 z-40"
     >
-        <div class="flex items-center gap-3">
-            <div class="join bg-base-200/50 p-1 rounded-xl shadow-inner">
-                <button
-                    class="join-item btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
-                    onclick={goToPreviousDay}
-                    aria-label="Previous Day"
-                >
-                    <ChevronLeft class="w-4 h-4" />
-                </button>
-                <!-- Richer Date Display matching Gantt -->
-                <div
-                    class="flex flex-col items-center justify-center px-4 min-w-[140px] cursor-pointer hover:opacity-70 transition-opacity"
-                    onclick={goToToday}
-                    role="button"
-                    tabindex="0"
-                    onkeydown={(e) => e.key === "Enter" && goToToday()}
-                >
-                    <span
-                        class="text-[10px] font-bold uppercase tracking-wider text-base-content/40 mb-[-2px]"
-                        >{selectedDate.getFullYear()}</span
-                    >
-                    <span
-                        class="font-bold text-sm text-base-content leading-tight"
-                        class:text-primary={isToday()}>{dateLabel()}</span
-                    >
-                </div>
-                <button
-                    class="join-item btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
-                    onclick={goToNextDay}
-                    aria-label="Next Day"
-                >
-                    <ChevronRight class="w-4 h-4" />
-                </button>
-            </div>
-            {#if !isToday()}
-                <button
-                    class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 rounded-full px-3 transition-all"
-                    onclick={goToToday}
-                    in:fade={{ duration: 200 }}
-                >
-                    Return to Today
-                </button>
-            {/if}
+        <!-- Left: Date Navigation -->
+        <DateNavigator {selectedDate} {onDateChange} />
+
+        <!-- Center: Category Filter -->
+        <div class="flex-1 flex justify-center">
+            <CategoryFilter
+                {categories}
+                totalTaskCount={tasks.length}
+                filteredTaskCount={filteredTasks.length}
+                {uncategorizedCount}
+                selectedCategory={selectedCategoryFilter}
+                onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
+            />
         </div>
 
-        {#if isToday()}
-            <div
-                class="flex items-center gap-2 px-3 py-1.5 bg-base-200/50 rounded-full border border-base-200/60"
-                in:fade
-            >
-                <div
-                    class="w-2 h-2 rounded-full bg-primary animate-pulse"
-                ></div>
-                <span class="text-xs font-mono font-bold text-base-content/70"
-                    >{nowFormatted}</span
-                >
+        <!-- Right: Live Clock & Stats -->
+        <div class="flex items-center gap-3">
+            <LiveClock {selectedDate} />
+
+            <!-- Stats -->
+            <div class="flex items-center gap-3 text-sm">
+                <span class="text-base-content/60">
+                    <span class="font-bold text-base-content">{totalTasks}</span
+                    > tasks
+                </span>
+                {#if completedTasks > 0}
+                    <div
+                        class="flex items-center gap-1 text-success font-medium"
+                    >
+                        <Check class="w-3.5 h-3.5" />
+                        {completedTasks}
+                    </div>
+                {/if}
             </div>
-        {/if}
+        </div>
     </div>
 
     <!-- Agenda Content -->
-    <div
-        class="flex-1 overflow-y-auto custom-scrollbar p-6 relative bg-base-50/30"
-    >
-        <!-- Spine Line -->
-        <div
-            class="absolute left-[39px] top-6 bottom-0 w-px bg-gradient-to-b from-transparent via-base-300/60 to-transparent z-0"
-        ></div>
-
+    <div class="flex-1 overflow-y-auto custom-scrollbar bg-base-200/30">
         {#if activeBlocks.length === 0}
             <div
                 class="flex items-center justify-center h-full p-8"
                 in:fade={{ duration: 400 }}
             >
                 <div
-                    class="flex flex-col items-center justify-center text-center p-8 border border-dashed border-base-300 rounded-3xl bg-base-100/40 backdrop-blur-sm max-w-sm"
+                    class="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-base-300/60 rounded-3xl bg-base-100/80 max-w-md shadow-inner"
                 >
-                    <div class="bg-base-200/50 p-4 rounded-full mb-4">
-                        <Calendar class="w-8 h-8 text-base-content/20" />
+                    <div class="bg-base-200 p-5 rounded-2xl mb-5">
+                        <Calendar class="w-10 h-10 text-base-content/30" />
                     </div>
-                    <h3 class="font-bold text-base-content/60">
-                        No tasks for {dateLabel()}
+                    <h3 class="text-lg font-bold text-base-content/70">
+                        {#if selectedCategoryFilter === "__uncategorized__"}
+                            No uncategorized tasks
+                        {:else if selectedCategoryFilter}
+                            No tasks in "{selectedCategoryFilter}"
+                        {:else}
+                            No tasks scheduled
+                        {/if}
                     </h3>
-                    <p class="text-xs text-base-content/40 mt-1">
-                        Enjoy your free time or add new tasks to get started.
+                    <p
+                        class="text-sm text-base-content/40 mt-2 leading-relaxed"
+                    >
+                        {#if selectedCategoryFilter}
+                            Try clearing the filter or add tasks to this
+                            category.
+                        {:else if isToday()}
+                            Your day is wide open! Add some tasks to get
+                            started.
+                        {:else}
+                            Nothing planned for {dateLabel()}. Enjoy the free
+                            time!
+                        {/if}
                     </p>
                 </div>
             </div>
         {:else}
-            {#each activeBlocks as block, i}
-                {@const blockTasks = tasksByBlock.get(block) || []}
-                {@const BlockIcon = getTimeBlockIcon(block)}
-                {@const isCurrentBlock = isToday() && block === currentBlock}
+            <div class="p-5 space-y-6">
+                {#each activeBlocks as block, i}
+                    {@const blockTasks = tasksByBlock.get(block) || []}
+                    {@const BlockIcon = getTimeBlockIcon(block)}
+                    {@const isCurrentBlock =
+                        isToday() && block === currentBlock}
+                    {@const gradient = getTimeBlockGradient(block)}
+                    {@const iconBg = getTimeBlockIconBg(block)}
 
-                <div
-                    class="relative z-10 mb-8 last:mb-2"
-                    in:slide={{ duration: 400, delay: i * 50 }}
-                >
-                    <!-- Block Header -->
-                    <div class="flex items-center gap-4 mb-4">
+                    <div
+                        class="relative"
+                        in:fly={{
+                            y: 15,
+                            duration: 350,
+                            delay: i * 60,
+                            easing: cubicOut,
+                        }}
+                    >
+                        <!-- Block Header -->
                         <div
-                            class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm z-20 border-[3px] border-base-100 transition-colors
-                             {isCurrentBlock
-                                ? 'bg-primary text-primary-content ring-2 ring-primary/20'
-                                : 'bg-base-200 text-base-content/60'}"
+                            class="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r {gradient} border border-base-200/40"
                         >
-                            <BlockIcon class="w-4 h-4" />
-                        </div>
-                        <div class="flex items-baseline gap-3">
-                            <h3
-                                class="text-sm font-bold tracking-wide uppercase {isCurrentBlock
-                                    ? 'text-primary'
-                                    : 'text-base-content/70'}"
-                            >
-                                {getTimeBlockLabel(block)}
-                            </h3>
-                            <span
-                                class="text-xs text-base-content/40 font-medium"
-                            >
-                                {blockTasks.length}
-                                {blockTasks.length === 1 ? "Task" : "Tasks"}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Tasks List -->
-                    <div class="pl-[48px] space-y-3">
-                        {#each blockTasks as task, j (task.id)}
-                            {@const status = getTaskStatus(task)}
-                            {@const bg = task.categoryColor || "#6b7280"}
-                            {@const isCompleted = task.completed}
-
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_interactive_supports_focus -->
                             <div
-                                class="group relative flex flex-col sm:flex-row items-stretch gap-0 rounded-xl border transition-all duration-300 w-full overflow-hidden bg-base-100
-                                    {isCompleted
-                                    ? 'opacity-80 border-base-200 hover:opacity-100'
-                                    : status === 'current'
-                                      ? 'shadow-lg ring-1 ring-primary/20 border-primary/30 -translate-x-1'
-                                      : 'shadow-sm border-base-200/80 hover:shadow-md hover:border-base-300 hover:scale-[1.01]'}"
-                                role="button"
-                                onclick={() => onTaskClick?.(task.id)}
-                                in:slide={{
-                                    duration: 300,
-                                    delay: i * 30 + j * 50,
-                                }}
+                                class="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg text-white transition-all duration-300
+                                 {isCurrentBlock
+                                    ? 'ring-4 ring-white/30 scale-110'
+                                    : ''} {iconBg}"
                             >
-                                <!-- Left Color Indicator -->
-                                <div
-                                    class="w-1.5 shrink-0 transition-colors"
-                                    class:opacity-50={isCompleted}
-                                    style="background-color: {bg};"
-                                ></div>
-
-                                <!-- Main Card Content -->
-                                <div
-                                    class="flex-1 flex items-center p-3 sm:px-4 sm:py-3.5 relative"
-                                >
-                                    <!-- Background Pattern for Completed -->
-                                    {#if isCompleted}
-                                        <div
-                                            class="absolute inset-0 opacity-[0.03] pointer-events-none"
-                                            style="background-image: repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%); background-size: 8px 8px;"
-                                        ></div>
+                                <BlockIcon class="w-5 h-5" />
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <h3
+                                        class="text-sm font-bold {isCurrentBlock
+                                            ? 'text-primary'
+                                            : 'text-base-content'}"
+                                    >
+                                        {getTimeBlockLabel(block)}
+                                    </h3>
+                                    {#if isCurrentBlock}
+                                        <span
+                                            class="badge badge-primary badge-xs font-bold"
+                                            >NOW</span
+                                        >
                                     {/if}
-
-                                    <!-- Time column -->
-                                    <div
-                                        class="flex flex-col w-[70px] shrink-0 mr-4 text-right justify-center border-r border-base-200/50 pr-4"
+                                </div>
+                                <p class="text-[11px] text-base-content/50">
+                                    {getTimeBlockSubLabel(block)} •
+                                    <span class="font-semibold"
+                                        >{blockTasks.length}</span
                                     >
-                                        <span
-                                            class="text-sm font-bold font-mono tracking-tight text-base-content/90"
-                                        >
-                                            {formatTime(task.startTime)}
-                                        </span>
-                                        <span
-                                            class="text-[10px] text-base-content/40 font-medium"
-                                        >
-                                            {formatDuration(
-                                                task.startTime,
-                                                task.endTime,
-                                            )}
-                                        </span>
-                                    </div>
+                                    {blockTasks.length === 1 ? "task" : "tasks"}
+                                </p>
+                            </div>
+                        </div>
 
-                                    <!-- Task Info -->
+                        <!-- Tasks List -->
+                        <div class="space-y-2 pl-1">
+                            {#each blockTasks as task, j (task.id)}
+                                {@const status = getTaskStatus(task)}
+                                {@const bg = task.categoryColor || "#6b7280"}
+                                {@const isCompleted = task.completed}
+
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <!-- svelte-ignore a11y_interactive_supports_focus -->
+                                <div
+                                    class="group relative flex items-stretch rounded-xl border-2 transition-all duration-200 overflow-hidden cursor-pointer shadow-sm
+                                        {isCompleted
+                                        ? 'bg-base-100/80 border-base-200/80 hover:border-base-300'
+                                        : status === 'current'
+                                          ? 'bg-base-100 border-primary/40 shadow-lg shadow-primary/10 ring-1 ring-primary/20'
+                                          : 'bg-base-100 border-base-200/80 hover:border-base-300 hover:shadow-md'}"
+                                    role="button"
+                                    onclick={() => onTaskClick?.(task.id)}
+                                    in:fly={{
+                                        x: -8,
+                                        duration: 250,
+                                        delay: i * 30 + j * 40,
+                                        easing: cubicOut,
+                                    }}
+                                >
+                                    <!-- Left Color Bar -->
                                     <div
-                                        class="flex-1 min-w-0 flex flex-col justify-center py-0.5"
-                                    >
-                                        <h4
-                                            class="text-sm font-semibold truncate leading-tight transition-colors
-                                                {isCompleted
-                                                ? 'text-base-content/60 line-through decoration-base-content/20'
-                                                : 'text-base-content'}"
-                                        >
-                                            {task.title}
-                                        </h4>
-                                        {#if task.categoryName}
-                                            <div
-                                                class="flex items-center gap-2 mt-1.5"
-                                            >
-                                                <span
-                                                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-base-200/50"
-                                                    style="color: {bg}; background-color: {bg}15;"
-                                                >
-                                                    {task.categoryName}
-                                                </span>
-                                            </div>
-                                        {/if}
-                                    </div>
+                                        class="w-1.5 shrink-0 transition-all duration-200"
+                                        class:opacity-40={isCompleted}
+                                        style="background-color: {bg};"
+                                    ></div>
 
-                                    <!-- Status / Action -->
-                                    <div class="flex items-center pl-3">
-                                        {#if isCompleted}
-                                            <div
-                                                class="badge badge-sm badge-ghost gap-1 opacity-70 font-medium bg-base-200/80"
+                                    <!-- Main Content -->
+                                    <div
+                                        class="flex-1 flex items-center gap-3 p-3 min-w-0"
+                                    >
+                                        <!-- Time Badge -->
+                                        <div
+                                            class="flex flex-col items-center justify-center min-w-[72px] shrink-0 border-r border-base-200/60 pr-3"
+                                        >
+                                            <span
+                                                class="text-sm font-bold font-mono {isCompleted
+                                                    ? 'text-base-content/40'
+                                                    : status === 'current'
+                                                      ? 'text-primary'
+                                                      : 'text-base-content/80'}"
                                             >
-                                                <Check class="w-3 h-3" /> Done
-                                            </div>
-                                        {:else if status === "current"}
-                                            <div
-                                                class="flex items-center gap-1.5 text-primary text-xs font-bold animate-pulse"
+                                                {formatTime(task.startTime)}
+                                            </span>
+                                            <span
+                                                class="text-[10px] font-medium text-base-content/40 mt-0.5"
                                             >
+                                                {formatDuration(
+                                                    task.startTime,
+                                                    task.endTime,
+                                                )}
+                                            </span>
+                                        </div>
+
+                                        <!-- Task Details -->
+                                        <div class="flex-1 min-w-0">
+                                            <h4
+                                                class="text-sm font-semibold truncate leading-snug transition-colors
+                                                    {isCompleted
+                                                    ? 'text-base-content/40 line-through decoration-base-content/20'
+                                                    : 'text-base-content'}"
+                                            >
+                                                {task.title}
+                                            </h4>
+                                            {#if task.categoryName}
                                                 <div
-                                                    class="w-1.5 h-1.5 rounded-full bg-primary"
-                                                ></div>
-                                                Now
-                                            </div>
-                                        {:else}
-                                            <div
-                                                class="opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <ChevronRight
-                                                    class="w-4 h-4 text-base-content/30"
-                                                />
-                                            </div>
-                                        {/if}
+                                                    class="flex items-center gap-1.5 mt-1"
+                                                >
+                                                    <div
+                                                        class="w-2 h-2 rounded-full shrink-0"
+                                                        style="background-color: {bg};"
+                                                    ></div>
+                                                    <span
+                                                        class="text-[11px] font-medium text-base-content/50 truncate"
+                                                    >
+                                                        {task.categoryName}
+                                                    </span>
+                                                </div>
+                                            {/if}
+                                        </div>
+
+                                        <!-- Status Indicator -->
+                                        <div
+                                            class="flex items-center shrink-0 pl-2"
+                                        >
+                                            {#if isCompleted}
+                                                <div
+                                                    class="flex items-center gap-1 text-success bg-success/10 px-2.5 py-1 rounded-lg"
+                                                >
+                                                    <Check
+                                                        class="w-3.5 h-3.5"
+                                                        strokeWidth={3}
+                                                    />
+                                                    <span
+                                                        class="text-[11px] font-bold"
+                                                        >Done</span
+                                                    >
+                                                </div>
+                                            {:else if status === "current"}
+                                                <div
+                                                    class="flex items-center gap-1.5 text-primary bg-primary/10 px-2.5 py-1 rounded-lg"
+                                                >
+                                                    <div class="relative">
+                                                        <div
+                                                            class="w-1.5 h-1.5 rounded-full bg-primary"
+                                                        ></div>
+                                                        <div
+                                                            class="absolute inset-0 w-1.5 h-1.5 rounded-full bg-primary animate-ping"
+                                                        ></div>
+                                                    </div>
+                                                    <span
+                                                        class="text-[11px] font-bold"
+                                                        >Now</span
+                                                    >
+                                                </div>
+                                            {:else}
+                                                <div
+                                                    class="opacity-0 group-hover:opacity-100 transition-all duration-200 text-base-content/30 group-hover:text-primary"
+                                                >
+                                                    <ArrowRight
+                                                        class="w-4 h-4"
+                                                    />
+                                                </div>
+                                            {/if}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        {/each}
+                            {/each}
+                        </div>
                     </div>
-                </div>
-            {/each}
+                {/each}
+            </div>
         {/if}
     </div>
 </div>
@@ -466,7 +556,7 @@
     }
 
     .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: oklch(var(--bc) / 0.1);
+        background: oklch(var(--bc) / 0.12);
         border-radius: 10px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {

@@ -1,18 +1,20 @@
 <script lang="ts">
     import {
-        Clock,
-        ChevronLeft,
-        ChevronRight,
         Minus,
         Plus,
         Check,
         Pencil,
         GripVertical,
-        Palette,
+        Clock,
     } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
     import { fade, scale, slide } from "svelte/transition";
     import type { TimelineTask, TimelineProps } from "./types";
+
+    // Shared components
+    import DateNavigator from "./DateNavigator.svelte";
+    import CategoryFilter from "./CategoryFilter.svelte";
+    import LiveClock from "./LiveClock.svelte";
 
     let {
         tasks = [],
@@ -29,6 +31,9 @@
     // Internal edit mode state (can be controlled externally or internally)
     let internalEditMode = $state(false);
     const isEditMode = $derived(editMode || internalEditMode);
+
+    // Category filter state
+    let selectedCategoryFilter = $state<string | null>(null);
 
     function toggleEditMode() {
         internalEditMode = !internalEditMode;
@@ -425,6 +430,7 @@
 
     onMount(() => {
         timeInterval = setInterval(() => (currentTime = new Date()), 1000);
+
         if (timelineRef) {
             containerWidth = timelineRef.clientWidth;
             const observer = new ResizeObserver(() => {
@@ -442,22 +448,42 @@
         document.removeEventListener("mouseup", handleDragEnd);
     });
 
-    function goToPreviousDay() {
-        const d = new Date(selectedDate);
-        d.setDate(d.getDate() - 1);
-        onDateChange?.(d);
-    }
+    // Extract unique categories with task counts
+    const categories = $derived.by(() => {
+        const catMap = new Map<string, { color: string; count: number }>();
+        tasks.forEach((t) => {
+            if (t.categoryName && t.categoryColor) {
+                const existing = catMap.get(t.categoryName);
+                if (existing) {
+                    existing.count++;
+                } else {
+                    catMap.set(t.categoryName, {
+                        color: t.categoryColor,
+                        count: 1,
+                    });
+                }
+            }
+        });
+        return Array.from(catMap.entries())
+            .map(([name, data]) => ({ name, ...data }))
+            .sort((a, b) => b.count - a.count);
+    });
 
-    function goToNextDay() {
-        const d = new Date(selectedDate);
-        d.setDate(d.getDate() + 1);
-        onDateChange?.(d);
-    }
+    // Count uncategorized tasks
+    const uncategorizedCount = $derived(
+        tasks.filter((t) => !t.categoryName).length,
+    );
 
-    function goToToday() {
-        onDateChange?.(new Date());
-    }
+    // Filtered tasks - handle "__uncategorized__" special filter
+    const filteredTasks = $derived(
+        selectedCategoryFilter === "__uncategorized__"
+            ? tasks.filter((t) => !t.categoryName)
+            : selectedCategoryFilter
+              ? tasks.filter((t) => t.categoryName === selectedCategoryFilter)
+              : tasks,
+    );
 
+    // Check if viewing today
     const isToday = $derived(() => {
         const t = new Date();
         return (
@@ -466,39 +492,6 @@
             selectedDate.getDate() === t.getDate()
         );
     });
-
-    const dateLabel = $derived(() => {
-        const t = new Date();
-        const y = new Date(t);
-        y.setDate(y.getDate() - 1);
-        const tm = new Date(t);
-        tm.setDate(tm.getDate() + 1);
-        if (isToday()) return "Today";
-        if (selectedDate.toDateString() === y.toDateString())
-            return "Yesterday";
-        if (selectedDate.toDateString() === tm.toDateString())
-            return "Tomorrow";
-        return selectedDate.toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-        });
-    });
-
-    // Extract unique categories for legend
-    const categories = $derived.by(() => {
-        const unique = new Map<string, string>();
-        tasks.forEach((t) => {
-            if (t.categoryName && t.categoryColor) {
-                unique.set(t.categoryName, t.categoryColor);
-            }
-        });
-        return Array.from(unique.entries())
-            .map(([name, color]) => ({ name, color }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    });
-
-    let showLegend = $state(false);
 
     // Better time formatting based on zoom level
     function formatHour(h: number): string {
@@ -662,7 +655,7 @@
         };
     }
 
-    const packed = $derived.by(() => packTasks(tasks));
+    const packed = $derived.by(() => packTasks(filteredTasks));
 
     function getTextColor(bg: string): string {
         // Always white for clean, consistent look on vibrant/dark colors
@@ -808,104 +801,29 @@
 >
     <!-- Header -->
     <div
-        class="flex items-center justify-between px-5 py-3 bg-base-100/90 backdrop-blur-md border-b border-base-200 z-40 sticky top-0 transition-all duration-300"
+        class="flex items-center justify-between gap-4 px-5 py-3 bg-base-100/95 backdrop-blur-xl border-b border-base-200 z-40 sticky top-0"
     >
-        <div class="flex items-center gap-3">
-            <div class="join bg-base-200/50 p-1 rounded-xl shadow-inner">
-                <button
-                    class="btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
-                    onclick={goToPreviousDay}
-                    aria-label="Previous Day"
-                >
-                    <ChevronLeft class="w-4 h-4" />
-                </button>
-                <div
-                    class="flex flex-col items-center justify-center px-4 min-w-[140px] cursor-default"
-                >
-                    <span
-                        class="text-[10px] font-bold uppercase tracking-wider text-base-content/40 mb-[-2px]"
-                        >{selectedDate.getFullYear()}</span
-                    >
-                    <span
-                        class="font-bold text-sm text-base-content leading-tight"
-                        class:text-primary={isToday()}>{dateLabel()}</span
-                    >
-                </div>
-                <button
-                    class="btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-colors"
-                    onclick={goToNextDay}
-                    aria-label="Next Day"
-                >
-                    <ChevronRight class="w-4 h-4" />
-                </button>
-            </div>
+        <!-- Left: Date Navigation -->
+        <DateNavigator {selectedDate} {onDateChange} />
 
-            {#if !isToday()}
-                <button
-                    class="btn btn-xs btn-ghost text-primary hover:bg-primary/10 rounded-full px-3 transition-all"
-                    onclick={goToToday}
-                    in:fade={{ duration: 200 }}
-                >
-                    Return to Today
-                </button>
-            {/if}
+        <!-- Center: Category Filter -->
+        <div class="flex-1 flex justify-center">
+            <CategoryFilter
+                {categories}
+                totalTaskCount={tasks.length}
+                filteredTaskCount={filteredTasks.length}
+                {uncategorizedCount}
+                selectedCategory={selectedCategoryFilter}
+                onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
+            />
         </div>
 
+        <!-- Right: Controls -->
         <div class="flex items-center gap-3">
-            <!-- Legend -->
-            {#if categories.length > 0}
-                <div class="relative">
-                    <button
-                        class="btn btn-sm btn-square btn-ghost text-base-content/60 hover:text-primary hover:bg-base-200 rounded-lg"
-                        class:bg-base-200={showLegend}
-                        onclick={() => (showLegend = !showLegend)}
-                        title="Show Category Legend"
-                    >
-                        <Palette class="w-4 h-4" />
-                    </button>
-
-                    {#if showLegend}
-                        <div
-                            class="absolute top-full right-0 mt-3 p-3 bg-base-100/95 backdrop-blur-xl rounded-xl shadow-xl border border-base-200 z-[100] min-w-[200px]"
-                            in:scale={{ duration: 200, start: 0.95 }}
-                        >
-                            <div
-                                class="text-[10px] font-bold text-base-content/50 mb-2.5 uppercase tracking-wider flex justify-between items-center"
-                            >
-                                <span>Categories</span>
-                                <span
-                                    class="bg-base-200 px-1.5 py-0.5 rounded text-base-content/70"
-                                    >{categories.length}</span
-                                >
-                            </div>
-                            <div
-                                class="space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-1"
-                            >
-                                {#each categories as cat}
-                                    <div
-                                        class="flex items-center gap-2.5 group cursor-default p-1 hover:bg-base-200/50 rounded-lg transition-colors"
-                                    >
-                                        <div
-                                            class="w-3 h-3 rounded-full ring-2 ring-white/20 shadow-sm"
-                                            style="background-color: {cat.color}"
-                                        ></div>
-                                        <span
-                                            class="text-xs font-medium text-base-content/80 group-hover:text-base-content transition-colors"
-                                            >{cat.name}</span
-                                        >
-                                    </div>
-                                {/each}
-                            </div>
-                        </div>
-                        <div
-                            class="fixed inset-0 z-[90]"
-                            onclick={() => (showLegend = false)}
-                        ></div>
-                    {/if}
-                </div>
+            <LiveClock {selectedDate} />
+            {#if isToday()}
+                <div class="h-5 w-px bg-base-300/60"></div>
             {/if}
-
-            <div class="h-6 w-px bg-base-300/60"></div>
 
             <!-- Edit Mode Toggle -->
             <button
@@ -916,7 +834,7 @@
             >
                 <Pencil class="w-3.5 h-3.5" />
                 <span class="font-medium text-xs hidden sm:inline"
-                    >{isEditMode ? "Done Editing" : "Edit Tasks"}</span
+                    >{isEditMode ? "Done" : "Edit"}</span
                 >
             </button>
 
@@ -1248,15 +1166,15 @@
                                             >
                                                 <span
                                                     class="font-extrabold text-sm truncate drop-shadow-md {task.completed
-                                                        ? 'line-through opacity-80 decoration-white/50'
+                                                        ? 'opacity-80'
                                                         : ''}"
                                                     >{task.title}</span
                                                 >
                                             </div>
-                                            {#if task.categoryName && ROW_HEIGHT > 40}
+                                            {#if task.description && ROW_HEIGHT > 40}
                                                 <span
-                                                    class="text-[10px] opacity-90 truncate uppercase tracking-wider font-semibold"
-                                                    >{task.categoryName}</span
+                                                    class="text-[10px] opacity-80 truncate"
+                                                    >{task.description}</span
                                                 >
                                             {/if}
                                         </div>
@@ -1273,7 +1191,7 @@
                                     {:else if contentMode === "title-only"}
                                         <span
                                             class="font-bold text-xs truncate drop-shadow-md {task.completed
-                                                ? 'line-through opacity-80'
+                                                ? 'opacity-80'
                                                 : ''}">{task.title}</span
                                         >
                                     {:else}
@@ -1288,11 +1206,6 @@
                                         class="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30"
                                         style="background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.2) 5px, rgba(0,0,0,0.2) 10px);"
                                     ></div>
-                                    <div
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-white/40"
-                                    >
-                                        <Check class="w-4 h-4" />
-                                    </div>
                                 {/if}
                             </div>
                         </div>

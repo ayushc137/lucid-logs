@@ -144,6 +144,7 @@
   type TimelineTask = {
     id: string;
     title: string;
+    description?: string;
     startTime: Date;
     endTime: Date;
     categoryColor?: string;
@@ -165,6 +166,7 @@
       return {
         id: task.id,
         title: task.title,
+        description: task.note,
         startTime,
         endTime,
         categoryColor: task.category?.color,
