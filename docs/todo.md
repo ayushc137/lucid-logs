@@ -1,4 +1,9 @@
 
+make side bar more pretty with anuimation and more cleanup 
+
+fix the username, email throughout and fix edit properly ----------
+
+
 SET default states in setting for : completed staate, last task, from last task 
 set default time for retro and based ont hat update timeline with default time there as well 
 etc 

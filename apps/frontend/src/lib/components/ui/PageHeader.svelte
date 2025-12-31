@@ -22,6 +22,7 @@
     let {
         title,
         subtitle = "",
+        icon: Icon,
         showAddButton = false,
         addButtonLabel = "Add",
         onAdd,
@@ -30,21 +31,37 @@
 </script>
 
 <div
-    class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between {className}"
+    class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between {className}"
 >
-    <div>
-        <h1 class="text-3xl font-bold">{title}</h1>
-        {#if subtitle}
-            <p class="text-sm opacity-60 mt-1">{subtitle}</p>
+    <div class="flex items-start gap-4">
+        {#if Icon}
+            <div class="p-3 rounded-2xl bg-base-200/50 text-primary">
+                <Icon class="w-8 h-8" />
+            </div>
         {/if}
+        <div class="flex flex-col gap-1">
+            <h1 class="text-3xl font-bold tracking-tight text-base-content">
+                {title}
+            </h1>
+            {#if subtitle}
+                <p
+                    class="text-base font-medium text-base-content/60 max-w-2xl leading-relaxed"
+                >
+                    {subtitle}
+                </p>
+            {/if}
+        </div>
     </div>
+
     {#if showAddButton}
         <button
-            class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+            class="group relative inline-flex items-center justify-center gap-2 px-6 py-2.5 font-medium text-primary-content bg-primary rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
             onclick={onAdd}
         >
-            <Plus class="w-4 h-4" />
-            {addButtonLabel}
+            <Plus
+                class="w-5 h-5 transition-transform duration-200 group-hover:rotate-90"
+            />
+            <span>{addButtonLabel}</span>
         </button>
     {/if}
 </div>

@@ -15,44 +15,48 @@
 </script>
 
 <header
-  class="h-14 flex items-center justify-between px-4 bg-base-100 border-b border-base-300"
+  class="h-16 flex items-center justify-between px-6 bg-base-100/95 backdrop-blur-sm border-b border-base-200 z-40 sticky top-0"
 >
   <!-- Left -->
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-4">
     <button
-      class="btn btn-ghost btn-sm btn-square lg:hidden"
+      class="btn btn-ghost btn-square lg:hidden"
       onclick={onMenuClick}
       aria-label="Menu"
     >
-      <Menu class="w-5 h-5" />
+      <Menu class="w-6 h-6" />
     </button>
 
     <div class="hidden sm:flex items-center gap-2">
-      <label class="input input-sm input-bordered flex items-center gap-2 w-64">
+      <label
+        class="input input-bordered flex items-center gap-3 w-72 h-10 bg-base-200/50 hover:bg-base-200 transition-colors focus-within:bg-base-100 focus-within:border-primary/50"
+      >
         <Search class="w-4 h-4 opacity-50" />
         <input
           type="text"
           placeholder="Search logs..."
-          class="grow bg-transparent"
+          class="grow bg-transparent placeholder:text-base-content/40"
         />
-        <kbd class="kbd kbd-xs">⌘K</kbd>
+        <kbd
+          class="kbd kbd-sm h-6 min-h-0 bg-base-300 border-none text-[10px] font-bold opacity-60"
+          >⌘K</kbd
+        >
       </label>
     </div>
   </div>
 
   <!-- Right -->
-  <div class="flex items-center gap-2">
-    <!-- Quick Log Button -->
-    <button class="btn btn-primary btn-sm gap-2">
-      <Plus class="w-4 h-4" />
-      <span class="hidden sm:inline">Quick Log</span>
-    </button>
-
+  <div class="flex items-center gap-3">
     <!-- Notifications -->
-    <button class="btn btn-ghost btn-sm btn-square" aria-label="Notifications">
+    <button
+      class="btn btn-ghost btn-circle h-10 w-10 min-h-0 hover:bg-base-200"
+      aria-label="Notifications"
+    >
       <div class="indicator">
         <Bell class="w-5 h-5" />
-        <span class="badge badge-error badge-xs indicator-item"></span>
+        <span
+          class="badge badge-error badge-xs indicator-item w-2 h-2 p-0 border-2 border-base-100"
+        ></span>
       </div>
     </button>
 
@@ -60,12 +64,12 @@
     <div class="dropdown dropdown-end">
       <button
         tabindex="0"
-        class="btn btn-ghost btn-circle avatar hover:ring-2 hover:ring-primary/20 transition-all"
+        class="btn btn-ghost btn-circle avatar h-10 w-10 min-h-0 hover:ring-2 hover:ring-primary/20 transition-all p-0"
       >
         <div
-          class="w-8 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center shadow-sm"
+          class="w-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center shadow-lg shadow-primary/20"
         >
-          <span class="text-xs font-bold">{avatarLetter}</span>
+          <span class="text-sm font-bold">{avatarLetter}</span>
         </div>
       </button>
       <div
