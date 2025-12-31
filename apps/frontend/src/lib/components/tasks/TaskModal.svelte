@@ -407,7 +407,9 @@
         <!-- Content -->
         <div class="flex flex-1 overflow-hidden">
             <!-- Left: Title + Journal -->
-            <div class="flex-1 flex flex-col p-6 overflow-y-auto">
+            <div
+                class="flex-1 flex flex-col p-6 overflow-y-auto overflow-x-hidden"
+            >
                 <!-- Title Input with Category Tag -->
                 <div class="flex items-center gap-3">
                     <input

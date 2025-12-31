@@ -6,12 +6,13 @@
   themes: light --default, dark --prefersdark, nord, night, dim, lofi, winter, corporate, retro, dracula;
 }
 
+/* Import component styles */
+@import './lib/components/rich-editor/rich-editor.css';
+
 /* Base font */
 * {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
-
-
 
 /* Color picker button */
 .color-picker-btn {
@@ -24,50 +25,4 @@
 
 .color-picker-btn.active {
   @apply ring-2 ring-primary ring-offset-1 ring-offset-base-100;
-}
-
-/* Rich editor (TipTap) */
-.rich-editor .ProseMirror {
-  @apply outline-none min-h-full;
-}
-
-.rich-editor .ProseMirror p.is-editor-empty:first-child::before {
-  @apply text-base-content/30 float-left h-0 pointer-events-none;
-  content: attr(data-placeholder);
-}
-
-.rich-editor .ProseMirror ul[data-type="taskList"] {
-  @apply list-none p-0;
-}
-
-.rich-editor .ProseMirror ul[data-type="taskList"] li {
-  @apply flex items-start gap-2;
-}
-
-.rich-editor .ProseMirror ul[data-type="taskList"] li>label input[type="checkbox"] {
-  @apply checkbox checkbox-sm checkbox-primary;
-}
-
-.rich-editor .ProseMirror ul {
-  @apply list-disc pl-5;
-}
-
-.rich-editor .ProseMirror ol {
-  @apply list-decimal pl-5;
-}
-
-.rich-editor .ProseMirror blockquote {
-  @apply border-l-4 border-primary/30 pl-4 italic;
-}
-
-.rich-editor .ProseMirror code {
-  @apply bg-base-300 px-1 py-0.5 rounded text-sm;
-}
-
-.rich-editor .ProseMirror pre {
-  @apply bg-base-300 p-3 rounded-lg;
-}
-
-.rich-editor .ProseMirror a {
-  @apply text-primary underline;
 }
