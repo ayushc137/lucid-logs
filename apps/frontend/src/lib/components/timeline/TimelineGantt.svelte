@@ -81,6 +81,10 @@
     // Track if we're currently in a drag operation (to prevent click)
     let hasDragged = $state(false);
 
+    // Track mouse position and task position during drag for the fixed popover
+    let dragMouseX = $state(0);
+    let dragTaskTop = $state(0);
+
     // Optimistic updates to prevent snap-back while saving
     let optimisticOverrides = $state<
         Record<string, { startTime: Date; endTime: Date }>
@@ -140,9 +144,13 @@
     function getHourFromMouseX(clientX: number): number {
         if (!gridRef) return 0;
         const rect = gridRef.getBoundingClientRect();
-        const x = clientX - rect.left + timelineRef.scrollLeft;
+        // getBoundingClientRect already accounts for scroll position
+        // so we just need clientX - rect.left to get position within grid
+        const x = clientX - rect.left;
         const totalWidth = gridRef.scrollWidth;
-        return Math.max(0, Math.min(24, (x / totalWidth) * 24));
+        // Convert to hour and clamp to 0-24 range
+        const hour = (x / totalWidth) * 24;
+        return Math.max(0, Math.min(24, hour));
     }
 
     function hourToDate(hour: number): Date {
@@ -178,6 +186,14 @@
         previewStartTime = new Date(task.startTime);
         previewEndTime = new Date(task.endTime);
         hasDragged = false;
+        dragMouseX = e.clientX;
+
+        // Get the task element's position for the popover
+        const taskElement = (e.target as HTMLElement).closest(".task-wrapper");
+        if (taskElement) {
+            const rect = taskElement.getBoundingClientRect();
+            dragTaskTop = rect.top;
+        }
 
         // Add listeners
         document.addEventListener("mousemove", handleDragMove);
@@ -192,6 +208,9 @@
             !originalEndTime
         )
             return;
+
+        // Update mouse X position for the fixed popover
+        dragMouseX = e.clientX;
 
         // Mark that we've started dragging (to prevent click)
         const deltaX = Math.abs(e.clientX - dragStartX);
@@ -292,6 +311,8 @@
         originalEndTime = null;
         previewStartTime = null;
         previewEndTime = null;
+        dragMouseX = 0;
+        dragTaskTop = 0;
 
         // Delay resetting hasDragged to prevent immediate click
         setTimeout(() => {
@@ -1057,56 +1078,6 @@
                             onmouseleave={onMouseLeave}
                             onclick={(e) => handleTaskClick(e, task.id)}
                         >
-                            <!-- Time preview badge during drag -->
-                            {#if previewTimes}
-                                <div
-                                    class="absolute -top-16 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"
-                                    in:scale={{ duration: 150, start: 0.9 }}
-                                >
-                                    <div
-                                        class="bg-base-100 text-base-content px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xl border border-primary/20 flex flex-col items-center gap-0.5 min-w-[120px]"
-                                    >
-                                        <div
-                                            class="flex items-center gap-2 text-sm justify-center w-full"
-                                        >
-                                            <span
-                                                class="font-mono tracking-tight"
-                                                >{formatTimeCompact(
-                                                    previewStartTime!,
-                                                )}</span
-                                            >
-                                            <span class="opacity-40 text-[10px]"
-                                                >→</span
-                                            >
-                                            <span
-                                                class="font-mono tracking-tight"
-                                                >{formatTimeCompact(
-                                                    previewEndTime!,
-                                                )}</span
-                                            >
-                                        </div>
-                                        <div
-                                            class="flex items-center gap-1.5 opacity-60"
-                                        >
-                                            <Clock class="w-3 h-3" />
-                                            <span
-                                                class="text-[10px] font-bold uppercase tracking-wide"
-                                            >
-                                                {formatDuration(
-                                                    previewStartTime!,
-                                                    previewEndTime!,
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <!-- Triangle -->
-                                    <div
-                                        class="w-3 h-3 bg-base-100 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 shadow-sm border-r border-b border-primary/20"
-                                    ></div>
-                                </div>
-                            {/if}
-
-                            <!-- Task Bar -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
                                 class="task-bar relative h-full rounded-lg overflow-hidden transition-all duration-300
@@ -1263,6 +1234,26 @@
 <!-- Task Popover -->
 {#if hovered && tooltipPosition && !dragMode}
     <TaskPopover task={hovered} position={tooltipPosition} />
+{/if}
+
+<!-- Fixed position drag time preview - positioned above task at mouse X -->
+{#if dragMode && previewStartTime && previewEndTime}
+    <div
+        class="fixed pointer-events-none z-[9999]"
+        style="left: {dragMouseX}px; top: {dragTaskTop -
+            36}px; transform: translateX(-50%);"
+    >
+        <div
+            class="bg-warning text-warning-content px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg flex items-center gap-2 whitespace-nowrap"
+        >
+            <span class="font-mono">{formatTimeCompact(previewStartTime)}</span>
+            <span class="opacity-50">→</span>
+            <span class="font-mono">{formatTimeCompact(previewEndTime)}</span>
+            <span class="opacity-60 text-[10px] font-bold ml-1"
+                >{formatDuration(previewStartTime, previewEndTime)}</span
+            >
+        </div>
+    </div>
 {/if}
 
 <style>
