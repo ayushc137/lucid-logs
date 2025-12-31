@@ -29,7 +29,7 @@
     error = "";
     try {
       const response = await login({ username: email, password });
-      authStore.loginWithResponse(response);
+      authStore.loginWithResponse(response, email);
       await goto("/", { replaceState: true });
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {

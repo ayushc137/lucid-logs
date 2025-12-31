@@ -21,6 +21,7 @@ export function isDevAuthBypassEnabled(): boolean {
 class AuthStore {
     user = $state<User | null>(null);
     userIdString = $state<string | null>(null);
+    userEmail = $state<string | null>(null);
     isAdmin = $state(false);
     token = $state<string | null>(null);
     isLoading = $state(true);
@@ -38,6 +39,7 @@ class AuthStore {
         if (browser) {
             this.token = sessionStorage.getItem('token');
             this.userIdString = sessionStorage.getItem('userId');
+            this.userEmail = sessionStorage.getItem('userEmail');
             this.isAdmin = sessionStorage.getItem('isAdmin') === 'true';
             this.isLoading = false;
             // If we have a token in sessionStorage, we're authenticated
@@ -73,9 +75,10 @@ class AuthStore {
     /**
      * Login with auth response from API
      */
-    loginWithResponse(response: AuthResponse) {
+    loginWithResponse(response: AuthResponse, email?: string) {
         this.token = response.token;
         this.userIdString = response.user;
+        this.userEmail = email || null;
         this.isAdmin = response.is_admin;
         this.isInitialized = true;
         this.isLoading = false;
@@ -84,6 +87,9 @@ class AuthStore {
             sessionStorage.setItem('token', response.token);
             sessionStorage.setItem('userId', response.user);
             sessionStorage.setItem('isAdmin', String(response.is_admin));
+            if (email) {
+                sessionStorage.setItem('userEmail', email);
+            }
         }
     }
 
@@ -115,11 +121,13 @@ class AuthStore {
         this.user = null;
         this.token = null;
         this.userIdString = null;
+        this.userEmail = null;
         this.isAdmin = false;
         this.isInitialized = false;
         if (browser) {
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('userId');
+            sessionStorage.removeItem('userEmail');
             sessionStorage.removeItem('isAdmin');
         }
     }
@@ -141,7 +149,7 @@ class AuthStore {
                 username: DEV_ADMIN_EMAIL,
                 password: DEV_ADMIN_PASSWORD
             });
-            this.loginWithResponse(response);
+            this.loginWithResponse(response, DEV_ADMIN_EMAIL);
             console.log('[Dev Auth] Auto-login successful');
             return true;
         } catch (error) {

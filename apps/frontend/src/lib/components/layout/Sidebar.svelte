@@ -54,61 +54,76 @@
   )}
 >
   <!-- Logo -->
-  <div class="flex items-center h-14 px-3 border-b border-base-300">
-    <div class="flex items-center gap-3 w-full">
-      <img
-        src="/icon.png"
-        alt="Lucid Logs"
-        class="w-9 h-9 rounded-lg flex-shrink-0"
-      />
-      {#if !collapsed}
-        <div class="flex flex-col overflow-hidden">
-          <span class="font-bold text-sm">Lucid Logs</span>
-          <span class="text-[10px] opacity-60">Daily Journey</span>
-        </div>
-      {/if}
-    </div>
+  <div
+    class={cn(
+      "flex items-center h-14 border-b border-base-300",
+      collapsed ? "justify-center" : "px-3 gap-3",
+    )}
+  >
+    <img
+      src="/icon.png"
+      alt="Lucid Logs"
+      class="w-9 h-9 rounded-lg flex-shrink-0"
+    />
+    {#if !collapsed}
+      <div class="flex flex-col overflow-hidden">
+        <span class="font-bold text-sm">Lucid Logs</span>
+        <span class="text-[10px] opacity-60">Daily Journey</span>
+      </div>
+    {/if}
   </div>
 
   <!-- Navigation -->
-  <nav class="flex-1 p-2">
-    <ul class="menu menu-sm gap-1 p-0">
-      {#each navItems as item}
-        {@const active = isActive(item.href)}
-        <li>
-          <a
-            href={item.href}
-            class={cn(
-              "flex items-center gap-3",
-              active && "active",
-              collapsed && "tooltip tooltip-right",
-            )}
-            data-tip={collapsed ? item.label : undefined}
-          >
-            <item.icon class="w-5 h-5 flex-shrink-0" />
-            {#if !collapsed}
-              <span>{item.label}</span>
-            {/if}
-          </a>
-        </li>
-      {/each}
-    </ul>
+  <nav
+    class={cn(
+      "flex-1 flex flex-col gap-1",
+      collapsed ? "p-1 items-center" : "p-2",
+    )}
+  >
+    {#each navItems as item}
+      {@const active = isActive(item.href)}
+      <a
+        href={item.href}
+        class={cn(
+          "btn btn-ghost btn-sm",
+          collapsed
+            ? "btn-square tooltip tooltip-right"
+            : "w-full justify-start gap-3",
+          active && "btn-active",
+        )}
+        data-tip={collapsed ? item.label : undefined}
+      >
+        <item.icon class="w-5 h-5 flex-shrink-0" />
+        {#if !collapsed}
+          <span>{item.label}</span>
+        {/if}
+      </a>
+    {/each}
   </nav>
 
   <!-- Bottom -->
-  <div class="p-2 border-t border-base-300">
+  <div
+    class={cn(
+      "border-t border-base-300 flex flex-col",
+      collapsed ? "p-1 items-center" : "p-2",
+    )}
+  >
     <!-- Theme Picker -->
     <div
       class={cn(
-        "dropdown w-full",
-        collapsed ? "dropdown-right dropdown-end" : "dropdown-top dropdown-end",
+        "dropdown",
+        collapsed
+          ? "dropdown-right dropdown-end"
+          : "dropdown-top dropdown-end w-full",
       )}
     >
       <button
         tabindex="0"
         class={cn(
-          "btn btn-ghost btn-sm w-full justify-start gap-3",
-          collapsed && "btn-square tooltip tooltip-right",
+          "btn btn-ghost btn-sm",
+          collapsed
+            ? "btn-square tooltip tooltip-right"
+            : "w-full justify-start gap-3",
         )}
         data-tip={collapsed ? "Theme" : undefined}
       >
@@ -147,8 +162,10 @@
     <a
       href="/settings"
       class={cn(
-        "btn btn-ghost btn-sm w-full justify-start gap-3 mt-1",
-        collapsed && "btn-square tooltip tooltip-right",
+        "btn btn-ghost btn-sm mt-1",
+        collapsed
+          ? "btn-square tooltip tooltip-right"
+          : "w-full justify-start gap-3",
         $page.url.pathname === "/settings" && "active",
       )}
       data-tip={collapsed ? "Settings" : undefined}
@@ -161,8 +178,10 @@
 
     <button
       class={cn(
-        "btn btn-ghost btn-sm w-full justify-start gap-3 mt-1 text-error hover:bg-error/10",
-        collapsed && "btn-square tooltip tooltip-right",
+        "btn btn-ghost btn-sm mt-1 text-error hover:bg-error/10",
+        collapsed
+          ? "btn-square tooltip tooltip-right"
+          : "w-full justify-start gap-3",
       )}
       onclick={handleLogout}
       data-tip={collapsed ? "Logout" : undefined}
@@ -173,18 +192,21 @@
       {/if}
     </button>
 
-    <div class="divider my-2"></div>
+    <div class="divider my-1 w-full"></div>
 
     <button
-      class="btn btn-ghost btn-sm w-full"
+      class={cn(
+        "btn btn-ghost btn-xs opacity-60 hover:opacity-100 transition-opacity",
+        collapsed ? "btn-square" : "w-full",
+      )}
       onclick={onToggle}
       aria-label="Toggle sidebar"
     >
       {#if collapsed}
-        <ChevronRight class="w-4 h-4" />
+        <ChevronRight class="w-3.5 h-3.5" />
       {:else}
-        <ChevronLeft class="w-4 h-4" />
-        <span class="text-xs opacity-60">Collapse</span>
+        <ChevronLeft class="w-3.5 h-3.5" />
+        <span class="text-xs">Collapse</span>
       {/if}
     </button>
   </div>

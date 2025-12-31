@@ -1,11 +1,17 @@
 <script lang="ts">
   import { Bell, Search, Plus, Menu, Settings, LogOut } from "lucide-svelte";
+  import { authStore } from "$lib/stores/auth.svelte";
 
   interface Props {
     onMenuClick?: () => void;
   }
 
   let { onMenuClick }: Props = $props();
+
+  // Get first letter of email for avatar
+  const avatarLetter = $derived(
+    authStore.userEmail?.charAt(0).toUpperCase() || "U",
+  );
 </script>
 
 <header
@@ -59,7 +65,7 @@
         <div
           class="w-8 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center shadow-sm"
         >
-          <span class="text-xs font-bold">U</span>
+          <span class="text-xs font-bold">{avatarLetter}</span>
         </div>
       </button>
       <div
@@ -68,29 +74,30 @@
       >
         <!-- User Info Header -->
         <div class="px-4 py-3 bg-base-200/50 border-b border-base-200">
-          <p class="text-sm font-medium text-base-content">user@example.com</p>
+          <p class="text-sm font-medium text-base-content truncate">
+            {authStore.userEmail || "User"}
+          </p>
         </div>
 
         <!-- Menu Items -->
-        <ul class="menu menu-sm p-2">
-          <li>
-            <a href="/settings" class="flex items-center gap-3 rounded-lg">
-              <Settings class="w-4 h-4 opacity-70" />
-              <span>Settings</span>
-            </a>
-          </li>
-        </ul>
-        <div class="divider my-0 mx-2 h-px"></div>
-        <ul class="menu menu-sm p-2">
-          <li>
-            <button
-              class="flex items-center gap-3 rounded-lg text-error hover:bg-error/10"
-            >
-              <LogOut class="w-4 h-4" />
-              <span>Logout</span>
-            </button>
-          </li>
-        </ul>
+        <div class="p-2 flex flex-col gap-1">
+          <a
+            href="/settings"
+            class="btn btn-ghost btn-sm w-full justify-start gap-3"
+          >
+            <Settings class="w-4 h-4" />
+            <span>Settings</span>
+          </a>
+
+          <div class="divider my-1"></div>
+
+          <button
+            class="btn btn-ghost btn-sm w-full justify-start gap-3 text-error hover:bg-error/10"
+          >
+            <LogOut class="w-4 h-4" />
+            <span>Logout</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
