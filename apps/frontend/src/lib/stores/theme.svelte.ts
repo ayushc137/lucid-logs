@@ -1,11 +1,11 @@
 /**
  * Theme Store - DaisyUI Themes for Lucid Logs
+ * Single source of truth for theme configuration across the app.
  */
 
 export type ThemeId =
-  | 'light' | 'dark' | 'cupcake' | 'emerald' | 'corporate'
-  | 'synthwave' | 'retro' | 'cyberpunk' | 'forest' | 'dracula'
-  | 'night' | 'coffee' | 'nord' | 'sunset';
+  | 'light' | 'dark' | 'nord' | 'night' | 'dim'
+  | 'lofi' | 'winter' | 'corporate' | 'retro' | 'dracula';
 
 export interface Theme {
   id: ThemeId;
@@ -15,24 +15,22 @@ export interface Theme {
   isDark: boolean;
 }
 
+// 10 curated themes - used by both sidebar and settings
 export const THEMES: Theme[] = [
   { id: 'light', label: 'Light', emoji: '☀️', description: 'Clean & Bright', isDark: false },
   { id: 'dark', label: 'Dark', emoji: '🌙', description: 'Easy on Eyes', isDark: true },
-  { id: 'cupcake', label: 'Cupcake', emoji: '🧁', description: 'Sweet Pastel', isDark: false },
-  { id: 'emerald', label: 'Emerald', emoji: '💚', description: 'Green Focus', isDark: false },
-  { id: 'corporate', label: 'Corporate', emoji: '🏢', description: 'Professional', isDark: false },
-  { id: 'synthwave', label: 'Synthwave', emoji: '🌆', description: 'Retro Neon', isDark: true },
-  { id: 'retro', label: 'Retro', emoji: '📺', description: 'Vintage Vibes', isDark: false },
-  { id: 'cyberpunk', label: 'Cyberpunk', emoji: '🤖', description: 'Futuristic', isDark: true },
-  { id: 'forest', label: 'Forest', emoji: '🌲', description: 'Nature', isDark: true },
-  { id: 'dracula', label: 'Dracula', emoji: '🧛', description: 'Dark Purple', isDark: true },
-  { id: 'night', label: 'Night', emoji: '🌃', description: 'Deep Dark', isDark: true },
-  { id: 'coffee', label: 'Coffee', emoji: '☕', description: 'Warm Brown', isDark: true },
   { id: 'nord', label: 'Nord', emoji: '❄️', description: 'Arctic Cool', isDark: true },
-  { id: 'sunset', label: 'Sunset', emoji: '🌅', description: 'Warm Glow', isDark: true },
+  { id: 'night', label: 'Night', emoji: '🌃', description: 'Deep Blue', isDark: true },
+  { id: 'dim', label: 'Dim', emoji: '🌑', description: 'Soft Dark', isDark: true },
+  { id: 'lofi', label: 'Lofi', emoji: '📻', description: 'Muted Tones', isDark: false },
+  { id: 'winter', label: 'Winter', emoji: '⛄', description: 'Frosty Light', isDark: false },
+  { id: 'corporate', label: 'Corporate', emoji: '💼', description: 'Professional', isDark: false },
+  { id: 'retro', label: 'Retro', emoji: '🕹️', description: 'Vintage Vibes', isDark: false },
+  { id: 'dracula', label: 'Dracula', emoji: '🧛', description: 'Dark Purple', isDark: true },
 ];
 
-const STORAGE_KEY = 'lucid-logs-theme';
+// Use same key as sidebar was using for backward compatibility
+const STORAGE_KEY = 'theme';
 const DEFAULT_THEME: ThemeId = 'dark';
 
 function createThemeStore() {

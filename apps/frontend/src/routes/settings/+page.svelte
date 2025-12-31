@@ -2,9 +2,8 @@
   import { themeStore, THEMES } from "$lib/stores";
   import { Palette, User, Shield, Check, Moon, Sun } from "lucide-svelte";
   import { cn } from "$lib/utils";
-  import { CategorySettings } from "$lib/components/settings";
 
-  let activeTab = $state<"appearance" | "categories" | "account">("appearance");
+  let activeTab = $state<"appearance" | "account">("appearance");
 </script>
 
 <svelte:head>
@@ -25,13 +24,6 @@
       onclick={() => (activeTab = "appearance")}
     >
       Appearance
-    </button>
-    <button
-      role="tab"
-      class={cn("tab", activeTab === "categories" && "tab-active")}
-      onclick={() => (activeTab = "categories")}
-    >
-      Categories
     </button>
     <button
       role="tab"
@@ -90,15 +82,6 @@
             </button>
           {/each}
         </div>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Categories Content -->
-  {#if activeTab === "categories"}
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <CategorySettings />
       </div>
     </div>
   {/if}

@@ -14,11 +14,10 @@
     LogOut,
     Palette,
     Check,
-    Sun,
-    Moon,
   } from "lucide-svelte";
   import { cn } from "$lib/utils";
   import { authStore } from "$lib/stores/auth.svelte";
+  import { themeStore, THEMES } from "$lib/stores";
 
   interface Props {
     collapsed?: boolean;
@@ -26,46 +25,6 @@
   }
 
   let { collapsed = $bindable(false), onToggle }: Props = $props();
-  let currentTheme = $state("dark");
-  let themeDropdownOpen = $state(false);
-
-  // Available DaisyUI themes - 10 curated themes
-  const themes = [
-    { id: "light", emoji: "☀️", label: "Light", description: "Clean & Bright" },
-    { id: "dark", emoji: "🌙", label: "Dark", description: "Easy on Eyes" },
-    { id: "nord", emoji: "❄️", label: "Nord", description: "Arctic Cool" },
-    { id: "night", emoji: "🌃", label: "Night", description: "Deep Blue" },
-    { id: "dim", emoji: "🌑", label: "Dim", description: "Soft Dark" },
-    { id: "lofi", emoji: "📻", label: "Lofi", description: "Muted Tones" },
-    { id: "winter", emoji: "⛄", label: "Winter", description: "Frosty Light" },
-    {
-      id: "corporate",
-      emoji: "💼",
-      label: "Corporate",
-      description: "Professional",
-    },
-    { id: "retro", emoji: "🕹️", label: "Retro", description: "Vintage Vibes" },
-    {
-      id: "dracula",
-      emoji: "🧛",
-      label: "Dracula",
-      description: "Dark Purple",
-    },
-  ] as const;
-
-  // Load saved theme on mount
-  $effect(() => {
-    const saved = localStorage.getItem("theme") || "dark";
-    currentTheme = saved;
-    document.documentElement.setAttribute("data-theme", saved);
-  });
-
-  function applyTheme(theme: string) {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-    currentTheme = theme;
-    themeDropdownOpen = false;
-  }
 
   const navItems = [
     { href: "/", icon: Home, label: "Dashboard" },
@@ -112,7 +71,7 @@
   </div>
 
   <!-- Navigation -->
-  <nav class="flex-1 p-2 overflow-y-auto">
+  <nav class="flex-1 p-2">
     <ul class="menu menu-sm gap-1 p-0">
       {#each navItems as item}
         {@const active = isActive(item.href)}
@@ -139,7 +98,12 @@
   <!-- Bottom -->
   <div class="p-2 border-t border-base-300">
     <!-- Theme Picker -->
-    <div class="dropdown dropdown-top dropdown-end w-full">
+    <div
+      class={cn(
+        "dropdown w-full",
+        collapsed ? "dropdown-right dropdown-end" : "dropdown-top dropdown-end",
+      )}
+    >
       <button
         tabindex="0"
         class={cn(
@@ -151,26 +115,27 @@
         <Palette class="w-5 h-5" />
         {#if !collapsed}
           <span class="flex-1 text-left">Theme</span>
-          <span class="text-lg"
-            >{themes.find((t) => t.id === currentTheme)?.emoji}</span
-          >
+          <span class="text-lg">{themeStore.currentTheme?.emoji}</span>
         {/if}
       </button>
       <ul
-        class="dropdown-content menu bg-base-100 rounded-xl z-50 w-52 p-1.5 shadow-xl border border-base-300"
+        class={cn(
+          "dropdown-content menu bg-base-100 rounded-xl z-[100] w-52 p-1.5 shadow-xl border border-base-300",
+          collapsed && "mb-0",
+        )}
       >
-        {#each themes as theme}
+        {#each THEMES as theme}
           <li>
             <button
-              onclick={() => applyTheme(theme.id)}
+              onclick={() => themeStore.set(theme.id)}
               class={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-lg",
-                currentTheme === theme.id && "bg-primary/10",
+                themeStore.current === theme.id && "bg-primary/10",
               )}
             >
               <span class="text-lg">{theme.emoji}</span>
               <span class="flex-1 font-medium text-sm">{theme.label}</span>
-              {#if currentTheme === theme.id}
+              {#if themeStore.current === theme.id}
                 <Check class="w-4 h-4 text-primary" />
               {/if}
             </button>

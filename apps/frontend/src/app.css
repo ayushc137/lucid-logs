@@ -13,16 +13,3 @@
 * {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
-
-/* Color picker button */
-.color-picker-btn {
-  @apply w-6 h-6 rounded-md cursor-pointer transition-transform;
-}
-
-.color-picker-btn:hover {
-  @apply scale-110;
-}
-
-.color-picker-btn.active {
-  @apply ring-2 ring-primary ring-offset-1 ring-offset-base-100;
-}
