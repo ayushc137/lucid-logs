@@ -166,7 +166,7 @@
       return {
         id: task.id,
         title: task.title,
-        description: task.note,
+        description: task.journal,
         startTime,
         endTime,
         categoryColor: task.category?.color,

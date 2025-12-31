@@ -7,7 +7,6 @@
         Moon,
         Coffee,
         Check,
-        ArrowRight,
     } from "lucide-svelte";
     import { fade, fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
@@ -16,7 +15,7 @@
     // Shared components
     import DateNavigator from "./DateNavigator.svelte";
     import CategoryFilter from "./CategoryFilter.svelte";
-    import LiveClock from "./LiveClock.svelte";
+    import AgendaTaskCard from "./AgendaTaskCard.svelte";
 
     let {
         tasks = [],
@@ -288,10 +287,8 @@
             />
         </div>
 
-        <!-- Right: Live Clock & Stats -->
+        <!-- Right: Stats -->
         <div class="flex items-center gap-3">
-            <LiveClock {selectedDate} />
-
             <!-- Stats -->
             <div class="flex items-center gap-3 text-sm">
                 <span class="text-base-content/60">
@@ -408,135 +405,12 @@
                         <!-- Tasks List -->
                         <div class="space-y-2 pl-1">
                             {#each blockTasks as task, j (task.id)}
-                                {@const status = getTaskStatus(task)}
-                                {@const bg = task.categoryColor || "#6b7280"}
-                                {@const isCompleted = task.completed}
-
-                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                <!-- svelte-ignore a11y_interactive_supports_focus -->
-                                <div
-                                    class="group relative flex items-stretch rounded-xl border-2 transition-all duration-200 overflow-hidden cursor-pointer shadow-sm
-                                        {isCompleted
-                                        ? 'bg-base-100/80 border-base-200/80 hover:border-base-300'
-                                        : status === 'current'
-                                          ? 'bg-base-100 border-primary/40 shadow-lg shadow-primary/10 ring-1 ring-primary/20'
-                                          : 'bg-base-100 border-base-200/80 hover:border-base-300 hover:shadow-md'}"
-                                    role="button"
-                                    onclick={() => onTaskClick?.(task.id)}
-                                    in:fly={{
-                                        x: -8,
-                                        duration: 250,
-                                        delay: i * 30 + j * 40,
-                                        easing: cubicOut,
-                                    }}
-                                >
-                                    <!-- Left Color Bar -->
-                                    <div
-                                        class="w-1.5 shrink-0 transition-all duration-200"
-                                        class:opacity-40={isCompleted}
-                                        style="background-color: {bg};"
-                                    ></div>
-
-                                    <!-- Main Content -->
-                                    <div
-                                        class="flex-1 flex items-center gap-3 p-3 min-w-0"
-                                    >
-                                        <!-- Time Badge -->
-                                        <div
-                                            class="flex flex-col items-center justify-center min-w-[72px] shrink-0 border-r border-base-200/60 pr-3"
-                                        >
-                                            <span
-                                                class="text-sm font-bold font-mono {isCompleted
-                                                    ? 'text-base-content/40'
-                                                    : status === 'current'
-                                                      ? 'text-primary'
-                                                      : 'text-base-content/80'}"
-                                            >
-                                                {formatTime(task.startTime)}
-                                            </span>
-                                            <span
-                                                class="text-[10px] font-medium text-base-content/40 mt-0.5"
-                                            >
-                                                {formatDuration(
-                                                    task.startTime,
-                                                    task.endTime,
-                                                )}
-                                            </span>
-                                        </div>
-
-                                        <!-- Task Details -->
-                                        <div class="flex-1 min-w-0">
-                                            <h4
-                                                class="text-sm font-semibold truncate leading-snug transition-colors
-                                                    {isCompleted
-                                                    ? 'text-base-content/40 line-through decoration-base-content/20'
-                                                    : 'text-base-content'}"
-                                            >
-                                                {task.title}
-                                            </h4>
-                                            {#if task.categoryName}
-                                                <div
-                                                    class="flex items-center gap-1.5 mt-1"
-                                                >
-                                                    <div
-                                                        class="w-2 h-2 rounded-full shrink-0"
-                                                        style="background-color: {bg};"
-                                                    ></div>
-                                                    <span
-                                                        class="text-[11px] font-medium text-base-content/50 truncate"
-                                                    >
-                                                        {task.categoryName}
-                                                    </span>
-                                                </div>
-                                            {/if}
-                                        </div>
-
-                                        <!-- Status Indicator -->
-                                        <div
-                                            class="flex items-center shrink-0 pl-2"
-                                        >
-                                            {#if isCompleted}
-                                                <div
-                                                    class="flex items-center gap-1 text-success bg-success/10 px-2.5 py-1 rounded-lg"
-                                                >
-                                                    <Check
-                                                        class="w-3.5 h-3.5"
-                                                        strokeWidth={3}
-                                                    />
-                                                    <span
-                                                        class="text-[11px] font-bold"
-                                                        >Done</span
-                                                    >
-                                                </div>
-                                            {:else if status === "current"}
-                                                <div
-                                                    class="flex items-center gap-1.5 text-primary bg-primary/10 px-2.5 py-1 rounded-lg"
-                                                >
-                                                    <div class="relative">
-                                                        <div
-                                                            class="w-1.5 h-1.5 rounded-full bg-primary"
-                                                        ></div>
-                                                        <div
-                                                            class="absolute inset-0 w-1.5 h-1.5 rounded-full bg-primary animate-ping"
-                                                        ></div>
-                                                    </div>
-                                                    <span
-                                                        class="text-[11px] font-bold"
-                                                        >Now</span
-                                                    >
-                                                </div>
-                                            {:else}
-                                                <div
-                                                    class="opacity-0 group-hover:opacity-100 transition-all duration-200 text-base-content/30 group-hover:text-primary"
-                                                >
-                                                    <ArrowRight
-                                                        class="w-4 h-4"
-                                                    />
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                </div>
+                                <AgendaTaskCard
+                                    {task}
+                                    status={getTaskStatus(task)}
+                                    transitionDelay={i * 30 + j * 40}
+                                    {onTaskClick}
+                                />
                             {/each}
                         </div>
                     </div>

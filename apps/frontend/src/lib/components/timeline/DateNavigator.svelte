@@ -1,5 +1,6 @@
 <script lang="ts">
     import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-svelte";
+    import { onMount, onDestroy } from "svelte";
     import { scale } from "svelte/transition";
 
     let {
@@ -11,6 +12,16 @@
     } = $props();
 
     let dateInputRef: HTMLInputElement = null!;
+    let currentTime = $state(new Date());
+    let timeInterval: ReturnType<typeof setInterval>;
+
+    onMount(() => {
+        timeInterval = setInterval(() => (currentTime = new Date()), 1000);
+    });
+
+    onDestroy(() => {
+        if (timeInterval) clearInterval(timeInterval);
+    });
 
     function goToPreviousDay() {
         const d = new Date(selectedDate);
@@ -29,7 +40,6 @@
     }
 
     function openDatePicker() {
-        // Trigger the native date picker by clicking the hidden input
         dateInputRef?.showPicker?.();
     }
 
@@ -72,9 +82,18 @@
     const datePickerValue = $derived(
         `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`,
     );
+
+    const nowFormatted = $derived(
+        currentTime.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        }),
+    );
 </script>
 
 <div class="flex items-center gap-3">
+    <!-- Left: Date Navigation -->
     <div class="flex items-center bg-base-200/40 rounded-xl p-1 shadow-inner">
         <button
             class="btn btn-sm btn-ghost btn-square rounded-lg hover:bg-base-100 transition-all duration-200"
@@ -111,7 +130,19 @@
         </button>
     </div>
 
-    {#if !isToday()}
+    <!-- Right: Live Clock (when today) or Go to Today button (when not today) -->
+    {#if isToday()}
+        <!-- Live Clock -->
+        <div
+            class="flex items-center gap-2 px-3 py-1.5 bg-primary/5 rounded-lg border border-primary/10"
+        >
+            <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+            <span class="text-xs font-mono font-bold text-primary"
+                >{nowFormatted}</span
+            >
+        </div>
+    {:else}
+        <!-- Go to Today Button -->
         <button
             class="btn btn-sm btn-ghost text-primary hover:bg-primary/10 rounded-lg gap-1.5 transition-all duration-200"
             onclick={goToToday}

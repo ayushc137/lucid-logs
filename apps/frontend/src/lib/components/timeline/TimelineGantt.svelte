@@ -6,15 +6,17 @@
         Pencil,
         GripVertical,
         Clock,
+        MoveHorizontal,
     } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
     import { fade, scale, slide } from "svelte/transition";
     import type { TimelineTask, TimelineProps } from "./types";
+    import { stripHtml } from "$lib/utils";
 
     // Shared components
     import DateNavigator from "./DateNavigator.svelte";
     import CategoryFilter from "./CategoryFilter.svelte";
-    import LiveClock from "./LiveClock.svelte";
+    import TaskPopover from "./TaskPopover.svelte";
 
     let {
         tasks = [],
@@ -820,11 +822,6 @@
 
         <!-- Right: Controls -->
         <div class="flex items-center gap-3">
-            <LiveClock {selectedDate} />
-            {#if isToday()}
-                <div class="h-5 w-px bg-base-300/60"></div>
-            {/if}
-
             <!-- Edit Mode Toggle -->
             <button
                 class="btn btn-sm gap-2 transition-all duration-300 rounded-lg {isEditMode
@@ -879,11 +876,7 @@
                     <span class="text-xs font-semibold">Drag to move</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div
-                        class="flex h-3 w-4 items-center justify-between border-x border-current opacity-60"
-                    >
-                        <div class="w-3 h-px bg-current"></div>
-                    </div>
+                    <MoveHorizontal class="w-4 h-4 opacity-70" />
                     <span class="text-xs font-semibold"
                         >Drag edges to resize</span
                     >
@@ -1174,7 +1167,10 @@
                                             {#if task.description && ROW_HEIGHT > 40}
                                                 <span
                                                     class="text-[10px] opacity-80 truncate"
-                                                    >{task.description}</span
+                                                    >{stripHtml(
+                                                        task.description,
+                                                        { compact: true },
+                                                    )}</span
                                                 >
                                             {/if}
                                         </div>
@@ -1236,61 +1232,9 @@
     </div>
 </div>
 
-<!-- Tooltip - High z-index to ensure visibility -->
+<!-- Task Popover -->
 {#if hovered && tooltipPosition && !dragMode}
-    <div
-        class="fixed z-[9999] pointer-events-none"
-        style="top: {tooltipPosition.y}px; left: {tooltipPosition.x}px;"
-        in:scale={{ duration: 150, start: 0.95, opacity: 0 }}
-    >
-        <div
-            class="bg-base-100/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-200/60 p-4 min-w-[180px] max-w-[260px]"
-        >
-            <div class="flex gap-3">
-                <div
-                    class="w-2 h-2 rounded-full shrink-0 mt-1.5 ring-2 ring-base-200"
-                    style="background-color: {hovered.categoryColor ||
-                        '#6b7280'}"
-                ></div>
-                <div class="min-w-0 flex-1">
-                    <p class="font-bold text-sm leading-snug">
-                        {hovered.title}
-                    </p>
-                    {#if hovered.categoryName}
-                        <p
-                            class="text-[10px] font-bold uppercase tracking-wider text-base-content/40 mt-1"
-                        >
-                            {hovered.categoryName}
-                        </p>
-                    {/if}
-                </div>
-            </div>
-            <div
-                class="flex justify-between items-center mt-3 pt-3 border-t border-base-200/50 text-xs"
-            >
-                <span class="text-base-content/50 font-medium">
-                    {formatTime(hovered.startTime)} – {formatTime(
-                        hovered.endTime,
-                    )}
-                </span>
-                <span
-                    class="font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md"
-                >
-                    {formatDuration(hovered.startTime, hovered.endTime)}
-                </span>
-            </div>
-            {#if hovered.completed}
-                <div
-                    class="flex items-center gap-1.5 mt-2 text-success px-2 py-1 bg-success/5 rounded-md w-fit"
-                >
-                    <Check class="w-3 h-3" />
-                    <span class="text-[10px] font-bold uppercase tracking-wide"
-                        >Completed</span
-                    >
-                </div>
-            {/if}
-        </div>
-    </div>
+    <TaskPopover task={hovered} position={tooltipPosition} />
 {/if}
 
 <style>
