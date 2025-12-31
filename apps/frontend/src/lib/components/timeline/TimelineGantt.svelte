@@ -707,10 +707,21 @@
             label?: string;
         }> = [];
 
+        // Dynamic Label Density: Calculate pixels per hour to prevent overlapping text
+        const pixelsPerHour = containerWidth / hoursInView;
+        let labelStep = 1;
+
+        if (pixelsPerHour < 25)
+            labelStep = 6; // Very tight (e.g., mobile 24h view)
+        else if (pixelsPerHour < 45)
+            labelStep = 3; // Tight
+        else if (pixelsPerHour < 60) labelStep = 2; // Medium
+
         for (let h = 0; h <= 24; h++) {
             // Major hour lines
+            const showLabel = h % labelStep === 0;
             // Don't show label for 24h (end of day) if it's 12 AM
-            const label = h === 24 ? undefined : formatHour(h);
+            const label = h === 24 || !showLabel ? undefined : formatHour(h);
             lines.push({ hour: h, type: "major", label });
 
             if (h < 24) {
@@ -801,27 +812,8 @@
     class:edit-active={isEditMode}
     onwheel={handleWheel}
 >
-    <!-- Header -->
-    <div
-        class="flex items-center justify-between gap-4 px-5 py-3 bg-base-100/95 backdrop-blur-xl border-b border-base-200 z-40 sticky top-0"
-    >
-        <!-- Left: Date Navigation -->
-        <DateNavigator {selectedDate} {onDateChange} />
-
-        <!-- Center: Category Filter -->
-        <div class="flex-1 flex justify-center">
-            <CategoryFilter
-                {categories}
-                totalTaskCount={tasks.length}
-                filteredTaskCount={filteredTasks.length}
-                {uncategorizedCount}
-                selectedCategory={selectedCategoryFilter}
-                onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
-            />
-        </div>
-
-        <!-- Right: Controls -->
-        <div class="flex items-center gap-3">
+    {#snippet controls()}
+        <div class="flex items-center gap-2 sm:gap-3">
             <!-- Edit Mode Toggle -->
             <button
                 class="btn btn-sm gap-2 transition-all duration-300 rounded-lg {isEditMode
@@ -861,6 +853,42 @@
                     <Plus class="w-3 h-3" />
                 </button>
             </div>
+        </div>
+    {/snippet}
+
+    <!-- Header -->
+    <div
+        class="flex flex-col md:flex-row items-center justify-between gap-4 px-4 py-3 bg-base-100/95 backdrop-blur-xl border-b border-base-200 z-40 sticky top-0"
+    >
+        <div class="flex items-center justify-between w-full md:w-auto gap-4">
+            <!-- Left: Date Navigation -->
+            <DateNavigator {selectedDate} {onDateChange} />
+
+            <!-- Controls (Mobile) -->
+            <div class="md:hidden">
+                {@render controls()}
+            </div>
+        </div>
+
+        <!-- Center: Category Filter -->
+        <div
+            class="w-full md:flex-1 flex justify-center order-last md:order-none"
+        >
+            <div class="w-full md:w-auto flex justify-center">
+                <CategoryFilter
+                    {categories}
+                    totalTaskCount={tasks.length}
+                    filteredTaskCount={filteredTasks.length}
+                    {uncategorizedCount}
+                    selectedCategory={selectedCategoryFilter}
+                    onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
+                />
+            </div>
+        </div>
+
+        <!-- Right: Controls (Desktop) -->
+        <div class="hidden md:block">
+            {@render controls()}
         </div>
     </div>
 

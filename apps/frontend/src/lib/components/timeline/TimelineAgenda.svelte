@@ -270,30 +270,53 @@
 >
     <!-- Header -->
     <div
-        class="flex items-center justify-between gap-4 px-5 py-3 bg-base-100/95 backdrop-blur-xl border-b border-base-200 sticky top-0 z-40"
+        class="flex flex-col md:flex-row items-center justify-between gap-4 px-4 py-3 bg-base-100/95 backdrop-blur-xl border-b border-base-200 sticky top-0 z-40"
     >
-        <!-- Left: Date Navigation -->
-        <DateNavigator {selectedDate} {onDateChange} />
+        <div class="flex items-center justify-between w-full md:w-auto gap-4">
+            <!-- Date Navigation -->
+            <DateNavigator {selectedDate} {onDateChange} />
 
-        <!-- Center: Category Filter -->
-        <div class="flex-1 flex justify-center">
-            <CategoryFilter
-                {categories}
-                totalTaskCount={tasks.length}
-                filteredTaskCount={filteredTasks.length}
-                {uncategorizedCount}
-                selectedCategory={selectedCategoryFilter}
-                onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
-            />
+            <!-- Stats (Mobile Compact) -->
+            <div class="flex items-center gap-3 text-xs md:hidden">
+                <span class="text-base-content/60">
+                    <span class="font-bold text-base-content">{totalTasks}</span
+                    >
+                    tasks
+                </span>
+                {#if completedTasks > 0}
+                    <div
+                        class="flex items-center gap-1 text-success font-medium"
+                    >
+                        <Check class="w-3.5 h-3.5" />
+                        {completedTasks}
+                    </div>
+                {/if}
+            </div>
         </div>
 
-        <!-- Right: Stats -->
-        <div class="flex items-center gap-3">
-            <!-- Stats -->
+        <!-- Center: Category Filter -->
+        <div
+            class="w-full md:flex-1 flex justify-center order-last md:order-none"
+        >
+            <div class="w-full md:w-auto flex justify-center">
+                <CategoryFilter
+                    {categories}
+                    totalTaskCount={tasks.length}
+                    filteredTaskCount={filteredTasks.length}
+                    {uncategorizedCount}
+                    selectedCategory={selectedCategoryFilter}
+                    onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
+                />
+            </div>
+        </div>
+
+        <!-- Right: Stats (Desktop) -->
+        <div class="hidden md:flex items-center gap-3">
             <div class="flex items-center gap-3 text-sm">
                 <span class="text-base-content/60">
                     <span class="font-bold text-base-content">{totalTasks}</span
-                    > tasks
+                    >
+                    tasks
                 </span>
                 {#if completedTasks > 0}
                     <div

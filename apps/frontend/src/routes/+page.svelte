@@ -427,25 +427,27 @@
         <div class="join border border-base-300/60 rounded-lg bg-base-100 h-10">
           <button
             type="button"
-            class="join-item btn btn-sm h-full px-4 gap-2 {currentTimelineView ===
+            class="join-item btn btn-sm h-full px-3 sm:px-4 gap-2 {currentTimelineView ===
             'timeline'
               ? 'btn-primary'
               : 'btn-ghost'}"
             onclick={() => handleViewChange("timeline")}
+            title="Timeline View"
           >
             <AlignHorizontalJustifyStart class="w-4 h-4" />
-            <span class="font-medium">Timeline</span>
+            <span class="font-medium hidden sm:inline">Timeline</span>
           </button>
           <button
             type="button"
-            class="join-item btn btn-sm h-full px-4 gap-2 {currentTimelineView ===
+            class="join-item btn btn-sm h-full px-3 sm:px-4 gap-2 {currentTimelineView ===
             'agenda'
               ? 'btn-primary'
               : 'btn-ghost'}"
             onclick={() => handleViewChange("agenda")}
+            title="Agenda View"
           >
             <List class="w-4 h-4" />
-            <span class="font-medium">Agenda</span>
+            <span class="font-medium hidden sm:inline">Agenda</span>
           </button>
         </div>
 
