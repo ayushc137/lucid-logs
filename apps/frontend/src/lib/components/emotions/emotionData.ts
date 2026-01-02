@@ -52,10 +52,10 @@ export const QUADRANT_META: Record<Quadrant, {
     energyLabel: string;
     pleasantnessLabel: string;
 }> = {
-    yellow: { label: 'High Energy Positive', energyLabel: 'High', pleasantnessLabel: 'Pleasant' },
-    green: { label: 'Low Energy Positive', energyLabel: 'Low', pleasantnessLabel: 'Pleasant' },
-    red: { label: 'High Energy Negative', energyLabel: 'High', pleasantnessLabel: 'Unpleasant' },
-    blue: { label: 'Low Energy Negative', energyLabel: 'Low', pleasantnessLabel: 'Unpleasant' }
+    yellow: { label: 'High Energy Pleasant', energyLabel: 'High', pleasantnessLabel: 'Pleasant' },
+    green: { label: 'Low Energy Pleasant', energyLabel: 'Low', pleasantnessLabel: 'Pleasant' },
+    red: { label: 'High Energy Unpleasant', energyLabel: 'High', pleasantnessLabel: 'Unpleasant' },
+    blue: { label: 'Low Energy Unpleasant', energyLabel: 'Low', pleasantnessLabel: 'Unpleasant' }
 };
 
 // Seeded random number generator for consistent procedural shapes

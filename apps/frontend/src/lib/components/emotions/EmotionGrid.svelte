@@ -11,7 +11,12 @@
     import { onMount, onDestroy, tick } from "svelte";
     import panzoom, { type PanZoom } from "panzoom";
     import * as blobs2 from "blobs/v2";
-    import { QUADRANT_COLORS, seededRandom } from "./emotionData";
+    import {
+        QUADRANT_COLORS,
+        QUADRANT_META,
+        seededRandom,
+        type Quadrant,
+    } from "./emotionData";
     import { getEmotionGrid, type Emotion } from "$lib/api/emotions";
     import {
         ZoomIn,
@@ -24,6 +29,7 @@
         Search,
         X,
         Loader2,
+        Target,
     } from "lucide-svelte";
 
     interface Props {
@@ -177,6 +183,53 @@
         // Calculate the new pan position to center the emotion
         const newX = viewportCenterX - btnCenterX * transform.scale;
         const newY = viewportCenterY - btnCenterY * transform.scale;
+        pzInstance.smoothMoveTo(newX, newY);
+    }
+
+    /**
+     * Pan to a specific quadrant center.
+     */
+    function panToQuadrant(quadrant: Quadrant) {
+        if (!pzInstance || !viewportElement || !gridElement) return;
+
+        const viewportRect = viewportElement.getBoundingClientRect();
+        const gridRect = gridElement.getBoundingClientRect();
+        const transform = pzInstance.getTransform();
+
+        // Calculate unscaled grid dimensions
+        const gridWidth = gridRect.width / transform.scale;
+        const gridHeight = gridRect.height / transform.scale;
+
+        let targetXRatio = 0.5;
+        let targetYRatio = 0.5;
+
+        switch (quadrant) {
+            case "red": // Top Left
+                targetXRatio = 0.25;
+                targetYRatio = 0.25;
+                break;
+            case "yellow": // Top Right
+                targetXRatio = 0.75;
+                targetYRatio = 0.25;
+                break;
+            case "blue": // Bottom Left
+                targetXRatio = 0.25;
+                targetYRatio = 0.75;
+                break;
+            case "green": // Bottom Right
+                targetXRatio = 0.75;
+                targetYRatio = 0.75;
+                break;
+        }
+
+        const targetX = gridWidth * targetXRatio;
+        const targetY = gridHeight * targetYRatio;
+
+        const viewportCenterX = viewportRect.width / 2;
+        const viewportCenterY = viewportRect.height / 2;
+
+        const newX = viewportCenterX - targetX * transform.scale;
+        const newY = viewportCenterY - targetY * transform.scale;
 
         pzInstance.smoothMoveTo(newX, newY);
     }
@@ -666,7 +719,7 @@
             <div class="absolute inset-0 pointer-events-none z-10">
                 <!-- Top: High Energy -->
                 <div
-                    class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+                    class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-base-100/30 backdrop-blur-md shadow-md border border-base-content/10"
                 >
                     <ArrowUp size={12} class="text-warning" strokeWidth={2.5} />
                     <span
@@ -676,7 +729,7 @@
                 </div>
                 <!-- Bottom: Low Energy -->
                 <div
-                    class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+                    class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-base-100/30 backdrop-blur-md shadow-md border border-base-content/10"
                 >
                     <ArrowDown size={12} class="text-info" strokeWidth={2.5} />
                     <span
@@ -686,7 +739,7 @@
                 </div>
                 <!-- Left: Unpleasant (vertical) -->
                 <div
-                    class="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-1.5 py-3 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-1.5 py-3 rounded-full bg-base-100/30 backdrop-blur-md shadow-md border border-base-content/10"
                 >
                     <ArrowLeft size={12} class="text-error" strokeWidth={2.5} />
                     <span
@@ -697,7 +750,7 @@
                 </div>
                 <!-- Right: Pleasant (vertical) -->
                 <div
-                    class="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-1.5 py-3 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-1.5 py-3 rounded-full bg-base-100/30 backdrop-blur-md shadow-md border border-base-content/10"
                 >
                     <ArrowRight
                         size={12}
@@ -709,6 +762,51 @@
                         style="writing-mode: vertical-rl;">Pleasant</span
                     >
                 </div>
+
+                <!-- Quadrant Focus Buttons (Pointer events auto) -->
+                <!-- Top Left: Red (High Energy Negative) -->
+                <button
+                    class="absolute top-4 left-4 btn btn-circle btn-xs md:btn-sm shadow-md border border-base-content/10 bg-base-100/30 backdrop-blur-md hover:bg-base-100 pointer-events-auto transition-all hover:scale-110 z-20 tooltip tooltip-right tooltip-error"
+                    style="color: {QUADRANT_COLORS.red.secondary};"
+                    onclick={() => panToQuadrant("red")}
+                    aria-label="Focus {QUADRANT_META.red.label}"
+                    data-tip={QUADRANT_META.red.label}
+                >
+                    <Target class="w-3 h-3 md:w-4 md:h-4" />
+                </button>
+
+                <!-- Top Right: Yellow (High Energy Positive) -->
+                <button
+                    class="absolute top-4 right-4 btn btn-circle btn-xs md:btn-sm shadow-md border border-base-content/10 bg-base-100/30 backdrop-blur-md hover:bg-base-100 pointer-events-auto transition-all hover:scale-110 z-20 tooltip tooltip-left tooltip-warning"
+                    style="color: {QUADRANT_COLORS.yellow.secondary};"
+                    onclick={() => panToQuadrant("yellow")}
+                    aria-label="Focus {QUADRANT_META.yellow.label}"
+                    data-tip={QUADRANT_META.yellow.label}
+                >
+                    <Target class="w-3 h-3 md:w-4 md:h-4" />
+                </button>
+
+                <!-- Bottom Left: Blue (Low Energy Negative) -->
+                <button
+                    class="absolute bottom-4 left-4 btn btn-circle btn-xs md:btn-sm shadow-md border border-base-content/10 bg-base-100/30 backdrop-blur-md hover:bg-base-100 pointer-events-auto transition-all hover:scale-110 z-20 tooltip tooltip-right tooltip-info"
+                    style="color: {QUADRANT_COLORS.blue.secondary};"
+                    onclick={() => panToQuadrant("blue")}
+                    aria-label="Focus {QUADRANT_META.blue.label}"
+                    data-tip={QUADRANT_META.blue.label}
+                >
+                    <Target class="w-3 h-3 md:w-4 md:h-4" />
+                </button>
+
+                <!-- Bottom Right: Green (Low Energy Positive) -->
+                <button
+                    class="absolute bottom-4 right-4 btn btn-circle btn-xs md:btn-sm shadow-md border border-base-content/10 bg-base-100/30 backdrop-blur-md hover:bg-base-100 pointer-events-auto transition-all hover:scale-110 z-20 tooltip tooltip-left tooltip-success"
+                    style="color: {QUADRANT_COLORS.green.secondary};"
+                    onclick={() => panToQuadrant("green")}
+                    aria-label="Focus {QUADRANT_META.green.label}"
+                    data-tip={QUADRANT_META.green.label}
+                >
+                    <Target class="w-3 h-3 md:w-4 md:h-4" />
+                </button>
             </div>
 
             <div
