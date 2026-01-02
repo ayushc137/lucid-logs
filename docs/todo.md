@@ -1,12 +1,27 @@
 the emotuiions are not saving or changing, also pfor posive and negtives hwo tos et emotion 
 also in timeline or agnda the emotion is nto showing also why if nothing shows ai suggestion ???
 
+
+
+
 also how are you showing the infered emotion , show both infered and selected in smae line 
 
+double click should select with confirmation for emotion 
 
 clean emotions page and not required code 
 
-double click should select with confirmatkon 
+
+
+
+
+FIX task ui, make it look better, expand the rick text, moe header back and breadcrumb to page header search and remove searchits not require in taks create and edit keep it only for dahboard 
+
+
+
+
+clean up frontend code fix linting errors and warning, move constants to seperate file, move interfaces to seperate file. add comments 
+make utils where required, make components for reusing items 
+follow and expand design language .md if required 
 
 
 
@@ -21,10 +36,11 @@ when the hover is based on pan center and then user hovers on some other emotion
 make side bar more pretty with anuimation and more cleanup 
 
 fix the username, email throughout and fix edit properly ----------
-
+timezone throught based on 
 
 SET default states in setting for : completed staate, last task, from last task 
-set default time for retro and based ont hat update timeline with default time there as well 
+set default time for retro and based ont hat update timeline with default time zone there as well based on user proefernece in case by defaulpick local 
+
 etc 
 
 

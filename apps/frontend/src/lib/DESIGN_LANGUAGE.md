@@ -431,3 +431,56 @@ import {
 // Shared constants
 import { COLOR_PRESETS, DEFAULT_COLOR, getContrastColor } from "$lib/constants";
 ```
+
+---
+
+## URL State Persistence
+
+To maintain application state across refreshes and shareable links, use the `navigation.ts` utility. This ensures filters, sort options, and other view preferences are persisted in the URL query parameters.
+
+### Usage Pattern
+
+1. **Import Utilities**:
+```typescript
+import { getUrlParams, updateUrlParams, parsers } from "$lib/utils/navigation";
+import { browser } from "$app/environment";
+```
+
+2. **Initialize State**:
+Use `getUrlParams` to set initial values for reactive state variables.
+```typescript
+const initialParams = getUrlParams({
+    q: parsers.string(""),           // String param
+    page: parsers.number(1),         // Number param
+    active: parsers.boolean(true),   // Boolean param
+    date: parsers.dateOnly(new Date()), // Date (YYYY-MM-DD local)
+});
+
+let searchQuery = $state(initialParams.q);
+let page = $state(initialParams.page);
+```
+
+3. **Sync to URL**:
+Use `$effect` to automatically update the URL when state changes.
+```typescript
+$effect(() => {
+    updateUrlParams({
+        q: searchQuery,
+        page: page
+    }, { replace: true, keepFocus: true });
+});
+```
+
+4. **Navigate Back**:
+When constructing "Back" buttons from detail pages, use `sessionStorage` to properly return the user to their previous filtered state if applicable.
+```typescript
+// On navigation TO detail page
+if (browser) {
+    sessionStorage.setItem("referrer", $page.url.pathname + $page.url.search);
+}
+
+// On navigation BACK
+const referrer = sessionStorage.getItem("referrer") || "/default-path";
+goto(referrer);
+```
+

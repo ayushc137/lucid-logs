@@ -35,21 +35,58 @@
   import { getCategories, type Category } from "$lib/api/categories";
   import type { Emotion } from "$lib/api/emotions";
   import { cn } from "$lib/utils";
+  import { goto } from "$app/navigation";
+  import { browser } from "$app/environment";
+  import { page } from "$app/stores";
+  import {
+    getUrlParams,
+    updateUrlParams,
+    parsers,
+  } from "$lib/utils/navigation";
 
-  // Selected date state
-  let selectedDate = $state(new Date());
+  // Selected date state initialized from URL
+    date: parsers.dateOnly(new Date()),
+    view: parsers.string("timeline"),
+  });
 
-  // Helper to format date for API (YYYY-MM-DD)
+  let selectedDate = $state(initialParams.date);
+  let currentTimelineView = $state<TimelineView>(
+    (initialParams.view as TimelineView) || "timeline",
+  );
+
+  function handleViewChange(view: TimelineView) {
+    currentTimelineView = view;
+  }
+
+  // Sync state to URL
+  $effect(() => {
+    // Format as YYYY-MM-DD local time
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+    
+    updateUrlParams({ 
+        date: `${year}-${month}-${day}`,
+        view: currentTimelineView 
+    });
+  });
+
+  // Helper to format date for API (Correctly handles local timezone to UTC)
   function formatDateForApi(date: Date): {
     startOfDay: string;
     endOfDay: string;
   } {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+    // Create date at start of local day (00:00:00)
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    
+    // Create date at end of local day (23:59:59.999)
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    
     return {
-      startOfDay: `${year}-${month}-${day}T00:00:00Z`,
-      endOfDay: `${year}-${month}-${day}T23:59:59Z`,
+      startOfDay: start.toISOString(),
+      endOfDay: end.toISOString(),
     };
   }
 
@@ -132,15 +169,7 @@
   // Filter state
   let selectedCategoryId = $state<string | null>(null);
 
-  // Timeline view state
-  let currentTimelineView = $state<TimelineView>("timeline");
 
-  function handleViewChange(view: TimelineView) {
-    currentTimelineView = view;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("timeline-view-preference", view);
-    }
-  }
 
   // FAB menu state
   let fabOpen = $state(false);
@@ -301,29 +330,26 @@
     selectedCategoryId = null; // Reset filter on date change
   }
 
-  // Handle task click from timeline to open edit modal
+  // Handle task click from timeline - navigate to edit page
   function handleTaskClick(taskId: string) {
-    const allTasksList = allTasks();
-    const timelineTask = allTasksList.find((t) => t.id === taskId);
-    if (timelineTask) {
-      // Find the original API task
-      const apiTask = [
-        ...($tasksQuery.data?.items || []),
-        ...($prevDayTasksQuery.data?.items || []),
-      ].find((t) => t.id === taskId);
-      if (apiTask) {
-        editingTask = apiTask;
-        initialCategoryId = undefined;
-        modalOpen = true;
-      }
+    if (browser) {
+      sessionStorage.setItem(
+        "task-form-referrer",
+        $page.url.pathname + $page.url.search,
+      );
     }
+    goto(`/tasks/${taskId}`);
   }
 
-  // Handle category label click from timeline
+  // Handle category label click from timeline - navigate to create page with category
   function handleCategoryClick(categoryId: string) {
-    editingTask = null;
-    initialCategoryId = categoryId;
-    modalOpen = true;
+    if (browser) {
+      sessionStorage.setItem(
+        "task-form-referrer",
+        $page.url.pathname + $page.url.search,
+      );
+    }
+    goto(`/tasks/create?category=${categoryId}`);
   }
 
   // Handle modal close
@@ -413,9 +439,13 @@
 
   function openTaskModal() {
     fabOpen = false;
-    editingTask = null;
-    initialCategoryId = undefined;
-    modalOpen = true;
+    if (browser) {
+      sessionStorage.setItem(
+        "task-form-referrer",
+        $page.url.pathname + $page.url.search,
+      );
+    }
+    goto("/tasks/create");
   }
 
   // Update task time mutation

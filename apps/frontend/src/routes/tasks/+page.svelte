@@ -13,6 +13,11 @@
     CalendarDays,
   } from "lucide-svelte";
   import {
+    getUrlParams,
+    updateUrlParams,
+    parsers,
+  } from "$lib/utils/navigation";
+  import {
     createQuery,
     createMutation,
     useQueryClient,
@@ -41,37 +46,82 @@
   } from "$lib/components/ui";
   import type { Emotion } from "$lib/api/emotions";
   import { cn } from "$lib/utils";
+  import { goto } from "$app/navigation";
+  import { browser } from "$app/environment";
+  import { page } from "$app/stores";
+  import { onMount } from "svelte";
+
+  // Session storage keys removed favor of URL params
 
   const queryClient = useQueryClient();
 
-  // Today's date for filtering
+  // Today's date for filtering (Local -> ISO)
   const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  const todayStart = `${year}-${month}-${day}T00:00:00Z`;
-  const todayEnd = `${year}-${month}-${day}T23:59:59Z`;
+  const startOfDay = new Date(today);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(today);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const todayStart = startOfDay.toISOString();
+  const todayEnd = endOfDay.toISOString();
+
+  // Initialize state from URL params
+  const initialParams = getUrlParams({
+    q: parsers.string(""),
+    cat: parsers.string("all"),
+    status: parsers.string("all"),
+    prio: parsers.string("all"),
+    show: parsers.boolean(false),
+    today: parsers.boolean(true),
+    from: parsers.string(""),
+    to: parsers.string(""),
+    sort: parsers.string("start_date"),
+    dir: parsers.string("desc"),
+  });
 
   // Search and filter states
-  let searchQuery = $state("");
-  let debouncedSearch = $state("");
-  let filterCategory = $state<string>("all");
-  let filterStatus = $state<"all" | "completed" | "pending">("all");
-  let filterPriority = $state<"all" | "high" | "medium" | "low">("all");
-  let showFilters = $state(false);
+  let searchQuery = $state(initialParams.q);
+  let debouncedSearch = $state(initialParams.q); // Initialize with same valid
+  let filterCategory = $state<string>(initialParams.cat);
+  let filterStatus = $state<"all" | "completed" | "pending">(
+    initialParams.status as any,
+  );
+  let filterPriority = $state<"all" | "high" | "medium" | "low">(
+    initialParams.prio as any,
+  );
+  let showFilters = $state(initialParams.show);
 
-  // Today only toggle - ON by default
-  let todayOnly = $state(true);
+  // Today only toggle
+  let todayOnly = $state(initialParams.today);
 
-  // Date range filter (when todayOnly is off)
-  let dateFrom = $state("");
-  let dateTo = $state("");
+  // Date range filter
+  let dateFrom = $state(initialParams.from);
+  let dateTo = $state(initialParams.to);
 
   // Sort states
   type SortField = "title" | "start_date" | "priority" | "created_at";
   type SortDirection = "asc" | "desc";
-  let sortField = $state<SortField>("start_date");
-  let sortDirection = $state<SortDirection>("desc");
+  let sortField = $state<SortField>(initialParams.sort as SortField);
+  let sortDirection = $state<SortDirection>(initialParams.dir as SortDirection);
+
+  // Sync state to URL params
+  $effect(() => {
+    updateUrlParams(
+      {
+        q: debouncedSearch,
+        cat: filterCategory,
+        status: filterStatus,
+        prio: filterPriority,
+        show: showFilters,
+        today: todayOnly,
+        from: dateFrom,
+        to: dateTo,
+        sort: sortField,
+        dir: sortDirection,
+      },
+      { replace: true, keepFocus: true },
+    );
+  });
 
   // Debounce search input
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -191,13 +241,25 @@
   let pendingUncompleteTask = $state<Task | null>(null);
 
   function openCreateModal() {
-    editingTask = null;
-    modalOpen = true;
+    // Set referrer before navigating (include search params)
+    if (browser) {
+      sessionStorage.setItem(
+        "task-form-referrer",
+        $page.url.pathname + $page.url.search,
+      );
+    }
+    goto("/tasks/create");
   }
 
   function openEditModal(task: Task) {
-    editingTask = task;
-    modalOpen = true;
+    // Set referrer before navigating (include search params)
+    if (browser) {
+      sessionStorage.setItem(
+        "task-form-referrer",
+        $page.url.pathname + $page.url.search,
+      );
+    }
+    goto(`/tasks/${task.id}`);
   }
 
   function handleModalClose() {

@@ -30,12 +30,23 @@
         DEFAULT_COLOR,
         getContrastColor,
     } from "$lib/constants";
+    import {
+        getUrlParams,
+        updateUrlParams,
+        parsers,
+    } from "$lib/utils/navigation";
+    import { browser } from "$app/environment";
 
     const queryClient = useQueryClient();
 
+    // Initialize state from URL
+    const initialParams = getUrlParams({
+        q: parsers.string(""),
+    });
+
     // Search state
-    let searchQuery = $state("");
-    let debouncedSearch = $state("");
+    let searchQuery = $state(initialParams.q);
+    let debouncedSearch = $state(initialParams.q);
     let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
     function handleSearchInput(value: string) {
@@ -45,6 +56,14 @@
             debouncedSearch = value;
         }, 300);
     }
+
+    // Sync state to URL
+    $effect(() => {
+        updateUrlParams(
+            { q: debouncedSearch },
+            { replace: true, keepFocus: true },
+        );
+    });
 
     // Query params
     const queryParams = $derived({
