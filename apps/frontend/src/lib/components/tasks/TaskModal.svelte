@@ -10,12 +10,14 @@
     } from "$lib/api";
     import { createQuery } from "@tanstack/svelte-query";
     import { getCategories, createCategory } from "$lib/api/categories";
+    import { getEmotion, type Emotion } from "$lib/api/emotions";
     import { RichEditor } from "$lib/components/rich-editor";
     import {
         CategoryDropdown,
         ColorPicker,
         ConfirmDialog,
     } from "$lib/components/ui";
+    import { EmotionBadge, QUADRANT_COLORS } from "$lib/components/emotions";
     import { cn } from "$lib/utils";
 
     import {
@@ -32,6 +34,8 @@
         Calendar,
         CircleCheck,
         Circle,
+        Heart,
+        ChevronRight,
     } from "lucide-svelte";
 
     import { onMount, onDestroy } from "svelte";
@@ -42,7 +46,15 @@
         initialCategoryId?: string;
         lastTaskEndTime?: Date | null;
         onClose?: () => void;
+        onOpenEmotionModal?: (context: EmotionSelectionContext) => void;
+        pendingEmotion?: Emotion | null;
     }
+
+    // Context for emotion selection (main task, positive item, negative item)
+    export type EmotionSelectionContext = {
+        type: "task" | "positive" | "negative";
+        index?: number; // For positive/negative items
+    };
 
     let {
         open = $bindable(false),
@@ -50,6 +62,8 @@
         initialCategoryId,
         lastTaskEndTime = null,
         onClose,
+        onOpenEmotionModal,
+        pendingEmotion = null,
     }: Props = $props();
 
     const queryClient = useQueryClient();
@@ -64,6 +78,10 @@
     let newPositive = $state("");
     let newNegative = $state("");
     let completed = $state(false);
+
+    // Emotion state
+    let selectedEmotion = $state<Emotion | null>(null);
+    let emotionContext = $state<EmotionSelectionContext | null>(null);
 
     // Date/time state (times include seconds HH:MM:SS)
     let startDate = $state("");
@@ -194,6 +212,11 @@
             // Include seconds in time (HH:MM:SS)
             startTime = startDateObj.toTimeString().slice(0, 8);
             endTime = endDateObj.toTimeString().slice(0, 8);
+
+            // Load emotion if task has one
+            if (task.emotion_id) {
+                loadTaskEmotion(task.emotion_id);
+            }
         } else if (open) {
             resetForm();
             // Apply initial category if provided
@@ -203,6 +226,34 @@
             if (categories.length === 0 && !$categoriesQuery.isLoading) {
                 showNewCategory = true;
             }
+        }
+    });
+
+    // Handle pending emotion from emotion modal
+    $effect(() => {
+        if (pendingEmotion && emotionContext) {
+            if (emotionContext.type === "task") {
+                selectedEmotion = pendingEmotion;
+            } else if (
+                emotionContext.type === "positive" &&
+                emotionContext.index !== undefined
+            ) {
+                positives = positives.map((p, i) =>
+                    i === emotionContext!.index
+                        ? { ...p, emotion_id: pendingEmotion!.id }
+                        : p,
+                );
+            } else if (
+                emotionContext.type === "negative" &&
+                emotionContext.index !== undefined
+            ) {
+                negatives = negatives.map((n, i) =>
+                    i === emotionContext!.index
+                        ? { ...n, emotion_id: pendingEmotion!.id }
+                        : n,
+                );
+            }
+            emotionContext = null;
         }
     });
 
@@ -233,7 +284,61 @@
         endTime = "10:00:00";
         liveEndTime = false;
         useLastTaskStart = false;
+        selectedEmotion = null;
+        emotionContext = null;
     }
+
+    // Load emotion from API when editing task
+    async function loadTaskEmotion(emotionId: string) {
+        try {
+            selectedEmotion = await getEmotion(emotionId);
+        } catch (e) {
+            console.error("Failed to load task emotion:", e);
+        }
+    }
+
+    // Open emotion modal for task emotion selection
+    function openEmotionForTask() {
+        emotionContext = { type: "task" };
+        open = false; // Close task modal
+        onOpenEmotionModal?.({ type: "task" });
+    }
+
+    // Open emotion modal for positive item
+    function openEmotionForPositive(index: number) {
+        emotionContext = { type: "positive", index };
+        open = false;
+        onOpenEmotionModal?.({ type: "positive", index });
+    }
+
+    // Open emotion modal for negative item
+    function openEmotionForNegative(index: number) {
+        emotionContext = { type: "negative", index };
+        open = false;
+        onOpenEmotionModal?.({ type: "negative", index });
+    }
+
+    // Clear task emotion
+    function clearTaskEmotion() {
+        selectedEmotion = null;
+    }
+
+    // Clear item emotion
+    function clearPositiveEmotion(index: number) {
+        positives = positives.map((p, i) =>
+            i === index ? { ...p, emotion_id: undefined } : p,
+        );
+    }
+
+    function clearNegativeEmotion(index: number) {
+        negatives = negatives.map((n, i) =>
+            i === index ? { ...n, emotion_id: undefined } : n,
+        );
+    }
+
+    // Derived: check if we have inferred emotion but no actual emotion
+    const inferredEmotion = $derived(task?.inferred_emotion);
+    const showInferred = $derived(!selectedEmotion && inferredEmotion);
 
     // Handle completion toggle
     function handleCompletionToggle() {
@@ -304,7 +409,8 @@
             priority: priority || undefined,
             positives: positives.length > 0 ? positives : undefined,
             negatives: negatives.length > 0 ? negatives : undefined,
-            completed: completed, // Add completed here
+            completed: completed,
+            emotion_id: selectedEmotion?.id || undefined,
         };
 
         if (isEditing && task) {
@@ -721,6 +827,70 @@
                     </div>
                 </div>
 
+                <!-- Emotion Selection -->
+                <div class="form-control mb-5">
+                    <label class="label pb-1">
+                        <span
+                            class="label-text text-xs font-semibold uppercase opacity-50 flex items-center gap-1.5"
+                        >
+                            <Heart class="w-3 h-3" />
+                            Emotion
+                        </span>
+                    </label>
+
+                    {#if selectedEmotion}
+                        <!-- Selected Emotion -->
+                        <div
+                            class="bg-base-100 rounded-lg border border-base-300 p-3"
+                        >
+                            <EmotionBadge
+                                name={selectedEmotion.name}
+                                emoji={selectedEmotion.emoji}
+                                quadrant={selectedEmotion.quadrant}
+                                size="md"
+                                removable={true}
+                                onRemove={clearTaskEmotion}
+                                onclick={openEmotionForTask}
+                            />
+                        </div>
+                    {:else if showInferred}
+                        <!-- Inferred Emotion (AI suggested) -->
+                        <button
+                            class="w-full bg-base-100 rounded-lg border border-dashed border-primary/30 p-3 flex items-center justify-between gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                            onclick={openEmotionForTask}
+                        >
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium"
+                                >
+                                    <Sparkles class="w-3 h-3" />
+                                    AI Suggestion
+                                </div>
+                                <span
+                                    class="text-sm font-medium text-base-content/70"
+                                >
+                                    {inferredEmotion?.closest_emotion_name}
+                                </span>
+                            </div>
+                            <div
+                                class="flex items-center gap-1 text-xs text-primary/70 group-hover:text-primary"
+                            >
+                                <span>Set or change</span>
+                                <ChevronRight class="w-3.5 h-3.5" />
+                            </div>
+                        </button>
+                    {:else}
+                        <!-- No Emotion - Click to add -->
+                        <button
+                            class="w-full bg-base-100 rounded-lg border border-dashed border-base-300 p-3 flex items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all text-base-content/50 hover:text-primary"
+                            onclick={openEmotionForTask}
+                        >
+                            <Plus class="w-4 h-4" />
+                            <span class="text-sm font-medium">Add Emotion</span>
+                        </button>
+                    {/if}
+                </div>
+
                 <!-- Reflection -->
                 <div class="form-control">
                     <label class="label pb-1">
@@ -734,38 +904,92 @@
 
                     <!-- Positives -->
                     <div class="mb-3">
-                        <div class="join w-full">
-                            <input
-                                type="text"
+                        <div class="flex items-start gap-2 w-full">
+                            <textarea
                                 bind:value={newPositive}
-                                placeholder="Add a win..."
-                                class="input input-sm input-bordered join-item flex-1 bg-success/5 border-success/30 focus:border-success"
-                                onkeydown={(e) =>
-                                    e.key === "Enter" &&
-                                    (e.preventDefault(), addPositive())}
-                            />
+                                placeholder="What went well? Add a win..."
+                                class="textarea textarea-sm textarea-bordered flex-1 bg-success/5 border-success/30 focus:border-success min-h-[60px] resize-y"
+                                rows="2"
+                                onkeydown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        addPositive();
+                                    }
+                                }}
+                            ></textarea>
                             <button
-                                class="btn btn-sm btn-ghost join-item text-success"
+                                class="btn btn-sm btn-ghost text-success shrink-0"
                                 onclick={addPositive}
+                                title="Add positive"
                             >
                                 <Plus class="w-4 h-4" />
                             </button>
                         </div>
+                        <p class="text-[10px] text-base-content/40 mt-1 ml-1">
+                            Press Enter to add, Shift+Enter for new line
+                        </p>
                         {#if positives.length > 0}
-                            <div class="flex flex-wrap gap-1.5 mt-2">
+                            <div class="flex flex-col gap-2 mt-2">
                                 {#each positives as p, i}
-                                    <span
-                                        class="badge badge-sm bg-success/10 text-success gap-1 pr-1 animate-fade-in"
+                                    <div
+                                        class="rounded-lg bg-success/10 border border-success/20 p-2.5 animate-fade-in"
                                     >
-                                        <ThumbsUp class="w-2.5 h-2.5" />
-                                        {p.text}
-                                        <button
-                                            onclick={() => removePositive(i)}
-                                            class="hover:bg-success/20 rounded p-0.5"
-                                        >
-                                            <X class="w-2.5 h-2.5" />
-                                        </button>
-                                    </span>
+                                        <div class="flex items-start gap-2">
+                                            <ThumbsUp
+                                                class="w-3.5 h-3.5 text-success shrink-0 mt-0.5"
+                                            />
+                                            <p
+                                                class="flex-1 text-sm text-success-content/90 whitespace-pre-wrap break-words"
+                                            >
+                                                {p.text}
+                                            </p>
+                                            <button
+                                                onclick={() =>
+                                                    removePositive(i)}
+                                                class="btn btn-ghost btn-xs text-success/60 hover:text-success hover:bg-success/20"
+                                                title="Remove"
+                                            >
+                                                <X class="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <!-- Emotion for this positive -->
+                                        <div class="mt-2 pl-5">
+                                            {#if p.emotion_id}
+                                                <button
+                                                    class="text-xs text-success/70 hover:text-success flex items-center gap-1"
+                                                    onclick={() =>
+                                                        openEmotionForPositive(
+                                                            i,
+                                                        )}
+                                                >
+                                                    <Heart
+                                                        class="w-2.5 h-2.5"
+                                                    />
+                                                    <span>Emotion set</span>
+                                                    <X
+                                                        class="w-2.5 h-2.5 ml-1 hover:text-error"
+                                                        onclick={(e) => {
+                                                            e.stopPropagation();
+                                                            clearPositiveEmotion(
+                                                                i,
+                                                            );
+                                                        }}
+                                                    />
+                                                </button>
+                                            {:else}
+                                                <button
+                                                    class="text-[10px] text-base-content/40 hover:text-success flex items-center gap-1"
+                                                    onclick={() =>
+                                                        openEmotionForPositive(
+                                                            i,
+                                                        )}
+                                                >
+                                                    <Plus class="w-2.5 h-2.5" />
+                                                    <span>Add emotion</span>
+                                                </button>
+                                            {/if}
+                                        </div>
+                                    </div>
                                 {/each}
                             </div>
                         {/if}
@@ -773,38 +997,92 @@
 
                     <!-- Negatives -->
                     <div>
-                        <div class="join w-full">
-                            <input
-                                type="text"
+                        <div class="flex items-start gap-2 w-full">
+                            <textarea
                                 bind:value={newNegative}
-                                placeholder="Add an improvement..."
-                                class="input input-sm input-bordered join-item flex-1 bg-error/5 border-error/30 focus:border-error"
-                                onkeydown={(e) =>
-                                    e.key === "Enter" &&
-                                    (e.preventDefault(), addNegative())}
-                            />
+                                placeholder="What could improve? Add a lesson..."
+                                class="textarea textarea-sm textarea-bordered flex-1 bg-error/5 border-error/30 focus:border-error min-h-[60px] resize-y"
+                                rows="2"
+                                onkeydown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        addNegative();
+                                    }
+                                }}
+                            ></textarea>
                             <button
-                                class="btn btn-sm btn-ghost join-item text-error"
+                                class="btn btn-sm btn-ghost text-error shrink-0"
                                 onclick={addNegative}
+                                title="Add improvement"
                             >
                                 <Plus class="w-4 h-4" />
                             </button>
                         </div>
+                        <p class="text-[10px] text-base-content/40 mt-1 ml-1">
+                            Press Enter to add, Shift+Enter for new line
+                        </p>
                         {#if negatives.length > 0}
-                            <div class="flex flex-wrap gap-1.5 mt-2">
+                            <div class="flex flex-col gap-2 mt-2">
                                 {#each negatives as n, i}
-                                    <span
-                                        class="badge badge-sm bg-error/10 text-error gap-1 pr-1 animate-fade-in"
+                                    <div
+                                        class="rounded-lg bg-error/10 border border-error/20 p-2.5 animate-fade-in"
                                     >
-                                        <ThumbsDown class="w-2.5 h-2.5" />
-                                        {n.text}
-                                        <button
-                                            onclick={() => removeNegative(i)}
-                                            class="hover:bg-error/20 rounded p-0.5"
-                                        >
-                                            <X class="w-2.5 h-2.5" />
-                                        </button>
-                                    </span>
+                                        <div class="flex items-start gap-2">
+                                            <ThumbsDown
+                                                class="w-3.5 h-3.5 text-error shrink-0 mt-0.5"
+                                            />
+                                            <p
+                                                class="flex-1 text-sm text-error-content/90 whitespace-pre-wrap break-words"
+                                            >
+                                                {n.text}
+                                            </p>
+                                            <button
+                                                onclick={() =>
+                                                    removeNegative(i)}
+                                                class="btn btn-ghost btn-xs text-error/60 hover:text-error hover:bg-error/20"
+                                                title="Remove"
+                                            >
+                                                <X class="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <!-- Emotion for this negative -->
+                                        <div class="mt-2 pl-5">
+                                            {#if n.emotion_id}
+                                                <button
+                                                    class="text-xs text-error/70 hover:text-error flex items-center gap-1"
+                                                    onclick={() =>
+                                                        openEmotionForNegative(
+                                                            i,
+                                                        )}
+                                                >
+                                                    <Heart
+                                                        class="w-2.5 h-2.5"
+                                                    />
+                                                    <span>Emotion set</span>
+                                                    <X
+                                                        class="w-2.5 h-2.5 ml-1 hover:text-base-content"
+                                                        onclick={(e) => {
+                                                            e.stopPropagation();
+                                                            clearNegativeEmotion(
+                                                                i,
+                                                            );
+                                                        }}
+                                                    />
+                                                </button>
+                                            {:else}
+                                                <button
+                                                    class="text-[10px] text-base-content/40 hover:text-error flex items-center gap-1"
+                                                    onclick={() =>
+                                                        openEmotionForNegative(
+                                                            i,
+                                                        )}
+                                                >
+                                                    <Plus class="w-2.5 h-2.5" />
+                                                    <span>Add emotion</span>
+                                                </button>
+                                            {/if}
+                                        </div>
+                                    </div>
                                 {/each}
                             </div>
                         {/if}

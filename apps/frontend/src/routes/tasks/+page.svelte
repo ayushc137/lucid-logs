@@ -25,7 +25,11 @@
     type Task,
     type TaskFilterParams,
   } from "$lib/api";
-  import { TaskModal } from "$lib/components/tasks";
+  import {
+    TaskModal,
+    type EmotionSelectionContext,
+  } from "$lib/components/tasks";
+  import { EmotionModal } from "$lib/components/emotions";
   import {
     CategoryDropdown,
     StatusDropdown,
@@ -35,6 +39,7 @@
     DataTable,
     SortableHeader,
   } from "$lib/components/ui";
+  import type { Emotion } from "$lib/api/emotions";
   import { cn } from "$lib/utils";
 
   const queryClient = useQueryClient();
@@ -198,7 +203,33 @@
   function handleModalClose() {
     modalOpen = false;
     editingTask = null;
+    pendingEmotion = null;
     $tasksQuery.refetch(); // Refresh after modal closes
+  }
+
+  // Emotion modal state (for modal switching)
+  let emotionModalOpen = $state(false);
+  let pendingEmotion = $state<Emotion | null>(null);
+  let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
+
+  // Handle opening emotion modal from TaskModal
+  function handleOpenEmotionModal(context: EmotionSelectionContext) {
+    emotionSelectionContext = context;
+    emotionModalOpen = true;
+  }
+
+  // Handle emotion selection from EmotionModal
+  function handleEmotionSelect(emotion: Emotion) {
+    pendingEmotion = emotion;
+    emotionModalOpen = false;
+    modalOpen = true; // Reopen task modal
+  }
+
+  // Handle emotion modal close (cancelled)
+  function handleEmotionModalClose() {
+    emotionModalOpen = false;
+    modalOpen = true; // Reopen task modal without selection
+    emotionSelectionContext = null;
   }
 
   function confirmDelete(id: string, e: Event) {
@@ -729,6 +760,15 @@
   bind:open={modalOpen}
   task={editingTask}
   onClose={handleModalClose}
+  onOpenEmotionModal={handleOpenEmotionModal}
+  {pendingEmotion}
+/>
+
+<!-- Emotion Modal (separate from task modal) -->
+<EmotionModal
+  bind:open={emotionModalOpen}
+  onSelect={handleEmotionSelect}
+  onClose={handleEmotionModalClose}
 />
 
 <!-- Delete Dialog -->

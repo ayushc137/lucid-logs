@@ -9,6 +9,14 @@ export interface TimelineTask {
     completed?: boolean;
     emoji?: string;
     categoryId?: string;
+    // Emotion fields
+    emotionId?: string;
+    emotionName?: string;
+    emotionEmoji?: string;
+    emotionQuadrant?: 'yellow' | 'green' | 'red' | 'blue';
+    // Inferred emotion (AI suggested from positives/negatives)
+    inferredEmotionName?: string;
+    inferredEmotionId?: string;
 }
 
 export interface TimelineProps {

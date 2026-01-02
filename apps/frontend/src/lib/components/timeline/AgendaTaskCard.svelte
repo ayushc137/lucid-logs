@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { Check, ArrowRight } from "lucide-svelte";
+    import { Check, ArrowRight, Sparkles } from "lucide-svelte";
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import type { TimelineTask } from "./types";
     import { stripHtml } from "$lib/utils";
+    import { EmotionBadge } from "$lib/components/emotions";
 
     interface Props {
         task: TimelineTask;
@@ -16,6 +17,17 @@
 
     const bg = $derived(task.categoryColor || "#6b7280");
     const isCompleted = $derived(task.completed);
+
+    // Determine emotion to display (actual or inferred)
+    const hasActualEmotion = $derived(
+        !!task.emotionId &&
+            !!task.emotionName &&
+            !!task.emotionEmoji &&
+            !!task.emotionQuadrant,
+    );
+    const hasInferredEmotion = $derived(
+        !hasActualEmotion && !!task.inferredEmotionName,
+    );
 
     function formatTime(d: Date): string {
         if (!(d instanceof Date) || isNaN(d.getTime())) return "--:--";
@@ -108,19 +120,43 @@
                 </p>
             {/if}
 
-            {#if task.categoryName}
-                <div class="flex items-center gap-1.5 mt-1">
+            <!-- Category & Emotion Row -->
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                {#if task.categoryName}
+                    <div class="flex items-center gap-1.5">
+                        <div
+                            class="w-2 h-2 rounded-full shrink-0"
+                            style="background-color: {bg};"
+                        ></div>
+                        <span
+                            class="text-[11px] font-medium text-base-content/50 truncate"
+                        >
+                            {task.categoryName}
+                        </span>
+                    </div>
+                {/if}
+
+                <!-- Emotion Badge -->
+                {#if hasActualEmotion}
+                    <EmotionBadge
+                        name={task.emotionName!}
+                        emoji={task.emotionEmoji!}
+                        quadrant={task.emotionQuadrant!}
+                        size="xs"
+                    />
+                {:else if hasInferredEmotion}
+                    <!-- Inferred emotion indicator (simplified) -->
                     <div
-                        class="w-2 h-2 rounded-full shrink-0"
-                        style="background-color: {bg};"
-                    ></div>
-                    <span
-                        class="text-[11px] font-medium text-base-content/50 truncate"
+                        class="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary/70"
+                        title="AI inferred emotion from your reflection"
                     >
-                        {task.categoryName}
-                    </span>
-                </div>
-            {/if}
+                        <Sparkles class="w-2.5 h-2.5" />
+                        <span class="truncate max-w-[80px]"
+                            >{task.inferredEmotionName}</span
+                        >
+                    </div>
+                {/if}
+            </div>
         </div>
 
         <!-- Status Indicator -->

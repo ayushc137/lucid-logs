@@ -1,7 +1,18 @@
+the emotuiions are not saving or changing, also pfor posive and negtives hwo tos et emotion 
+also in timeline or agnda the emotion is nto showing also why if nothing shows ai suggestion ???
 
-Bored (E95): 1F611 (😑) -> 1F971 (🥱 Yawning Face). More active representation.
-Belonging (E35): 1F3E1 (🏡) -> 1F9E9 (🧩 Puzzle Piece). Metaphor: Fitting in perfectly.
-tranquil ? 
+also how are you showing the infered emotion , show both infered and selected in smae line 
+
+
+clean emotions page and not required code 
+
+double click should select with confirmatkon 
+
+
+
+
+
+
 
 Modals are not rendering over sidebar 
 

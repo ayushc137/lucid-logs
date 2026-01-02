@@ -15,7 +15,11 @@
     type TimelineView,
   } from "$lib/components/timeline";
   import { AlignHorizontalJustifyStart, List } from "lucide-svelte";
-  import { TaskModal } from "$lib/components/tasks";
+  import {
+    TaskModal,
+    type EmotionSelectionContext,
+  } from "$lib/components/tasks";
+  import { EmotionModal } from "$lib/components/emotions";
   import {
     Card,
     IconBox,
@@ -29,6 +33,7 @@
   } from "@tanstack/svelte-query";
   import { getTasks, updateTask, type Task } from "$lib/api";
   import { getCategories, type Category } from "$lib/api/categories";
+  import type { Emotion } from "$lib/api/emotions";
   import { cn } from "$lib/utils";
 
   // Selected date state
@@ -152,6 +157,13 @@
     completed?: boolean;
     emoji?: string;
     categoryId?: string;
+    // Emotion fields
+    emotionId?: string;
+    emotionName?: string;
+    emotionEmoji?: string;
+    emotionQuadrant?: "yellow" | "green" | "red" | "blue";
+    inferredEmotionName?: string;
+    inferredEmotionId?: string;
   };
 
   function transformTasks(apiTasks: Task[]): TimelineTask[] {
@@ -174,6 +186,11 @@
         completed: task.completed,
         emoji: task.completed ? "✓" : undefined,
         categoryId: task.category?.id,
+        // Emotion data - we'll need to fetch the full emotion data if only ID is stored
+        // For now, we use inferred emotion name from the API response
+        emotionId: task.emotion_id,
+        inferredEmotionName: task.inferred_emotion?.closest_emotion_name,
+        inferredEmotionId: task.inferred_emotion?.closest_emotion_id,
       };
     });
   }
@@ -261,6 +278,11 @@
   let showUncompleteConfirm = $state(false);
   let pendingUncompleteTaskId = $state<string | null>(null);
 
+  // Emotion modal state (for modal switching)
+  let emotionModalOpen = $state(false);
+  let pendingEmotion = $state<Emotion | null>(null);
+  let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
+
   // Toggle complete mutation
   const queryClient = useQueryClient();
   const toggleCompleteMut = createMutation({
@@ -309,8 +331,29 @@
     modalOpen = false;
     editingTask = null;
     initialCategoryId = undefined;
+    pendingEmotion = null; // Clear pending emotion
     queryClient.invalidateQueries({ queryKey: ["tasks", "timeline"] });
     queryClient.invalidateQueries({ queryKey: ["tasks", "timeline-prev"] });
+  }
+
+  // Handle opening emotion modal from TaskModal
+  function handleOpenEmotionModal(context: EmotionSelectionContext) {
+    emotionSelectionContext = context;
+    emotionModalOpen = true;
+  }
+
+  // Handle emotion selection from EmotionModal
+  function handleEmotionSelect(emotion: Emotion) {
+    pendingEmotion = emotion;
+    emotionModalOpen = false;
+    modalOpen = true; // Reopen task modal
+  }
+
+  // Handle emotion modal close (cancelled)
+  function handleEmotionModalClose() {
+    emotionModalOpen = false;
+    modalOpen = true; // Reopen task modal without selection
+    emotionSelectionContext = null;
   }
 
   // Handle toggle complete from timeline
@@ -675,6 +718,15 @@
   {initialCategoryId}
   lastTaskEndTime={lastTaskEndTime()}
   onClose={handleModalClose}
+  onOpenEmotionModal={handleOpenEmotionModal}
+  {pendingEmotion}
+/>
+
+<!-- Emotion Modal (separate from task modal) -->
+<EmotionModal
+  bind:open={emotionModalOpen}
+  onSelect={handleEmotionSelect}
+  onClose={handleEmotionModalClose}
 />
 <ConfirmDialog
   bind:open={showUncompleteConfirm}
