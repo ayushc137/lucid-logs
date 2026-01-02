@@ -79,7 +79,7 @@
         >
             <!-- Header -->
             <div
-                class="flex items-start justify-between gap-3 px-5 py-4 border-b border-base-300 shrink-0 min-h-20"
+                class="flex items-start justify-between gap-4 px-5 py-4 border-b border-base-300 shrink-0 min-h-20 bg-gradient-to-r from-base-200/50 to-transparent"
             >
                 {#if displayEmotion}
                     {@const colors = QUADRANT_COLORS[displayEmotion.quadrant]}
@@ -87,9 +87,9 @@
                     {@const isSelected =
                         selectedEmotion?.id === displayEmotion.id}
 
-                    <div class="flex items-start gap-3.5 flex-1">
+                    <div class="flex items-start gap-4 flex-1">
                         <div
-                            class="w-13 h-13 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300"
+                            class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300 shadow-lg"
                             style="background: {colors.gradient};"
                         >
                             <span
@@ -99,54 +99,64 @@
                         </div>
 
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 mb-1">
-                                <h3 class="text-lg font-semibold m-0">
+                            <div
+                                class="flex items-center gap-2 mb-1.5 flex-wrap"
+                            >
+                                <h3
+                                    class="text-xl font-bold m-0 tracking-tight"
+                                >
                                     {displayEmotion.name}
                                 </h3>
                                 {#if isSelected}
                                     <span
-                                        class="text-[0.6rem] px-2 py-0.5 bg-primary text-white rounded-lg font-medium uppercase tracking-wide"
-                                        >Selected</span
+                                        class="text-[0.6rem] px-2.5 py-1 bg-primary text-primary-content rounded-full font-semibold uppercase tracking-wide shadow-sm"
+                                        >✓ Selected</span
                                     >
                                 {/if}
-                            </div>
-                            <p class="m-0 text-sm opacity-70 leading-relaxed">
-                                {displayEmotion.description}
-                            </p>
-                            {#if showIndicators && dots.length > 0}
-                                <div class="flex gap-1.5 mt-2 flex-wrap">
+                                {#if showIndicators}
                                     {#each dots as d}
                                         <span
-                                            class="text-[0.6rem] px-2 py-0.5 rounded-lg font-medium"
+                                            class="text-[0.55rem] px-1.5 py-0.5 rounded-full font-medium"
                                             style="background: color-mix(in srgb, {d.color} 15%, transparent); color: color-mix(in srgb, {d.color} 80%, var(--bc, #333));"
                                             >{d.label}</span
                                         >
                                     {/each}
-                                </div>
-                            {/if}
+                                {/if}
+                            </div>
+                            <p
+                                class="m-0 text-sm text-base-content/70 leading-relaxed"
+                            >
+                                {displayEmotion.description}
+                            </p>
                         </div>
                     </div>
                 {:else}
-                    <div class="flex items-start gap-3.5 flex-1">
+                    <div class="flex items-start gap-4 flex-1">
                         <div
-                            class="w-13 h-13 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-indigo-200 to-indigo-300 text-indigo-500"
+                            class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 border border-base-300/50"
                         >
-                            <Heart size={22} strokeWidth={2} />
+                            <Heart
+                                size={24}
+                                strokeWidth={1.5}
+                                class="text-primary/60"
+                            />
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-lg font-semibold m-0">
+                            <h3 class="text-xl font-bold m-0 tracking-tight">
                                 How are you feeling?
                             </h3>
-                            <p class="m-0 text-sm opacity-70 leading-relaxed">
-                                Pan around the grid or hover over an emotion to
-                                see details
+                            <p
+                                class="m-0 text-sm text-base-content/60 leading-relaxed mt-1"
+                            >
+                                Explore the grid below. Hover or tap an emotion
+                                to preview, then click to select.
                             </p>
                         </div>
                     </div>
                 {/if}
 
                 <button
-                    class="btn btn-ghost btn-sm btn-circle"
+                    class="btn btn-ghost btn-sm btn-circle hover:bg-base-300/50"
                     onclick={handleClose}
                 >
                     <X class="w-5 h-5" />
@@ -159,33 +169,66 @@
                     bind:selectedEmotion
                     onSelect={handleSelect}
                     onHoveredChange={handleHoveredChange}
-                    {showIndicators}
+                    bind:showIndicators
                 />
             </div>
 
             <!-- Footer -->
             <div
-                class="flex items-center gap-2 px-4 py-3 border-t border-base-300 shrink-0"
+                class="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-base-300 shrink-0 bg-base-200/30"
             >
-                {#if selectedEmotion}
-                    <button
-                        class="btn btn-ghost btn-sm"
-                        onclick={clearSelection}
-                    >
-                        Clear
+                <div class="flex items-center gap-2">
+                    {#if selectedEmotion}
+                        {@const colors =
+                            QUADRANT_COLORS[selectedEmotion.quadrant]}
+                        <div
+                            class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-base-100 border border-base-300"
+                        >
+                            <div
+                                class="w-5 h-5 rounded-full flex items-center justify-center text-xs"
+                                style="background: {colors.gradient};"
+                            >
+                                <span
+                                    class="font-['OpenMojiColor'] text-[0.7rem]"
+                                    >{selectedEmotion.emoji}</span
+                                >
+                            </div>
+                            <span class="text-sm font-medium"
+                                >{selectedEmotion.name}</span
+                            >
+                            <button
+                                class="ml-1 p-0.5 rounded-full hover:bg-base-300 transition-colors"
+                                onclick={clearSelection}
+                                title="Reset selection"
+                            >
+                                <X
+                                    class="w-3.5 h-3.5 opacity-60 hover:opacity-100"
+                                />
+                            </button>
+                        </div>
+                    {:else}
+                        <span class="text-sm text-base-content/50 italic"
+                            >No emotion selected</span
+                        >
+                    {/if}
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button class="btn btn-ghost btn-sm" onclick={handleClose}>
+                        Cancel
                     </button>
-                {/if}
-                <div class="flex-1"></div>
-                <button class="btn btn-ghost btn-sm" onclick={handleClose}>
-                    Cancel
-                </button>
-                <button
-                    class="btn btn-primary btn-sm"
-                    onclick={handleConfirm}
-                    disabled={!selectedEmotion}
-                >
-                    Confirm
-                </button>
+                    <button
+                        class="btn btn-primary btn-sm min-w-[100px]"
+                        onclick={handleConfirm}
+                        disabled={!selectedEmotion}
+                    >
+                        {#if selectedEmotion}
+                            Confirm
+                        {:else}
+                            Select One
+                        {/if}
+                    </button>
+                </div>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop bg-base-content/20">

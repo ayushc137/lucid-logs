@@ -15,7 +15,15 @@
         EMOTIONS,
         seededRandom,
     } from "./emotionData";
-    import { ZoomIn, ZoomOut, RotateCcw } from "lucide-svelte";
+    import {
+        ZoomIn,
+        ZoomOut,
+        RotateCcw,
+        ArrowUp,
+        ArrowDown,
+        ArrowLeft,
+        ArrowRight,
+    } from "lucide-svelte";
 
     interface Props {
         selectedEmotion?: Emotion | null;
@@ -27,7 +35,7 @@
     let {
         selectedEmotion = null,
         onSelect,
-        showIndicators = false,
+        showIndicators = $bindable(false),
         onHoveredChange,
     }: Props = $props();
 
@@ -347,16 +355,73 @@
 
     <!-- Panzoom viewport -->
     <div
-        class="flex-1 overflow-hidden rounded-2xl bg-gray-500/[0.02] cursor-grab active:cursor-grabbing"
+        class="flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-base-200/40 to-base-300/30 cursor-grab active:cursor-grabbing relative"
         bind:this={viewportElement}
     >
+        <!-- Floating Axis Labels -->
+        <div class="absolute inset-0 pointer-events-none z-10">
+            <!-- Top: High Energy -->
+            <div
+                class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+            >
+                <ArrowUp size={12} class="text-warning" strokeWidth={2.5} />
+                <span
+                    class="text-[0.65rem] font-semibold uppercase tracking-wider text-warning"
+                    >High Energy</span
+                >
+            </div>
+            <!-- Bottom: Low Energy -->
+            <div
+                class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1.5 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+            >
+                <ArrowDown size={12} class="text-info" strokeWidth={2.5} />
+                <span
+                    class="text-[0.65rem] font-semibold uppercase tracking-wider text-info"
+                    >Low Energy</span
+                >
+            </div>
+            <!-- Left: Unpleasant (vertical) -->
+            <div
+                class="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-1.5 py-3 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+            >
+                <ArrowLeft size={12} class="text-error" strokeWidth={2.5} />
+                <span
+                    class="text-[0.6rem] font-semibold uppercase tracking-wider text-error"
+                    style="writing-mode: vertical-rl; transform: rotate(180deg);"
+                    >Unpleasant</span
+                >
+            </div>
+            <!-- Right: Pleasant (vertical) -->
+            <div
+                class="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-1.5 py-3 rounded-full bg-base-100/90 backdrop-blur-sm shadow-sm border border-base-300/50"
+            >
+                <ArrowRight size={12} class="text-success" strokeWidth={2.5} />
+                <span
+                    class="text-[0.6rem] font-semibold uppercase tracking-wider text-success"
+                    style="writing-mode: vertical-rl;">Pleasant</span
+                >
+            </div>
+        </div>
+
         <div
-            class="grid grid-cols-10 gap-3.5 p-5 md:gap-4 md:p-6 lg:gap-[18px] lg:p-7"
+            class="grid grid-cols-10 gap-3.5 p-5 md:gap-4 md:p-6 lg:gap-[18px] lg:p-7 relative"
             bind:this={gridElement}
         >
+            <!-- Grid Lines (Quadrant Dividers) -->
+            <div class="absolute inset-0 pointer-events-none z-[1]">
+                <!-- Vertical center line -->
+                <div
+                    class="absolute left-1/2 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-base-content/20 to-transparent"
+                ></div>
+                <!-- Horizontal center line -->
+                <div
+                    class="absolute top-1/2 left-4 right-4 h-px bg-gradient-to-r from-transparent via-base-content/20 to-transparent"
+                ></div>
+            </div>
+
             {#each grid as row}
                 {#each row as emotion}
-                    <div class="aspect-square">
+                    <div class="aspect-square relative z-[2]">
                         {#if emotion}
                             {@const isHovered =
                                 hoveredEmotion?.id === emotion.id}
@@ -378,8 +443,18 @@
                                 onmouseenter={(e) => onMouseEnter(e, emotion)}
                                 onmousemove={onMouseMove}
                                 onmouseleave={onMouseLeave}
-                                style="--glow: {colors.glow}; --speed: {animSpeed}s;"
+                                style="--glow: {colors.glow}; --speed: {animSpeed}s; --primary: {colors.primary};"
                             >
+                                <!-- Selected state ring -->
+                                {#if isSelected}
+                                    <div
+                                        class="absolute -inset-1.5 rounded-2xl border-2 border-primary animate-pulse pointer-events-none z-[5]"
+                                    ></div>
+                                    <div
+                                        class="absolute -inset-2.5 rounded-2xl bg-primary/10 pointer-events-none z-[4]"
+                                    ></div>
+                                {/if}
+
                                 <div
                                     class="absolute -inset-[12%] w-[124%] h-[124%] pointer-events-none"
                                 >
@@ -451,10 +526,11 @@
                                 >
                                     <span
                                         class="emoji font-['OpenMojiColor','Segoe_UI_Emoji','Apple_Color_Emoji',sans-serif] text-[clamp(1rem,2.2vw,1.5rem)] leading-none transition-transform duration-200"
+                                        class:scale-110={isSelected}
                                         >{emotion.emoji}</span
                                     >
                                     <span
-                                        class="name text-[clamp(0.32rem,0.55vw,0.42rem)] font-semibold text-white uppercase max-w-full overflow-hidden text-ellipsis whitespace-nowrap hidden sm:inline"
+                                        class="name text-[clamp(0.5rem,1vw,0.7rem)] font-semibold text-white uppercase max-w-full overflow-hidden text-ellipsis whitespace-nowrap hidden sm:inline"
                                         style="text-shadow: 0 1px 2px rgba(0,0,0,0.7);"
                                         >{emotion.name}</span
                                     >
@@ -473,7 +549,7 @@
     {@const colors = QUADRANT_COLORS[hoveredEmotion.quadrant]}
     {@const dots = getIndicatorDots(hoveredEmotion)}
     <div
-        class="fixed z-[100000] min-w-[180px] max-w-[260px] bg-white dark:bg-slate-800 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] overflow-hidden pointer-events-none animate-[tooltipIn_0.12s_ease-out]"
+        class="fixed z-[100000] min-w-[180px] max-w-[260px] bg-base-100 text-base-content rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-base-300 overflow-hidden pointer-events-none animate-[tooltipIn_0.12s_ease-out]"
         style="left: {tooltipPosition.x}px; top: {tooltipPosition.y}px;"
         use:portal
     >
@@ -488,7 +564,7 @@
             <strong class="text-sm">{hoveredEmotion.name}</strong>
         </div>
         <div class="px-3 py-2.5">
-            <p class="m-0 text-xs opacity-70 leading-relaxed">
+            <p class="m-0 text-xs text-base-content/70 leading-relaxed">
                 {hoveredEmotion.description}
             </p>
             {#if showIndicators && dots.length > 0}
@@ -496,7 +572,7 @@
                     {#each dots as d}
                         <span
                             class="text-[0.58rem] px-1.5 py-0.5 rounded-lg font-medium"
-                            style="background: color-mix(in srgb, {d.color} 15%, transparent); color: color-mix(in srgb, {d.color} 80%, #333);"
+                            style="background: color-mix(in srgb, {d.color} 15%, transparent); color: color-mix(in srgb, {d.color} 80%, var(--bc, #333));"
                             >{d.label}</span
                         >
                     {/each}
@@ -519,24 +595,75 @@
         }
     }
 
+    @keyframes selectedGlow {
+        0%,
+        100% {
+            filter: drop-shadow(0 0 12px var(--glow))
+                drop-shadow(0 0 24px var(--glow));
+        }
+        50% {
+            filter: drop-shadow(0 0 18px var(--glow))
+                drop-shadow(0 0 32px var(--glow));
+        }
+    }
+
+    @keyframes hoverPulse {
+        0%,
+        100% {
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 12px var(--glow))
+                drop-shadow(0 0 24px var(--glow));
+        }
+        50% {
+            transform: scale(1.18);
+            filter: drop-shadow(0 0 18px var(--glow))
+                drop-shadow(0 0 32px var(--glow));
+        }
+    }
+
+    @keyframes emojiBounce {
+        0%,
+        100% {
+            transform: scale(1.2) translateY(0);
+        }
+        50% {
+            transform: scale(1.25) translateY(-2px);
+        }
+    }
+
     .blob-svg {
         opacity: var(--opacity, 0.8);
         transform: translate(var(--ox, 0), var(--oy, 0))
             rotate(var(--rot, 0deg)) scale(var(--scale, 1));
+        transition:
+            opacity 0.3s ease,
+            filter 0.3s ease;
     }
 
     .blob-path {
         transition: d 0.4s ease;
     }
 
+    .emotion-btn {
+        transition:
+            transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+            filter 0.25s ease;
+    }
+
     .emotion-btn:hover,
     .emotion-btn.auto-hovered {
-        transform: scale(1.06);
-        filter: drop-shadow(0 0 8px var(--glow));
+        animation: hoverPulse 1.2s ease-in-out infinite;
+        z-index: 10;
     }
 
     .emotion-btn.selected {
-        transform: scale(1.1);
+        transform: scale(1.12);
+        animation: selectedGlow 2s ease-in-out infinite;
+    }
+
+    .emotion-btn.selected .blob-svg:first-child {
+        filter: drop-shadow(0 0 14px var(--glow))
+            drop-shadow(0 0 28px var(--glow));
     }
 
     .emotion-btn:focus-visible {
@@ -544,14 +671,26 @@
         outline-offset: 3px;
     }
 
+    .emotion-btn:hover .blob-svg,
+    .emotion-btn.auto-hovered .blob-svg {
+        opacity: calc(var(--opacity, 0.8) * 1.2);
+    }
+
     .emotion-btn:hover .blob-svg:first-child,
     .emotion-btn.auto-hovered .blob-svg:first-child {
-        filter: drop-shadow(0 0 10px var(--glow))
-            drop-shadow(0 0 20px var(--glow));
+        filter: drop-shadow(0 0 16px var(--glow))
+            drop-shadow(0 0 32px var(--glow)) drop-shadow(0 0 48px var(--glow));
     }
 
     .emotion-btn:hover .emoji,
     .emotion-btn.auto-hovered .emoji {
-        transform: scale(1.1);
+        animation: emojiBounce 0.8s ease-in-out infinite;
+    }
+
+    .emotion-btn:hover .name,
+    .emotion-btn.auto-hovered .name {
+        text-shadow:
+            0 1px 3px rgba(0, 0, 0, 0.9),
+            0 0 12px var(--primary);
     }
 </style>
