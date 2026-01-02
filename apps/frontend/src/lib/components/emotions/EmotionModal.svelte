@@ -7,6 +7,7 @@
      */
     import EmotionGrid from "./EmotionGrid.svelte";
     import { QUADRANT_COLORS } from "./emotionData";
+    import { getIndicatorDots } from "./emotionUtils";
     import type { Emotion } from "$lib/api/emotions";
     import { X, Heart } from "lucide-svelte";
 
@@ -53,23 +54,6 @@
     function clearSelection() {
         selectedEmotion = null;
     }
-
-    function getIndicatorDots(
-        emotion: Emotion,
-    ): { color: string; label: string }[] {
-        const dots: { color: string; label: string }[] = [];
-        if (emotion.dominance > 0.7)
-            dots.push({ color: "#fbbf24", label: "Empowered" });
-        else if (emotion.dominance < -0.5)
-            dots.push({ color: "#a78bfa", label: "Vulnerable" });
-        if (emotion.social > 0.6)
-            dots.push({ color: "#60a5fa", label: "Social" });
-        if (emotion.certainty < -0.3)
-            dots.push({ color: "#9ca3af", label: "Uncertain" });
-        if (emotion.intensity > 0.85)
-            dots.push({ color: "#f87171", label: "Intense" });
-        return dots;
-    }
 </script>
 
 {#if open}
@@ -79,7 +63,7 @@
         >
             <!-- Header -->
             <div
-                class="flex items-start justify-between gap-4 px-5 py-4 border-b border-base-300 shrink-0 min-h-20 bg-gradient-to-r from-base-200/50 to-transparent"
+                class="flex items-start justify-between gap-4 px-6 py-5 border-b border-base-content/5 shrink-0 min-h-24 bg-base-100/60 backdrop-blur-xl sticky top-0 z-30"
             >
                 {#if displayEmotion}
                     {@const colors =
@@ -112,8 +96,8 @@
                                 </h3>
                                 {#if isSelected}
                                     <span
-                                        class="text-[0.6rem] px-2.5 py-1 bg-primary text-primary-content rounded-full font-semibold uppercase tracking-wide shadow-sm"
-                                        >✓ Selected</span
+                                        class="badge badge-primary badge-sm gap-1 font-bold uppercase tracking-wider shadow-sm"
+                                        >Selected</span
                                     >
                                 {/if}
                                 {#if showIndicators}
@@ -141,7 +125,7 @@
                             <Heart
                                 size={24}
                                 strokeWidth={1.5}
-                                class="text-primary/60"
+                                class="text-primary/60 animate-pulse"
                             />
                         </div>
                         <div class="flex-1 min-w-0">
