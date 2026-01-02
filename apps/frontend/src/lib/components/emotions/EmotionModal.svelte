@@ -8,6 +8,7 @@
     import EmotionGrid from "./EmotionGrid.svelte";
     import { QUADRANT_COLORS } from "./emotionData";
     import { getIndicatorDots } from "./emotionUtils";
+    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
     import type { Emotion } from "$lib/api/emotions";
     import { X, Heart } from "lucide-svelte";
 
@@ -79,10 +80,12 @@
                             class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300 shadow-lg"
                             style="background: {colors.gradient};"
                         >
-                            <span
-                                class="font-['OpenMojiColor'] text-2xl leading-none"
-                                >{displayEmotion.emoji}</span
-                            >
+                            <OpenMoji
+                                emoji={displayEmotion.emoji}
+                                alt={displayEmotion.name}
+                                size="lg"
+                                class="drop-shadow-sm"
+                            />
                         </div>
 
                         <div class="flex-1 min-w-0">
@@ -177,10 +180,11 @@
                                 class="w-5 h-5 rounded-full flex items-center justify-center text-xs"
                                 style="background: {colors.gradient};"
                             >
-                                <span
-                                    class="font-['OpenMojiColor'] text-[0.7rem]"
-                                    >{selectedEmotion.emoji}</span
-                                >
+                                <OpenMoji
+                                    emoji={selectedEmotion.emoji}
+                                    alt={selectedEmotion.name}
+                                    size="xs"
+                                />
                             </div>
                             <span class="text-sm font-medium"
                                 >{selectedEmotion.name}</span

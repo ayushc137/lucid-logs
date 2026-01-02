@@ -20,6 +20,34 @@ export function getIndicatorDots(
     return dots;
 }
 
+// --- OpenMoji Logic ---
+// Check if string looks like a hex code (e.g., "1F9B6" or "1F62E-200D-1F4A8")
+function isHexCode(str: string): boolean {
+    return /^[0-9A-F]+(-[0-9A-F]+)*$/i.test(str);
+}
+
+export function getOpenMojiUrl(emoji: string): string {
+    try {
+        let hex: string;
+
+        if (isHexCode(emoji)) {
+            // Already a hex code from backend, use directly (uppercase)
+            hex = emoji.toUpperCase();
+        } else {
+            // Actual emoji character, convert to hex code points
+            hex = Array.from(emoji)
+                .map((c) => c.codePointAt(0)?.toString(16).toUpperCase())
+                .filter(Boolean)
+                .join("-");
+        }
+
+        return `https://openmoji.org/data/color/svg/${hex}.svg`;
+    } catch (e) {
+        console.warn("Failed to generate OpenMoji URL for", emoji, e);
+        return "";
+    }
+}
+
 // --- Color Logic ---
 export function getEmotionColors(emotion: Emotion) {
     const quadrant = emotion.quadrant as keyof typeof QUADRANT_COLORS;

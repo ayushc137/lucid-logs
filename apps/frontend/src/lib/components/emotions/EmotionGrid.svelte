@@ -24,6 +24,7 @@
         type BlobLayer,
         BLOB_SIZE,
     } from "./emotionUtils";
+    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
     import { getEmotionGrid, type Emotion } from "$lib/api/emotions";
     import {
         ZoomIn,
@@ -531,7 +532,11 @@
                                     class="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                     style="background: {colors.gradient}"
                                 >
-                                    {result.emoji}
+                                    <OpenMoji
+                                        emoji={result.emoji}
+                                        alt={result.name}
+                                        size="sm"
+                                    />
                                 </span>
                                 <div class="flex-1 min-w-0">
                                     <div class="text-xs font-medium truncate">
@@ -831,11 +836,14 @@
                                     <div
                                         class="relative z-[2] flex flex-col items-center gap-px pointer-events-none"
                                     >
-                                        <span
-                                            class="emoji font-['OpenMojiColor','Segoe_UI_Emoji','Apple_Color_Emoji',sans-serif] text-[clamp(1rem,2.2vw,1.5rem)] leading-none transition-transform duration-200"
-                                            class:scale-110={isSelected}
-                                            >{emotion.emoji}</span
-                                        >
+                                        <OpenMoji
+                                            emoji={emotion.emoji}
+                                            alt={emotion.name}
+                                            size="lg"
+                                            class="transition-transform duration-200 {isSelected
+                                                ? 'scale-110'
+                                                : ''}"
+                                        />
                                         <span
                                             class="name text-[clamp(0.5rem,1vw,0.7rem)] font-semibold text-white uppercase max-w-full overflow-hidden text-ellipsis whitespace-nowrap hidden sm:inline"
                                             style="text-shadow: 0 1px 2px rgba(0,0,0,0.7);"
@@ -865,10 +873,11 @@
             class="flex items-center gap-2.5 px-3 py-2.5 text-white"
             style="background: {colors.gradient};"
         >
-            <span
-                class="font-['OpenMojiColor','Segoe_UI_Emoji','Apple_Color_Emoji',sans-serif] text-[1.4rem] leading-none"
-                >{hoveredEmotion.emoji}</span
-            >
+            <OpenMoji
+                emoji={hoveredEmotion.emoji}
+                alt={hoveredEmotion.name}
+                size="lg"
+            />
             <strong class="text-sm">{hoveredEmotion.name}</strong>
         </div>
         <div class="px-3 py-2.5">

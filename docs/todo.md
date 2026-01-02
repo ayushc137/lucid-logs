@@ -1,4 +1,8 @@
 
+Bored (E95): 1F611 (😑) -> 1F971 (🥱 Yawning Face). More active representation.
+Belonging (E35): 1F3E1 (🏡) -> 1F9E9 (🧩 Puzzle Piece). Metaphor: Fitting in perfectly.
+tranquil ? 
+
 Modals are not rendering over sidebar 
 
 when the hover is based on pan center and then user hovers on some other emotion the pan center item hover flickers, is there any solution fort his ?
