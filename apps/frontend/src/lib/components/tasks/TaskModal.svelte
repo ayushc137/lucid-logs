@@ -177,6 +177,7 @@
 
     $effect(() => {
         if (open && task) {
+            resetForm();
             title = task.title;
             journal = task.journal || "";
             categoryId = task.category?.id;
