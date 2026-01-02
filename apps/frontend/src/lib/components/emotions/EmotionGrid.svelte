@@ -839,7 +839,7 @@
                                         <OpenMoji
                                             emoji={emotion.emoji}
                                             alt={emotion.name}
-                                            size="lg"
+                                            size="xl"
                                             class="transition-transform duration-200 {isSelected
                                                 ? 'scale-110'
                                                 : ''}"

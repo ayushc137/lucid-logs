@@ -35,7 +35,7 @@
         sm: "w-4 h-4",
         md: "w-6 h-6",
         lg: "w-8 h-8",
-        xl: "w-12 h-12",
+        xl: "w-10 h-10",
     };
 
     // Check if string looks like a hex code (e.g., "1F9B6" or "1F62E-200D-1F4A8")
