@@ -49,7 +49,7 @@
 
 <aside
   class={cn(
-    "flex flex-col h-screen transition-all duration-300 bg-base-100/95 backdrop-blur-sm border-r border-base-200 z-[9999] relative",
+    "flex flex-col h-screen transition-all duration-300 bg-base-100/95 backdrop-blur-sm border-r border-base-200 z-50 relative",
     collapsed ? "w-20" : "w-64",
   )}
 >

@@ -49,6 +49,7 @@
     let hoveredEmotion = $state<Emotion | null>(null);
     let tooltipPosition = $state<{ x: number; y: number } | null>(null);
     let isMouseHovering = $state(false);
+    let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
 
     // Panzoom
     let viewportElement: HTMLDivElement;
@@ -317,6 +318,7 @@
 
     onDestroy(() => {
         pzInstance?.dispose();
+        if (hoverTimeout) clearTimeout(hoverTimeout);
     });
 
     // Watch for selectedEmotion changes to pan to selected item
@@ -463,6 +465,8 @@
 
     // Mouse handlers - update tooltip in DOM portal
     function onMouseEnter(e: MouseEvent, emotion: Emotion) {
+        if (hoverTimeout) clearTimeout(hoverTimeout);
+
         isMouseHovering = true;
         hoveredEmotion = emotion;
         onHoveredChange?.(emotion);
@@ -496,12 +500,16 @@
     }
 
     function onMouseLeave() {
-        isMouseHovering = false;
-        tooltipPosition = null;
-        if (centerEmotion) {
-            hoveredEmotion = centerEmotion;
-            onHoveredChange?.(centerEmotion);
-        }
+        if (hoverTimeout) clearTimeout(hoverTimeout);
+
+        hoverTimeout = setTimeout(() => {
+            isMouseHovering = false;
+            tooltipPosition = null;
+            if (centerEmotion) {
+                hoveredEmotion = centerEmotion;
+                onHoveredChange?.(centerEmotion);
+            }
+        }, 50);
     }
 
     function portal(node: HTMLElement) {

@@ -1,4 +1,8 @@
 
+Modals are not rendering over sidebar 
+
+when the hover is based on pan center and then user hovers on some other emotion the pan center item hover flickers, is there any solution fort his ?
+
 make side bar more pretty with anuimation and more cleanup 
 
 fix the username, email throughout and fix edit properly ----------
