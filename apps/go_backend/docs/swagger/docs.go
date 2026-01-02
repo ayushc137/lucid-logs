@@ -3253,6 +3253,57 @@ const docTemplate = `{
                 }
             }
         },
+        "emotions.Emotion": {
+            "type": "object",
+            "properties": {
+                "arousal": {
+                    "description": "-1 to +1: high/low energy",
+                    "type": "number"
+                },
+                "certainty": {
+                    "description": "-1 to +1: sure/unsure",
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dominance": {
+                    "description": "-1 to +1: in control/controlled",
+                    "type": "number"
+                },
+                "emoji": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "e.g., \"emotions:E16\"",
+                    "type": "string"
+                },
+                "intensity": {
+                    "description": "0.1 to 1.0: default weight",
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quadrant": {
+                    "type": "string"
+                },
+                "social": {
+                    "description": "-1 to +1: social/individual",
+                    "type": "number"
+                },
+                "valence": {
+                    "description": "-1 to +1: pleasant/unpleasant",
+                    "type": "number"
+                },
+                "x": {
+                    "type": "integer"
+                },
+                "y": {
+                    "type": "integer"
+                }
+            }
+        },
         "emotions.EmotionDetail": {
             "type": "object",
             "properties": {
@@ -3298,52 +3349,25 @@ const docTemplate = `{
                 }
             }
         },
-        "emotions.GridEmotion": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "emoji": {
-                    "type": "string"
-                },
-                "id": {
-                    "description": "e.g., \"emotions:E16\"",
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "quadrant": {
-                    "type": "string"
-                },
-                "x": {
-                    "type": "integer"
-                },
-                "y": {
-                    "type": "integer"
-                }
-            }
-        },
         "emotions.GridResponse": {
             "type": "object",
             "properties": {
                 "blue": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/emotions.GridEmotion"
+                        "$ref": "#/definitions/emotions.Emotion"
                     }
                 },
                 "green": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/emotions.GridEmotion"
+                        "$ref": "#/definitions/emotions.Emotion"
                     }
                 },
                 "red": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/emotions.GridEmotion"
+                        "$ref": "#/definitions/emotions.Emotion"
                     }
                 },
                 "total": {
@@ -3352,7 +3376,7 @@ const docTemplate = `{
                 "yellow": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/emotions.GridEmotion"
+                        "$ref": "#/definitions/emotions.Emotion"
                     }
                 }
             }

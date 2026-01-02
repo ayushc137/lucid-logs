@@ -93,24 +93,23 @@ func (r *Repository) BuildGridResponse(ctx context.Context) (*GridResponse, erro
 	}
 
 	resp := &GridResponse{
-		Yellow: make([]*GridEmotion, 0, 25),
-		Green:  make([]*GridEmotion, 0, 25),
-		Red:    make([]*GridEmotion, 0, 25),
-		Blue:   make([]*GridEmotion, 0, 25),
+		Yellow: make([]*Emotion, 0, 25),
+		Green:  make([]*Emotion, 0, 25),
+		Red:    make([]*Emotion, 0, 25),
+		Blue:   make([]*Emotion, 0, 25),
 		Total:  len(emotions),
 	}
 
 	for _, e := range emotions {
-		grid := e.ToGridEmotion()
 		switch e.Quadrant {
 		case "yellow":
-			resp.Yellow = append(resp.Yellow, grid)
+			resp.Yellow = append(resp.Yellow, e)
 		case "green":
-			resp.Green = append(resp.Green, grid)
+			resp.Green = append(resp.Green, e)
 		case "red":
-			resp.Red = append(resp.Red, grid)
+			resp.Red = append(resp.Red, e)
 		case "blue":
-			resp.Blue = append(resp.Blue, grid)
+			resp.Blue = append(resp.Blue, e)
 		}
 	}
 

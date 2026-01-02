@@ -67,24 +67,14 @@ type Emotion struct {
 // GRID RESPONSE TYPES
 // =============================================================================
 
-// GridEmotion is the minimal emotion data for UI grid rendering.
-type GridEmotion struct {
-	ID          string `json:"id"` // e.g., "emotions:E16"
-	Name        string `json:"name"`
-	Emoji       string `json:"emoji"`
-	Description string `json:"description"`
-	X           int    `json:"x"`
-	Y           int    `json:"y"`
-	Quadrant    string `json:"quadrant"`
-}
-
 // GridResponse is the response for GET /emotions/grid.
+// Returns full Emotion data for each quadrant to support all UI features.
 type GridResponse struct {
-	Yellow []*GridEmotion `json:"yellow"`
-	Green  []*GridEmotion `json:"green"`
-	Red    []*GridEmotion `json:"red"`
-	Blue   []*GridEmotion `json:"blue"`
-	Total  int            `json:"total"`
+	Yellow []*Emotion `json:"yellow"`
+	Green  []*Emotion `json:"green"`
+	Red    []*Emotion `json:"red"`
+	Blue   []*Emotion `json:"blue"`
+	Total  int        `json:"total"`
 }
 
 // =============================================================================
@@ -145,19 +135,6 @@ type TaskItem struct {
 // =============================================================================
 // CONVERSION HELPERS
 // =============================================================================
-
-// ToGridEmotion converts an Emotion to the minimal GridEmotion format.
-func (e *Emotion) ToGridEmotion() *GridEmotion {
-	return &GridEmotion{
-		ID:          e.ID,
-		Name:        e.Name,
-		Emoji:       e.Emoji,
-		Description: e.Description,
-		X:           e.X,
-		Y:           e.Y,
-		Quadrant:    e.Quadrant,
-	}
-}
 
 // ToDetail converts an Emotion to the full EmotionDetail format.
 func (e *Emotion) ToDetail() *EmotionDetail {

@@ -20,23 +20,17 @@ export interface Emotion {
     description: string;
 }
 
-export interface GridEmotion {
-    id: string;
-    name: string;
-    emoji: string;
-    description: string;
-    x: number;
-    y: number;
-    quadrant: string;
-}
+
 
 export interface EmotionGridResponse {
-    yellow: GridEmotion[];
-    green: GridEmotion[];
-    red: GridEmotion[];
-    blue: GridEmotion[];
+    yellow: Emotion[];
+    green: Emotion[];
+    red: Emotion[];
+    blue: Emotion[];
     total: number;
 }
+
+
 
 // =============================================================================
 // EMOTION API FUNCTIONS
@@ -49,3 +43,5 @@ export async function getEmotionGrid(): Promise<EmotionGridResponse> {
 export async function getEmotion(id: string): Promise<Emotion> {
     return unwrap(api.get(`emotions/${id}`));
 }
+
+

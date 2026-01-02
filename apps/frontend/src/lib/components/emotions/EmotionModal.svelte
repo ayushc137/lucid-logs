@@ -6,8 +6,8 @@
      * - Tailwind CSS styling
      */
     import EmotionGrid from "./EmotionGrid.svelte";
-    import type { Emotion } from "./emotionData";
     import { QUADRANT_COLORS } from "./emotionData";
+    import type { Emotion } from "$lib/api/emotions";
     import { X, Heart } from "lucide-svelte";
 
     interface Props {
@@ -82,7 +82,10 @@
                 class="flex items-start justify-between gap-4 px-5 py-4 border-b border-base-300 shrink-0 min-h-20 bg-gradient-to-r from-base-200/50 to-transparent"
             >
                 {#if displayEmotion}
-                    {@const colors = QUADRANT_COLORS[displayEmotion.quadrant]}
+                    {@const colors =
+                        QUADRANT_COLORS[
+                            displayEmotion.quadrant as keyof typeof QUADRANT_COLORS
+                        ]}
                     {@const dots = getIndicatorDots(displayEmotion)}
                     {@const isSelected =
                         selectedEmotion?.id === displayEmotion.id}
@@ -180,7 +183,9 @@
                 <div class="flex items-center gap-2">
                     {#if selectedEmotion}
                         {@const colors =
-                            QUADRANT_COLORS[selectedEmotion.quadrant]}
+                            QUADRANT_COLORS[
+                                selectedEmotion.quadrant as keyof typeof QUADRANT_COLORS
+                            ]}
                         <div
                             class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-base-100 border border-base-300"
                         >

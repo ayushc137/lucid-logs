@@ -53,7 +53,6 @@ export {
     getEmotionGrid,
     getEmotion,
     type Emotion,
-    type GridEmotion,
     type EmotionGridResponse
 } from './emotions';
 

@@ -411,6 +411,42 @@ definitions:
         minLength: 1
         type: string
     type: object
+  emotions.Emotion:
+    properties:
+      arousal:
+        description: '-1 to +1: high/low energy'
+        type: number
+      certainty:
+        description: '-1 to +1: sure/unsure'
+        type: number
+      description:
+        type: string
+      dominance:
+        description: '-1 to +1: in control/controlled'
+        type: number
+      emoji:
+        type: string
+      id:
+        description: e.g., "emotions:E16"
+        type: string
+      intensity:
+        description: '0.1 to 1.0: default weight'
+        type: number
+      name:
+        type: string
+      quadrant:
+        type: string
+      social:
+        description: '-1 to +1: social/individual'
+        type: number
+      valence:
+        description: '-1 to +1: pleasant/unpleasant'
+        type: number
+      x:
+        type: integer
+      "y":
+        type: integer
+    type: object
   emotions.EmotionDetail:
     properties:
       arousal:
@@ -441,43 +477,25 @@ definitions:
       "y":
         type: integer
     type: object
-  emotions.GridEmotion:
-    properties:
-      description:
-        type: string
-      emoji:
-        type: string
-      id:
-        description: e.g., "emotions:E16"
-        type: string
-      name:
-        type: string
-      quadrant:
-        type: string
-      x:
-        type: integer
-      "y":
-        type: integer
-    type: object
   emotions.GridResponse:
     properties:
       blue:
         items:
-          $ref: '#/definitions/emotions.GridEmotion'
+          $ref: '#/definitions/emotions.Emotion'
         type: array
       green:
         items:
-          $ref: '#/definitions/emotions.GridEmotion'
+          $ref: '#/definitions/emotions.Emotion'
         type: array
       red:
         items:
-          $ref: '#/definitions/emotions.GridEmotion'
+          $ref: '#/definitions/emotions.Emotion'
         type: array
       total:
         type: integer
       yellow:
         items:
-          $ref: '#/definitions/emotions.GridEmotion'
+          $ref: '#/definitions/emotions.Emotion'
         type: array
     type: object
   emotions.InferredEmotion:
