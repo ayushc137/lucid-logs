@@ -111,9 +111,8 @@ type InferredEmotion struct {
 	Dominance float64 `json:"dominance"` // -1 to +1
 
 	// Classification
-	Quadrant           string `json:"quadrant"`           // Dominant quadrant
-	ClosestEmotionID   string `json:"closest_emotion_id"` // Nearest emotion
-	ClosestEmotionName string `json:"closest_emotion_name"`
+	Quadrant         string `json:"quadrant"`           // Dominant quadrant
+	ClosestEmotionID string `json:"closest_emotion_id"` // Nearest emotion
 
 	// Metadata
 	PositiveCount int     `json:"positive_count"` // Number of positive items with emotions
@@ -145,6 +144,7 @@ type InferRequest struct {
 // InferResponse is the response for POST /emotions/infer.
 type InferResponse struct {
 	InferredEmotion *InferredEmotion `json:"inferred_emotion"`
+	ClosestEmotion  *EmotionDetail   `json:"closest_emotion,omitempty"`
 }
 
 // =============================================================================

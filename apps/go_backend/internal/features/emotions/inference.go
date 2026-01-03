@@ -86,21 +86,20 @@ func InferFromItems(positives, negatives []TaskItem) *InferredEmotion {
 	quadrant := determineQuadrant(centroidV, centroidA)
 
 	// Find closest emotion
-	closestID, closestName := findClosestEmotion(centroidV, centroidA, centroidD)
+	closestID := findClosestEmotion(centroidV, centroidA, centroidD)
 
 	// Calculate dissonance (conflict between positive and negative valence)
 	dissonance := calculateDissonance(inputs)
 
 	return &InferredEmotion{
-		Valence:            round3(centroidV),
-		Arousal:            round3(centroidA),
-		Dominance:          round3(centroidD),
-		Quadrant:           quadrant,
-		ClosestEmotionID:   closestID,
-		ClosestEmotionName: closestName,
-		PositiveCount:      positiveCount,
-		NegativeCount:      negativeCount,
-		Dissonance:         round3(dissonance),
+		Valence:          round3(centroidV),
+		Arousal:          round3(centroidA),
+		Dominance:        round3(centroidD),
+		Quadrant:         quadrant,
+		ClosestEmotionID: closestID,
+		PositiveCount:    positiveCount,
+		NegativeCount:    negativeCount,
+		Dissonance:       round3(dissonance),
 	}
 }
 
@@ -124,7 +123,7 @@ func determineQuadrant(valence, arousal float64) string {
 
 // findClosestEmotion finds the emotion closest to the given coordinates.
 // Uses 3D Euclidean distance (Valence, Arousal, Dominance).
-func findClosestEmotion(valence, arousal, dominance float64) (id, name string) {
+func findClosestEmotion(valence, arousal, dominance float64) string {
 	var closestDist float64 = math.MaxFloat64
 	var closestEmotion *Emotion
 
@@ -142,9 +141,9 @@ func findClosestEmotion(valence, arousal, dominance float64) (id, name string) {
 	}
 
 	if closestEmotion != nil {
-		return closestEmotion.ID, closestEmotion.Name
+		return closestEmotion.ID
 	}
-	return "", ""
+	return ""
 }
 
 // calculateDissonance measures internal conflict when positive and negative
@@ -236,14 +235,13 @@ func InferFromSingle(emotionID string) *InferredEmotion {
 	weight := emotion.Intensity
 
 	return &InferredEmotion{
-		Valence:            round3(emotion.Valence * weight),
-		Arousal:            round3(emotion.Arousal * weight),
-		Dominance:          round3(emotion.Dominance * weight),
-		Quadrant:           emotion.Quadrant,
-		ClosestEmotionID:   emotion.ID,
-		ClosestEmotionName: emotion.Name,
-		PositiveCount:      0,
-		NegativeCount:      0,
-		Dissonance:         0,
+		Valence:          round3(emotion.Valence * weight),
+		Arousal:          round3(emotion.Arousal * weight),
+		Dominance:        round3(emotion.Dominance * weight),
+		Quadrant:         emotion.Quadrant,
+		ClosestEmotionID: emotion.ID,
+		PositiveCount:    0,
+		NegativeCount:    0,
+		Dissonance:       0,
 	}
 }

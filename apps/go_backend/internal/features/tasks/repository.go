@@ -606,9 +606,6 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	emotionItems := toEmotionItems(positives, negatives)
 	if len(emotionItems.positives) > 0 || len(emotionItems.negatives) > 0 {
 		inferredEmotion = emotions.InferFromItems(emotionItems.positives, emotionItems.negatives)
-	} else if req.EmotionID != nil && *req.EmotionID != "" {
-		// Fall back to single emotion if no items have emotions
-		inferredEmotion = emotions.InferFromSingle(*req.EmotionID)
 	}
 
 	// Generate task ID using models.RecordID
@@ -810,12 +807,8 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		if len(emotionItems.positives) > 0 || len(emotionItems.negatives) > 0 {
 			updateData["inferred_emotion"] = emotions.InferFromItems(emotionItems.positives, emotionItems.negatives)
 		} else {
-			// Fall back to single emotion
-			if finalEmotionID != nil && *finalEmotionID != "" {
-				updateData["inferred_emotion"] = emotions.InferFromSingle(*finalEmotionID)
-			} else {
-				updateData["inferred_emotion"] = nil
-			}
+			// Explicitly remove inferred emotion if no items
+			updateData["inferred_emotion"] = nil
 		}
 	}
 

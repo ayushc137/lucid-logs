@@ -3492,6 +3492,9 @@ const docTemplate = `{
         "emotions.InferResponse": {
             "type": "object",
             "properties": {
+                "closest_emotion": {
+                    "$ref": "#/definitions/emotions.EmotionDetail"
+                },
                 "inferred_emotion": {
                     "$ref": "#/definitions/emotions.InferredEmotion"
                 }
@@ -3506,9 +3509,6 @@ const docTemplate = `{
                 },
                 "closest_emotion_id": {
                     "description": "Nearest emotion",
-                    "type": "string"
-                },
-                "closest_emotion_name": {
                     "type": "string"
                 },
                 "dissonance": {

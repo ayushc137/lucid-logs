@@ -123,7 +123,16 @@ func (h *Handler) Infer(c *gin.Context) {
 	// Calculate inferred emotion using existing logic
 	inferredEmotion := InferFromItems(req.Positives, req.Negatives)
 
+	var closestEmotionDetail *EmotionDetail
+	if inferredEmotion != nil && inferredEmotion.ClosestEmotionID != "" {
+		closest, err := h.repo.GetByID(c.Request.Context(), inferredEmotion.ClosestEmotionID)
+		if err == nil && closest != nil {
+			closestEmotionDetail = closest.ToDetail()
+		}
+	}
+
 	response.OK(c, InferResponse{
 		InferredEmotion: inferredEmotion,
+		ClosestEmotion:  closestEmotionDetail,
 	})
 }
