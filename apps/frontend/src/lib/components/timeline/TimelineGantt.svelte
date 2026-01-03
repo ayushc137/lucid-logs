@@ -1151,26 +1151,6 @@
                                     style="color: {txt};"
                                 >
                                     {#if contentMode === "full"}
-                                        <!-- Emotion Emoji (if any) -->
-                                        {#if task.emotionEmoji}
-                                            <div
-                                                class="shrink-0 mr-1.5 drop-shadow-md"
-                                            >
-                                                <OpenMoji
-                                                    emoji={task.emotionEmoji}
-                                                    size={20}
-                                                />
-                                            </div>
-                                        {:else if task.inferredEmotionEmoji}
-                                            <div
-                                                class="shrink-0 mr-1.5 drop-shadow-md opacity-70"
-                                            >
-                                                <OpenMoji
-                                                    emoji={task.inferredEmotionEmoji}
-                                                    size={18}
-                                                />
-                                            </div>
-                                        {/if}
                                         <div
                                             class="flex flex-col justify-center min-w-0 flex-1"
                                         >
@@ -1195,8 +1175,28 @@
                                             {/if}
                                         </div>
                                         <div
-                                            class="ml-auto pl-2 flex items-center gap-1.5"
+                                            class="ml-auto pl-2 flex items-center gap-1"
                                         >
+                                            <!-- Emotion Emoji near duration -->
+                                            {#if task.emotionEmoji}
+                                                <div
+                                                    class="shrink-0 drop-shadow-md"
+                                                >
+                                                    <OpenMoji
+                                                        emoji={task.emotionEmoji}
+                                                        size={24}
+                                                    />
+                                                </div>
+                                            {:else if task.inferredEmotionEmoji}
+                                                <div
+                                                    class="shrink-0 drop-shadow-md opacity-70"
+                                                >
+                                                    <OpenMoji
+                                                        emoji={task.inferredEmotionEmoji}
+                                                        size={22}
+                                                    />
+                                                </div>
+                                            {/if}
                                             <span
                                                 class="text-[10px] font-bold bg-black/20 px-1.5 py-0.5 rounded-md backdrop-blur-sm whitespace-nowrap border border-white/10"
                                             >
@@ -1207,46 +1207,13 @@
                                             </span>
                                         </div>
                                     {:else if contentMode === "title-only"}
-                                        <!-- Emotion Emoji (compact) -->
-                                        {#if task.emotionEmoji}
-                                            <div
-                                                class="shrink-0 mr-1 drop-shadow-md"
-                                            >
-                                                <OpenMoji
-                                                    emoji={task.emotionEmoji}
-                                                    size={16}
-                                                />
-                                            </div>
-                                        {:else if task.inferredEmotionEmoji}
-                                            <div
-                                                class="shrink-0 mr-1 drop-shadow-md opacity-70"
-                                            >
-                                                <OpenMoji
-                                                    emoji={task.inferredEmotionEmoji}
-                                                    size={14}
-                                                />
-                                            </div>
-                                        {/if}
                                         <span
                                             class="font-bold text-xs truncate drop-shadow-md {task.completed
                                                 ? 'opacity-80'
                                                 : ''}">{task.title}</span
                                         >
                                     {:else}
-                                        <!-- Minimal View - just emoji if available -->
-                                        {#if task.emotionEmoji}
-                                            <OpenMoji
-                                                emoji={task.emotionEmoji}
-                                                size={14}
-                                            />
-                                        {:else if task.inferredEmotionEmoji}
-                                            <div class="opacity-70">
-                                                <OpenMoji
-                                                    emoji={task.inferredEmotionEmoji}
-                                                    size={12}
-                                                />
-                                            </div>
-                                        {/if}
+                                        <!-- Minimal View - no content shown -->
                                     {/if}
                                 </div>
 
