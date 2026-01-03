@@ -44,3 +44,4 @@ export { default as SortableHeader } from "./SortableHeader.svelte";
 // -----------------------------------------------------------------------------
 export { default as IconBox } from "./IconBox.svelte";
 export { default as StatCard } from "./StatCard.svelte";
+export { default as OpenMoji } from "./OpenMoji.svelte";

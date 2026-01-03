@@ -4,7 +4,11 @@
     import { cubicOut } from "svelte/easing";
     import type { TimelineTask } from "./types";
     import { stripHtml } from "$lib/utils";
-    import { EmotionBadge } from "$lib/components/emotions";
+    import {
+        QUADRANT_COLORS,
+        type Quadrant,
+    } from "$lib/components/emotions/emotionData";
+    import { OpenMoji } from "$lib/components/ui";
 
     interface Props {
         task: TimelineTask;
@@ -26,7 +30,11 @@
             !!task.emotionQuadrant,
     );
     const hasInferredEmotion = $derived(
-        !hasActualEmotion && !!task.inferredEmotionName,
+        !hasActualEmotion &&
+            !!task.inferredEmotionId &&
+            !!task.inferredEmotionName &&
+            !!task.inferredEmotionEmoji &&
+            !!task.inferredEmotionQuadrant,
     );
 
     function formatTime(d: Date): string {
@@ -136,24 +144,60 @@
                     </div>
                 {/if}
 
-                <!-- Emotion Badge -->
+                <!-- Selected Emotion Badge with Tooltip -->
                 {#if hasActualEmotion}
-                    <EmotionBadge
-                        name={task.emotionName!}
-                        emoji={task.emotionEmoji!}
-                        quadrant={task.emotionQuadrant!}
-                        size="xs"
-                    />
-                {:else if hasInferredEmotion}
-                    <!-- Inferred emotion indicator (simplified) -->
+                    {@const colors =
+                        QUADRANT_COLORS[task.emotionQuadrant as Quadrant]}
                     <div
-                        class="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary/70"
-                        title="AI inferred emotion from your reflection"
+                        class="tooltip tooltip-top"
+                        data-tip={task.emotionDescription || task.emotionName}
                     >
-                        <Sparkles class="w-2.5 h-2.5" />
-                        <span class="truncate max-w-[80px]"
-                            >{task.inferredEmotionName}</span
+                        <div
+                            class="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:scale-105"
+                            style="
+                                background: linear-gradient(135deg, 
+                                    color-mix(in srgb, {colors.primary} 20%, transparent) 0%, 
+                                    color-mix(in srgb, {colors.secondary} 15%, transparent) 100%);
+                                border: 1px solid color-mix(in srgb, {colors.primary} 40%, transparent);
+                                color: {colors.primary};
+                            "
                         >
+                            <OpenMoji emoji={task.emotionEmoji!} size={14} />
+                            <span class="truncate max-w-[70px]"
+                                >{task.emotionName}</span
+                            >
+                        </div>
+                    </div>
+                {:else if hasInferredEmotion}
+                    <!-- Inferred Emotion Badge with dashed border and tooltip -->
+                    {@const colors =
+                        QUADRANT_COLORS[
+                            task.inferredEmotionQuadrant as Quadrant
+                        ]}
+                    <div
+                        class="tooltip tooltip-top"
+                        data-tip="Inferred from reflections: {task.inferredEmotionDescription ||
+                            task.inferredEmotionName}"
+                    >
+                        <div
+                            class="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-200 hover:scale-105 opacity-80"
+                            style="
+                                background: linear-gradient(135deg, 
+                                    color-mix(in srgb, {colors.primary} 10%, transparent) 0%, 
+                                    color-mix(in srgb, {colors.secondary} 8%, transparent) 100%);
+                                border: 1.5px dashed color-mix(in srgb, {colors.primary} 50%, transparent);
+                                color: {colors.primary};
+                            "
+                        >
+                            <Sparkles class="w-2.5 h-2.5 opacity-70" />
+                            <OpenMoji
+                                emoji={task.inferredEmotionEmoji!}
+                                size={14}
+                            />
+                            <span class="truncate max-w-[60px]"
+                                >{task.inferredEmotionName}</span
+                            >
+                        </div>
                     </div>
                 {/if}
             </div>

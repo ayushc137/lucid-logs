@@ -10,7 +10,7 @@
     interface Props {
         emoji: string;
         alt?: string;
-        size?: "xs" | "sm" | "md" | "lg" | "xl";
+        size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
         class?: string;
     }
 
@@ -29,7 +29,7 @@
     let isVisible = $state(false);
     let imgElement: HTMLImageElement;
 
-    // Size classes mapping
+    // Size classes mapping for named sizes
     const sizeClasses: Record<string, string> = {
         xs: "w-3 h-3",
         sm: "w-4 h-4",
@@ -88,7 +88,14 @@
     }
 
     const url = $derived(getOpenMojiUrl(emoji));
-    const sizeClass = $derived(sizeClasses[size] || sizeClasses.md);
+    // Support both named sizes and numeric pixel sizes
+    const isNumericSize = $derived(typeof size === "number");
+    const sizeClass = $derived(
+        isNumericSize ? "" : sizeClasses[size as string] || sizeClasses.md,
+    );
+    const sizeStyle = $derived(
+        isNumericSize ? `width: ${size}px; height: ${size}px;` : "",
+    );
     const fallbackEmoji = $derived(hexToEmoji(emoji));
 
     function handleLoad() {
@@ -125,17 +132,23 @@
 
 <span
     class="inline-flex items-center justify-center {sizeClass} {className}"
+    style={sizeStyle}
     use:lazyLoad
 >
     {#if hasError}
         <!-- Fallback to native emoji -->
-        <span class="leading-none">{fallbackEmoji}</span>
+        <span
+            class="leading-none"
+            style={sizeStyle ? `font-size: ${(size as number) * 0.7}px;` : ""}
+            >{fallbackEmoji}</span
+        >
     {:else if isVisible}
         <img
             bind:this={imgElement}
             src={url}
             {alt}
             class="{sizeClass} object-contain transition-opacity duration-200"
+            style={sizeStyle}
             class:opacity-0={!isLoaded}
             class:opacity-100={isLoaded}
             onload={handleLoad}
@@ -145,6 +158,10 @@
         />
     {:else}
         <!-- Placeholder while not visible -->
-        <span class="leading-none opacity-30">{fallbackEmoji}</span>
+        <span
+            class="leading-none opacity-30"
+            style={sizeStyle ? `font-size: ${(size as number) * 0.7}px;` : ""}
+            >{fallbackEmoji}</span
+        >
     {/if}
 </span>

@@ -185,13 +185,18 @@
     completed?: boolean;
     emoji?: string;
     categoryId?: string;
-    // Emotion fields
+    // Emotion fields (user-selected)
     emotionId?: string;
     emotionName?: string;
     emotionEmoji?: string;
     emotionQuadrant?: "yellow" | "green" | "red" | "blue";
-    inferredEmotionName?: string;
+    emotionDescription?: string;
+    // Inferred emotion
     inferredEmotionId?: string;
+    inferredEmotionName?: string;
+    inferredEmotionEmoji?: string;
+    inferredEmotionQuadrant?: "yellow" | "green" | "red" | "blue";
+    inferredEmotionDescription?: string;
   };
 
   // Cache for emotion data to avoid refetching
@@ -225,32 +230,62 @@
     });
   }
 
-  // Enrich tasks with emotion data
+  // Enrich tasks with emotion data (both selected and inferred)
   async function enrichTasksWithEmotions(
     tasks: TimelineTask[],
   ): Promise<TimelineTask[]> {
     const enrichedTasks = await Promise.all(
       tasks.map(async (task) => {
-        if (!task.emotionId) return task;
+        let enrichedTask = { ...task };
 
-        // Check cache first
-        let emotion = emotionCache.get(task.emotionId);
-        if (!emotion) {
-          try {
-            emotion = await getEmotion(task.emotionId);
-            emotionCache.set(task.emotionId, emotion);
-          } catch (e) {
-            console.error(`Failed to fetch emotion ${task.emotionId}:`, e);
-            return task;
+        // Fetch selected emotion data
+        if (task.emotionId) {
+          let emotion = emotionCache.get(task.emotionId);
+          if (!emotion) {
+            try {
+              emotion = await getEmotion(task.emotionId);
+              emotionCache.set(task.emotionId, emotion);
+            } catch (e) {
+              console.error(`Failed to fetch emotion ${task.emotionId}:`, e);
+            }
+          }
+          if (emotion) {
+            enrichedTask = {
+              ...enrichedTask,
+              emotionName: emotion.name,
+              emotionEmoji: emotion.emoji,
+              emotionQuadrant: emotion.quadrant,
+              emotionDescription: emotion.description,
+            };
           }
         }
 
-        return {
-          ...task,
-          emotionName: emotion.name,
-          emotionEmoji: emotion.emoji,
-          emotionQuadrant: emotion.quadrant,
-        };
+        // Fetch inferred emotion data
+        if (task.inferredEmotionId) {
+          let inferredEmotion = emotionCache.get(task.inferredEmotionId);
+          if (!inferredEmotion) {
+            try {
+              inferredEmotion = await getEmotion(task.inferredEmotionId);
+              emotionCache.set(task.inferredEmotionId, inferredEmotion);
+            } catch (e) {
+              console.error(
+                `Failed to fetch inferred emotion ${task.inferredEmotionId}:`,
+                e,
+              );
+            }
+          }
+          if (inferredEmotion) {
+            enrichedTask = {
+              ...enrichedTask,
+              inferredEmotionName: inferredEmotion.name,
+              inferredEmotionEmoji: inferredEmotion.emoji,
+              inferredEmotionQuadrant: inferredEmotion.quadrant,
+              inferredEmotionDescription: inferredEmotion.description,
+            };
+          }
+        }
+
+        return enrichedTask;
       }),
     );
     return enrichedTasks;

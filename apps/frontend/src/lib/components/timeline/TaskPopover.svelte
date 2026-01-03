@@ -1,8 +1,13 @@
 <script lang="ts">
-    import { Check, Clock, FileText } from "lucide-svelte";
+    import { Check, Clock, FileText, Heart, Sparkles } from "lucide-svelte";
     import { scale } from "svelte/transition";
     import type { TimelineTask } from "./types";
     import { stripHtml } from "$lib/utils";
+    import {
+        QUADRANT_COLORS,
+        type Quadrant,
+    } from "$lib/components/emotions/emotionData";
+    import { OpenMoji } from "$lib/components/ui";
 
     interface Props {
         task: TimelineTask;
@@ -22,7 +27,7 @@
         }
 
         const POPOVER_WIDTH = 280;
-        const POPOVER_HEIGHT = 200; // Approximate max height
+        const POPOVER_HEIGHT = 280; // Increased for emotion content
         const PADDING = 16;
         const CURSOR_OFFSET = 12;
 
@@ -52,6 +57,21 @@
 
         return { x, y, anchor };
     });
+
+    // Check for emotions
+    const hasSelectedEmotion = $derived(
+        !!task.emotionId &&
+            !!task.emotionName &&
+            !!task.emotionEmoji &&
+            !!task.emotionQuadrant,
+    );
+    const hasInferredEmotion = $derived(
+        !!task.inferredEmotionId &&
+            !!task.inferredEmotionName &&
+            !!task.inferredEmotionEmoji &&
+            !!task.inferredEmotionQuadrant,
+    );
+    const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
 
     function formatTime(d: Date): string {
         if (!(d instanceof Date) || isNaN(d.getTime())) return "--:--";
@@ -129,6 +149,92 @@
                     >
                         {descriptionPreview}
                     </p>
+                </div>
+            {/if}
+
+            <!-- Emotion Section -->
+            {#if hasAnyEmotion}
+                <div class="mb-3 p-2.5 bg-base-200/30 rounded-lg space-y-2">
+                    <div
+                        class="flex items-center gap-1.5 text-[10px] font-semibold uppercase text-base-content/40"
+                    >
+                        <Heart class="w-3 h-3" />
+                        <span>Feeling</span>
+                    </div>
+
+                    <!-- Selected Emotion -->
+                    {#if hasSelectedEmotion}
+                        {@const colors =
+                            QUADRANT_COLORS[task.emotionQuadrant as Quadrant]}
+                        <div class="flex items-center gap-2">
+                            <div
+                                class="flex items-center gap-1.5 px-2 py-1 rounded-lg"
+                                style="
+                                    background: linear-gradient(135deg, 
+                                        color-mix(in srgb, {colors.primary} 15%, transparent) 0%, 
+                                        color-mix(in srgb, {colors.secondary} 10%, transparent) 100%);
+                                    border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
+                                "
+                            >
+                                <OpenMoji
+                                    emoji={task.emotionEmoji!}
+                                    size={18}
+                                />
+                                <div class="flex flex-col">
+                                    <span
+                                        class="text-xs font-semibold"
+                                        style="color: {colors.primary};"
+                                        >{task.emotionName}</span
+                                    >
+                                    {#if task.emotionDescription}
+                                        <span
+                                            class="text-[9px] text-base-content/50 line-clamp-1"
+                                            >{task.emotionDescription}</span
+                                        >
+                                    {/if}
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
+
+                    <!-- Inferred Emotion -->
+                    {#if hasInferredEmotion}
+                        {@const colors =
+                            QUADRANT_COLORS[
+                                task.inferredEmotionQuadrant as Quadrant
+                            ]}
+                        <div class="flex items-center gap-2">
+                            <div
+                                class="flex items-center gap-1.5 px-2 py-1 rounded-lg opacity-80"
+                                style="
+                                    background: linear-gradient(135deg, 
+                                        color-mix(in srgb, {colors.primary} 8%, transparent) 0%, 
+                                        color-mix(in srgb, {colors.secondary} 6%, transparent) 100%);
+                                    border: 1.5px dashed color-mix(in srgb, {colors.primary} 40%, transparent);
+                                "
+                            >
+                                <Sparkles
+                                    class="w-3 h-3 opacity-60"
+                                    style="color: {colors.primary};"
+                                />
+                                <OpenMoji
+                                    emoji={task.inferredEmotionEmoji!}
+                                    size={16}
+                                />
+                                <div class="flex flex-col">
+                                    <span
+                                        class="text-[11px] font-medium"
+                                        style="color: {colors.primary};"
+                                        >{task.inferredEmotionName}</span
+                                    >
+                                    <span
+                                        class="text-[9px] text-base-content/40"
+                                        >Inferred from reflections</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             {/if}
 
