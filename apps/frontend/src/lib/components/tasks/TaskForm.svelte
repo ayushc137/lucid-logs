@@ -1028,78 +1028,85 @@
                                         selectedEmotion.quadrant as Quadrant
                                     ]}
 
-                                <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
-                                    class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer group/card relative overflow-hidden border"
-                                    style="
-                                        background: linear-gradient(135deg, 
-                                            color-mix(in srgb, {colors.primary} 12%, var(--b1)) 0%, 
-                                            color-mix(in srgb, {colors.secondary} 8%, var(--b1)) 100%);
-                                        border-color: color-mix(in srgb, {colors.primary} 25%, transparent);
-                                    "
-                                    onclick={openEmotionForTask}
-                                    onkeydown={(e) =>
-                                        e.key === "Enter" &&
-                                        openEmotionForTask()}
-                                    role="button"
-                                    tabindex="0"
+                                    class="tooltip tooltip-bottom w-full"
+                                    data-tip={selectedEmotion.description}
                                 >
-                                    <!-- Background glow on hover -->
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div
-                                        class="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
-                                        style="background: radial-gradient(circle at 30% 50%, {colors.glow}, transparent 60%);"
-                                    ></div>
-
-                                    <!-- Emoji -->
-                                    <div
-                                        class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md group-hover/card:scale-110 transition-transform duration-300 relative z-10"
-                                        style="background: {colors.gradient};"
+                                        class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer group/card relative overflow-hidden border"
+                                        style="
+                                                background: linear-gradient(135deg, 
+                                                    color-mix(in srgb, {colors.primary} 12%, var(--b1)) 0%, 
+                                                    color-mix(in srgb, {colors.secondary} 8%, var(--b1)) 100%);
+                                                border-color: color-mix(in srgb, {colors.primary} 25%, transparent);
+                                            "
+                                        onclick={openEmotionForTask}
+                                        onkeydown={(e) =>
+                                            e.key === "Enter" &&
+                                            openEmotionForTask()}
+                                        role="button"
+                                        tabindex="0"
                                     >
-                                        <OpenMoji
-                                            emoji={selectedEmotion.emoji}
-                                            alt={selectedEmotion.name}
-                                            size="md"
-                                        />
-                                    </div>
-
-                                    <!-- Info -->
-                                    <div
-                                        class="flex-1 min-w-0 text-left relative z-10"
-                                    >
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="text-sm font-bold truncate"
-                                                style="color: {colors.secondary};"
-                                            >
-                                                {selectedEmotion.name}
-                                            </span>
-                                            <span
-                                                class="badge badge-xs font-bold uppercase tracking-wider px-1.5 shrink-0"
-                                                style="background: {colors.primary}; color: white; border: none;"
-                                            >
-                                                ✓
-                                            </span>
-                                        </div>
+                                        <!-- Background glow on hover -->
                                         <div
-                                            class="text-[10px] opacity-60 mt-0.5"
-                                        >
-                                            {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
-                                        </div>
-                                    </div>
+                                            class="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
+                                            style="background: radial-gradient(circle at 30% 50%, {colors.glow}, transparent 60%);"
+                                        ></div>
 
-                                    <!-- Clear button -->
-                                    <button
-                                        class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors relative z-10 opacity-0 group-hover/card:opacity-100"
-                                        onclick={(e) => {
-                                            e.stopPropagation();
-                                            clearTaskEmotion();
-                                        }}
-                                        title="Remove"
-                                    >
-                                        <X
-                                            class="w-4 h-4 opacity-60 hover:opacity-100"
-                                        />
-                                    </button>
+                                        <!-- Emoji -->
+                                        <div
+                                            class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md group-hover/card:scale-110 transition-transform duration-300 relative z-10"
+                                            style="background: {colors.gradient};"
+                                        >
+                                            <OpenMoji
+                                                emoji={selectedEmotion.emoji}
+                                                alt={selectedEmotion.name}
+                                                size="md"
+                                            />
+                                        </div>
+
+                                        <!-- Info -->
+                                        <div
+                                            class="flex-1 min-w-0 text-left relative z-10"
+                                        >
+                                            <div
+                                                class="flex items-center gap-2"
+                                            >
+                                                <span
+                                                    class="text-sm font-bold truncate"
+                                                    style="color: {colors.secondary};"
+                                                >
+                                                    {selectedEmotion.name}
+                                                </span>
+                                                <span
+                                                    class="badge badge-xs font-bold uppercase tracking-wider px-1.5 shrink-0"
+                                                    style="background: {colors.primary}; color: white; border: none;"
+                                                >
+                                                    ✓
+                                                </span>
+                                            </div>
+                                            <div
+                                                class="text-[10px] opacity-60 mt-0.5"
+                                            >
+                                                {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
+                                            </div>
+                                        </div>
+
+                                        <!-- Clear button -->
+                                        <button
+                                            class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors relative z-10 opacity-0 group-hover/card:opacity-100"
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                clearTaskEmotion();
+                                            }}
+                                            title="Remove"
+                                        >
+                                            <X
+                                                class="w-4 h-4 opacity-60 hover:opacity-100"
+                                            />
+                                        </button>
+                                    </div>
                                 </div>
                             {:else}
                                 <!-- Empty State -->
@@ -1253,42 +1260,47 @@
                                         QUADRANT_COLORS[
                                             pendingPositiveEmotion.quadrant as Quadrant
                                         ]}
-                                    <button
-                                        class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                        style="
-                                            background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                            color: {colors.secondary};
-                                            border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                        "
-                                        onclick={openEmotionForPendingPositive}
+                                    <div
+                                        class="tooltip tooltip-bottom tooltip-secondary"
+                                        data-tip={pendingPositiveEmotion.description}
                                     >
-                                        <span
-                                            class="w-5 h-5 rounded-md flex items-center justify-center"
-                                            style="background: {colors.gradient};"
+                                        <button
+                                            class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
+                                            style="
+                                                background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
+                                                color: {colors.secondary};
+                                                border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
+                                            "
+                                            onclick={openEmotionForPendingPositive}
                                         >
-                                            <OpenMoji
-                                                emoji={pendingPositiveEmotion.emoji}
-                                                alt={pendingPositiveEmotion.name}
-                                                size="xs"
-                                            />
-                                        </span>
-                                        <span class="truncate max-w-[80px]"
-                                            >{pendingPositiveEmotion.name}</span
-                                        >
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                        <span
-                                            class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                            onclick={(e) => {
-                                                e.stopPropagation();
-                                                clearPendingPositiveEmotion();
-                                            }}
-                                            role="button"
-                                            tabindex="0"
-                                        >
-                                            <X class="w-3 h-3" />
-                                        </span>
-                                    </button>
+                                            <span
+                                                class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                style="background: {colors.gradient};"
+                                            >
+                                                <OpenMoji
+                                                    emoji={pendingPositiveEmotion.emoji}
+                                                    alt={pendingPositiveEmotion.name}
+                                                    size="xs"
+                                                />
+                                            </span>
+                                            <span class="truncate max-w-[80px]"
+                                                >{pendingPositiveEmotion.name}</span
+                                            >
+                                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                            <span
+                                                class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                onclick={(e) => {
+                                                    e.stopPropagation();
+                                                    clearPendingPositiveEmotion();
+                                                }}
+                                                role="button"
+                                                tabindex="0"
+                                            >
+                                                <X class="w-3 h-3" />
+                                            </span>
+                                        </button>
+                                    </div>
                                 {:else}
                                     <button
                                         class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-success/10 text-success/70 hover:bg-success/20 hover:text-success transition-all duration-200"
@@ -1353,52 +1365,57 @@
                                                                 QUADRANT_COLORS[
                                                                     emotion.quadrant as Quadrant
                                                                 ]}
-                                                            <button
-                                                                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                                                style="
-                                                                    background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                                                    color: {colors.secondary};
-                                                                    border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                                                "
-                                                                onclick={() =>
-                                                                    openEmotionForPositive(
-                                                                        i,
-                                                                    )}
+                                                            <div
+                                                                class="tooltip tooltip-bottom tooltip-secondary"
+                                                                data-tip={emotion.description}
                                                             >
-                                                                <span
-                                                                    class="w-5 h-5 rounded-md flex items-center justify-center"
-                                                                    style="background: {colors.gradient};"
-                                                                >
-                                                                    <OpenMoji
-                                                                        emoji={emotion.emoji}
-                                                                        alt={emotion.name}
-                                                                        size="xs"
-                                                                    />
-                                                                </span>
-                                                                <span
-                                                                    class="truncate max-w-[80px]"
-                                                                    >{emotion.name}</span
-                                                                >
-                                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                                <span
-                                                                    class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                                                    onclick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        clearPositiveEmotion(
+                                                                <button
+                                                                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
+                                                                    style="
+                                                                        background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
+                                                                        color: {colors.secondary};
+                                                                        border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
+                                                                    "
+                                                                    onclick={() =>
+                                                                        openEmotionForPositive(
                                                                             i,
-                                                                        );
-                                                                    }}
-                                                                    role="button"
-                                                                    tabindex="0"
+                                                                        )}
                                                                 >
-                                                                    <X
-                                                                        class="w-3 h-3"
-                                                                    />
-                                                                </span>
-                                                            </button>
+                                                                    <span
+                                                                        class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                                        style="background: {colors.gradient};"
+                                                                    >
+                                                                        <OpenMoji
+                                                                            emoji={emotion.emoji}
+                                                                            alt={emotion.name}
+                                                                            size="xs"
+                                                                        />
+                                                                    </span>
+                                                                    <span
+                                                                        class="truncate max-w-[80px]"
+                                                                        >{emotion.name}</span
+                                                                    >
+                                                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                                                    <span
+                                                                        class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                        onclick={(
+                                                                            e,
+                                                                        ) => {
+                                                                            e.stopPropagation();
+                                                                            clearPositiveEmotion(
+                                                                                i,
+                                                                            );
+                                                                        }}
+                                                                        role="button"
+                                                                        tabindex="0"
+                                                                    >
+                                                                        <X
+                                                                            class="w-3 h-3"
+                                                                        />
+                                                                    </span>
+                                                                </button>
+                                                            </div>
                                                         {:else}
                                                             <span
                                                                 class="text-xs text-success/50"
@@ -1464,42 +1481,47 @@
                                         QUADRANT_COLORS[
                                             pendingNegativeEmotion.quadrant as Quadrant
                                         ]}
-                                    <button
-                                        class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                        style="
-                                            background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                            color: {colors.secondary};
-                                            border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                        "
-                                        onclick={openEmotionForPendingNegative}
+                                    <div
+                                        class="tooltip tooltip-bottom tooltip-secondary"
+                                        data-tip={pendingNegativeEmotion.description}
                                     >
-                                        <span
-                                            class="w-5 h-5 rounded-md flex items-center justify-center"
-                                            style="background: {colors.gradient};"
+                                        <button
+                                            class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
+                                            style="
+                                                background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
+                                                color: {colors.secondary};
+                                                border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
+                                            "
+                                            onclick={openEmotionForPendingNegative}
                                         >
-                                            <OpenMoji
-                                                emoji={pendingNegativeEmotion.emoji}
-                                                alt={pendingNegativeEmotion.name}
-                                                size="xs"
-                                            />
-                                        </span>
-                                        <span class="truncate max-w-[80px]"
-                                            >{pendingNegativeEmotion.name}</span
-                                        >
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                        <span
-                                            class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                            onclick={(e) => {
-                                                e.stopPropagation();
-                                                clearPendingNegativeEmotion();
-                                            }}
-                                            role="button"
-                                            tabindex="0"
-                                        >
-                                            <X class="w-3 h-3" />
-                                        </span>
-                                    </button>
+                                            <span
+                                                class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                style="background: {colors.gradient};"
+                                            >
+                                                <OpenMoji
+                                                    emoji={pendingNegativeEmotion.emoji}
+                                                    alt={pendingNegativeEmotion.name}
+                                                    size="xs"
+                                                />
+                                            </span>
+                                            <span class="truncate max-w-[80px]"
+                                                >{pendingNegativeEmotion.name}</span
+                                            >
+                                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                            <span
+                                                class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                onclick={(e) => {
+                                                    e.stopPropagation();
+                                                    clearPendingNegativeEmotion();
+                                                }}
+                                                role="button"
+                                                tabindex="0"
+                                            >
+                                                <X class="w-3 h-3" />
+                                            </span>
+                                        </button>
+                                    </div>
                                 {:else}
                                     <button
                                         class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-error/10 text-error/70 hover:bg-error/20 hover:text-error transition-all duration-200"
@@ -1564,52 +1586,57 @@
                                                                 QUADRANT_COLORS[
                                                                     emotion.quadrant as Quadrant
                                                                 ]}
-                                                            <button
-                                                                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                                                style="
-                                                                    background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                                                    color: {colors.secondary};
-                                                                    border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                                                "
-                                                                onclick={() =>
-                                                                    openEmotionForNegative(
-                                                                        i,
-                                                                    )}
+                                                            <div
+                                                                class="tooltip tooltip-bottom tooltip-secondary"
+                                                                data-tip={emotion.description}
                                                             >
-                                                                <span
-                                                                    class="w-5 h-5 rounded-md flex items-center justify-center"
-                                                                    style="background: {colors.gradient};"
-                                                                >
-                                                                    <OpenMoji
-                                                                        emoji={emotion.emoji}
-                                                                        alt={emotion.name}
-                                                                        size="xs"
-                                                                    />
-                                                                </span>
-                                                                <span
-                                                                    class="truncate max-w-[80px]"
-                                                                    >{emotion.name}</span
-                                                                >
-                                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                                <span
-                                                                    class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                                                    onclick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        clearNegativeEmotion(
+                                                                <button
+                                                                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
+                                                                    style="
+                                                                        background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
+                                                                        color: {colors.secondary};
+                                                                        border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
+                                                                    "
+                                                                    onclick={() =>
+                                                                        openEmotionForNegative(
                                                                             i,
-                                                                        );
-                                                                    }}
-                                                                    role="button"
-                                                                    tabindex="0"
+                                                                        )}
                                                                 >
-                                                                    <X
-                                                                        class="w-3 h-3"
-                                                                    />
-                                                                </span>
-                                                            </button>
+                                                                    <span
+                                                                        class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                                        style="background: {colors.gradient};"
+                                                                    >
+                                                                        <OpenMoji
+                                                                            emoji={emotion.emoji}
+                                                                            alt={emotion.name}
+                                                                            size="xs"
+                                                                        />
+                                                                    </span>
+                                                                    <span
+                                                                        class="truncate max-w-[80px]"
+                                                                        >{emotion.name}</span
+                                                                    >
+                                                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                                                    <span
+                                                                        class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
+                                                                        onclick={(
+                                                                            e,
+                                                                        ) => {
+                                                                            e.stopPropagation();
+                                                                            clearNegativeEmotion(
+                                                                                i,
+                                                                            );
+                                                                        }}
+                                                                        role="button"
+                                                                        tabindex="0"
+                                                                    >
+                                                                        <X
+                                                                            class="w-3 h-3"
+                                                                        />
+                                                                    </span>
+                                                                </button>
+                                                            </div>
                                                         {:else}
                                                             <span
                                                                 class="text-xs text-error/50"

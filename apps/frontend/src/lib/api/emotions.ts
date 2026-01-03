@@ -59,9 +59,6 @@ export async function getEmotionGrid(): Promise<EmotionGridResponse> {
     return unwrap(api.get('emotions/grid'));
 }
 
-export async function getEmotion(id: string): Promise<Emotion> {
-    return unwrap(api.get(`emotions/${id}`));
-}
 
 export async function inferEmotion(request: InferEmotionRequest): Promise<InferEmotionResponse> {
     return unwrap(api.post('emotions/infer', { json: request }));

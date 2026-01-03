@@ -1,4 +1,5 @@
 import { api, unwrap, type PaginatedResponse } from './client';
+import type { InferredEmotion } from './emotions';
 
 // =============================================================================
 // TASK TYPES (matching Go backend)
@@ -55,17 +56,6 @@ export interface Category {
     updated_at: string;
 }
 
-export interface InferredEmotion {
-    valence: number;
-    arousal: number;
-    dominance: number;
-    quadrant: string;
-    closest_emotion_id: string;
-    closest_emotion_name: string;
-    positive_count: number;
-    negative_count: number;
-    dissonance: number;
-}
 
 export interface CreateTaskRequest {
     title: string;

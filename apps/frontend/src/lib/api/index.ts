@@ -28,7 +28,6 @@ export {
     type Quantity,
     type TaskGoalLink,
     type Category,
-    type InferredEmotion,
     type CreateTaskRequest,
     type UpdateTaskRequest,
     type TaskFilterParams
@@ -52,8 +51,8 @@ export {
 // Emotions
 export {
     getEmotionGrid,
-    getEmotion,
     type Emotion,
+    type InferredEmotion,
     type EmotionGridResponse
 } from './emotions';
 

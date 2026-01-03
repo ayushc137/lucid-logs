@@ -104,7 +104,8 @@
                 {@const dots = getIndicatorDots(selectedEmotion)}
                 {@const icons = getQuadrantIcon(selectedEmotion.quadrant)}
 
-                <button
+                <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+                <div
                     class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer group/card relative overflow-hidden"
                     style="
                         background: linear-gradient(135deg, 
@@ -112,7 +113,15 @@
                             color-mix(in srgb, {colors.secondary} 10%, var(--b1)) 100%);
                         border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
                     "
+                    role="button"
+                    tabindex="0"
                     onclick={onSelect}
+                    onkeydown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onSelect();
+                        }
+                    }}
                     onmouseenter={() =>
                         handleMouseEnter(selectedEmotion.quadrant as Quadrant)}
                     onmouseleave={handleMouseLeave}
@@ -193,7 +202,7 @@
                     >
                         <X class="w-4 h-4 opacity-60 hover:opacity-100" />
                     </button>
-                </button>
+                </div>
 
                 <!-- Quadrant Detail Tooltip on Hover -->
                 {#if hoveredQuadrant === selectedEmotion.quadrant}

@@ -21,7 +21,10 @@ also how are you showing the infered emotion , show both infered and selected in
 
 double click should select with confirmation for emotion 
 
-clean emotions page and not required code 
+
+
+
+clean emotions page and not required code realted to emotion, unused code or page that is not used 
 
 
 

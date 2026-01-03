@@ -33,7 +33,6 @@
   } from "@tanstack/svelte-query";
   import { getTasks, updateTask, type Task } from "$lib/api";
   import { getCategories, type Category } from "$lib/api/categories";
-  import { getCategories, type Category } from "$lib/api/categories";
   import { type Emotion } from "$lib/api/emotions";
   import { emotionStore } from "$lib/stores/emotions.svelte";
   import { cn } from "$lib/utils";
@@ -199,8 +198,6 @@
     inferredEmotionEmoji?: string;
     inferredEmotionQuadrant?: "yellow" | "green" | "red" | "blue";
     inferredEmotionDescription?: string;
-  };
-
   };
 
   function transformTasks(apiTasks: Task[]): TimelineTask[] {
