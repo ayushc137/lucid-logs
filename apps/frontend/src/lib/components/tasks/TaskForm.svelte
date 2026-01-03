@@ -123,6 +123,8 @@
     let emotionModalOpen = $state(false);
     let liveInferredEmotion = $state<InferredEmotion | null>(null);
     let inferredEmotionFull = $state<Emotion | null>(null);
+    let inferringEmotion = $state(false);
+    let inferenceError = $state<string | null>(null);
     /** Initial emotion to pre-select when modal opens (e.g. suggested emotion) */
     let initialEmotionForModal = $state<Emotion | null>(null);
     /** Allowed quadrants for emotion selection (null = all allowed) */
@@ -164,8 +166,8 @@
     // Hash of reflections to check if they have changed
     function getReflectionsHash(p: TaskItem[], n: TaskItem[]) {
         return JSON.stringify({
-            p: p.map((x) => x.text),
-            n: n.map((x) => x.text),
+            p: p.map((x) => ({ t: x.text, e: x.emotion_id })),
+            n: n.map((x) => ({ t: x.text, e: x.emotion_id })),
         });
     }
 
@@ -218,8 +220,15 @@
             if (initialCategoryId) {
                 categoryId = initialCategoryId;
             }
+            // Initialize hash for empty arrays in create mode
+            lastInferredHash = getReflectionsHash([], []);
         }
         formInitialized = true;
+        console.log('[TaskForm Init] Initialized:', {
+            isEditing,
+            lastInferredHash,
+            formInitialized,
+        });
     });
 
     // Live time interval for create mode
@@ -249,29 +258,58 @@
             positives.some((p) => p.emotion_id) ||
             negatives.some((n) => n.emotion_id);
 
-        if (hasEmotions && currentHash !== lastInferredHash) {
+        console.log('[Emotion Inference] Effect triggered:', {
+            hasEmotions,
+            currentHash,
+            lastInferredHash,
+            positivesCount: positives.length,
+            negativesCount: negatives.length,
+            positivesWithEmotions: positives.filter(p => p.emotion_id).length,
+            negativesWithEmotions: negatives.filter(n => n.emotion_id).length,
+        });
+
+        if (!hasEmotions) {
+            console.log('[Emotion Inference] No emotions, clearing inference');
+            liveInferredEmotion = null;
+            inferredEmotionFull = null;
+            inferringEmotion = false;
+            inferenceError = null;
+            return;
+        }
+
+        if (currentHash !== lastInferredHash) {
+            console.log('[Emotion Inference] Starting inference...');
+            inferringEmotion = true;
+            inferenceError = null;
+
             inferEmotion({ positives, negatives })
                 .then((response) => {
+                    console.log('[Emotion Inference] Success:', response);
                     lastInferredHash = currentHash;
                     liveInferredEmotion = response.inferred_emotion;
+                    inferringEmotion = false;
+
                     // Get full emotion data from store
                     if (response.inferred_emotion?.closest_emotion_id) {
                         const e = emotionStore.get(
                             response.inferred_emotion.closest_emotion_id,
                         );
+                        console.log('[Emotion Inference] Found emotion in store:', e?.name);
                         inferredEmotionFull = e || null;
                     } else {
+                        console.log('[Emotion Inference] No closest emotion ID in response');
                         inferredEmotionFull = null;
                     }
                 })
                 .catch((error) => {
-                    console.error("Failed to infer emotion:", error);
+                    console.error('[Emotion Inference] Error:', error);
+                    inferringEmotion = false;
+                    inferenceError = error.message || 'Failed to infer emotion';
                     liveInferredEmotion = null;
                     inferredEmotionFull = null;
                 });
         } else {
-            liveInferredEmotion = null;
-            inferredEmotionFull = null;
+            console.log('[Emotion Inference] Hash unchanged, skipping inference');
         }
     });
 
@@ -383,6 +421,8 @@
 
     // Emotion handlers
     function handleEmotionSelect(emotion: Emotion) {
+        console.log('[Emotion Select]', { emotion: emotion.name, context: emotionContext });
+
         if (emotionContext?.type === "task") {
             selectedEmotion = emotion;
         } else if (
@@ -392,12 +432,14 @@
             if (emotionContext.index === -1) {
                 // Pending new positive item
                 pendingPositiveEmotion = emotion;
+                console.log('[Emotion Select] Set pending positive emotion:', emotion.name);
             } else {
                 positives = positives.map((p, i) =>
                     i === emotionContext!.index
                         ? { ...p, emotion_id: emotion.id }
                         : p,
                 );
+                console.log('[Emotion Select] Updated positive item at index', emotionContext.index);
             }
         } else if (
             emotionContext?.type === "negative" &&
@@ -406,12 +448,14 @@
             if (emotionContext.index === -1) {
                 // Pending new negative item
                 pendingNegativeEmotion = emotion;
+                console.log('[Emotion Select] Set pending negative emotion:', emotion.name);
             } else {
                 negatives = negatives.map((n, i) =>
                     i === emotionContext!.index
                         ? { ...n, emotion_id: emotion.id }
                         : n,
                 );
+                console.log('[Emotion Select] Updated negative item at index', emotionContext.index);
             }
         }
         emotionContext = null;
@@ -510,13 +554,16 @@
     // Reflection items
     function addPositive() {
         if (newPositive.trim()) {
-            positives = [
-                ...positives,
-                {
-                    text: newPositive.trim(),
-                    emotion_id: pendingPositiveEmotion?.id,
-                },
-            ];
+            const newItem = {
+                text: newPositive.trim(),
+                emotion_id: pendingPositiveEmotion?.id,
+            };
+            positives = [...positives, newItem];
+            console.log('[Add Positive]', {
+                newItem,
+                totalPositives: positives.length,
+                hasEmotion: !!newItem.emotion_id,
+            });
             newPositive = "";
             pendingPositiveEmotion = null;
         }
@@ -524,13 +571,16 @@
 
     function addNegative() {
         if (newNegative.trim()) {
-            negatives = [
-                ...negatives,
-                {
-                    text: newNegative.trim(),
-                    emotion_id: pendingNegativeEmotion?.id,
-                },
-            ];
+            const newItem = {
+                text: newNegative.trim(),
+                emotion_id: pendingNegativeEmotion?.id,
+            };
+            negatives = [...negatives, newItem];
+            console.log('[Add Negative]', {
+                newItem,
+                totalNegatives: negatives.length,
+                hasEmotion: !!newItem.emotion_id,
+            });
             newNegative = "";
             pendingNegativeEmotion = null;
         }
@@ -1137,20 +1187,15 @@
                         </div>
 
                         <!-- Inferred Emotion (side by side feel) -->
-                        {#if inferredEmotion}
-                            {@const inferredQuadrant =
-                                (inferredEmotionFull?.quadrant ||
-                                    inferredEmotion.quadrant ||
-                                    "green") as Quadrant}
-                            {@const colors = QUADRANT_COLORS[inferredQuadrant]}
-                            {@const meta = QUADRANT_META[inferredQuadrant]}
-
+                        {#if inferringEmotion || inferredEmotion || inferenceError}
                             <div class="relative">
                                 <div
                                     class="text-[10px] uppercase font-semibold text-primary/70 mb-2 flex items-center gap-1.5"
                                 >
                                     <Sparkles
-                                        class="w-3 h-3 text-primary animate-pulse"
+                                        class="w-3 h-3 text-primary {inferringEmotion
+                                            ? 'animate-pulse'
+                                            : ''}"
                                     />
                                     <span>Suggested</span>
                                     <div
@@ -1159,66 +1204,115 @@
                                     >
                                         <Info class="w-3 h-3 text-primary/50" />
                                     </div>
+                                    {#if inferringEmotion}
+                                        <span
+                                            class="loading loading-spinner loading-xs text-primary"
+                                        ></span>
+                                    {/if}
                                 </div>
 
-                                <div
-                                    class="tooltip tooltip-bottom w-full"
-                                    data-tip={inferredEmotionFull?.description ||
-                                        "Calculated from your reflections"}
-                                >
-                                    <button
-                                        class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
-                                        style="
-                                            background: linear-gradient(135deg, 
-                                                color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%, 
-                                                color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
-                                            border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
-                                        "
-                                        onclick={openEmotionForSuggested}
+                                {#if inferenceError}
+                                    <!-- Error State -->
+                                    <div
+                                        class="w-full rounded-xl p-2.5 flex items-center gap-2 bg-error/10 border border-error/30"
                                     >
-                                        <!-- Emoji -->
-                                        <div
-                                            class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
-                                            style="background: {colors.gradient}; opacity: 0.9;"
-                                        >
-                                            {#if inferredEmotionFull}
-                                                <OpenMoji
-                                                    emoji={inferredEmotionFull.emoji}
-                                                    alt={inferredEmotionFull?.name ||
-                                                        "Inferred Emotion"}
-                                                    size="sm"
-                                                />
-                                            {:else}
-                                                <Sparkles
-                                                    class="w-4 h-4 text-white/80"
-                                                />
-                                            {/if}
-                                        </div>
-
-                                        <!-- Info -->
-                                        <div class="flex-1 min-w-0 text-left">
-                                            <div
-                                                class="flex items-center gap-2"
-                                            >
-                                                <span
-                                                    class="text-sm font-semibold opacity-80"
-                                                >
-                                                    {inferredEmotionFull?.name ||
-                                                        "Suggesting..."}
-                                                </span>
-                                            </div>
-                                            <div
-                                                class="text-[10px] opacity-50 mt-0.5"
-                                            >
-                                                {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
-                                            </div>
-                                        </div>
-
-                                        <ChevronRight
-                                            class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
+                                        <CircleAlert
+                                            class="w-4 h-4 text-error shrink-0"
                                         />
-                                    </button>
-                                </div>
+                                        <span class="text-xs text-error"
+                                            >{inferenceError}</span
+                                        >
+                                    </div>
+                                {:else if inferringEmotion}
+                                    <!-- Loading State -->
+                                    <div
+                                        class="w-full rounded-xl p-2.5 flex items-center gap-3 bg-base-200 border border-base-300 animate-pulse"
+                                    >
+                                        <div
+                                            class="w-9 h-9 rounded-lg bg-base-300"
+                                        ></div>
+                                        <div class="flex-1">
+                                            <div
+                                                class="h-3 bg-base-300 rounded w-24 mb-1"
+                                            ></div>
+                                            <div
+                                                class="h-2 bg-base-300 rounded w-32"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                {:else if inferredEmotion}
+                                    {@const inferredQuadrant =
+                                        (inferredEmotionFull?.quadrant ||
+                                            inferredEmotion.quadrant ||
+                                            "green") as Quadrant}
+                                    {@const colors =
+                                        QUADRANT_COLORS[inferredQuadrant]}
+                                    {@const meta =
+                                        QUADRANT_META[inferredQuadrant]}
+                                    <!-- Emotion Display -->
+
+                                    <div
+                                        class="tooltip tooltip-bottom w-full"
+                                        data-tip={inferredEmotionFull?.description ||
+                                            "Calculated from your reflections"}
+                                    >
+                                        <button
+                                            class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
+                                            style="
+                                                background: linear-gradient(135deg,
+                                                    color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%,
+                                                    color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
+                                                border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
+                                            "
+                                            onclick={openEmotionForSuggested}
+                                        >
+                                            <!-- Emoji -->
+                                            <div
+                                                class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
+                                                style="background: {colors.gradient}; opacity: 0.9;"
+                                            >
+                                                {#if inferredEmotionFull}
+                                                    <OpenMoji
+                                                        emoji={inferredEmotionFull.emoji}
+                                                        alt={inferredEmotionFull?.name ||
+                                                            "Inferred Emotion"}
+                                                        size="sm"
+                                                    />
+                                                {:else}
+                                                    <Sparkles
+                                                        class="w-4 h-4 text-white/80"
+                                                    />
+                                                {/if}
+                                            </div>
+
+                                            <!-- Info -->
+                                            <div
+                                                class="flex-1 min-w-0 text-left"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <span
+                                                        class="text-sm font-semibold opacity-80"
+                                                    >
+                                                        {inferredEmotionFull?.name ||
+                                                            "Suggesting..."}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="text-[10px] opacity-50 mt-0.5"
+                                                >
+                                                    {meta?.energyLabel} Energy •
+                                                    {meta?.pleasantnessLabel}
+                                                </div>
+                                            </div>
+
+                                            <ChevronRight
+                                                class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
+                                            />
+                                        </button>
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
                     </div>
@@ -1261,7 +1355,7 @@
                                             pendingPositiveEmotion.quadrant as Quadrant
                                         ]}
                                     <div
-                                        class="tooltip tooltip-bottom tooltip-secondary"
+                                        class="tooltip tooltip-bottom"
                                         data-tip={pendingPositiveEmotion.description}
                                     >
                                         <button
@@ -1366,7 +1460,7 @@
                                                                     emotion.quadrant as Quadrant
                                                                 ]}
                                                             <div
-                                                                class="tooltip tooltip-bottom tooltip-secondary"
+                                                                class="tooltip tooltip-bottom"
                                                                 data-tip={emotion.description}
                                                             >
                                                                 <button
@@ -1482,7 +1576,7 @@
                                             pendingNegativeEmotion.quadrant as Quadrant
                                         ]}
                                     <div
-                                        class="tooltip tooltip-bottom tooltip-secondary"
+                                        class="tooltip tooltip-bottom"
                                         data-tip={pendingNegativeEmotion.description}
                                     >
                                         <button
@@ -1587,7 +1681,7 @@
                                                                     emotion.quadrant as Quadrant
                                                                 ]}
                                                             <div
-                                                                class="tooltip tooltip-bottom tooltip-secondary"
+                                                                class="tooltip tooltip-bottom"
                                                                 data-tip={emotion.description}
                                                             >
                                                                 <button
