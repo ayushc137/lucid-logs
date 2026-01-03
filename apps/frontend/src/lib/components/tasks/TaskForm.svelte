@@ -1111,7 +1111,7 @@
                                         <div
                                             class="text-[10px] opacity-50 mt-0.5"
                                         >
-                                            {meta?.energyLabel} • {meta?.pleasantnessLabel}
+                                            {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
                                         </div>
                                     </div>
 

@@ -33,7 +33,7 @@
   } from "@tanstack/svelte-query";
   import { getTasks, updateTask, type Task } from "$lib/api";
   import { getCategories, type Category } from "$lib/api/categories";
-  import type { Emotion } from "$lib/api/emotions";
+  import { getEmotion, type Emotion } from "$lib/api/emotions";
   import { cn } from "$lib/utils";
   import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
@@ -194,6 +194,10 @@
     inferredEmotionId?: string;
   };
 
+  // Cache for emotion data to avoid refetching
+  let emotionCache = new Map<string, Emotion>();
+  let emotionEnrichedTasks = $state<TimelineTask[]>([]);
+
   function transformTasks(apiTasks: Task[]): TimelineTask[] {
     return apiTasks.map((task) => {
       const startTime = task.start_date
@@ -214,13 +218,42 @@
         completed: task.completed,
         emoji: task.completed ? "✓" : undefined,
         categoryId: task.category?.id,
-        // Emotion data - we'll need to fetch the full emotion data if only ID is stored
-        // For now, we use inferred emotion name from the API response
         emotionId: task.emotion_id,
         inferredEmotionName: task.inferred_emotion?.closest_emotion_name,
         inferredEmotionId: task.inferred_emotion?.closest_emotion_id,
       };
     });
+  }
+
+  // Enrich tasks with emotion data
+  async function enrichTasksWithEmotions(
+    tasks: TimelineTask[],
+  ): Promise<TimelineTask[]> {
+    const enrichedTasks = await Promise.all(
+      tasks.map(async (task) => {
+        if (!task.emotionId) return task;
+
+        // Check cache first
+        let emotion = emotionCache.get(task.emotionId);
+        if (!emotion) {
+          try {
+            emotion = await getEmotion(task.emotionId);
+            emotionCache.set(task.emotionId, emotion);
+          } catch (e) {
+            console.error(`Failed to fetch emotion ${task.emotionId}:`, e);
+            return task;
+          }
+        }
+
+        return {
+          ...task,
+          emotionName: emotion.name,
+          emotionEmoji: emotion.emoji,
+          emotionQuadrant: emotion.quadrant,
+        };
+      }),
+    );
+    return enrichedTasks;
   }
 
   // Check if a task is relevant for the selected date view
@@ -235,7 +268,7 @@
   }
 
   // Combine current day tasks with overnight tasks from previous day
-  const allTasks = $derived(() => {
+  const allTasksRaw = $derived.by(() => {
     const currentDayTasks = transformTasks($tasksQuery.data?.items || []);
     const prevDayTasks = transformTasks($prevDayTasksQuery.data?.items || []);
 
@@ -255,6 +288,19 @@
 
     return Array.from(taskMap.values());
   });
+
+  // Enrich tasks with emotions when raw tasks change
+  $effect(() => {
+    const rawTasks = allTasksRaw;
+    enrichTasksWithEmotions(rawTasks).then((enriched) => {
+      emotionEnrichedTasks = enriched;
+    });
+  });
+
+  // Use enriched tasks for display
+  const allTasks = $derived(() =>
+    emotionEnrichedTasks.length > 0 ? emotionEnrichedTasks : allTasksRaw,
+  );
 
   const timelineTasks = $derived(
     selectedCategoryId
