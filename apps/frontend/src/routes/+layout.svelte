@@ -27,10 +27,8 @@
       $page.url.pathname.startsWith("/register"),
   );
 
-  // Show search ONLY on dashboard and tasks list
-  const showSearch = $derived(
-    $page.url.pathname === "/" || $page.url.pathname === "/tasks",
-  );
+  // Show search ONLY on dashboard
+  const showSearch = $derived($page.url.pathname === "/");
 
   onMount(() => {
     emotionStore.init();

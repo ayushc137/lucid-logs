@@ -36,6 +36,7 @@
     type EmotionSelectionContext,
   } from "$lib/components/tasks";
   import { EmotionModal } from "$lib/components/emotions";
+  import { emotionStore } from "$lib/stores/emotions.svelte";
   import {
     CategoryDropdown,
     StatusDropdown,
@@ -44,7 +45,13 @@
     ConfirmDialog,
     DataTable,
     SortableHeader,
+    OpenMoji,
   } from "$lib/components/ui";
+  import {
+    QUADRANT_COLORS,
+    QUADRANT_META,
+    type Quadrant,
+  } from "$lib/components/emotions/emotionData";
   import type { Emotion } from "$lib/api/emotions";
   import { cn } from "$lib/utils";
   import { goto } from "$app/navigation";
@@ -81,23 +88,23 @@
   });
 
   // Search and filter states
-  let searchQuery = $state(initialParams.q);
-  let debouncedSearch = $state(initialParams.q); // Initialize with same valid
-  let filterCategory = $state<string>(initialParams.cat);
+  let searchQuery = $state(initialParams.q as string);
+  let debouncedSearch = $state(initialParams.q as string); // Initialize with same valid
+  let filterCategory = $state<string>(initialParams.cat as string);
   let filterStatus = $state<"all" | "completed" | "pending">(
-    initialParams.status as any,
+    initialParams.status as "all" | "completed" | "pending",
   );
   let filterPriority = $state<"all" | "high" | "medium" | "low">(
-    initialParams.prio as any,
+    initialParams.prio as "all" | "high" | "medium" | "low",
   );
-  let showFilters = $state(initialParams.show);
+  let showFilters = $state(initialParams.show as boolean);
 
   // Today only toggle
-  let todayOnly = $state(initialParams.today);
+  let todayOnly = $state<boolean>(initialParams.today as boolean);
 
   // Date range filter
-  let dateFrom = $state(initialParams.from);
-  let dateTo = $state(initialParams.to);
+  let dateFrom = $state(initialParams.from as string);
+  let dateTo = $state(initialParams.to as string);
 
   // Sort states
   type SortField = "title" | "start_date" | "priority" | "created_at";
@@ -427,6 +434,46 @@
   <title>Tasks - Lucid Logs</title>
 </svelte:head>
 
+{#snippet taskEmotion(task: Task)}
+  {@const emotion =
+    task.emotion ||
+    (task.emotion_id ? emotionStore.get(task.emotion_id) : null) ||
+    (task.inferred_emotion
+      ? emotionStore.get(task.inferred_emotion.closest_emotion_id)
+      : null)}
+  {@const isInferred =
+    !task.emotion && !task.emotion_id && !!task.inferred_emotion}
+
+  {#if emotion}
+    {@const quadrant = emotion.quadrant as Quadrant}
+    {@const colors = QUADRANT_COLORS[quadrant]}
+    {@const meta = QUADRANT_META[quadrant]}
+    {@const tooltip = `${emotion.name}:
+${emotion.description}
+${meta.energyLabel} Energy • ${meta.pleasantnessLabel}
+${isInferred ? "(Inferred)" : ""}`}
+
+    <div
+      class="tooltip tooltip-right z-10 before:whitespace-pre before:text-left before:max-w-xs"
+      data-tip={tooltip}
+    >
+      <div
+        class={cn(
+          "flex items-center justify-center w-8 h-8 rounded-lg shadow-sm transition-transform hover:scale-110",
+          isInferred && "border border-dashed border-base-content/40",
+        )}
+        style="
+          background: {colors.gradient};
+        "
+      >
+        <OpenMoji emoji={emotion.emoji} size="md" />
+      </div>
+    </div>
+  {:else}
+    <span class="opacity-30 select-none">—</span>
+  {/if}
+{/snippet}
+
 <div class="max-w-6xl mx-auto space-y-6">
   <!-- Header -->
   <div
@@ -662,6 +709,7 @@
             {sortDirection}
             onSort={(f) => toggleSort(f as SortField)}
           />
+          <th class="w-16">Emotion</th>
           <th class="hidden lg:table-cell">Category</th>
           <SortableHeader
             label="Date"
@@ -715,43 +763,50 @@
 
             <!-- Title with Search Highlight -->
             <td>
-              <div class="flex flex-col gap-1">
-                <span
-                  class={cn(
-                    "font-semibold",
-                    task.completed && "line-through opacity-50",
-                  )}
-                >
-                  {#if debouncedSearch}
-                    {@html highlightText(task.title, debouncedSearch)}
-                  {:else}
-                    {task.title}
-                  {/if}
-                </span>
-                {#if task.journal}
-                  <span class="text-sm opacity-50 line-clamp-1 max-w-md">
+              <div class="flex items-start gap-3">
+                <div class="flex flex-col gap-1 flex-1">
+                  <span
+                    class={cn(
+                      "font-semibold",
+                      task.completed && "line-through opacity-50",
+                    )}
+                  >
                     {#if debouncedSearch}
-                      {@html highlightText(
-                        task.journal.replace(/<[^>]*>/g, "").slice(0, 80),
-                        debouncedSearch,
-                      )}
+                      {@html highlightText(task.title, debouncedSearch)}
                     {:else}
-                      {task.journal.replace(/<[^>]*>/g, "").slice(0, 80)}
+                      {task.title}
                     {/if}
                   </span>
-                {/if}
-                {#if task.category}
-                  <div class="lg:hidden mt-1">
-                    <span
-                      class="badge badge-sm"
-                      style="background-color: {task.category
-                        .color}20; color: {task.category.color};"
-                    >
-                      {task.category.name}
+                  {#if task.journal}
+                    <span class="text-sm opacity-50 line-clamp-1 max-w-md">
+                      {#if debouncedSearch}
+                        {@html highlightText(
+                          task.journal.replace(/<[^>]*>/g, "").slice(0, 80),
+                          debouncedSearch,
+                        )}
+                      {:else}
+                        {task.journal.replace(/<[^>]*>/g, "").slice(0, 80)}
+                      {/if}
                     </span>
-                  </div>
-                {/if}
+                  {/if}
+                  {#if task.category}
+                    <div class="lg:hidden mt-1">
+                      <span
+                        class="badge badge-sm"
+                        style="background-color: {task.category
+                          .color}20; color: {task.category.color};"
+                      >
+                        {task.category.name}
+                      </span>
+                    </div>
+                  {/if}
+                </div>
               </div>
+            </td>
+
+            <!-- Emotion -->
+            <td>
+              {@render taskEmotion(task)}
             </td>
 
             <!-- Category -->

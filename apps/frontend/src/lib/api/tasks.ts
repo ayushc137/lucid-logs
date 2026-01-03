@@ -1,5 +1,5 @@
 import { api, unwrap, type PaginatedResponse } from './client';
-import type { InferredEmotion } from './emotions';
+import type { InferredEmotion, Emotion } from './emotions';
 
 // =============================================================================
 // TASK TYPES (matching Go backend)
@@ -19,6 +19,7 @@ export interface Task {
     negatives: TaskItem[];
     category?: Category;
     emotion_id?: string;
+    emotion?: Emotion;
     inferred_emotion?: InferredEmotion;
     activity_key?: string;
     template_id?: string;
