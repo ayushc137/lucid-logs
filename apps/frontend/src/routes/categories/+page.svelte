@@ -441,7 +441,7 @@
         >
             <div class="overflow-x-auto">
                 <table class="table table-lg">
-                    <thead class="bg-base-200">
+                    <thead class="bg-base-100 border-b border-base-300">
                         <tr>
                             <th class="w-16">Color</th>
                             <th>Name</th>

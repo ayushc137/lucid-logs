@@ -1,11 +1,14 @@
 <script lang="ts">
   import { Sidebar, Header } from "$lib/components/layout";
+  import type { Snippet } from "svelte";
 
   interface Props {
-    children: import("svelte").Snippet;
+    children: Snippet;
+    showSearch?: boolean;
+    headerContent?: Snippet;
   }
 
-  let { children }: Props = $props();
+  let { children, showSearch = true, headerContent }: Props = $props();
   let sidebarCollapsed = $state(false);
   let mobileMenuOpen = $state(false);
 
@@ -50,9 +53,13 @@
 
   <!-- Main Content -->
   <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-    <Header onMenuClick={() => (mobileMenuOpen = true)} />
+    <Header
+      onMenuClick={() => (mobileMenuOpen = true)}
+      {showSearch}
+      {headerContent}
+    />
 
-    <main class="flex-1 overflow-y-auto bg-muted/30">
+    <main class="flex-1 overflow-y-auto bg-base-200/60">
       <div class="p-4 md:p-6 lg:p-8 h-full">
         <!-- Relaxed width constraint for wider timeline view -->
         <div class="w-full h-full">

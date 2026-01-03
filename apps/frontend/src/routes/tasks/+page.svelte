@@ -639,7 +639,7 @@
   {:else}
     <DataTable variant="lg">
       <!-- Table Header with Sortable Columns -->
-      <thead class="bg-base-200">
+      <thead class="bg-base-100 border-b border-base-300">
         <tr>
           <th class="w-12"></th>
           <SortableHeader

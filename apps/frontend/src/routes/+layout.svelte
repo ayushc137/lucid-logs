@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
-  import { page } from '$app/stores';
-  import { AppShell } from '$lib/components/layout';
-  import { AuthGuard } from '$lib/components/auth';
-  
+  import { QueryClient, QueryClientProvider } from "@tanstack/svelte-query";
+  import { page } from "$app/stores";
+  import { AppShell } from "$lib/components/layout";
+  import { AuthGuard } from "$lib/components/auth";
+
   // App styles (Tailwind via PostCSS)
-  import '../app.css';
+  import "../app.css";
 
   let { children } = $props();
 
@@ -21,7 +21,13 @@
   });
 
   const isAuthPage = $derived(
-    $page.url.pathname.startsWith('/login') || $page.url.pathname.startsWith('/register')
+    $page.url.pathname.startsWith("/login") ||
+      $page.url.pathname.startsWith("/register"),
+  );
+
+  // Show search ONLY on dashboard and tasks list
+  const showSearch = $derived(
+    $page.url.pathname === "/" || $page.url.pathname === "/tasks",
   );
 </script>
 
@@ -32,7 +38,7 @@
     </div>
   {:else}
     <AuthGuard>
-      <AppShell>
+      <AppShell {showSearch}>
         {@render children()}
       </AppShell>
     </AuthGuard>
