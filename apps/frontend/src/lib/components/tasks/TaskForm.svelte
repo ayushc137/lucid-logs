@@ -1268,7 +1268,7 @@
                                         >
                                             <!-- Emoji -->
                                             <div
-                                                class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
+                                                class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
                                                 style="background: {colors.gradient}; opacity: 0.9;"
                                             >
                                                 {#if inferredEmotionFull}
@@ -1276,7 +1276,7 @@
                                                         emoji={inferredEmotionFull.emoji}
                                                         alt={inferredEmotionFull?.name ||
                                                             "Inferred Emotion"}
-                                                        size="sm"
+                                                        size="md"
                                                     />
                                                 {:else}
                                                     <Sparkles
@@ -1368,13 +1368,13 @@
                                             onclick={openEmotionForPendingPositive}
                                         >
                                             <span
-                                                class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                class="w-6 h-6 rounded-md flex items-center justify-center"
                                                 style="background: {colors.gradient};"
                                             >
                                                 <OpenMoji
                                                     emoji={pendingPositiveEmotion.emoji}
                                                     alt={pendingPositiveEmotion.name}
-                                                    size="xs"
+                                                    size="sm"
                                                 />
                                             </span>
                                             <span class="truncate max-w-[80px]"
@@ -1476,13 +1476,13 @@
                                                                         )}
                                                                 >
                                                                     <span
-                                                                        class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                                        class="w-6 h-6 rounded-md flex items-center justify-center"
                                                                         style="background: {colors.gradient};"
                                                                     >
                                                                         <OpenMoji
                                                                             emoji={emotion.emoji}
                                                                             alt={emotion.name}
-                                                                            size="xs"
+                                                                            size="sm"
                                                                         />
                                                                     </span>
                                                                     <span
@@ -1589,13 +1589,13 @@
                                             onclick={openEmotionForPendingNegative}
                                         >
                                             <span
-                                                class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                class="w-6 h-6 rounded-md flex items-center justify-center"
                                                 style="background: {colors.gradient};"
                                             >
                                                 <OpenMoji
                                                     emoji={pendingNegativeEmotion.emoji}
                                                     alt={pendingNegativeEmotion.name}
-                                                    size="xs"
+                                                    size="sm"
                                                 />
                                             </span>
                                             <span class="truncate max-w-[80px]"
@@ -1697,13 +1697,13 @@
                                                                         )}
                                                                 >
                                                                     <span
-                                                                        class="w-5 h-5 rounded-md flex items-center justify-center"
+                                                                        class="w-6 h-6 rounded-md flex items-center justify-center"
                                                                         style="background: {colors.gradient};"
                                                                     >
                                                                         <OpenMoji
                                                                             emoji={emotion.emoji}
                                                                             alt={emotion.name}
-                                                                            size="xs"
+                                                                            size="sm"
                                                                         />
                                                                     </span>
                                                                     <span
