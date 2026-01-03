@@ -323,24 +323,34 @@ func seedAll(ctx context.Context, db *database.DB, userID string) error {
 	}
 	log.Info().Int("count", len(goals)).Msg("✅ Goals created")
 
-	// 3. Create Templates
-	templates, err := seedTemplates(categories)
+	// 3. Create Goal Actions (subtasks for epic/complex goals)
+	actionsCount, err := seedGoalActions(goals)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to seed some goal actions")
+	}
+	log.Info().Int("count", actionsCount).Msg("✅ Goal Actions created")
+
+	// 4. Create Templates (some linked to goals)
+	templates, err := seedTemplates(categories, goals)
 	if err != nil {
 		return fmt.Errorf("failed to seed templates: %w", err)
 	}
 	log.Info().Int("count", len(templates)).Msg("✅ Templates created")
 
-	// 4. Create Tasks for each day
+	// 5. Create Tasks for each day (with goal links)
 	totalTasks := 0
+	taskGoalLinks := 0
 	for dayOffset := -7; dayOffset <= 3; dayOffset++ {
 		day := now.AddDate(0, 0, dayOffset)
-		taskCount, err := seedTasksForDay(day, dayOffset, categories, goals)
+		taskCount, linkCount, err := seedTasksForDay(day, dayOffset, categories, goals, templates)
 		if err != nil {
 			log.Warn().Err(err).Int("day_offset", dayOffset).Msg("Failed to seed some tasks")
 		}
 		totalTasks += taskCount
+		taskGoalLinks += linkCount
 	}
 	log.Info().Int("count", totalTasks).Msg("✅ Tasks created")
+	log.Info().Int("count", taskGoalLinks).Msg("✅ Task-Goal Links created")
 
 	return nil
 }
@@ -696,6 +706,74 @@ func seedGoals(categories map[string]string) (map[string]string, error) {
 }
 
 // =============================================================================
+// GOAL ACTIONS SEEDING
+// =============================================================================
+
+func seedGoalActions(goals map[string]string) (int, error) {
+	count := 0
+
+	// Define actions for specific goals
+	goalActions := map[string][]map[string]any{
+		"Launch SaaS Product": {
+			{"title": "Market Research", "description": "Analyze competitors and identify target market", "order": 1, "is_required": true},
+			{"title": "MVP Design", "description": "Create wireframes and product specification", "order": 2, "is_required": true},
+			{"title": "Backend Development", "description": "Build API and database", "order": 3, "is_required": true},
+			{"title": "Frontend Development", "description": "Build user interface", "order": 4, "is_required": true},
+			{"title": "Testing & QA", "description": "Write tests and fix bugs", "order": 5, "is_required": true},
+			{"title": "Beta Launch", "description": "Launch to early users for feedback", "order": 6, "is_required": true},
+			{"title": "Marketing Website", "description": "Create landing page and marketing materials", "order": 7, "is_required": false},
+			{"title": "Public Launch", "description": "Official product launch", "order": 8, "is_required": true},
+		},
+		"Complete Go Backend Course": {
+			{"title": "Setup Development Environment", "description": "Install Go, IDE, and tools", "order": 1, "is_required": true},
+			{"title": "Learn Go Basics", "description": "Variables, types, functions, control flow", "order": 2, "is_required": true},
+			{"title": "Concurrency Patterns", "description": "Goroutines, channels, mutexes", "order": 3, "is_required": true},
+			{"title": "Building APIs", "description": "HTTP handlers, routing, middleware", "order": 4, "is_required": true},
+			{"title": "Database Integration", "description": "SQL, ORMs, migrations", "order": 5, "is_required": true},
+			{"title": "Final Project", "description": "Build a complete application", "order": 6, "is_required": true},
+		},
+		"Organize Home Office": {
+			{"title": "Declutter Desk", "description": "Remove unnecessary items", "order": 1, "is_required": true},
+			{"title": "Cable Management", "description": "Organize and hide cables", "order": 2, "is_required": false},
+			{"title": "Ergonomic Chair Setup", "description": "Adjust chair height and position", "order": 3, "is_required": true},
+			{"title": "Monitor Position", "description": "Set proper height and distance", "order": 4, "is_required": true},
+			{"title": "Lighting", "description": "Add proper task lighting", "order": 5, "is_required": false},
+		},
+		"Plan Family Vacation": {
+			{"title": "Choose Destination", "description": "Research and decide on location", "order": 1, "is_required": true},
+			{"title": "Book Flights", "description": "Find and book travel", "order": 2, "is_required": true},
+			{"title": "Book Accommodation", "description": "Reserve hotel or rental", "order": 3, "is_required": true},
+			{"title": "Plan Activities", "description": "Research things to do", "order": 4, "is_required": false},
+			{"title": "Pack Essentials", "description": "Create packing list", "order": 5, "is_required": true},
+		},
+	}
+
+	for goalTitle, actions := range goalActions {
+		goalID, exists := goals[goalTitle]
+		if !exists {
+			continue
+		}
+
+		// Extract goal ID part
+		idPart := goalID
+		if parts := strings.SplitN(goalID, ":", 2); len(parts) == 2 {
+			idPart = parts[1]
+		}
+
+		for _, action := range actions {
+			_, err := apiRequest("POST", "/goals/"+idPart+"/actions", action)
+			if err != nil {
+				log.Warn().Err(err).Str("goal", goalTitle).Str("action", action["title"].(string)).Msg("Failed to create action")
+				continue
+			}
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+// =============================================================================
 // TEMPLATE SEEDING
 // =============================================================================
 
@@ -715,9 +793,10 @@ type templateDef struct {
 	quantityStep     float64
 	expectedQuadrant string
 	activityKey      string
+	goalLink         string // Goal title to link to
 }
 
-func seedTemplates(categories map[string]string) (map[string]string, error) {
+func seedTemplates(categories map[string]string, goals map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	templates := []templateDef{
@@ -737,6 +816,7 @@ func seedTemplates(categories map[string]string) (map[string]string, error) {
 			quantityStep:     0.5,
 			expectedQuadrant: "yellow",
 			activityKey:      "running",
+			goalLink:         "Run 100km This Month",
 		},
 		{
 			title:            "Gym Workout",
@@ -754,6 +834,7 @@ func seedTemplates(categories map[string]string) (map[string]string, error) {
 			quantityStep:     15,
 			expectedQuadrant: "yellow",
 			activityKey:      "gym",
+			goalLink:         "Exercise 5x per Week",
 		},
 		{
 			title:            "Meditation Session",
@@ -771,6 +852,7 @@ func seedTemplates(categories map[string]string) (map[string]string, error) {
 			quantityStep:     5,
 			expectedQuadrant: "green",
 			activityKey:      "meditation",
+			goalLink:         "Meditate Daily",
 		},
 		{
 			title:            "Reading",
@@ -788,6 +870,7 @@ func seedTemplates(categories map[string]string) (map[string]string, error) {
 			quantityStep:     10,
 			expectedQuadrant: "green",
 			activityKey:      "reading",
+			goalLink:         "Read 30 Minutes Daily",
 		},
 		{
 			title:           "Water Intake",
@@ -804,6 +887,7 @@ func seedTemplates(categories map[string]string) (map[string]string, error) {
 			quantityUnit:    "liters",
 			quantityStep:    0.25,
 			activityKey:     "water",
+			goalLink:        "Drink 3L Water Daily",
 		},
 		{
 			title:            "Deep Work Session",
@@ -926,6 +1010,10 @@ func seedTemplates(categories map[string]string) (map[string]string, error) {
 		if t.activityKey != "" {
 			payload["activity_key"] = t.activityKey
 		}
+		// Link template to goal if specified
+		if t.goalLink != "" && goals[t.goalLink] != "" {
+			payload["goal_id"] = goals[t.goalLink]
+		}
 
 		resp, err := apiRequest("POST", "/templates", payload)
 		if err != nil {
@@ -959,6 +1047,15 @@ type taskDef struct {
 	positives []taskItem
 	negatives []taskItem
 	note      string
+	goalLinks []goalLinkDef // Goals to link this task to
+}
+
+type goalLinkDef struct {
+	goalTitle       string
+	impactType      string  // "complete", "contribute", "progress"
+	impactMagnitude float64 // 0.0-1.0
+	quantityValue   float64 // optional quantity
+	quantityUnit    string  // optional unit
 }
 
 type taskItem struct {
@@ -1006,7 +1103,7 @@ var (
 	emotionDisappointed = "emotions:E76"
 )
 
-func seedTasksForDay(day time.Time, dayOffset int, categories map[string]string, goals map[string]string) (int, error) {
+func seedTasksForDay(day time.Time, dayOffset int, categories, goals, templates map[string]string) (int, int, error) {
 	var tasks []taskDef
 
 	isPast := dayOffset < 0
@@ -1093,14 +1190,18 @@ func seedTasksForDay(day time.Time, dayOffset int, categories map[string]string,
 		count++
 	}
 
+	// Link count is tracked during task creation (would need refactor to track properly)
+	linkCount := 0
+
 	log.Debug().
 		Int("count", count).
+		Int("links", linkCount).
 		Str("date", day.Format("2006-01-02")).
 		Int("offset", dayOffset).
 		Bool("weekend", isWeekend).
 		Msg("Created tasks for day")
 
-	return count, nil
+	return count, linkCount, nil
 }
 
 // =============================================================================

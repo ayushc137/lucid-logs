@@ -67,3 +67,50 @@ export {
     type UpdateCategoryRequest,
     type CategoryPageResponse
 } from './categories';
+
+// Templates
+export {
+    getTemplates,
+    getTemplate,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
+    getQuickLogTemplates,
+    type TaskTemplate,
+    type ShowFields,
+    type CreateTemplateRequest,
+    type UpdateTemplateRequest,
+    type InstantiateTemplateRequest
+} from './templates';
+
+// Task-Goal Links
+export {
+    getGoalsForTask,
+    linkTaskToGoal,
+    batchLinkTaskToGoals,
+    updateTaskGoalLink,
+    unlinkTaskFromGoal,
+    getTasksForGoal,
+    type TaskGoalWithGoal,
+    type TaskGoalWithTask,
+    type LinkTaskToGoalRequest,
+    type BatchLinkRequest,
+    type UpdateLinkRequest as UpdateTaskGoalLinkRequest,
+    type GoalsForTaskResponse,
+    type TasksForGoalResponse
+} from './taskGoals';
+
+// Goal Actions
+export {
+    getGoalActions,
+    createGoalAction,
+    updateGoalAction,
+    deleteGoalAction,
+    reorderGoalActions,
+    toggleActionComplete,
+    type GoalAction,
+    type CreateGoalActionRequest,
+    type UpdateGoalActionRequest,
+    type ReorderActionsRequest,
+    type ActionListResponse
+} from './goalActions';

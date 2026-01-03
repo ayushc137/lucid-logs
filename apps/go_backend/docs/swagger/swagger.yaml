@@ -2537,6 +2537,15 @@ paths:
         in: query
         name: recurring
         type: boolean
+      - description: Search in title and description
+        in: query
+        name: search
+        type: string
+      - description: Sort by field (created_at, title, streak, priority) with optional
+          -desc suffix
+        in: query
+        name: sort_by
+        type: string
       produces:
       - application/json
       responses:

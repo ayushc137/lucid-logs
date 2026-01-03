@@ -71,6 +71,8 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 // @Param        status     query string false "Filter by status (active, completed, paused, abandoned)"
 // @Param        goal_type  query string false "Filter by type (discrete, measurable, epic, avoidance)"
 // @Param        recurring  query bool   false "Filter recurring (true) or one-time (false)"
+// @Param        search     query string false "Search in title and description"
+// @Param        sort_by    query string false "Sort by field (created_at, title, streak, priority) with optional -desc suffix"
 // @Success      200 {object} GoalPageResponse
 // @Failure      401 {object} response.APIResponse
 // @Failure      500 {object} response.APIResponse
@@ -90,6 +92,8 @@ func (h *Handler) List(c *gin.Context) {
 		Status:     c.Query("status"),
 		GoalType:   c.Query("goal_type"),
 		LifeDomain: c.Query("life_domain"),
+		Search:     c.Query("search"),
+		SortBy:     c.Query("sort_by"),
 	}
 	if recurring := c.Query("recurring"); recurring != "" {
 		isRecurring := recurring == "true"

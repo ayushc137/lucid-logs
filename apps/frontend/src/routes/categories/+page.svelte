@@ -210,6 +210,17 @@
     }
 
     const isSearching = $derived(searchQuery !== debouncedSearch);
+
+    // Highlight search matches
+    function highlightText(text: string, query: string): string {
+        if (!query || !text) return text;
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`(${escapedQuery})`, "gi");
+        return text.replace(
+            regex,
+            '<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
+        );
+    }
 </script>
 
 <svelte:head>
@@ -571,9 +582,16 @@
                                     </td>
                                     <td>
                                         <div class="flex items-center gap-3">
-                                            <span class="font-semibold"
-                                                >{category.name}</span
-                                            >
+                                            <span class="font-semibold">
+                                                {#if debouncedSearch}
+                                                    {@html highlightText(
+                                                        category.name,
+                                                        debouncedSearch,
+                                                    )}
+                                                {:else}
+                                                    {category.name}
+                                                {/if}
+                                            </span>
                                             <span
                                                 class="badge badge-sm"
                                                 style="background-color: {category.color}20; color: {category.color};"

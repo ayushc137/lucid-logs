@@ -91,11 +91,19 @@ export async function getGoals(params?: {
     limit?: number;
     offset?: number;
     status?: string;
+    goal_type?: string;
+    recurring?: boolean;
+    search?: string;
+    sort_by?: string;
 }): Promise<PaginatedResponse<Goal>> {
     const searchParams = new URLSearchParams();
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.offset) searchParams.set('offset', String(params.offset));
     if (params?.status) searchParams.set('status', params.status);
+    if (params?.goal_type) searchParams.set('goal_type', params.goal_type);
+    if (params?.recurring !== undefined) searchParams.set('recurring', String(params.recurring));
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.sort_by) searchParams.set('sort_by', params.sort_by);
 
     return unwrap(api.get('goals', { searchParams }));
 }

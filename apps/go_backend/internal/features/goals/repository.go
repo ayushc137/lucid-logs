@@ -76,6 +76,8 @@ type GoalFilters struct {
 	GoalType    string // Filter by goal type
 	LifeDomain  string // Filter by life domain
 	IsRecurring *bool  // Filter recurring (true) vs one-time (false)
+	Search      string // Search in title and description
+	SortBy      string // Sort field with optional -desc suffix
 }
 
 // =============================================================================
@@ -412,8 +414,42 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 			conditions = append(conditions, "recurrence IS NONE")
 		}
 	}
+	// Search filter - search in title and description
+	if filters.Search != "" {
+		conditions = append(conditions, "(string::lowercase(title) CONTAINS string::lowercase($search) OR string::lowercase(description) CONTAINS string::lowercase($search))")
+		queryVars["search"] = filters.Search
+	}
 
 	whereClause := strings.Join(conditions, " AND ")
+
+	// Determine sort order
+	orderClause := "ORDER BY created_at DESC" // default
+	if filters.SortBy != "" {
+		sortField := filters.SortBy
+		sortDir := "ASC"
+		if strings.HasSuffix(sortField, "-desc") {
+			sortField = strings.TrimSuffix(sortField, "-desc")
+			sortDir = "DESC"
+		} else if strings.HasSuffix(sortField, "-asc") {
+			sortField = strings.TrimSuffix(sortField, "-asc")
+			sortDir = "ASC"
+		}
+		// Map allowed sort fields
+		switch sortField {
+		case "title":
+			orderClause = "ORDER BY title " + sortDir
+		case "streak":
+			orderClause = "ORDER BY current_streak " + sortDir
+		case "priority":
+			orderClause = "ORDER BY priority " + sortDir
+		case "updated_at":
+			orderClause = "ORDER BY updated_at " + sortDir
+		case "created_at":
+			orderClause = "ORDER BY created_at " + sortDir
+		default:
+			orderClause = "ORDER BY created_at DESC"
+		}
+	}
 
 	// Count query
 	countQuery := "RETURN (SELECT count() FROM goals WHERE " + whereClause + " GROUP ALL)[0].count OR 0"
@@ -424,7 +460,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Main query with linked tasks subquery
-	dataQuery := "SELECT *, (SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, quantity_unit FROM task_goals WHERE out = $parent.id) as linked_tasks FROM goals WHERE " + whereClause + " ORDER BY created_at DESC LIMIT $limit START $offset FETCH category"
+	dataQuery := "SELECT *, (SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, quantity_unit FROM task_goals WHERE out = $parent.id) as linked_tasks FROM goals WHERE " + whereClause + " " + orderClause + " LIMIT $limit START $offset FETCH category"
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, dataQuery, queryVars)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("list query failed")

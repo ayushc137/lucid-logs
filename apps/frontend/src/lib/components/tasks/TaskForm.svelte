@@ -36,6 +36,7 @@
         SectionHeader,
     } from "$lib/components/ui";
     import { EmotionModal } from "$lib/components/emotions";
+    import { GoalSelector } from "$lib/components/goals";
     import { cn } from "$lib/utils";
     import { goto } from "$app/navigation";
     import { browser } from "$app/environment";
@@ -60,6 +61,7 @@
         Edit3,
         FileText,
         Info,
+        Target,
     } from "lucide-svelte";
 
     import { onDestroy } from "svelte";
@@ -116,6 +118,16 @@
     let newPositive = $state("");
     let newNegative = $state("");
     let completed = $state(false);
+
+    // Goal links state
+    interface GoalLink {
+        goal_id: string;
+        impact_type: "positive" | "negative" | "neutral";
+        impact_magnitude: number;
+        quantity_value?: number;
+        quantity_unit?: string;
+    }
+    let goalLinks = $state<GoalLink[]>([]);
 
     // Emotion state
     let selectedEmotion = $state<Emotion | null>(null);
@@ -224,7 +236,7 @@
             lastInferredHash = getReflectionsHash([], []);
         }
         formInitialized = true;
-        console.log('[TaskForm Init] Initialized:', {
+        console.log("[TaskForm Init] Initialized:", {
             isEditing,
             lastInferredHash,
             formInitialized,
@@ -258,18 +270,18 @@
             positives.some((p) => p.emotion_id) ||
             negatives.some((n) => n.emotion_id);
 
-        console.log('[Emotion Inference] Effect triggered:', {
+        console.log("[Emotion Inference] Effect triggered:", {
             hasEmotions,
             currentHash,
             lastInferredHash,
             positivesCount: positives.length,
             negativesCount: negatives.length,
-            positivesWithEmotions: positives.filter(p => p.emotion_id).length,
-            negativesWithEmotions: negatives.filter(n => n.emotion_id).length,
+            positivesWithEmotions: positives.filter((p) => p.emotion_id).length,
+            negativesWithEmotions: negatives.filter((n) => n.emotion_id).length,
         });
 
         if (!hasEmotions) {
-            console.log('[Emotion Inference] No emotions, clearing inference');
+            console.log("[Emotion Inference] No emotions, clearing inference");
             liveInferredEmotion = null;
             inferredEmotionFull = null;
             inferringEmotion = false;
@@ -278,13 +290,13 @@
         }
 
         if (currentHash !== lastInferredHash) {
-            console.log('[Emotion Inference] Starting inference...');
+            console.log("[Emotion Inference] Starting inference...");
             inferringEmotion = true;
             inferenceError = null;
 
             inferEmotion({ positives, negatives })
                 .then((response) => {
-                    console.log('[Emotion Inference] Success:', response);
+                    console.log("[Emotion Inference] Success:", response);
                     lastInferredHash = currentHash;
                     liveInferredEmotion = response.inferred_emotion;
                     inferringEmotion = false;
@@ -294,22 +306,29 @@
                         const e = emotionStore.get(
                             response.inferred_emotion.closest_emotion_id,
                         );
-                        console.log('[Emotion Inference] Found emotion in store:', e?.name);
+                        console.log(
+                            "[Emotion Inference] Found emotion in store:",
+                            e?.name,
+                        );
                         inferredEmotionFull = e || null;
                     } else {
-                        console.log('[Emotion Inference] No closest emotion ID in response');
+                        console.log(
+                            "[Emotion Inference] No closest emotion ID in response",
+                        );
                         inferredEmotionFull = null;
                     }
                 })
                 .catch((error) => {
-                    console.error('[Emotion Inference] Error:', error);
+                    console.error("[Emotion Inference] Error:", error);
                     inferringEmotion = false;
-                    inferenceError = error.message || 'Failed to infer emotion';
+                    inferenceError = error.message || "Failed to infer emotion";
                     liveInferredEmotion = null;
                     inferredEmotionFull = null;
                 });
         } else {
-            console.log('[Emotion Inference] Hash unchanged, skipping inference');
+            console.log(
+                "[Emotion Inference] Hash unchanged, skipping inference",
+            );
         }
     });
 
@@ -421,7 +440,10 @@
 
     // Emotion handlers
     function handleEmotionSelect(emotion: Emotion) {
-        console.log('[Emotion Select]', { emotion: emotion.name, context: emotionContext });
+        console.log("[Emotion Select]", {
+            emotion: emotion.name,
+            context: emotionContext,
+        });
 
         if (emotionContext?.type === "task") {
             selectedEmotion = emotion;
@@ -432,14 +454,20 @@
             if (emotionContext.index === -1) {
                 // Pending new positive item
                 pendingPositiveEmotion = emotion;
-                console.log('[Emotion Select] Set pending positive emotion:', emotion.name);
+                console.log(
+                    "[Emotion Select] Set pending positive emotion:",
+                    emotion.name,
+                );
             } else {
                 positives = positives.map((p, i) =>
                     i === emotionContext!.index
                         ? { ...p, emotion_id: emotion.id }
                         : p,
                 );
-                console.log('[Emotion Select] Updated positive item at index', emotionContext.index);
+                console.log(
+                    "[Emotion Select] Updated positive item at index",
+                    emotionContext.index,
+                );
             }
         } else if (
             emotionContext?.type === "negative" &&
@@ -448,14 +476,20 @@
             if (emotionContext.index === -1) {
                 // Pending new negative item
                 pendingNegativeEmotion = emotion;
-                console.log('[Emotion Select] Set pending negative emotion:', emotion.name);
+                console.log(
+                    "[Emotion Select] Set pending negative emotion:",
+                    emotion.name,
+                );
             } else {
                 negatives = negatives.map((n, i) =>
                     i === emotionContext!.index
                         ? { ...n, emotion_id: emotion.id }
                         : n,
                 );
-                console.log('[Emotion Select] Updated negative item at index', emotionContext.index);
+                console.log(
+                    "[Emotion Select] Updated negative item at index",
+                    emotionContext.index,
+                );
             }
         }
         emotionContext = null;
@@ -559,7 +593,7 @@
                 emotion_id: pendingPositiveEmotion?.id,
             };
             positives = [...positives, newItem];
-            console.log('[Add Positive]', {
+            console.log("[Add Positive]", {
                 newItem,
                 totalPositives: positives.length,
                 hasEmotion: !!newItem.emotion_id,
@@ -576,7 +610,7 @@
                 emotion_id: pendingNegativeEmotion?.id,
             };
             negatives = [...negatives, newItem];
-            console.log('[Add Negative]', {
+            console.log("[Add Negative]", {
                 newItem,
                 totalNegatives: negatives.length,
                 hasEmotion: !!newItem.emotion_id,
@@ -1044,6 +1078,17 @@
                             >
                         {/each}
                     </div>
+                </Card>
+
+                <!-- Goals Section -->
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
+                    <GoalSelector
+                        value={goalLinks}
+                        onChange={(links) => (goalLinks = links)}
+                    />
                 </Card>
 
                 <!-- Emotion Section - Redesigned -->

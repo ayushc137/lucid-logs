@@ -855,6 +855,18 @@
                         "description": "Filter recurring (true) or one-time (false)",
                         "name": "recurring",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search in title and description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort by field (created_at, title, streak, priority) with optional -desc suffix",
+                        "name": "sort_by",
+                        "in": "query"
                     }
                 ],
                 "responses": {
