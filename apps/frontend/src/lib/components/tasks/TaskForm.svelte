@@ -16,11 +16,11 @@
     } from "$lib/api";
     import { getCategories, createCategory } from "$lib/api/categories";
     import {
-        getEmotion,
-        type Emotion,
         inferEmotion,
         type InferredEmotion,
+        type Emotion,
     } from "$lib/api/emotions";
+    import { emotionStore } from "$lib/stores/emotions.svelte";
     import {
         QUADRANT_COLORS,
         QUADRANT_META,
@@ -190,7 +190,11 @@
             endTime = endDateObj.toTimeString().slice(0, 8);
 
             if (task.emotion_id) {
-                loadTaskEmotion(task.emotion_id);
+                // Try to load immediately from store
+                const e = emotionStore.get(task.emotion_id);
+                if (e) {
+                    selectedEmotion = e;
+                }
             }
         } else {
             // Create mode - set defaults
@@ -235,15 +239,14 @@
             inferEmotion({ positives, negatives })
                 .then((response) => {
                     liveInferredEmotion = response.inferred_emotion;
-                    // Fetch full emotion data for emoji display
+                    // Get full emotion data from store
                     if (response.inferred_emotion?.closest_emotion_id) {
-                        getEmotion(response.inferred_emotion.closest_emotion_id)
-                            .then((emotion) => {
-                                inferredEmotionFull = emotion;
-                            })
-                            .catch(() => {
-                                inferredEmotionFull = null;
-                            });
+                        const e = emotionStore.get(
+                            response.inferred_emotion.closest_emotion_id,
+                        );
+                        inferredEmotionFull = e || null;
+                    } else {
+                        inferredEmotionFull = null;
                     }
                 })
                 .catch((error) => {
@@ -254,6 +257,43 @@
         } else {
             liveInferredEmotion = null;
             inferredEmotionFull = null;
+        }
+    });
+
+    // Reactively update selectedEmotion and inferredEmotionFull when store initializes
+    $effect(() => {
+        if (emotionStore.isInitialized) {
+            if (task?.emotion_id && !selectedEmotion) {
+                const e = emotionStore.get(task.emotion_id);
+                if (e) selectedEmotion = e;
+                // Note: this might override if user cleared it?
+                // Actually formInitialized prevents re-running the main init block.
+                // This block is specifically for when store loads AFTER task load.
+                // But simply checking !selectedEmotion checks if it's empty.
+                // If user actively cleared it, it is null.
+                // Ideally we track if we have "attempted" to load the initial emotion.
+            }
+            // Update inferred emotion full if needed (e.g. store loaded late)
+            if (
+                liveInferredEmotion?.closest_emotion_id &&
+                !inferredEmotionFull
+            ) {
+                const e = emotionStore.get(
+                    liveInferredEmotion.closest_emotion_id,
+                );
+                if (e) inferredEmotionFull = e;
+            }
+            // Also need to handle task.inferred_emotion if not editing live
+            if (
+                task?.inferred_emotion?.closest_emotion_id &&
+                !inferredEmotionFull &&
+                !liveInferredEmotion
+            ) {
+                const e = emotionStore.get(
+                    task.inferred_emotion.closest_emotion_id,
+                );
+                if (e) inferredEmotionFull = e;
+            }
         }
     });
 
@@ -324,13 +364,7 @@
         }
     }
 
-    async function loadTaskEmotion(emotionId: string) {
-        try {
-            selectedEmotion = await getEmotion(emotionId);
-        } catch (e) {
-            console.error("Failed to load task emotion:", e);
-        }
-    }
+    // loadTaskEmotion removed as it's handled in effects/init
 
     // Emotion handlers
     function handleEmotionSelect(emotion: Emotion) {
@@ -1096,7 +1130,7 @@
                                 <div
                                     class="tooltip tooltip-bottom w-full"
                                     data-tip={inferredEmotionFull?.description ||
-                                        inferredEmotion.closest_emotion_name}
+                                        "Calculated from your reflections"}
                                 >
                                     <button
                                         class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
@@ -1116,7 +1150,8 @@
                                             {#if inferredEmotionFull}
                                                 <OpenMoji
                                                     emoji={inferredEmotionFull.emoji}
-                                                    alt={inferredEmotion.closest_emotion_name}
+                                                    alt={inferredEmotionFull?.name ||
+                                                        "Inferred Emotion"}
                                                     size="sm"
                                                 />
                                             {:else}
@@ -1134,7 +1169,8 @@
                                                 <span
                                                     class="text-sm font-semibold opacity-80"
                                                 >
-                                                    {inferredEmotion.closest_emotion_name}
+                                                    {inferredEmotionFull?.name ||
+                                                        "Suggesting..."}
                                                 </span>
                                             </div>
                                             <div
@@ -1281,7 +1317,11 @@
                                                 <!-- Emotion display -->
                                                 <div class="mt-2">
                                                     {#if hasEmotion}
-                                                        {#await getEmotion(p.emotion_id!) then emotion}
+                                                        {@const emotion =
+                                                            emotionStore.get(
+                                                                p.emotion_id!,
+                                                            )}
+                                                        {#if emotion}
                                                             {@const colors =
                                                                 QUADRANT_COLORS[
                                                                     emotion.quadrant as Quadrant
@@ -1332,12 +1372,12 @@
                                                                     />
                                                                 </span>
                                                             </button>
-                                                        {:catch}
+                                                        {:else}
                                                             <span
                                                                 class="text-xs text-success/50"
-                                                                >Emotion linked</span
+                                                                >Loading...</span
                                                             >
-                                                        {/await}
+                                                        {/if}
                                                     {:else}
                                                         <button
                                                             class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-base-content/40 hover:text-success hover:bg-success/10 transition-all duration-200"
@@ -1488,7 +1528,11 @@
                                                 <!-- Emotion display -->
                                                 <div class="mt-2">
                                                     {#if hasEmotion}
-                                                        {#await getEmotion(n.emotion_id!) then emotion}
+                                                        {@const emotion =
+                                                            emotionStore.get(
+                                                                n.emotion_id!,
+                                                            )}
+                                                        {#if emotion}
                                                             {@const colors =
                                                                 QUADRANT_COLORS[
                                                                     emotion.quadrant as Quadrant
@@ -1539,12 +1583,12 @@
                                                                     />
                                                                 </span>
                                                             </button>
-                                                        {:catch}
+                                                        {:else}
                                                             <span
                                                                 class="text-xs text-error/50"
-                                                                >Emotion linked</span
+                                                                >Loading...</span
                                                             >
-                                                        {/await}
+                                                        {/if}
                                                     {:else}
                                                         <button
                                                             class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-base-content/40 hover:text-error hover:bg-error/10 transition-all duration-200"

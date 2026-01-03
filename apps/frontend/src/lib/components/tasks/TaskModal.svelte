@@ -11,7 +11,8 @@
     } from "$lib/api";
     import { createQuery } from "@tanstack/svelte-query";
     import { getCategories, createCategory } from "$lib/api/categories";
-    import { getEmotion, type Emotion } from "$lib/api/emotions";
+    import { type Emotion } from "$lib/api/emotions";
+    import { emotionStore } from "$lib/stores/emotions.svelte";
     import { RichEditor } from "$lib/components/rich-editor";
     import {
         CategoryDropdown,
@@ -229,7 +230,10 @@
 
             // Load emotion if task has one
             if (task.emotion_id) {
-                loadTaskEmotion(task.emotion_id);
+                // Ensure we try to load even if store not yet ready (the effect below handles it)
+                if (emotionStore.isInitialized) {
+                    loadTaskEmotion(task.emotion_id);
+                }
             }
         } else if (open) {
             resetForm();
@@ -240,6 +244,18 @@
             if (categories.length === 0 && !$categoriesQuery.isLoading) {
                 showNewCategory = true;
             }
+        }
+    });
+
+    // Reactively update selectedEmotion when store initializes
+    $effect(() => {
+        if (
+            open &&
+            task?.emotion_id &&
+            !selectedEmotion &&
+            emotionStore.isInitialized
+        ) {
+            loadTaskEmotion(task.emotion_id);
         }
     });
 
@@ -302,13 +318,11 @@
         emotionContext = null;
     }
 
-    // Load emotion from API when editing task
-    async function loadTaskEmotion(emotionId: string) {
-        try {
-            selectedEmotion = await getEmotion(emotionId);
-        } catch (e) {
-            console.error("Failed to load task emotion:", e);
-        }
+    // Load emotion from store when editing task
+    function loadTaskEmotion(emotionId: string) {
+        if (!emotionStore.isInitialized) return;
+        const e = emotionStore.get(emotionId);
+        if (e) selectedEmotion = e;
     }
 
     // Open emotion modal for task emotion selection
@@ -352,6 +366,11 @@
 
     // Derived: check if we have inferred emotion but no actual emotion
     const inferredEmotion = $derived(task?.inferred_emotion);
+    const inferredEmotionDetail = $derived(
+        inferredEmotion?.closest_emotion_id
+            ? emotionStore.get(inferredEmotion.closest_emotion_id)
+            : null,
+    );
     const showInferred = $derived(!selectedEmotion && inferredEmotion);
 
     // Handle completion toggle
@@ -883,7 +902,8 @@
                                 <span
                                     class="text-sm font-medium text-base-content/70"
                                 >
-                                    {inferredEmotion?.closest_emotion_name}
+                                    {inferredEmotionDetail?.name ||
+                                        "Inferred Emotion"}
                                 </span>
                             </div>
                             <div

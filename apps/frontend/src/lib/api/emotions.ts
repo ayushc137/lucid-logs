@@ -27,7 +27,6 @@ export interface InferredEmotion {
     dominance: number;
     quadrant: string;
     closest_emotion_id: string;
-    closest_emotion_name: string;
     positive_count: number;
     negative_count: number;
     dissonance: number;

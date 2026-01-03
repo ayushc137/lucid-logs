@@ -25,7 +25,8 @@
         BLOB_SIZE,
     } from "./emotionUtils";
     import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import { getEmotionGrid, type Emotion } from "$lib/api/emotions";
+    import { type Emotion } from "$lib/api/emotions";
+    import { emotionStore } from "$lib/stores/emotions.svelte";
     import {
         ZoomIn,
         ZoomOut,
@@ -65,10 +66,12 @@
         return allowedQuadrants.includes(emotion.quadrant as Quadrant);
     }
 
-    // API data state
-    let allEmotions = $state<Emotion[]>([]);
-    let isLoading = $state(true);
-    let loadError = $state<string | null>(null);
+    // API data state - from store
+    const allEmotions = $derived(emotionStore.all);
+    const isLoading = $derived(
+        emotionStore.isLoading && !emotionStore.isInitialized,
+    );
+    const loadError = $derived(emotionStore.error);
 
     // Hover state
     let hoveredEmotion = $state<Emotion | null>(null);
@@ -337,34 +340,11 @@
         }
     }
 
-    // Fetch emotions from API
-    async function loadEmotions() {
-        isLoading = true;
-        loadError = null;
-
-        try {
-            const response = await getEmotionGrid();
-            // Combine all quadrants into a single array
-            allEmotions = [
-                ...response.yellow,
-                ...response.green,
-                ...response.red,
-                ...response.blue,
-            ];
-        } catch (error) {
-            console.error("Failed to load emotions:", error);
-            loadError =
-                error instanceof Error
-                    ? error.message
-                    : "Failed to load emotions";
-        } finally {
-            isLoading = false;
-        }
-    }
-
     onMount(async () => {
-        // Load emotions from API
-        await loadEmotions();
+        // Ensure emotions are loaded
+        if (!emotionStore.isInitialized) {
+            await emotionStore.init();
+        }
 
         // Initialize panzoom after emotions are loaded
         await tick();
@@ -654,7 +634,10 @@
             <div class="flex flex-col items-center gap-3 text-center px-4">
                 <div class="text-error text-lg">⚠️</div>
                 <span class="text-sm text-base-content/70">{loadError}</span>
-                <button class="btn btn-sm btn-primary" onclick={loadEmotions}>
+                <button
+                    class="btn btn-sm btn-primary"
+                    onclick={() => emotionStore.init()}
+                >
                     Retry
                 </button>
             </div>

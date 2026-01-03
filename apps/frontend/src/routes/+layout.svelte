@@ -3,6 +3,8 @@
   import { page } from "$app/stores";
   import { AppShell } from "$lib/components/layout";
   import { AuthGuard } from "$lib/components/auth";
+  import { emotionStore } from "$lib/stores/emotions.svelte";
+  import { onMount } from "svelte";
 
   // App styles (Tailwind via PostCSS)
   import "../app.css";
@@ -29,6 +31,10 @@
   const showSearch = $derived(
     $page.url.pathname === "/" || $page.url.pathname === "/tasks",
   );
+
+  onMount(() => {
+    emotionStore.init();
+  });
 </script>
 
 <QueryClientProvider client={queryClient}>

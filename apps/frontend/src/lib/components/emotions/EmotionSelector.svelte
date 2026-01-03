@@ -26,6 +26,7 @@
         ArrowRight,
     } from "lucide-svelte";
     import { cn } from "$lib/utils";
+    import { emotionStore } from "$lib/stores/emotions.svelte";
 
     interface Props {
         /** User-selected emotion */
@@ -266,121 +267,126 @@
             {/if}
         </div>
 
-        <!-- Inferred Emotion (shown when available) -->
-        {#if inferredEmotion}
-            {@const inferredQuadrant =
-                (inferredEmotion.closest_emotion_quadrant as Quadrant) ||
-                "green"}
-            {@const colors = QUADRANT_COLORS[inferredQuadrant]}
-            {@const meta = QUADRANT_META[inferredQuadrant]}
-            {@const icons = getQuadrantIcon(inferredQuadrant)}
+        {#if inferredEmotion && inferredEmotion.closest_emotion_id}
+            {@const inferredDetail = emotionStore.get(
+                inferredEmotion.closest_emotion_id,
+            )}
+            {#if inferredDetail}
+                {@const inferredQuadrant = inferredDetail.quadrant as Quadrant}
+                {@const colors = QUADRANT_COLORS[inferredQuadrant]}
+                {@const meta = QUADRANT_META[inferredQuadrant]}
+                {@const icons = getQuadrantIcon(inferredQuadrant)}
 
-            <div class="relative">
-                <div
-                    class="text-[10px] uppercase font-semibold text-primary/60 mb-2 flex items-center gap-1.5"
-                >
-                    <Sparkles class="w-3 h-3 text-primary" />
-                    <span>AI Inferred</span>
+                <div class="relative">
                     <div
-                        class="tooltip tooltip-right cursor-help"
-                        data-tip="Calculated from emotions in your reflections"
+                        class="text-[10px] uppercase font-semibold text-primary/60 mb-2 flex items-center gap-1.5"
                     >
-                        <Info class="w-3 h-3 text-primary/50" />
+                        <Sparkles class="w-3 h-3 text-primary" />
+                        <span>AI Inferred</span>
+                        <div
+                            class="tooltip tooltip-right cursor-help"
+                            data-tip="Calculated from emotions in your reflections"
+                        >
+                            <Info class="w-3 h-3 text-primary/50" />
+                        </div>
                     </div>
-                </div>
 
-                <button
-                    class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
-                    style="
+                    <button
+                        class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
+                        style="
                         background: linear-gradient(135deg, 
                             color-mix(in srgb, {colors.primary} 8%, var(--b2)) 0%, 
                             color-mix(in srgb, {colors.secondary} 5%, var(--b2)) 100%);
                         border: 1px dashed color-mix(in srgb, {colors.primary} 40%, transparent);
                     "
-                    onclick={onSelect}
-                    onmouseenter={() => handleMouseEnter(inferredQuadrant)}
-                    onmouseleave={handleMouseLeave}
-                >
-                    <!-- Sparkle decoration -->
-                    <div class="absolute top-2 right-2 opacity-30">
-                        <Sparkles class="w-4 h-4 text-primary animate-pulse" />
-                    </div>
-
-                    <!-- Emoji Container -->
-                    <div
-                        class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
-                        style="background: {colors.gradient}; opacity: 0.85;"
+                        onclick={onSelect}
+                        onmouseenter={() => handleMouseEnter(inferredQuadrant)}
+                        onmouseleave={handleMouseLeave}
                     >
-                        <OpenMoji
-                            emoji={inferredEmotion.closest_emotion_emoji ||
-                                "1F914"}
-                            alt={inferredEmotion.closest_emotion_name}
-                            size="sm"
-                            class="drop-shadow-sm"
-                        />
-                    </div>
-
-                    <!-- Info -->
-                    <div class="flex-1 min-w-0 text-left">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-semibold opacity-80">
-                                {inferredEmotion.closest_emotion_name}
-                            </span>
-                            <span
-                                class="badge badge-xs font-medium uppercase tracking-wider px-1.5 bg-primary/20 text-primary border-none"
-                            >
-                                Inferred
-                            </span>
+                        <!-- Sparkle decoration -->
+                        <div class="absolute top-2 right-2 opacity-30">
+                            <Sparkles
+                                class="w-4 h-4 text-primary animate-pulse"
+                            />
                         </div>
-                        <!-- Quadrant info -->
+
+                        <!-- Emoji Container -->
                         <div
-                            class="flex items-center gap-2 mt-0.5 text-[10px] opacity-50"
+                            class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
+                            style="background: {colors.gradient}; opacity: 0.85;"
                         >
-                            <svelte:component
-                                this={icons.energy}
-                                class="w-2.5 h-2.5"
+                            <OpenMoji
+                                emoji={inferredDetail.emoji}
+                                alt={inferredDetail.name}
+                                size="sm"
+                                class="drop-shadow-sm"
                             />
-                            <span>{meta?.energyLabel}</span>
-                            <span class="opacity-30">•</span>
-                            <svelte:component
-                                this={icons.pleasantness}
-                                class="w-2.5 h-2.5"
-                            />
-                            <span>{meta?.pleasantnessLabel}</span>
                         </div>
-                    </div>
-                </button>
 
-                <!-- Quadrant Detail Tooltip on Hover -->
-                {#if hoveredQuadrant === inferredQuadrant && !selectedEmotion}
-                    <div
-                        class="absolute left-0 right-0 top-full mt-2 z-50 p-3 rounded-xl bg-base-100 border border-base-300 shadow-xl animate-fade-in"
-                    >
-                        <div class="flex items-center gap-2 mb-2">
+                        <!-- Info -->
+                        <div class="flex-1 min-w-0 text-left">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-semibold opacity-80">
+                                    {inferredDetail.name}
+                                </span>
+                                <span
+                                    class="badge badge-xs font-medium uppercase tracking-wider px-1.5 bg-primary/20 text-primary border-none"
+                                >
+                                    Inferred
+                                </span>
+                            </div>
+                            <!-- Quadrant info -->
                             <div
-                                class="w-4 h-4 rounded-full"
-                                style="background: {colors.gradient};"
-                            ></div>
-                            <span class="text-sm font-bold">{meta?.label}</span>
+                                class="flex items-center gap-2 mt-0.5 text-[10px] opacity-50"
+                            >
+                                <svelte:component
+                                    this={icons.energy}
+                                    class="w-2.5 h-2.5"
+                                />
+                                <span>{meta?.energyLabel}</span>
+                                <span class="opacity-30">•</span>
+                                <svelte:component
+                                    this={icons.pleasantness}
+                                    class="w-2.5 h-2.5"
+                                />
+                                <span>{meta?.pleasantnessLabel}</span>
+                            </div>
                         </div>
-                        <p class="text-xs opacity-70">
-                            {#if inferredQuadrant === "yellow"}
-                                High energy, pleasant feelings like excitement,
-                                enthusiasm, and joy.
-                            {:else if inferredQuadrant === "green"}
-                                Calm, pleasant feelings like contentment, peace,
-                                and relaxation.
-                            {:else if inferredQuadrant === "red"}
-                                High energy, challenging feelings like
-                                frustration, anxiety, or anger.
-                            {:else}
-                                Low energy, challenging feelings like sadness,
-                                exhaustion, or apathy.
-                            {/if}
-                        </p>
-                    </div>
-                {/if}
-            </div>
+                    </button>
+
+                    <!-- Quadrant Detail Tooltip on Hover -->
+                    {#if hoveredQuadrant === inferredQuadrant && !selectedEmotion}
+                        <div
+                            class="absolute left-0 right-0 top-full mt-2 z-50 p-3 rounded-xl bg-base-100 border border-base-300 shadow-xl animate-fade-in"
+                        >
+                            <div class="flex items-center gap-2 mb-2">
+                                <div
+                                    class="w-4 h-4 rounded-full"
+                                    style="background: {colors.gradient};"
+                                ></div>
+                                <span class="text-sm font-bold"
+                                    >{meta?.label}</span
+                                >
+                            </div>
+                            <p class="text-xs opacity-70">
+                                {#if inferredQuadrant === "yellow"}
+                                    High energy, pleasant feelings like
+                                    excitement, enthusiasm, and joy.
+                                {:else if inferredQuadrant === "green"}
+                                    Calm, pleasant feelings like contentment,
+                                    peace, and relaxation.
+                                {:else if inferredQuadrant === "red"}
+                                    High energy, challenging feelings like
+                                    frustration, anxiety, or anger.
+                                {:else}
+                                    Low energy, challenging feelings like
+                                    sadness, exhaustion, or apathy.
+                                {/if}
+                            </p>
+                        </div>
+                    {/if}
+                </div>
+            {/if}
         {/if}
     </div>
 </div>

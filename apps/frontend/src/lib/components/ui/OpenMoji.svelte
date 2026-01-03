@@ -1,42 +1,9 @@
-<script lang="ts">
-    /**
-     * OpenMoji Component
-     * - Displays emojis using OpenMoji SVG icons
-     * - Lazy loading with IntersectionObserver
-     * - Fallback to native emoji on error
-     * - Caches URLs to avoid re-computation
-     */
-
-    interface Props {
-        emoji: string;
-        alt?: string;
-        size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
-        class?: string;
-    }
-
-    let {
-        emoji,
-        alt = "",
-        size = "md",
-        class: className = "",
-    }: Props = $props();
-
-    // Cache for computed URLs
+<script context="module" lang="ts">
+    // Shared cache for computed URLs to avoid re-computation across instances
     const urlCache = new Map<string, string>();
 
-    let isLoaded = $state(false);
-    let hasError = $state(false);
-    let isVisible = $state(false);
-    let imgElement: HTMLImageElement;
-
-    // Size classes mapping for named sizes
-    const sizeClasses: Record<string, string> = {
-        xs: "w-3 h-3",
-        sm: "w-4 h-4",
-        md: "w-6 h-6",
-        lg: "w-8 h-8",
-        xl: "w-10 h-10",
-    };
+    // Shared cache for loaded images to avoid fade-in animation for already loaded images
+    const loadedImageCache = new Set<string>();
 
     // Check if string looks like a hex code (e.g., "1F9B6" or "1F62E-200D-1F4A8")
     function isHexCode(str: string): boolean {
@@ -44,7 +11,9 @@
     }
 
     // Generate OpenMoji URL from emoji (hex code or character)
-    function getOpenMojiUrl(emoji: string): string {
+    export function getOpenMojiUrl(emoji: string): string {
+        if (!emoji) return "";
+
         if (urlCache.has(emoji)) {
             return urlCache.get(emoji)!;
         }
@@ -74,6 +43,7 @@
 
     // Convert hex code to actual emoji character for fallback
     function hexToEmoji(input: string): string {
+        if (!input) return "";
         if (!isHexCode(input)) {
             return input; // Already an emoji character
         }
@@ -86,10 +56,62 @@
             return input;
         }
     }
+</script>
 
+<script lang="ts">
+    /**
+     * OpenMoji Component
+     * - Displays emojis using OpenMoji SVG icons
+     * - Lazy loading with IntersectionObserver
+     * - Fallback to native emoji on error
+     * - Caches URLs to avoid re-computation
+     * - Caches loaded state to prevent redundant animations
+     */
+
+    interface Props {
+        emoji: string;
+        alt?: string;
+        size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
+        class?: string;
+    }
+
+    let {
+        emoji,
+        alt = "",
+        size = "md",
+        class: className = "",
+    }: Props = $props();
+
+    // Derived values
     const url = $derived(getOpenMojiUrl(emoji));
     // Support both named sizes and numeric pixel sizes
     const isNumericSize = $derived(typeof size === "number");
+    const sizeClasses: Record<string, string> = {
+        xs: "w-3 h-3",
+        sm: "w-4 h-4",
+        md: "w-6 h-6",
+        lg: "w-8 h-8",
+        xl: "w-10 h-10",
+    };
+
+    // Optimization: check if image is already loaded in global cache
+    // We initialize based on cache presence to avoid initial false state
+    let isLoaded = $state(false);
+    let hasError = $state(false);
+    let isVisible = $state(false);
+    let imgElement: HTMLImageElement;
+
+    // React to URL changes - update isLoaded state
+    $effect(() => {
+        if (loadedImageCache.has(url)) {
+            isLoaded = true;
+            hasError = false;
+        } else {
+            // Only reset if it's a new URL not in cache
+            if (isLoaded) isLoaded = false;
+        }
+    });
+
     const sizeClass = $derived(
         isNumericSize ? "" : sizeClasses[size as string] || sizeClasses.md,
     );
@@ -100,14 +122,21 @@
 
     function handleLoad() {
         isLoaded = true;
+        if (url) loadedImageCache.add(url);
     }
 
     function handleError() {
         hasError = true;
+        // Optionally remove from cache if error?
+        // loadedImageCache.delete(url);
     }
 
     // Lazy loading with IntersectionObserver
     function lazyLoad(node: HTMLElement) {
+        // Optimization: If we already loaded this image before (in app session),
+        // we might surely be able to show it without observer delay?
+        // But for list performance, keeping IntersectionObserver is safer.
+
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
