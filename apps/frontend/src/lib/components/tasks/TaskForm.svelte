@@ -12,6 +12,7 @@
         type CreateTaskRequest,
         type UpdateTaskRequest,
         type TaskItem,
+        getLastTaskEndTime,
     } from "$lib/api";
     import { getCategories, createCategory } from "$lib/api/categories";
     import { getEmotion, type Emotion } from "$lib/api/emotions";
@@ -80,6 +81,21 @@
     const queryClient = useQueryClient();
     const isEditing = $derived(!!task);
 
+    // Fetch last task end time only in create mode
+    const queryOptions = $derived({
+        queryKey: ["tasks", "last-end-time"],
+        queryFn: getLastTaskEndTime,
+        enabled: !isEditing,
+    });
+
+    const lastTaskEndTimeQuery = createQuery(queryOptions);
+
+    const lastTaskEndTime = $derived(
+        $lastTaskEndTimeQuery.data?.end_time
+            ? new Date($lastTaskEndTimeQuery.data.end_time)
+            : null,
+    );
+
     // Form state
     let title = $state("");
     let journal = $state("");
@@ -114,6 +130,7 @@
 
     // Live time tracking (only for create mode)
     let liveEndTime = $state(false);
+    let useLastTaskStart = $state(false);
     let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
     // Track if form is initialized
@@ -174,6 +191,15 @@
         } else if (timeUpdateInterval) {
             clearInterval(timeUpdateInterval);
             timeUpdateInterval = null;
+        }
+    });
+
+    // Effect to set start from last task
+    $effect(() => {
+        if (!isEditing && useLastTaskStart && lastTaskEndTime) {
+            const lastEnd = new Date(lastTaskEndTime);
+            startDate = lastEnd.toISOString().split("T")[0];
+            startTime = lastEnd.toTimeString().slice(0, 8);
         }
     });
 
@@ -440,9 +466,9 @@
                         <!-- Completion Toggle -->
                         <button
                             class={cn(
-                                "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0",
+                                "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 hover:scale-105",
                                 completed
-                                    ? "bg-success text-success-content hover:bg-success/80"
+                                    ? "bg-success text-success-content hover:bg-success/80 shadow-sm"
                                     : "bg-base-200 hover:bg-primary/10 hover:text-primary",
                             )}
                             onclick={handleCompletionToggle}
@@ -451,9 +477,13 @@
                                 : "Mark as complete"}
                         >
                             {#if completed}
-                                <CircleCheck class="w-5 h-5" />
+                                <CircleCheck
+                                    class="w-5 h-5 transition-transform duration-200"
+                                />
                             {:else}
-                                <Circle class="w-5 h-5" />
+                                <Circle
+                                    class="w-5 h-5 transition-transform duration-200"
+                                />
                             {/if}
                         </button>
 
@@ -462,13 +492,13 @@
                             type="text"
                             bind:value={title}
                             placeholder="What needs to be done?"
-                            class="input input-ghost text-xl md:text-2xl font-bold flex-1 px-0 focus:outline-none focus:bg-transparent placeholder:text-base-content/20"
+                            class="input input-ghost text-xl md:text-2xl font-bold flex-1 px-0 focus:outline-none focus:bg-transparent placeholder:text-base-content/20 transition-all duration-200"
                         />
 
                         <!-- Category Badge -->
                         {#if selectedCategory}
                             <span
-                                class="badge badge-lg shrink-0"
+                                class="badge badge-lg shrink-0 transition-all duration-200 animate-fade-in"
                                 style="background-color: {selectedCategory.color}; color: white; border: none;"
                             >
                                 {selectedCategory.name}
@@ -477,7 +507,9 @@
 
                         <!-- Completed Badge -->
                         {#if completed}
-                            <span class="badge badge-success gap-1">
+                            <span
+                                class="badge badge-success gap-1 transition-all duration-200 animate-fade-in"
+                            >
                                 <Check class="w-3 h-3" />
                                 Done
                             </span>
@@ -486,7 +518,10 @@
                 </Card>
 
                 <!-- Journal Card - Expanded -->
-                <Card variant="bordered" class="min-h-[500px] flex flex-col">
+                <Card
+                    variant="bordered"
+                    class="min-h-[500px] flex flex-col transition-all duration-200 hover:shadow-md"
+                >
                     <div class="flex items-center gap-2 mb-3">
                         <FileText class="w-4 h-4 opacity-50" />
                         <span class="text-xs font-semibold uppercase opacity-50"
@@ -507,7 +542,10 @@
             <!-- Right Column: Meta Fields (1/3 width on desktop) -->
             <div class="space-y-4">
                 <!-- Category -->
-                <Card variant="bordered">
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
                     <div class="flex items-center gap-2 mb-3">
                         <Tag class="w-4 h-4 opacity-50" />
                         <span class="text-xs font-semibold uppercase opacity-50"
@@ -521,7 +559,7 @@
                                 bind:value={newCategoryName}
                                 placeholder="Category name"
                                 class={cn(
-                                    "input input-sm input-bordered w-full",
+                                    "input input-sm input-bordered w-full transition-all duration-200",
                                     newCategoryName.length > 40 &&
                                         "input-error",
                                 )}
@@ -549,7 +587,7 @@
                             />
                             <div class="flex gap-2">
                                 <button
-                                    class="btn btn-sm btn-primary flex-1 gap-1"
+                                    class="btn btn-sm btn-primary flex-1 gap-1 transition-all duration-200 hover:shadow-md"
                                     onclick={handleCreateCategory}
                                     disabled={$createCategoryMut.isPending ||
                                         !newCategoryName.trim()}
@@ -564,7 +602,7 @@
                                     Create
                                 </button>
                                 <button
-                                    class="btn btn-sm btn-ghost"
+                                    class="btn btn-sm btn-ghost transition-all duration-200 hover:bg-base-200"
                                     onclick={() => (showNewCategory = false)}
                                     >Cancel</button
                                 >
@@ -582,7 +620,10 @@
                 </Card>
 
                 <!-- Schedule -->
-                <Card variant="bordered">
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
                     <div class="flex items-center gap-2 mb-3">
                         <Calendar class="w-4 h-4 opacity-50" />
                         <span class="text-xs font-semibold uppercase opacity-50"
@@ -590,113 +631,156 @@
                         >
                     </div>
 
-                    <!-- Live time toggle (create mode only) -->
-                    {#if !isEditing}
-                        <div class="flex justify-end mb-3">
-                            <label
-                                class="flex items-center gap-2 cursor-pointer"
+                    <div
+                        class="bg-base-100 rounded-lg border border-base-300 p-3 space-y-3"
+                    >
+                        <!-- Quick toggles (only in create mode) -->
+                        {#if !isEditing}
+                            <div
+                                class="flex flex-wrap gap-2 pb-2 border-b border-base-200"
                             >
-                                <input
-                                    type="checkbox"
-                                    class="toggle toggle-xs toggle-success"
-                                    bind:checked={liveEndTime}
-                                />
-                                <span
-                                    class="text-xs flex items-center gap-1 {liveEndTime
-                                        ? 'text-success font-medium'
-                                        : 'opacity-60'}"
-                                >
-                                    {#if liveEndTime}
+                                {#if lastTaskEndTime}
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="toggle toggle-xs toggle-primary"
+                                            bind:checked={useLastTaskStart}
+                                        />
                                         <span
-                                            class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
-                                        ></span>
-                                    {/if}
-                                    End at Now
-                                </span>
-                            </label>
-                        </div>
-                    {/if}
-
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="form-control">
-                                <label class="label py-0 pb-1" for="start-date">
-                                    <span class="label-text text-xs opacity-50"
-                                        >Start Date</span
-                                    >
-                                </label>
-                                <input
-                                    id="start-date"
-                                    type="date"
-                                    bind:value={startDate}
-                                    class="input input-sm input-bordered w-full"
-                                />
-                            </div>
-                            <div class="form-control">
-                                <label class="label py-0 pb-1" for="end-date">
-                                    <span class="label-text text-xs opacity-50"
-                                        >End Date</span
-                                    >
-                                </label>
-                                <input
-                                    id="end-date"
-                                    type="date"
-                                    bind:value={endDate}
-                                    class="input input-sm input-bordered w-full {liveEndTime
-                                        ? 'input-success'
-                                        : ''}"
-                                    disabled={liveEndTime}
-                                />
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="form-control">
-                                <label class="label py-0 pb-1" for="start-time">
+                                            class="text-xs {useLastTaskStart
+                                                ? 'text-primary font-medium'
+                                                : 'opacity-60'}"
+                                        >
+                                            From last task
+                                        </span>
+                                    </label>
+                                {/if}
+                                <label
+                                    class="flex items-center gap-2 cursor-pointer ml-auto"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="toggle toggle-xs toggle-success"
+                                        bind:checked={liveEndTime}
+                                    />
                                     <span
-                                        class="label-text text-xs opacity-50 flex items-center gap-1"
+                                        class="text-xs flex items-center gap-1 {liveEndTime
+                                            ? 'text-success font-medium'
+                                            : 'opacity-60'}"
                                     >
-                                        <Clock class="w-3 h-3" /> From
-                                    </span>
-                                </label>
-                                <input
-                                    id="start-time"
-                                    type="time"
-                                    step="1"
-                                    bind:value={startTime}
-                                    class="input input-sm input-bordered w-full"
-                                />
-                            </div>
-                            <div class="form-control">
-                                <label class="label py-0 pb-1" for="end-time">
-                                    <span
-                                        class="label-text text-xs opacity-50 flex items-center gap-1"
-                                    >
-                                        <Clock class="w-3 h-3" /> To
                                         {#if liveEndTime}
                                             <span
-                                                class="badge badge-xs badge-success"
-                                                >LIVE</span
-                                            >
+                                                class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
+                                            ></span>
                                         {/if}
+                                        End at Now
                                     </span>
                                 </label>
-                                <input
-                                    id="end-time"
-                                    type="time"
-                                    step="1"
-                                    bind:value={endTime}
-                                    class="input input-sm input-bordered w-full {liveEndTime
-                                        ? 'input-success font-mono'
-                                        : ''}"
-                                    disabled={liveEndTime}
-                                />
+                            </div>
+                        {/if}
+
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="start-date"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50"
+                                            >Start Date</span
+                                        >
+                                    </label>
+                                    <input
+                                        id="start-date"
+                                        type="date"
+                                        bind:value={startDate}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
+                                        disabled={useLastTaskStart}
+                                    />
+                                </div>
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="end-date"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50"
+                                            >End Date</span
+                                        >
+                                    </label>
+                                    <input
+                                        id="end-date"
+                                        type="date"
+                                        bind:value={endDate}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
+                                            ? 'input-success'
+                                            : ''}"
+                                        disabled={liveEndTime}
+                                    />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="start-time"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50 flex items-center gap-1"
+                                        >
+                                            <Clock class="w-3 h-3" /> From
+                                        </span>
+                                    </label>
+                                    <input
+                                        id="start-time"
+                                        type="time"
+                                        step="1"
+                                        bind:value={startTime}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
+                                        disabled={useLastTaskStart}
+                                    />
+                                </div>
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="end-time"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50 flex items-center gap-1"
+                                        >
+                                            <Clock class="w-3 h-3" /> To
+                                            {#if liveEndTime}
+                                                <span
+                                                    class="badge badge-xs badge-success"
+                                                    >LIVE</span
+                                                >
+                                            {/if}
+                                        </span>
+                                    </label>
+                                    <input
+                                        id="end-time"
+                                        type="time"
+                                        step="1"
+                                        bind:value={endTime}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
+                                            ? 'input-success font-mono'
+                                            : ''}"
+                                        disabled={liveEndTime}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </Card>
 
                 <!-- Priority -->
-                <Card variant="bordered">
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center gap-2">
                             <CircleAlert class="w-4 h-4 opacity-50" />
@@ -717,7 +801,7 @@
                         min="0"
                         max="5"
                         bind:value={priority}
-                        class="range range-sm range-primary"
+                        class="range range-sm range-primary transition-all duration-200"
                         step="1"
                     />
                     <div
@@ -730,7 +814,10 @@
                 </Card>
 
                 <!-- Emotion -->
-                <Card variant="bordered">
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
                     <div class="flex items-center gap-2 mb-3">
                         <Heart class="w-4 h-4 opacity-50" />
                         <span class="text-xs font-semibold uppercase opacity-50"
@@ -740,43 +827,49 @@
 
                     <div class="space-y-3">
                         <!-- User Selected Emotion -->
-                        {#if selectedEmotion}
-                            <div>
-                                <div
-                                    class="text-[10px] uppercase font-semibold text-base-content/40 mb-1.5"
-                                >
-                                    Your Selection
-                                </div>
-                                <EmotionBadge
-                                    name={selectedEmotion.name}
-                                    emoji={selectedEmotion.emoji}
-                                    quadrant={selectedEmotion.quadrant}
-                                    size="md"
-                                    removable={true}
-                                    onRemove={clearTaskEmotion}
-                                    onclick={openEmotionForTask}
-                                />
-                            </div>
-                        {:else}
-                            <button
-                                class="w-full rounded-lg border border-dashed border-base-300 p-3 flex items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all text-base-content/50 hover:text-primary"
-                                onclick={openEmotionForTask}
+                        <div>
+                            <div
+                                class="text-[10px] uppercase font-semibold text-base-content/40 mb-1.5"
                             >
-                                <Plus class="w-4 h-4" />
-                                <span class="text-sm font-medium"
-                                    >Select Emotion</span
+                                Your Selection
+                            </div>
+                            {#if selectedEmotion}
+                                <div
+                                    class="transition-all duration-200 animate-fade-in"
                                 >
-                            </button>
-                        {/if}
+                                    <EmotionBadge
+                                        name={selectedEmotion.name}
+                                        emoji={selectedEmotion.emoji}
+                                        quadrant={selectedEmotion.quadrant}
+                                        size="md"
+                                        removable={true}
+                                        onRemove={clearTaskEmotion}
+                                        onclick={openEmotionForTask}
+                                    />
+                                </div>
+                            {:else}
+                                <button
+                                    class="w-full rounded-lg border border-dashed border-base-300 p-3 flex items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all duration-200 text-base-content/50 hover:text-primary"
+                                    onclick={openEmotionForTask}
+                                >
+                                    <Plus class="w-4 h-4" />
+                                    <span class="text-sm font-medium"
+                                        >Select Emotion</span
+                                    >
+                                </button>
+                            {/if}
+                        </div>
 
-                        <!-- Inspired Emotion (always show when available) -->
+                        <!-- Inferred Emotion (always show when available) -->
                         {#if inferredEmotion}
-                            <div class="pt-2 border-t border-base-200">
+                            <div
+                                class="pt-2 border-t border-base-200 transition-all duration-200"
+                            >
                                 <div class="flex items-center gap-1.5 mb-1.5">
                                     <Sparkles class="w-3 h-3 text-primary" />
                                     <span
                                         class="text-[10px] uppercase font-semibold text-primary"
-                                        >Inspired Emotion</span
+                                        >Inferred Emotion</span
                                     >
                                     <div
                                         class="tooltip tooltip-right"
@@ -788,7 +881,7 @@
                                     </div>
                                 </div>
                                 <button
-                                    class="w-full rounded-lg bg-primary/5 border border-primary/20 p-2.5 flex items-center justify-between gap-2 hover:bg-primary/10 transition-all group text-left"
+                                    class="w-full rounded-lg bg-primary/5 border border-primary/20 p-2.5 flex items-center justify-between gap-2 hover:bg-primary/10 transition-all duration-200 group text-left"
                                     onclick={openEmotionForTask}
                                 >
                                     <span
@@ -806,7 +899,10 @@
                 </Card>
 
                 <!-- Reflection -->
-                <Card variant="bordered">
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
                     <div class="flex items-center gap-2 mb-4">
                         <Sparkles class="w-4 h-4 opacity-50" />
                         <span class="text-xs font-semibold uppercase opacity-50"
@@ -815,7 +911,7 @@
                     </div>
 
                     <!-- Positives Section -->
-                    <div class="mb-5">
+                    <div class="mb-4">
                         <div class="flex items-center gap-2 mb-2">
                             <ThumbsUp class="w-3.5 h-3.5 text-success" />
                             <span class="text-xs font-medium text-success"
@@ -823,91 +919,88 @@
                             >
                         </div>
                         <div class="flex items-start gap-2">
-                            <textarea
+                            <input
+                                type="text"
                                 bind:value={newPositive}
                                 placeholder="Add a positive reflection..."
-                                class="textarea textarea-sm textarea-bordered flex-1 bg-success/5 border-success/30 focus:border-success min-h-[40px] resize-none text-sm"
-                                rows="1"
+                                class="input input-sm input-bordered flex-1 bg-success/5 border-success/30 focus:border-success text-sm"
                                 onkeydown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
+                                    if (e.key === "Enter") {
                                         e.preventDefault();
                                         addPositive();
                                     }
                                 }}
-                            ></textarea>
+                            />
                             <button
-                                class="btn btn-sm btn-success btn-outline shrink-0 gap-1"
+                                class="btn btn-sm btn-ghost text-success shrink-0"
                                 onclick={addPositive}
                                 disabled={!newPositive.trim()}
+                                title="Add positive"
                             >
-                                <Plus class="w-3.5 h-3.5" />
-                                Add
+                                <Plus class="w-4 h-4" />
                             </button>
                         </div>
                         {#if positives.length > 0}
-                            <div class="flex flex-col gap-2 mt-3">
-                                {#each positives as p, i}
+                            <div class="flex flex-col gap-2 mt-2">
+                                {#each positives as p, i (i)}
                                     <div
-                                        class="rounded-xl bg-success/5 border border-success/20 p-3 group hover:bg-success/10 transition-colors"
+                                        class="rounded-lg bg-success/10 border border-success/20 p-2.5 group hover:bg-success/15 transition-all duration-200 animate-fade-in"
                                     >
                                         <div class="flex items-start gap-2">
                                             <ThumbsUp
                                                 class="w-3.5 h-3.5 text-success shrink-0 mt-0.5"
                                             />
                                             <p
-                                                class="flex-1 text-sm leading-relaxed"
+                                                class="flex-1 text-sm text-success-content/90 leading-relaxed break-words"
                                             >
                                                 {p.text}
                                             </p>
-                                            <div
-                                                class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            <button
+                                                onclick={() =>
+                                                    removePositive(i)}
+                                                class="btn btn-ghost btn-xs text-success/60 hover:text-success hover:bg-success/20 transition-all duration-200 shrink-0"
+                                                title="Remove"
                                             >
-                                                <!-- Emotion button for this positive -->
+                                                <X class="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <!-- Emotion for this positive -->
+                                        <div class="mt-2 pl-5">
+                                            {#if p.emotion_id}
                                                 <button
+                                                    class="text-xs text-success/70 hover:text-success flex items-center gap-1 transition-colors duration-200"
                                                     onclick={() =>
                                                         openEmotionForPositive(
                                                             i,
                                                         )}
-                                                    class="btn btn-ghost btn-xs text-success/70 hover:text-success hover:bg-success/10"
-                                                    title="Set emotion"
-                                                >
-                                                    <Heart
-                                                        class="w-3.5 h-3.5"
-                                                    />
-                                                </button>
-                                                <button
-                                                    onclick={() =>
-                                                        removePositive(i)}
-                                                    class="btn btn-ghost btn-xs text-base-content/40 hover:text-error hover:bg-error/10"
-                                                    title="Remove"
-                                                >
-                                                    <X class="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {#if p.emotion_id}
-                                            <div class="mt-2 pl-5">
-                                                <span
-                                                    class="badge badge-sm badge-success/20 gap-1"
                                                 >
                                                     <Heart
                                                         class="w-2.5 h-2.5"
                                                     />
-                                                    Emotion linked
-                                                    <button
-                                                        onclick={() =>
+                                                    <span>Emotion set</span>
+                                                    <X
+                                                        class="w-2.5 h-2.5 ml-1 hover:text-error"
+                                                        onclick={(e) => {
+                                                            e.stopPropagation();
                                                             clearPositiveEmotion(
                                                                 i,
-                                                            )}
-                                                        class="ml-1 hover:text-error"
-                                                    >
-                                                        <X
-                                                            class="w-2.5 h-2.5"
-                                                        />
-                                                    </button>
-                                                </span>
-                                            </div>
-                                        {/if}
+                                                            );
+                                                        }}
+                                                    />
+                                                </button>
+                                            {:else}
+                                                <button
+                                                    class="text-[10px] text-base-content/40 hover:text-success flex items-center gap-1 transition-colors duration-200"
+                                                    onclick={() =>
+                                                        openEmotionForPositive(
+                                                            i,
+                                                        )}
+                                                >
+                                                    <Plus class="w-2.5 h-2.5" />
+                                                    <span>Add emotion</span>
+                                                </button>
+                                            {/if}
+                                        </div>
                                     </div>
                                 {/each}
                             </div>
@@ -926,91 +1019,88 @@
                             >
                         </div>
                         <div class="flex items-start gap-2">
-                            <textarea
+                            <input
+                                type="text"
                                 bind:value={newNegative}
                                 placeholder="Add an area for improvement..."
-                                class="textarea textarea-sm textarea-bordered flex-1 bg-error/5 border-error/30 focus:border-error min-h-[40px] resize-none text-sm"
-                                rows="1"
+                                class="input input-sm input-bordered flex-1 bg-error/5 border-error/30 focus:border-error text-sm"
                                 onkeydown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
+                                    if (e.key === "Enter") {
                                         e.preventDefault();
                                         addNegative();
                                     }
                                 }}
-                            ></textarea>
+                            />
                             <button
-                                class="btn btn-sm btn-error btn-outline shrink-0 gap-1"
+                                class="btn btn-sm btn-ghost text-error shrink-0"
                                 onclick={addNegative}
                                 disabled={!newNegative.trim()}
+                                title="Add improvement"
                             >
-                                <Plus class="w-3.5 h-3.5" />
-                                Add
+                                <Plus class="w-4 h-4" />
                             </button>
                         </div>
                         {#if negatives.length > 0}
-                            <div class="flex flex-col gap-2 mt-3">
-                                {#each negatives as n, i}
+                            <div class="flex flex-col gap-2 mt-2">
+                                {#each negatives as n, i (i)}
                                     <div
-                                        class="rounded-xl bg-error/5 border border-error/20 p-3 group hover:bg-error/10 transition-colors"
+                                        class="rounded-lg bg-error/10 border border-error/20 p-2.5 group hover:bg-error/15 transition-all duration-200 animate-fade-in"
                                     >
                                         <div class="flex items-start gap-2">
                                             <ThumbsDown
                                                 class="w-3.5 h-3.5 text-error shrink-0 mt-0.5"
                                             />
                                             <p
-                                                class="flex-1 text-sm leading-relaxed"
+                                                class="flex-1 text-sm text-error-content/90 leading-relaxed break-words"
                                             >
                                                 {n.text}
                                             </p>
-                                            <div
-                                                class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            <button
+                                                onclick={() =>
+                                                    removeNegative(i)}
+                                                class="btn btn-ghost btn-xs text-error/60 hover:text-error hover:bg-error/20 transition-all duration-200 shrink-0"
+                                                title="Remove"
                                             >
-                                                <!-- Emotion button for this negative -->
+                                                <X class="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <!-- Emotion for this negative -->
+                                        <div class="mt-2 pl-5">
+                                            {#if n.emotion_id}
                                                 <button
+                                                    class="text-xs text-error/70 hover:text-error flex items-center gap-1 transition-colors duration-200"
                                                     onclick={() =>
                                                         openEmotionForNegative(
                                                             i,
                                                         )}
-                                                    class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10"
-                                                    title="Set emotion"
-                                                >
-                                                    <Heart
-                                                        class="w-3.5 h-3.5"
-                                                    />
-                                                </button>
-                                                <button
-                                                    onclick={() =>
-                                                        removeNegative(i)}
-                                                    class="btn btn-ghost btn-xs text-base-content/40 hover:text-error hover:bg-error/10"
-                                                    title="Remove"
-                                                >
-                                                    <X class="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {#if n.emotion_id}
-                                            <div class="mt-2 pl-5">
-                                                <span
-                                                    class="badge badge-sm badge-error/20 gap-1"
                                                 >
                                                     <Heart
                                                         class="w-2.5 h-2.5"
                                                     />
-                                                    Emotion linked
-                                                    <button
-                                                        onclick={() =>
+                                                    <span>Emotion set</span>
+                                                    <X
+                                                        class="w-2.5 h-2.5 ml-1 hover:text-base-content"
+                                                        onclick={(e) => {
+                                                            e.stopPropagation();
                                                             clearNegativeEmotion(
                                                                 i,
-                                                            )}
-                                                        class="ml-1 hover:text-base-content"
-                                                    >
-                                                        <X
-                                                            class="w-2.5 h-2.5"
-                                                        />
-                                                    </button>
-                                                </span>
-                                            </div>
-                                        {/if}
+                                                            );
+                                                        }}
+                                                    />
+                                                </button>
+                                            {:else}
+                                                <button
+                                                    class="text-[10px] text-base-content/40 hover:text-error flex items-center gap-1 transition-colors duration-200"
+                                                    onclick={() =>
+                                                        openEmotionForNegative(
+                                                            i,
+                                                        )}
+                                                >
+                                                    <Plus class="w-2.5 h-2.5" />
+                                                    <span>Add emotion</span>
+                                                </button>
+                                            {/if}
+                                        </div>
                                     </div>
                                 {/each}
                             </div>
@@ -1023,13 +1113,13 @@
 
     <!-- Sticky Footer Actions -->
     <div
-        class="sticky bottom-0 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-4 mt-auto bg-base-200/90 backdrop-blur-md border-t border-base-300 z-30"
+        class="sticky bottom-0 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mt-auto bg-base-100/95 backdrop-blur-md border-t border-base-300 shadow-lg z-30"
     >
         <div class="flex items-center justify-between gap-4">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
                 {#if isEditing}
                     <button
-                        class="btn btn-ghost btn-sm text-error gap-2"
+                        class="btn btn-ghost btn-sm text-error hover:bg-error/10 gap-2 transition-all duration-200"
                         onclick={() => (showDeleteConfirm = true)}
                         disabled={$deleteMut.isPending}
                     >
@@ -1037,26 +1127,26 @@
                         <span class="hidden sm:inline">Delete</span>
                     </button>
                 {/if}
-                <span class="text-xs opacity-40 hidden md:inline">
+                <span class="text-xs text-base-content/40 hidden lg:inline">
                     <kbd class="kbd kbd-xs">⌘</kbd> +
                     <kbd class="kbd kbd-xs">Enter</kbd> to save
                 </span>
             </div>
             <div class="flex items-center gap-2">
                 <button
-                    class="btn btn-ghost btn-sm"
+                    class="btn btn-ghost btn-sm hover:bg-base-200 transition-all duration-200"
                     onclick={navigateBack}
                     disabled={isPending}
                 >
                     Cancel
                 </button>
                 <button
-                    class="btn btn-primary gap-2 min-w-[120px] shadow-lg shadow-primary/20"
+                    class="btn btn-primary btn-sm gap-2 min-w-[120px] shadow-md hover:shadow-lg shadow-primary/20 transition-all duration-200"
                     onclick={handleSubmit}
                     disabled={isPending || !title.trim()}
                 >
                     {#if isPending}
-                        <span class="loading loading-spinner loading-sm"></span>
+                        <span class="loading loading-spinner loading-xs"></span>
                         {isEditing ? "Saving..." : "Creating..."}
                     {:else}
                         <Save class="w-4 h-4" />

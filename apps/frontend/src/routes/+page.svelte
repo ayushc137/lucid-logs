@@ -279,24 +279,6 @@
     );
   });
 
-  // Get the end time of the last task that ended before now (for "start from last task" feature)
-  const lastTaskEndTime = $derived(() => {
-    const tasks = allTasks();
-    if (tasks.length === 0) return null;
-
-    const now = new Date();
-
-    // Filter to only tasks that have ended before now
-    const pastTasks = tasks.filter((t) => t.endTime.getTime() <= now.getTime());
-    if (pastTasks.length === 0) return null;
-
-    // Sort by end time and get the most recent
-    const sorted = [...pastTasks].sort(
-      (a, b) => b.endTime.getTime() - a.endTime.getTime(),
-    );
-    return sorted[0]?.endTime || null;
-  });
-
   // Task modal state
   let modalOpen = $state(false);
   let editingTask = $state<Task | null>(null);
@@ -745,7 +727,6 @@
   bind:open={modalOpen}
   task={editingTask}
   {initialCategoryId}
-  lastTaskEndTime={lastTaskEndTime()}
   onClose={handleModalClose}
   onOpenEmotionModal={handleOpenEmotionModal}
   {pendingEmotion}

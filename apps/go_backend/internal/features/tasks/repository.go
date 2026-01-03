@@ -75,6 +75,9 @@ type Repository interface {
 
 	// Delete soft-deletes a task.
 	Delete(ctx context.Context, id, userID string) error
+
+	// GetLastTaskEndTime retrieves the end time of the most recently finished task.
+	GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error)
 }
 
 // =============================================================================
@@ -911,6 +914,38 @@ func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID m
 // formatTaskID ensures the ID has the table prefix (string version).
 func formatTaskID(id string) string {
 	return database.RecordID(Table, id)
+}
+
+// GetLastTaskEndTime retrieves the end time of the most recently finished task.
+func (r *repository) GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error) {
+	// Query to find the most recent task that has already finished
+	query := `
+		SELECT end_date FROM tasks 
+		WHERE created_by = $user 
+		  AND deleted_at = NONE 
+		  AND end_date <= time::now()
+		ORDER BY end_date DESC 
+		LIMIT 1;
+	`
+
+	type result struct {
+		EndDate database.SurrealTime `json:"end_date"`
+	}
+
+	// Use QueryFirst to get a single result
+	record, err := database.QueryFirst[result](ctx, r.db, query, map[string]any{
+		"user": userID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("user_id", userID).Msg("failed to get last task end time")
+		return nil, err
+	}
+
+	if record == nil {
+		return nil, nil
+	}
+
+	return &record.EndDate.Time, nil
 }
 
 // generateTaskRecordID generates a unique task ID as models.RecordID.

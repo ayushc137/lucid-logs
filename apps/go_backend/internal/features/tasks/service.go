@@ -41,6 +41,9 @@ type Service interface {
 
 	// Delete soft-deletes a task.
 	Delete(ctx context.Context, id, userID string) error
+
+	// GetLastTaskEndTime retrieves the end time of the most recently finished task.
+	GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error)
 }
 
 // =============================================================================
@@ -231,6 +234,20 @@ func (s *service) Delete(ctx context.Context, id, userID string) error {
 		Msg("task deleted")
 
 	return nil
+}
+
+// =============================================================================
+// GET LAST TASK END TIME
+// =============================================================================
+
+// GetLastTaskEndTime retrieves the end time of the most recently finished task.
+func (s *service) GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error) {
+	endTime, err := s.repo.GetLastTaskEndTime(ctx, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("failed to get last task end time")
+		return nil, err
+	}
+	return endTime, nil
 }
 
 func validateOptionalDate(field string, value *string) (*time.Time, error) {

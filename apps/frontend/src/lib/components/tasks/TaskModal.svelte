@@ -7,6 +7,7 @@
         type CreateTaskRequest,
         type UpdateTaskRequest,
         type TaskItem,
+        getLastTaskEndTime,
     } from "$lib/api";
     import { createQuery } from "@tanstack/svelte-query";
     import { getCategories, createCategory } from "$lib/api/categories";
@@ -44,7 +45,6 @@
         open?: boolean;
         task?: Task | null;
         initialCategoryId?: string;
-        lastTaskEndTime?: Date | null;
         onClose?: () => void;
         onOpenEmotionModal?: (context: EmotionSelectionContext) => void;
         pendingEmotion?: Emotion | null;
@@ -60,13 +60,27 @@
         open = $bindable(false),
         task = null,
         initialCategoryId,
-        lastTaskEndTime = null,
         onClose,
         onOpenEmotionModal,
         pendingEmotion = null,
     }: Props = $props();
 
     const queryClient = useQueryClient();
+
+    // Fetch last task end time only when modal is open and in create mode
+    const queryOptions = $derived({
+        queryKey: ["tasks", "last-end-time"],
+        queryFn: getLastTaskEndTime,
+        enabled: open && !task,
+    });
+
+    const lastTaskEndTimeQuery = createQuery(queryOptions);
+
+    const lastTaskEndTime = $derived(
+        $lastTaskEndTimeQuery.data?.end_time
+            ? new Date($lastTaskEndTimeQuery.data.end_time)
+            : null,
+    );
 
     // Form state
     let title = $state("");

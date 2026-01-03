@@ -4,6 +4,7 @@ package tasks
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -50,9 +51,47 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 
 	r.GET("", h.List)
 	r.POST("", h.Create)
+	r.GET("/last-end-time", h.GetLastTaskEndTime)
 	r.GET("/:id", h.Get)
 	r.PUT("/:id", h.Update)
 	r.DELETE("/:id", h.Delete)
+}
+
+// =============================================================================
+// GET LAST TASK END TIME
+// =============================================================================
+
+// GetLastTaskEndTime handles GET /tasks/last-end-time - get end time of last finished task.
+//
+// @Summary      Get last task end time
+// @Description  Get the end time of the most recently finished task
+// @Tags         tasks
+// @Produce      json
+// @Success      200 {object} map[string]string
+// @Failure      401 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/tasks/last-end-time [get]
+func (h *Handler) GetLastTaskEndTime(c *gin.Context) {
+	// Get authenticated user
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	endTime, err := h.service.GetLastTaskEndTime(c.Request.Context(), user.UserID)
+	if err != nil {
+		response.ErrorFromErr(c, err)
+		return
+	}
+
+	if endTime == nil {
+		response.OK(c, map[string]any{"end_time": nil})
+		return
+	}
+
+	response.OK(c, map[string]any{"end_time": endTime.Format(time.RFC3339)})
 }
 
 // =============================================================================

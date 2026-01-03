@@ -3461,6 +3461,31 @@ paths:
       summary: Unlink task from goal
       tags:
       - task-goals
+  /api/v1/tasks/last-end-time:
+    get:
+      description: Get the end time of the most recently finished task
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get last task end time
+      tags:
+      - tasks
   /api/v1/templates:
     get:
       description: Get paginated list of templates for the authenticated user

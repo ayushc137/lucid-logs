@@ -27,6 +27,7 @@
     deleteTask,
     updateTask,
     getCategories,
+    getLastTaskEndTime,
     type Task,
     type TaskFilterParams,
   } from "$lib/api";
@@ -206,6 +207,18 @@
       $tasksQuery.refetch();
     }
   });
+
+  // Fetch last task end time (for quick start)
+  const lastTaskEndTimeQuery = createQuery({
+    queryKey: ["tasks", "last-end-time"],
+    queryFn: getLastTaskEndTime,
+  });
+
+  const lastTaskEndTime = $derived(
+    $lastTaskEndTimeQuery.data?.end_time
+      ? new Date($lastTaskEndTimeQuery.data.end_time)
+      : null,
+  );
 
   // Fetch categories
   const categoriesQuery = createQuery({
@@ -821,6 +834,7 @@
 <TaskModal
   bind:open={modalOpen}
   task={editingTask}
+  {lastTaskEndTime}
   onClose={handleModalClose}
   onOpenEmotionModal={handleOpenEmotionModal}
   {pendingEmotion}

@@ -177,3 +177,7 @@ export async function updateTask(id: string, data: UpdateTaskRequest): Promise<T
 export async function deleteTask(id: string): Promise<void> {
     await api.delete(`tasks/${encodeURIComponent(id)}`);
 }
+
+export async function getLastTaskEndTime(): Promise<{ end_time: string | null }> {
+    return unwrap(api.get('tasks/last-end-time'));
+}

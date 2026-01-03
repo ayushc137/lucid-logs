@@ -22,6 +22,7 @@ export {
     createTask,
     updateTask,
     deleteTask,
+    getLastTaskEndTime,
     type Task,
     type TaskItem,
     type Quantity,
