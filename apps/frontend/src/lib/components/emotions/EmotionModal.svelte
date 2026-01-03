@@ -55,6 +55,13 @@
     function clearSelection() {
         selectedEmotion = null;
     }
+
+    function handleDoubleClickConfirm(emotion: Emotion) {
+        // Double-click directly selects and confirms
+        selectedEmotion = emotion;
+        onSelect?.(emotion);
+        open = false;
+    }
 </script>
 
 {#if open}
@@ -158,6 +165,7 @@
                 <EmotionGrid
                     bind:selectedEmotion
                     onSelect={handleSelect}
+                    onConfirm={handleDoubleClickConfirm}
                     onHoveredChange={handleHoveredChange}
                     bind:showIndicators
                 />

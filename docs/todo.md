@@ -1,10 +1,16 @@
-the emotuiions are not saving or changing, also pfor posive and negtives hwo tos et emotion 
+for posive and negtives how to set emotion 
+FIX task ui, make it look better, expand the rich text, move header back and breadcrumb to page header search and remove searchits not require in taks create and edit keep it only for dahboard 
+
+
+
 also in timeline or agnda the emotion is nto showing also why if nothing shows ai suggestion ???
 
 
 
 
 also how are you showing the infered emotion , show both infered and selected in smae line 
+
+
 
 double click should select with confirmation for emotion 
 
@@ -14,7 +20,6 @@ clean emotions page and not required code
 
 
 
-FIX task ui, make it look better, expand the rick text, moe header back and breadcrumb to page header search and remove searchits not require in taks create and edit keep it only for dahboard 
 
 
 

@@ -8,7 +8,7 @@
      * - Tailwind CSS styling
      * - Client-side search (filters loaded emotions)
      */
-    import { onMount, onDestroy, tick } from "svelte";
+    import { onMount, onDestroy, tick, untrack } from "svelte";
     import panzoom, { type PanZoom } from "panzoom";
     import {
         QUADRANT_COLORS,
@@ -43,6 +43,7 @@
     interface Props {
         selectedEmotion?: Emotion | null;
         onSelect?: (emotion: Emotion) => void;
+        onConfirm?: (emotion: Emotion) => void;
         showIndicators?: boolean;
         onHoveredChange?: (emotion: Emotion | null) => void;
     }
@@ -50,6 +51,7 @@
     let {
         selectedEmotion = $bindable(null),
         onSelect,
+        onConfirm,
         showIndicators = $bindable(false),
         onHoveredChange,
     }: Props = $props();
@@ -71,6 +73,12 @@
     let pzInstance: PanZoom | null = null;
     let zoomLevel = $state(1);
     let isPzReady = $state(false);
+
+    // Double-click detection (custom implementation to work around panzoom)
+    // Using $state to ensure variables persist through re-renders
+    let lastClickTime = $state(0);
+    let lastClickedEmotionId = $state<string | null>(null);
+    const DOUBLE_CLICK_THRESHOLD = 400; // ms
 
     // Search state - client-side filtering
     let searchQuery = $state("");
@@ -383,10 +391,16 @@
     });
 
     // Watch for selectedEmotion changes to pan to selected item
+    // Note: Panning is now handled in handleSelect with timeout to support double-click
+    // This effect is only for initial load or external changes
     $effect(() => {
         if (isPzReady && selectedEmotion) {
-            // Small delay to ensure DOM is ready
-            setTimeout(() => panToEmotion(selectedEmotion), 50);
+            // Only auto-pan if not from a click (lastClickedEmotionId would be set)
+            const clickedId = untrack(() => lastClickedEmotionId);
+            if (!clickedId) {
+                // External selection change (not from click), pan immediately
+                setTimeout(() => panToEmotion(selectedEmotion), 50);
+            }
         }
     });
 
@@ -413,7 +427,27 @@
     }
 
     function handleSelect(emotion: Emotion) {
-        onSelect?.(emotion);
+        const now = Date.now();
+        const isDoubleClick =
+            lastClickedEmotionId === emotion.id &&
+            now - lastClickTime < DOUBLE_CLICK_THRESHOLD;
+
+        if (isDoubleClick) {
+            // Double-click detected - select and confirm (modal closes, pan is irrelevant)
+            onSelect?.(emotion);
+            onConfirm?.(emotion);
+            // Reset tracking
+            lastClickTime = 0;
+            lastClickedEmotionId = null;
+        } else {
+            // Single click - select and pan immediately for instant feedback
+            onSelect?.(emotion);
+            lastClickTime = now;
+            lastClickedEmotionId = emotion.id;
+
+            // Pan immediately - if user double-clicks, modal closes anyway
+            panToEmotion(emotion);
+        }
     }
 
     // Mouse handlers - update tooltip in DOM portal

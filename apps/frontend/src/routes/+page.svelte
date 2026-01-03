@@ -45,11 +45,12 @@
   } from "$lib/utils/navigation";
 
   // Selected date state initialized from URL
+  const initialParams = getUrlParams<{ date: Date; view: string }>({
     date: parsers.dateOnly(new Date()),
     view: parsers.string("timeline"),
   });
 
-  let selectedDate = $state(initialParams.date);
+  let selectedDate = $state<Date>(initialParams.date);
   let currentTimelineView = $state<TimelineView>(
     (initialParams.view as TimelineView) || "timeline",
   );
@@ -64,10 +65,10 @@
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
-    
-    updateUrlParams({ 
-        date: `${year}-${month}-${day}`,
-        view: currentTimelineView 
+
+    updateUrlParams({
+      date: `${year}-${month}-${day}`,
+      view: currentTimelineView,
     });
   });
 
@@ -79,11 +80,11 @@
     // Create date at start of local day (00:00:00)
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
-    
+
     // Create date at end of local day (23:59:59.999)
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
-    
+
     return {
       startOfDay: start.toISOString(),
       endOfDay: end.toISOString(),
@@ -168,8 +169,6 @@
 
   // Filter state
   let selectedCategoryId = $state<string | null>(null);
-
-
 
   // FAB menu state
   let fabOpen = $state(false);
