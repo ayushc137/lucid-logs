@@ -9,7 +9,8 @@ FIX task ui, make it look better, expand the rich text, move header back and bre
 
 
 
-also in timeline or agnda the emotion is nto showing also why if nothing shows ai suggestion ???
+in timeline or agnda the emotion is nto showing 
+cor completed tasks the timelien should shoiw a different ui its not changing ?
 
 
 

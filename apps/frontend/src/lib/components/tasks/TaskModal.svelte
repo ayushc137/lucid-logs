@@ -834,10 +834,10 @@
                     >
                         <span>None</span>
                         <span>Low</span>
-                        <span>Med</span>
+                        <span>Medium</span>
                         <span>High</span>
-                        <span>Crit</span>
-                        <span>Urg</span>
+                        <span>Critical</span>
+                        <span>Urgent</span>
                     </div>
                 </div>
 
