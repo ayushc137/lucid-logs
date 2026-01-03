@@ -511,30 +511,48 @@
                                                     />
                                                 </div>
                                             </div>
-                                            <div class="flex justify-end gap-2">
+                                            <div
+                                                class="flex justify-between items-center"
+                                            >
                                                 <button
-                                                    class="btn btn-ghost btn-sm"
-                                                    onclick={() =>
-                                                        (editingId = null)}
+                                                    class="btn btn-ghost btn-sm text-error gap-1"
+                                                    onclick={(e) =>
+                                                        confirmDelete(
+                                                            category.id,
+                                                            e,
+                                                        )}
                                                 >
-                                                    Cancel
+                                                    <Trash2 class="w-4 h-4" />
+                                                    <span
+                                                        class="hidden sm:inline"
+                                                        >Delete</span
+                                                    >
                                                 </button>
-                                                <button
-                                                    class="btn btn-primary btn-sm gap-1"
-                                                    onclick={saveEdit}
-                                                    disabled={$updateMut.isPending}
-                                                >
-                                                    {#if $updateMut.isPending}
-                                                        <span
-                                                            class="loading loading-spinner loading-xs"
-                                                        ></span>
-                                                    {:else}
-                                                        <Check
-                                                            class="w-4 h-4"
-                                                        />
-                                                    {/if}
-                                                    Save
-                                                </button>
+                                                <div class="flex gap-2">
+                                                    <button
+                                                        class="btn btn-ghost btn-sm"
+                                                        onclick={() =>
+                                                            (editingId = null)}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        class="btn btn-primary btn-sm gap-1"
+                                                        onclick={saveEdit}
+                                                        disabled={$updateMut.isPending}
+                                                    >
+                                                        {#if $updateMut.isPending}
+                                                            <span
+                                                                class="loading loading-spinner loading-xs"
+                                                            ></span>
+                                                        {:else}
+                                                            <Check
+                                                                class="w-4 h-4"
+                                                            />
+                                                        {/if}
+                                                        Save
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -542,7 +560,8 @@
                             {:else}
                                 <!-- View Row -->
                                 <tr
-                                    class="hover:bg-base-200/50 transition-colors group"
+                                    class="hover:bg-base-200/50 transition-colors group cursor-pointer"
+                                    onclick={() => startEdit(category)}
                                 >
                                     <td>
                                         <div
@@ -580,8 +599,10 @@
                                         >
                                             <button
                                                 class="btn btn-ghost btn-sm btn-square"
-                                                onclick={() =>
-                                                    startEdit(category)}
+                                                onclick={(e) => {
+                                                    e.stopPropagation();
+                                                    startEdit(category);
+                                                }}
                                             >
                                                 <SquarePen class="w-4 h-4" />
                                             </button>

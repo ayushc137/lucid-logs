@@ -60,16 +60,16 @@
 
     // Check for emotions
     const hasSelectedEmotion = $derived(
-        !!task.emotionId &&
-            !!task.emotionName &&
-            !!task.emotionEmoji &&
-            !!task.emotionQuadrant,
+        !!task?.emotionId &&
+            !!task?.emotionName &&
+            !!task?.emotionEmoji &&
+            !!task?.emotionQuadrant,
     );
     const hasInferredEmotion = $derived(
-        !!task.inferredEmotionId &&
-            !!task.inferredEmotionName &&
-            !!task.inferredEmotionEmoji &&
-            !!task.inferredEmotionQuadrant,
+        !!task?.inferredEmotionId &&
+            !!task?.inferredEmotionName &&
+            !!task?.inferredEmotionEmoji &&
+            !!task?.inferredEmotionQuadrant,
     );
     const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
 
@@ -165,7 +165,7 @@
                     <!-- Selected Emotion -->
                     {#if hasSelectedEmotion}
                         {@const colors =
-                            QUADRANT_COLORS[task.emotionQuadrant as Quadrant]}
+                            QUADRANT_COLORS[task?.emotionQuadrant as Quadrant]}
                         <div class="flex items-center gap-2">
                             <div
                                 class="flex items-center gap-1.5 px-2 py-1 rounded-lg"
@@ -177,16 +177,16 @@
                                 "
                             >
                                 <OpenMoji
-                                    emoji={task.emotionEmoji!}
+                                    emoji={task?.emotionEmoji ?? ""}
                                     size={18}
                                 />
                                 <div class="flex flex-col">
                                     <span
                                         class="text-xs font-semibold"
                                         style="color: {colors.primary};"
-                                        >{task.emotionName}</span
+                                        >{task?.emotionName}</span
                                     >
-                                    {#if task.emotionDescription}
+                                    {#if task?.emotionDescription}
                                         <span
                                             class="text-[9px] text-base-content/50 line-clamp-1"
                                             >{task.emotionDescription}</span
@@ -201,7 +201,7 @@
                     {#if hasInferredEmotion}
                         {@const colors =
                             QUADRANT_COLORS[
-                                task.inferredEmotionQuadrant as Quadrant
+                                task?.inferredEmotionQuadrant as Quadrant
                             ]}
                         <div class="flex items-center gap-2">
                             <div
@@ -218,14 +218,14 @@
                                     style="color: {colors.primary};"
                                 />
                                 <OpenMoji
-                                    emoji={task.inferredEmotionEmoji!}
+                                    emoji={task?.inferredEmotionEmoji ?? ""}
                                     size={16}
                                 />
                                 <div class="flex flex-col">
                                     <span
                                         class="text-[11px] font-medium"
                                         style="color: {colors.primary};"
-                                        >{task.inferredEmotionName}</span
+                                        >{task?.inferredEmotionName}</span
                                     >
                                     <span
                                         class="text-[9px] text-base-content/40"
