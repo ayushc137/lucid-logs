@@ -59,7 +59,7 @@
       {headerContent}
     />
 
-    <main class="flex-1 overflow-y-auto bg-base-200/60">
+    <main class="flex-1 overflow-y-auto overflow-x-hidden bg-base-200/60">
       <div class="p-4 md:p-6 lg:p-8 h-full">
         <!-- Relaxed width constraint for wider timeline view -->
         <div class="w-full h-full">

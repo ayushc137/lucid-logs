@@ -1,3 +1,9 @@
+
+footer is not sticky to bottom and there is padding on both end of footer why ??????
+
+
+
+
 for posive and negtives how to set emotion 
 FIX task ui, make it look better, expand the rich text, move header back and breadcrumb to page header search and remove searchits not require in taks create and edit keep it only for dahboard 
 

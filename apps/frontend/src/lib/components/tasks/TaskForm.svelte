@@ -429,14 +429,14 @@
 </script>
 
 <div class="flex flex-col min-h-[calc(100vh-6rem)] relative">
-    <div class="space-y-6 flex-1">
+    <div class="space-y-6 flex-1 pb-4">
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Column: Title + Journal (2/3 width on desktop) -->
             <div class="lg:col-span-2 space-y-4">
                 <!-- Title Card -->
                 <Card variant="bordered">
-                    <div class="flex items-center gap-3 mb-4">
+                    <div class="flex items-center gap-3">
                         <!-- Completion Toggle -->
                         <button
                             class={cn(
@@ -1020,50 +1020,50 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Sticky Footer Actions -->
-<div
-    class="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-4 bg-base-200/90 backdrop-blur-md border-t border-base-300 z-30 mt-auto"
->
-    <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
-            {#if isEditing}
-                <button
-                    class="btn btn-ghost btn-sm text-error gap-2"
-                    onclick={() => (showDeleteConfirm = true)}
-                    disabled={$deleteMut.isPending}
-                >
-                    <Trash2 class="w-4 h-4" />
-                    <span class="hidden sm:inline">Delete</span>
-                </button>
-            {/if}
-            <span class="text-xs opacity-40 hidden md:inline">
-                <kbd class="kbd kbd-xs">⌘</kbd> +
-                <kbd class="kbd kbd-xs">Enter</kbd> to save
-            </span>
-        </div>
-        <div class="flex items-center gap-2">
-            <button
-                class="btn btn-ghost btn-sm"
-                onclick={navigateBack}
-                disabled={isPending}
-            >
-                Cancel
-            </button>
-            <button
-                class="btn btn-primary gap-2 min-w-[120px] shadow-lg shadow-primary/20"
-                onclick={handleSubmit}
-                disabled={isPending || !title.trim()}
-            >
-                {#if isPending}
-                    <span class="loading loading-spinner loading-sm"></span>
-                    {isEditing ? "Saving..." : "Creating..."}
-                {:else}
-                    <Save class="w-4 h-4" />
-                    {isEditing ? "Save Changes" : "Create Task"}
+    <!-- Sticky Footer Actions -->
+    <div
+        class="sticky bottom-0 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-4 mt-auto bg-base-200/90 backdrop-blur-md border-t border-base-300 z-30"
+    >
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                {#if isEditing}
+                    <button
+                        class="btn btn-ghost btn-sm text-error gap-2"
+                        onclick={() => (showDeleteConfirm = true)}
+                        disabled={$deleteMut.isPending}
+                    >
+                        <Trash2 class="w-4 h-4" />
+                        <span class="hidden sm:inline">Delete</span>
+                    </button>
                 {/if}
-            </button>
+                <span class="text-xs opacity-40 hidden md:inline">
+                    <kbd class="kbd kbd-xs">⌘</kbd> +
+                    <kbd class="kbd kbd-xs">Enter</kbd> to save
+                </span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button
+                    class="btn btn-ghost btn-sm"
+                    onclick={navigateBack}
+                    disabled={isPending}
+                >
+                    Cancel
+                </button>
+                <button
+                    class="btn btn-primary gap-2 min-w-[120px] shadow-lg shadow-primary/20"
+                    onclick={handleSubmit}
+                    disabled={isPending || !title.trim()}
+                >
+                    {#if isPending}
+                        <span class="loading loading-spinner loading-sm"></span>
+                        {isEditing ? "Saving..." : "Creating..."}
+                    {:else}
+                        <Save class="w-4 h-4" />
+                        {isEditing ? "Save Changes" : "Create Task"}
+                    {/if}
+                </button>
+            </div>
         </div>
     </div>
 </div>
