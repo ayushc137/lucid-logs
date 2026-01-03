@@ -123,6 +123,10 @@
     let emotionModalOpen = $state(false);
     let liveInferredEmotion = $state<InferredEmotion | null>(null);
     let inferredEmotionFull = $state<Emotion | null>(null);
+    /** Initial emotion to pre-select when modal opens (e.g. suggested emotion) */
+    let initialEmotionForModal = $state<Emotion | null>(null);
+    /** Allowed quadrants for emotion selection (null = all allowed) */
+    let allowedQuadrantsForModal = $state<Quadrant[] | null>(null);
 
     // Pending emotion for new reflection item (select emotion FIRST)
     let pendingPositiveEmotion = $state<Emotion | null>(null);
@@ -368,16 +372,30 @@
 
     function openEmotionForTask() {
         emotionContext = { type: "task" };
+        initialEmotionForModal = null;
+        allowedQuadrantsForModal = null; // All quadrants allowed for task emotion
+        emotionModalOpen = true;
+    }
+
+    /** Open emotion modal with the suggested emotion pre-selected and panned to */
+    function openEmotionForSuggested() {
+        emotionContext = { type: "task" };
+        initialEmotionForModal = inferredEmotionFull;
+        allowedQuadrantsForModal = null; // All quadrants allowed for task emotion
         emotionModalOpen = true;
     }
 
     function openEmotionForPositive(index: number) {
         emotionContext = { type: "positive", index };
+        initialEmotionForModal = null;
+        allowedQuadrantsForModal = ["yellow", "green"]; // Only pleasant emotions for positives
         emotionModalOpen = true;
     }
 
     function openEmotionForNegative(index: number) {
         emotionContext = { type: "negative", index };
+        initialEmotionForModal = null;
+        allowedQuadrantsForModal = ["red", "blue"]; // Only unpleasant emotions for negatives
         emotionModalOpen = true;
     }
 
@@ -385,12 +403,16 @@
     function openEmotionForPendingPositive() {
         pendingEmotionType = "positive";
         emotionContext = { type: "positive", index: -1 };
+        initialEmotionForModal = null;
+        allowedQuadrantsForModal = ["yellow", "green"]; // Only pleasant emotions for positives
         emotionModalOpen = true;
     }
 
     function openEmotionForPendingNegative() {
         pendingEmotionType = "negative";
         emotionContext = { type: "negative", index: -1 };
+        initialEmotionForModal = null;
+        allowedQuadrantsForModal = ["red", "blue"]; // Only unpleasant emotions for negatives
         emotionModalOpen = true;
     }
 
@@ -1071,54 +1093,62 @@
                                     </div>
                                 </div>
 
-                                <button
-                                    class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
-                                    style="
-                                        background: linear-gradient(135deg, 
-                                            color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%, 
-                                            color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
-                                        border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
-                                    "
-                                    onclick={openEmotionForTask}
+                                <div
+                                    class="tooltip tooltip-bottom w-full"
+                                    data-tip={inferredEmotionFull?.description ||
+                                        inferredEmotion.closest_emotion_name}
                                 >
-                                    <!-- Emoji -->
-                                    <div
-                                        class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
-                                        style="background: {colors.gradient}; opacity: 0.9;"
+                                    <button
+                                        class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
+                                        style="
+                                            background: linear-gradient(135deg, 
+                                                color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%, 
+                                                color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
+                                            border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
+                                        "
+                                        onclick={openEmotionForSuggested}
                                     >
-                                        {#if inferredEmotionFull}
-                                            <OpenMoji
-                                                emoji={inferredEmotionFull.emoji}
-                                                alt={inferredEmotion.closest_emotion_name}
-                                                size="sm"
-                                            />
-                                        {:else}
-                                            <Sparkles
-                                                class="w-4 h-4 text-white/80"
-                                            />
-                                        {/if}
-                                    </div>
-
-                                    <!-- Info -->
-                                    <div class="flex-1 min-w-0 text-left">
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="text-sm font-semibold opacity-80"
-                                            >
-                                                {inferredEmotion.closest_emotion_name}
-                                            </span>
-                                        </div>
+                                        <!-- Emoji -->
                                         <div
-                                            class="text-[10px] opacity-50 mt-0.5"
+                                            class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
+                                            style="background: {colors.gradient}; opacity: 0.9;"
                                         >
-                                            {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
+                                            {#if inferredEmotionFull}
+                                                <OpenMoji
+                                                    emoji={inferredEmotionFull.emoji}
+                                                    alt={inferredEmotion.closest_emotion_name}
+                                                    size="sm"
+                                                />
+                                            {:else}
+                                                <Sparkles
+                                                    class="w-4 h-4 text-white/80"
+                                                />
+                                            {/if}
                                         </div>
-                                    </div>
 
-                                    <ChevronRight
-                                        class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
-                                    />
-                                </button>
+                                        <!-- Info -->
+                                        <div class="flex-1 min-w-0 text-left">
+                                            <div
+                                                class="flex items-center gap-2"
+                                            >
+                                                <span
+                                                    class="text-sm font-semibold opacity-80"
+                                                >
+                                                    {inferredEmotion.closest_emotion_name}
+                                                </span>
+                                            </div>
+                                            <div
+                                                class="text-[10px] opacity-50 mt-0.5"
+                                            >
+                                                {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
+                                            </div>
+                                        </div>
+
+                                        <ChevronRight
+                                            class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
+                                        />
+                                    </button>
+                                </div>
                             </div>
                         {/if}
                     </div>
@@ -1601,10 +1631,14 @@
 <!-- Emotion Modal -->
 <EmotionModal
     bind:open={emotionModalOpen}
+    initialEmotion={initialEmotionForModal}
+    allowedQuadrants={allowedQuadrantsForModal}
     onSelect={handleEmotionSelect}
     onClose={() => {
         emotionModalOpen = false;
         emotionContext = null;
+        initialEmotionForModal = null;
+        allowedQuadrantsForModal = null;
     }}
 />
 

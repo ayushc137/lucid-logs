@@ -4,17 +4,23 @@
      * - Clean header with description
      * - OpenMojiColor font
      * - Tailwind CSS styling
+     * - Supports initial emotion pre-selection with panning
+     * - Supports quadrant filtering for positive/negative contexts
      */
     import EmotionGrid from "./EmotionGrid.svelte";
-    import { QUADRANT_COLORS } from "./emotionData";
+    import { QUADRANT_COLORS, type Quadrant } from "./emotionData";
     import { getIndicatorDots } from "./emotionUtils";
     import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
     import type { Emotion } from "$lib/api/emotions";
-    import { X, Heart } from "lucide-svelte";
+    import { X, Heart, Lock } from "lucide-svelte";
 
     interface Props {
         open?: boolean;
         selectedEmotion?: Emotion | null;
+        /** Emotion to pre-select and pan to when modal opens */
+        initialEmotion?: Emotion | null;
+        /** Restrict selection to specific quadrants (e.g., for positive/negative reflections) */
+        allowedQuadrants?: Quadrant[] | null;
         onSelect?: (emotion: Emotion) => void;
         onClose?: () => void;
     }
@@ -22,9 +28,26 @@
     let {
         open = $bindable(false),
         selectedEmotion = $bindable(null),
+        initialEmotion = null,
+        allowedQuadrants = null,
         onSelect,
         onClose,
     }: Props = $props();
+
+    // Track if we've applied the initial emotion for this modal open
+    let appliedInitialEmotion = $state(false);
+
+    // Apply initial emotion when modal opens
+    $effect(() => {
+        if (open && initialEmotion && !appliedInitialEmotion) {
+            selectedEmotion = initialEmotion;
+            appliedInitialEmotion = true;
+        }
+        // Reset when modal closes
+        if (!open) {
+            appliedInitialEmotion = false;
+        }
+    });
 
     let showIndicators = $state(false);
     let hoveredEmotion = $state<Emotion | null>(null);
@@ -41,6 +64,7 @@
 
     function handleClose() {
         open = false;
+        selectedEmotion = null;
         onClose?.();
     }
 
@@ -49,6 +73,7 @@
             onSelect?.(selectedEmotion);
         }
         open = false;
+        selectedEmotion = null;
         onClose?.();
     }
 
@@ -61,7 +86,22 @@
         selectedEmotion = emotion;
         onSelect?.(emotion);
         open = false;
+        selectedEmotion = null;
     }
+
+    // Get quadrant restriction label for display
+    const quadrantRestrictionLabel = $derived.by(() => {
+        if (!allowedQuadrants || allowedQuadrants.length === 4) return null;
+        const isPositive =
+            allowedQuadrants.includes("yellow") &&
+            allowedQuadrants.includes("green");
+        const isNegative =
+            allowedQuadrants.includes("red") &&
+            allowedQuadrants.includes("blue");
+        if (isPositive) return "Pleasant emotions only";
+        if (isNegative) return "Unpleasant emotions only";
+        return null;
+    });
 </script>
 
 {#if open}
@@ -162,12 +202,23 @@
 
             <!-- Grid -->
             <div class="flex-1 overflow-hidden p-2">
+                {#if quadrantRestrictionLabel}
+                    <div
+                        class="flex items-center justify-center gap-2 px-3 py-1.5 mb-2 mx-2 rounded-lg bg-base-200/50 border border-base-300"
+                    >
+                        <Lock class="w-3.5 h-3.5 text-base-content/50" />
+                        <span class="text-xs text-base-content/60"
+                            >{quadrantRestrictionLabel}</span
+                        >
+                    </div>
+                {/if}
                 <EmotionGrid
                     bind:selectedEmotion
                     onSelect={handleSelect}
                     onConfirm={handleDoubleClickConfirm}
                     onHoveredChange={handleHoveredChange}
                     bind:showIndicators
+                    {allowedQuadrants}
                 />
             </div>
 

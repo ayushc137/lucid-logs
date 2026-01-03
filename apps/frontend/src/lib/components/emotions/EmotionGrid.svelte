@@ -46,6 +46,8 @@
         onConfirm?: (emotion: Emotion) => void;
         showIndicators?: boolean;
         onHoveredChange?: (emotion: Emotion | null) => void;
+        /** Restrict selection to specific quadrants (e.g., for positive/negative reflections) */
+        allowedQuadrants?: Quadrant[] | null;
     }
 
     let {
@@ -54,7 +56,14 @@
         onConfirm,
         showIndicators = $bindable(false),
         onHoveredChange,
+        allowedQuadrants = null,
     }: Props = $props();
+
+    // Check if an emotion is allowed based on quadrant filtering
+    function isEmotionAllowed(emotion: Emotion): boolean {
+        if (!allowedQuadrants || allowedQuadrants.length === 0) return true;
+        return allowedQuadrants.includes(emotion.quadrant as Quadrant);
+    }
 
     // API data state
     let allEmotions = $state<Emotion[]>([]);
@@ -427,6 +436,9 @@
     }
 
     function handleSelect(emotion: Emotion) {
+        // Skip if emotion is not in allowed quadrants
+        if (!isEmotionAllowed(emotion)) return;
+
         const now = Date.now();
         const isDoubleClick =
             lastClickedEmotionId === emotion.id &&
@@ -771,6 +783,7 @@
                                     hoveredEmotion?.id === emotion.id}
                                 {@const isSelected =
                                     selectedEmotion?.id === emotion.id}
+                                {@const isDisabled = !isEmotionAllowed(emotion)}
                                 {@const colors = getEmotionColors(emotion)}
                                 {@const layers =
                                     emotionLayers.get(emotion.id) || []}
@@ -778,10 +791,16 @@
                                 {@const layerCount = layers.length}
 
                                 <button
-                                    class="emotion-btn relative w-full h-full border-none bg-transparent cursor-pointer flex items-center justify-center rounded-xl overflow-visible outline-none transition-all duration-200"
+                                    class="emotion-btn relative w-full h-full border-none bg-transparent flex items-center justify-center rounded-xl overflow-visible outline-none transition-all duration-200"
                                     class:selected={isSelected}
                                     class:auto-hovered={isHovered &&
-                                        !isMouseHovering}
+                                        !isMouseHovering &&
+                                        !isDisabled}
+                                    class:disabled={isDisabled}
+                                    class:cursor-pointer={!isDisabled}
+                                    class:cursor-not-allowed={isDisabled}
+                                    class:grayscale={isDisabled}
+                                    class:opacity-40={isDisabled}
                                     data-emotion-id={emotion.id}
                                     onclick={() => handleSelect(emotion)}
                                     onmouseenter={(e) =>
@@ -789,6 +808,9 @@
                                     onmousemove={onMouseMove}
                                     onmouseleave={onMouseLeave}
                                     style="--glow: {colors.glow}; --speed: {animSpeed}s; --primary: {colors.primary};"
+                                    title={isDisabled
+                                        ? `${emotion.name} - Not available in this context`
+                                        : emotion.name}
                                 >
                                     <!-- Selected state ring -->
                                     {#if isSelected}
