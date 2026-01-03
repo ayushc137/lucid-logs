@@ -498,6 +498,22 @@ definitions:
           $ref: '#/definitions/emotions.Emotion'
         type: array
     type: object
+  emotions.InferRequest:
+    properties:
+      negatives:
+        items:
+          $ref: '#/definitions/emotions.TaskItem'
+        type: array
+      positives:
+        items:
+          $ref: '#/definitions/emotions.TaskItem'
+        type: array
+    type: object
+  emotions.InferResponse:
+    properties:
+      inferred_emotion:
+        $ref: '#/definitions/emotions.InferredEmotion'
+    type: object
   emotions.InferredEmotion:
     properties:
       arousal:
@@ -526,6 +542,14 @@ definitions:
       valence:
         description: Weighted centroid coordinates
         type: number
+    type: object
+  emotions.TaskItem:
+    properties:
+      emotion_id:
+        description: 'Optional: e.g., "emotions:E16"'
+        type: string
+      text:
+        type: string
     type: object
   errors.ErrorCode:
     enum:
@@ -2454,6 +2478,39 @@ paths:
       security:
       - BearerAuth: []
       summary: Get emotion grid
+      tags:
+      - emotions
+  /api/v1/emotions/infer:
+    post:
+      consumes:
+      - application/json
+      description: Calculate inferred emotion from positive and negative task items
+        with emotions
+      parameters:
+      - description: Positives and negatives arrays
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/emotions.InferRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/emotions.InferResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Infer emotion from task items
       tags:
       - emotions
   /api/v1/goals:

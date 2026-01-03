@@ -35,11 +35,13 @@ func NewHandler(db *database.DB) *Handler {
 // Routes registered (protected, requires authentication):
 //   - GET /grid    : Get all 100 emotions organized by quadrant
 //   - GET /:id     : Get single emotion details
+//   - POST /infer  : Calculate inferred emotion from task items
 func RegisterRoutes(r *gin.RouterGroup, db *database.DB) {
 	h := NewHandler(db)
 
 	r.GET("/grid", h.Grid)
 	r.GET("/:id", h.Get)
+	r.POST("/infer", h.Infer)
 }
 
 // =============================================================================
@@ -92,4 +94,36 @@ func (h *Handler) Get(c *gin.Context) {
 	}
 
 	response.OK(c, emotion.ToDetail())
+}
+
+// =============================================================================
+// INFER
+// =============================================================================
+
+// Infer handles POST /emotions/infer - calculate inferred emotion from task items.
+//
+// @Summary      Infer emotion from task items
+// @Description  Calculate inferred emotion from positive and negative task items with emotions
+// @Tags         emotions
+// @Accept       json
+// @Produce      json
+// @Param        request body InferRequest true "Positives and negatives arrays"
+// @Success      200 {object} InferResponse
+// @Failure      400 {object} response.APIResponse
+// @Failure      401 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/emotions/infer [post]
+func (h *Handler) Infer(c *gin.Context) {
+	var req InferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request body")
+		return
+	}
+
+	// Calculate inferred emotion using existing logic
+	inferredEmotion := InferFromItems(req.Positives, req.Negatives)
+
+	response.OK(c, InferResponse{
+		InferredEmotion: inferredEmotion,
+	})
 }

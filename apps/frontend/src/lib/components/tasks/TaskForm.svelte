@@ -15,7 +15,7 @@
         getLastTaskEndTime,
     } from "$lib/api";
     import { getCategories, createCategory } from "$lib/api/categories";
-    import { getEmotion, type Emotion } from "$lib/api/emotions";
+    import { getEmotion, type Emotion, inferEmotion, type InferredEmotion } from "$lib/api/emotions";
     import { RichEditor } from "$lib/components/rich-editor";
     import {
         CategoryDropdown,
@@ -111,6 +111,7 @@
     let selectedEmotion = $state<Emotion | null>(null);
     let emotionContext = $state<EmotionSelectionContext | null>(null);
     let emotionModalOpen = $state(false);
+    let liveInferredEmotion = $state<InferredEmotion | null>(null);
 
     // Date/time state
     let startDate = $state("");
@@ -203,6 +204,25 @@
         }
     });
 
+    // Effect to calculate live inferred emotion
+    $effect(() => {
+        // Only calculate if we have items with emotions
+        const hasEmotions = positives.some(p => p.emotion_id) || negatives.some(n => n.emotion_id);
+
+        if (hasEmotions) {
+            inferEmotion({ positives, negatives })
+                .then(response => {
+                    liveInferredEmotion = response.inferred_emotion;
+                })
+                .catch(error => {
+                    console.error("Failed to infer emotion:", error);
+                    liveInferredEmotion = null;
+                });
+        } else {
+            liveInferredEmotion = null;
+        }
+    });
+
     onDestroy(() => {
         if (timeUpdateInterval) clearInterval(timeUpdateInterval);
     });
@@ -252,7 +272,7 @@
     });
 
     const isPending = $derived($createMut.isPending || $updateMut.isPending);
-    const inferredEmotion = $derived(task?.inferred_emotion);
+    const inferredEmotion = $derived(liveInferredEmotion || task?.inferred_emotion);
 
     function handleSuccess() {
         queryClient.invalidateQueries({ queryKey: ["tasks"] });

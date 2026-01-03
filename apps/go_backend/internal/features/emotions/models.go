@@ -133,6 +133,21 @@ type TaskItem struct {
 }
 
 // =============================================================================
+// INFER REQUEST/RESPONSE
+// =============================================================================
+
+// InferRequest is the request body for POST /emotions/infer.
+type InferRequest struct {
+	Positives []TaskItem `json:"positives"`
+	Negatives []TaskItem `json:"negatives"`
+}
+
+// InferResponse is the response for POST /emotions/infer.
+type InferResponse struct {
+	InferredEmotion *InferredEmotion `json:"inferred_emotion"`
+}
+
+// =============================================================================
 // CONVERSION HELPERS
 // =============================================================================
 

@@ -716,6 +716,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/emotions/infer": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Calculate inferred emotion from positive and negative task items with emotions",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "emotions"
+                ],
+                "summary": "Infer emotion from task items",
+                "parameters": [
+                    {
+                        "description": "Positives and negatives arrays",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/emotions.InferRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/emotions.InferResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/emotions/{id}": {
             "get": {
                 "security": [
@@ -3421,6 +3472,31 @@ const docTemplate = `{
                 }
             }
         },
+        "emotions.InferRequest": {
+            "type": "object",
+            "properties": {
+                "negatives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.TaskItem"
+                    }
+                },
+                "positives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/emotions.TaskItem"
+                    }
+                }
+            }
+        },
+        "emotions.InferResponse": {
+            "type": "object",
+            "properties": {
+                "inferred_emotion": {
+                    "$ref": "#/definitions/emotions.InferredEmotion"
+                }
+            }
+        },
         "emotions.InferredEmotion": {
             "type": "object",
             "properties": {
@@ -3458,6 +3534,18 @@ const docTemplate = `{
                 "valence": {
                     "description": "Weighted centroid coordinates",
                     "type": "number"
+                }
+            }
+        },
+        "emotions.TaskItem": {
+            "type": "object",
+            "properties": {
+                "emotion_id": {
+                    "description": "Optional: e.g., \"emotions:E16\"",
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
                 }
             }
         },
