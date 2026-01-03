@@ -444,6 +444,8 @@
 
     // Mouse handlers - update tooltip in DOM portal
     function onMouseEnter(e: MouseEvent, emotion: Emotion) {
+        if (!isEmotionAllowed(emotion)) return;
+
         if (hoverTimeout) clearTimeout(hoverTimeout);
 
         isMouseHovering = true;
@@ -954,12 +956,10 @@
     @keyframes selectedGlow {
         0%,
         100% {
-            filter: drop-shadow(0 0 12px var(--glow))
-                drop-shadow(0 0 24px var(--glow));
+            opacity: 1;
         }
         50% {
-            filter: drop-shadow(0 0 18px var(--glow))
-                drop-shadow(0 0 32px var(--glow));
+            opacity: 0.9;
         }
     }
 
@@ -967,13 +967,9 @@
         0%,
         100% {
             transform: scale(1.15);
-            filter: drop-shadow(0 0 12px var(--glow))
-                drop-shadow(0 0 24px var(--glow));
         }
         50% {
             transform: scale(1.18);
-            filter: drop-shadow(0 0 18px var(--glow))
-                drop-shadow(0 0 32px var(--glow));
         }
     }
 
@@ -1018,8 +1014,7 @@
     }
 
     .emotion-btn.selected .blob-svg:first-child {
-        filter: drop-shadow(0 0 14px var(--glow))
-            drop-shadow(0 0 28px var(--glow));
+        filter: none;
     }
 
     .emotion-btn:focus-visible {
@@ -1034,8 +1029,7 @@
 
     .emotion-btn:hover .blob-svg:first-child,
     .emotion-btn.auto-hovered .blob-svg:first-child {
-        filter: drop-shadow(0 0 16px var(--glow))
-            drop-shadow(0 0 32px var(--glow)) drop-shadow(0 0 48px var(--glow));
+        filter: none;
     }
 
     .emotion-btn:hover .emoji,

@@ -161,6 +161,17 @@
         return new Date().toISOString().split("T")[0];
     }
 
+    // Hash of reflections to check if they have changed
+    function getReflectionsHash(p: TaskItem[], n: TaskItem[]) {
+        return JSON.stringify({
+            p: p.map((x) => x.text),
+            n: n.map((x) => x.text),
+        });
+    }
+
+    // Logic to prevent initial inference call
+    let lastInferredHash = $state("");
+
     function updateEndTimeToNow() {
         const now = new Date();
         endDate = now.toISOString().split("T")[0];
@@ -196,6 +207,9 @@
                     selectedEmotion = e;
                 }
             }
+
+            // Set initial hash to prevent immediate inference
+            lastInferredHash = getReflectionsHash(positives, negatives);
         } else {
             // Create mode - set defaults
             const today = getTodayString();
@@ -230,14 +244,15 @@
 
     // Effect to calculate live inferred emotion
     $effect(() => {
-        // Only calculate if we have items with emotions
+        const currentHash = getReflectionsHash(positives, negatives);
         const hasEmotions =
             positives.some((p) => p.emotion_id) ||
             negatives.some((n) => n.emotion_id);
 
-        if (hasEmotions) {
+        if (hasEmotions && currentHash !== lastInferredHash) {
             inferEmotion({ positives, negatives })
                 .then((response) => {
+                    lastInferredHash = currentHash;
                     liveInferredEmotion = response.inferred_emotion;
                     // Get full emotion data from store
                     if (response.inferred_emotion?.closest_emotion_id) {
@@ -421,14 +436,26 @@
 
     function openEmotionForPositive(index: number) {
         emotionContext = { type: "positive", index };
-        initialEmotionForModal = null;
+
+        // Find current emotion if it exists
+        const p = positives[index];
+        initialEmotionForModal = p.emotion_id
+            ? emotionStore.get(p.emotion_id) || null
+            : null;
+
         allowedQuadrantsForModal = ["yellow", "green"]; // Only pleasant emotions for positives
         emotionModalOpen = true;
     }
 
     function openEmotionForNegative(index: number) {
         emotionContext = { type: "negative", index };
-        initialEmotionForModal = null;
+
+        // Find current emotion if it exists
+        const n = negatives[index];
+        initialEmotionForModal = n.emotion_id
+            ? emotionStore.get(n.emotion_id) || null
+            : null;
+
         allowedQuadrantsForModal = ["red", "blue"]; // Only unpleasant emotions for negatives
         emotionModalOpen = true;
     }
@@ -437,7 +464,7 @@
     function openEmotionForPendingPositive() {
         pendingEmotionType = "positive";
         emotionContext = { type: "positive", index: -1 };
-        initialEmotionForModal = null;
+        initialEmotionForModal = pendingPositiveEmotion;
         allowedQuadrantsForModal = ["yellow", "green"]; // Only pleasant emotions for positives
         emotionModalOpen = true;
     }
@@ -445,7 +472,7 @@
     function openEmotionForPendingNegative() {
         pendingEmotionType = "negative";
         emotionContext = { type: "negative", index: -1 };
-        initialEmotionForModal = null;
+        initialEmotionForModal = pendingNegativeEmotion;
         allowedQuadrantsForModal = ["red", "blue"]; // Only unpleasant emotions for negatives
         emotionModalOpen = true;
     }
