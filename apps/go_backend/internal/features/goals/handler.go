@@ -89,15 +89,21 @@ func (h *Handler) List(c *gin.Context) {
 
 	// Parse filters from query params
 	filters := GoalFilters{
-		Status:     c.Query("status"),
-		GoalType:   c.Query("goal_type"),
-		LifeDomain: c.Query("life_domain"),
-		Search:     c.Query("search"),
-		SortBy:     c.Query("sort_by"),
+		Status: c.Query("status"),
+		Search: c.Query("search"),
+		SortBy: c.Query("sort_by"),
 	}
 	if recurring := c.Query("recurring"); recurring != "" {
 		isRecurring := recurring == "true"
 		filters.IsRecurring = &isRecurring
+	}
+	if hasTarget := c.Query("measurable"); hasTarget != "" {
+		hasTgt := hasTarget == "true"
+		filters.HasTarget = &hasTgt
+	}
+	if hasChildren := c.Query("grouped"); hasChildren != "" {
+		hasChild := hasChildren == "true"
+		filters.HasChildren = &hasChild
 	}
 
 	log.Debug().

@@ -31,9 +31,6 @@ type Repository interface {
 	// FindQuickLog retrieves quick-log templates for a user.
 	FindQuickLog(ctx context.Context, userID string) ([]*TaskTemplate, error)
 
-	// FindByActivityKey retrieves a template by its activity key.
-	FindByActivityKey(ctx context.Context, activityKey, userID string) (*TaskTemplate, error)
-
 	// Create creates a new template.
 	Create(ctx context.Context, req *CreateRequest, userID string) (*TaskTemplate, error)
 
@@ -45,6 +42,12 @@ type Repository interface {
 
 	// Delete soft-deletes a template.
 	Delete(ctx context.Context, id, userID string) error
+
+	// LinkGoal links a template to a goal via template_goals relation.
+	LinkGoal(ctx context.Context, templateID string, req *LinkGoalRequest, userID string) error
+
+	// UnlinkGoal removes a template-goal link.
+	UnlinkGoal(ctx context.Context, templateID, goalID, userID string) error
 }
 
 // =============================================================================
@@ -75,30 +78,18 @@ type templateDB struct {
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
 	Icon        string `json:"icon,omitempty"`
-	Color       string `json:"color,omitempty"`
 
-	DefaultDuration int         `json:"default_duration,omitempty"`
-	DefaultPriority int         `json:"default_priority,omitempty"`
-	DefaultCategory *categoryDB `json:"default_category,omitempty"`
+	DefaultDuration int `json:"default_duration,omitempty"`
 
 	IsQuickLog    bool `json:"is_quick_log"`
 	QuickLogOrder int  `json:"quick_log_order,omitempty"`
 
 	QuantityEnabled bool    `json:"quantity_enabled"`
 	QuantityDefault float64 `json:"quantity_default,omitempty"`
-	QuantityUnit    string  `json:"quantity_unit,omitempty"`
 	QuantityStep    float64 `json:"quantity_step,omitempty"`
 
 	ExpectedQuadrant string `json:"expected_quadrant,omitempty"`
 	DefaultEmotionID string `json:"default_emotion_id,omitempty"`
-
-	ActivityKey string `json:"activity_key,omitempty"`
-	GoalID      string `json:"goal_id,omitempty"`
-
-	ShowFields map[string]bool `json:"show_fields,omitempty"`
-
-	IsDefault    bool   `json:"is_default"`
-	SourceTaskID string `json:"source_task_id,omitempty"`
 
 	UseCount   int                   `json:"use_count"`
 	LastUsedAt *database.SurrealTime `json:"last_used_at,omitempty"`
@@ -106,6 +97,9 @@ type templateDB struct {
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
+
+	// Populated via subquery
+	Category *categoryDB `json:"category,omitempty"`
 }
 
 type categoryDB struct {
@@ -146,35 +140,26 @@ func (t *templateDB) toTemplate() *TaskTemplate {
 		Title:       t.Title,
 		Description: t.Description,
 		Icon:        t.Icon,
-		Color:       t.Color,
 
 		DefaultDuration: t.DefaultDuration,
-		DefaultPriority: t.DefaultPriority,
 
 		IsQuickLog:    t.IsQuickLog,
 		QuickLogOrder: t.QuickLogOrder,
 
 		QuantityEnabled: t.QuantityEnabled,
 		QuantityDefault: t.QuantityDefault,
-		QuantityUnit:    t.QuantityUnit,
 		QuantityStep:    t.QuantityStep,
 
 		ExpectedQuadrant: t.ExpectedQuadrant,
 		DefaultEmotionID: t.DefaultEmotionID,
-
-		ActivityKey: t.ActivityKey,
-		GoalID:      t.GoalID,
-
-		IsDefault:    t.IsDefault,
-		SourceTaskID: t.SourceTaskID,
 
 		UseCount:  t.UseCount,
 		CreatedAt: t.CreatedAt.Time,
 		UpdatedAt: t.UpdatedAt.Time,
 	}
 
-	if t.DefaultCategory != nil {
-		template.DefaultCategory = t.DefaultCategory.toCategory()
+	if t.Category != nil {
+		template.Category = t.Category.toCategory()
 	}
 
 	if t.LastUsedAt != nil && !t.LastUsedAt.IsZero() {
@@ -185,17 +170,6 @@ func (t *templateDB) toTemplate() *TaskTemplate {
 	if t.DeletedAt != nil && !t.DeletedAt.IsZero() {
 		dt := t.DeletedAt.Time
 		template.DeletedAt = &dt
-	}
-
-	if t.ShowFields != nil {
-		template.ShowFields = &ShowFields{
-			Journal:            t.ShowFields["journal"],
-			Duration:           t.ShowFields["duration"],
-			Quantity:           t.ShowFields["quantity"],
-			Emotion:            t.ShowFields["emotion"],
-			PositivesNegatives: t.ShowFields["positives_negatives"],
-			Notes:              t.ShowFields["notes"],
-		}
 	}
 
 	return template
@@ -209,7 +183,9 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*TaskTemp
 	templateID := database.MustRecordID(Table, id)
 
 	tmpl, err := database.QueryFirst[templateDB](ctx, r.db, `
-		SELECT * FROM type::thing($id) FETCH default_category
+		SELECT *,
+			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+		FROM type::thing($id)
 	`, map[string]any{
 		"id": templateID,
 	})
@@ -222,8 +198,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*TaskTemp
 		return nil, errors.ErrNotFound
 	}
 
-	// Allow access to default templates OR user's own templates
-	if tmpl.CreatedBy != userID && !tmpl.IsDefault {
+	if tmpl.CreatedBy != userID {
 		return nil, errors.ErrNotFound
 	}
 
@@ -235,10 +210,10 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*TaskTemp
 }
 
 func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*TaskTemplate, int64, error) {
-	// Count (user's templates + default templates)
+	// Count
 	countQuery := `
 		RETURN (SELECT count() FROM templates 
-			WHERE (created_by = $user OR is_default = true) 
+			WHERE created_by = $user 
 			  AND deleted_at IS NONE 
 			GROUP ALL)[0].count OR 0
 	`
@@ -248,14 +223,15 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		return nil, 0, err
 	}
 
-	// List
+	// List with category via in_category edge
 	dataQuery := `
-		SELECT * FROM templates 
-		WHERE (created_by = $user OR is_default = true) 
+		SELECT *,
+			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+		FROM templates 
+		WHERE created_by = $user 
 		  AND deleted_at IS NONE
 		ORDER BY is_quick_log DESC, quick_log_order ASC, created_at DESC
 		LIMIT $limit START $offset
-		FETCH default_category
 	`
 	templatesDB, err := database.QueryAll[templateDB](ctx, r.db, dataQuery, map[string]any{
 		"user":   userID,
@@ -277,12 +253,13 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 
 func (r *repository) FindQuickLog(ctx context.Context, userID string) ([]*TaskTemplate, error) {
 	templatesDB, err := database.QueryAll[templateDB](ctx, r.db, `
-		SELECT * FROM templates 
-		WHERE (created_by = $user OR is_default = true) 
+		SELECT *,
+			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+		FROM templates 
+		WHERE created_by = $user 
 		  AND deleted_at IS NONE
 		  AND is_quick_log = true
 		ORDER BY quick_log_order ASC, created_at DESC
-		FETCH default_category
 	`, map[string]any{
 		"user": userID,
 	})
@@ -299,29 +276,6 @@ func (r *repository) FindQuickLog(ctx context.Context, userID string) ([]*TaskTe
 	return templates, nil
 }
 
-func (r *repository) FindByActivityKey(ctx context.Context, activityKey, userID string) (*TaskTemplate, error) {
-	tmpl, err := database.QueryFirst[templateDB](ctx, r.db, `
-		SELECT * FROM templates 
-		WHERE (created_by = $user OR is_default = true)
-		  AND activity_key = $key 
-		  AND deleted_at IS NONE
-		FETCH default_category
-	`, map[string]any{
-		"user": userID,
-		"key":  activityKey,
-	})
-	if err != nil {
-		r.logger.Error().Err(err).Str("activity_key", activityKey).Msg("query failed for activity key lookup")
-		return nil, err
-	}
-
-	if tmpl == nil {
-		return nil, errors.ErrNotFound
-	}
-
-	return tmpl.toTemplate(), nil
-}
-
 // =============================================================================
 // CREATE OPERATION
 // =============================================================================
@@ -335,38 +289,17 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		"title":              req.Title,
 		"description":        req.Description,
 		"icon":               req.Icon,
-		"color":              req.Color,
 		"default_duration":   req.DefaultDuration,
-		"default_priority":   req.DefaultPriority,
 		"is_quick_log":       req.IsQuickLog,
 		"quick_log_order":    req.QuickLogOrder,
 		"quantity_enabled":   req.QuantityEnabled,
 		"quantity_default":   req.QuantityDefault,
-		"quantity_unit":      req.QuantityUnit,
 		"quantity_step":      req.QuantityStep,
 		"expected_quadrant":  req.ExpectedQuadrant,
 		"default_emotion_id": req.DefaultEmotionID,
-		"activity_key":       req.ActivityKey,
-		"goal_id":            req.GoalID,
-		"is_default":         false,
 		"use_count":          0,
 		"created_at":         now,
 		"updated_at":         now,
-	}
-
-	if req.DefaultCategoryID != "" {
-		createData["default_category"] = database.MustRecordID("categories", req.DefaultCategoryID)
-	}
-
-	if req.ShowFields != nil {
-		createData["show_fields"] = map[string]bool{
-			"journal":             boolValue(req.ShowFields.Journal),
-			"duration":            boolValue(req.ShowFields.Duration),
-			"quantity":            boolValue(req.ShowFields.Quantity),
-			"emotion":             boolValue(req.ShowFields.Emotion),
-			"positives_negatives": boolValue(req.ShowFields.PositivesNegatives),
-			"notes":               boolValue(req.ShowFields.Notes),
-		}
 	}
 
 	_, err := database.QueryAll[templateDB](ctx, r.db, `
@@ -380,9 +313,28 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		return nil, err
 	}
 
-	r.logger.Info().Str("template_id", database.ToStringID(templateID)).Msg("template created")
+	templateIDStr := database.ToStringID(templateID)
+	r.logger.Info().Str("template_id", templateIDStr).Msg("template created")
 
-	return r.FindByID(ctx, database.ToStringID(templateID), userID)
+	// Link category via in_category relation
+	if req.CategoryID != "" {
+		if err := r.linkCategory(ctx, templateIDStr, req.CategoryID, userID); err != nil {
+			r.logger.Warn().Err(err).Msg("failed to link category")
+		}
+	}
+
+	// Link goals via template_goals relation
+	for _, goalLink := range req.GoalLinks {
+		if err := r.LinkGoal(ctx, templateIDStr, &LinkGoalRequest{
+			GoalID:             goalLink.GoalID,
+			AutoLinkTasks:      goalLink.AutoLinkTasks,
+			QuantityMultiplier: goalLink.QuantityMultiplier,
+		}, userID); err != nil {
+			r.logger.Warn().Err(err).Str("goal_id", goalLink.GoalID).Msg("failed to link goal")
+		}
+	}
+
+	return r.FindByID(ctx, templateIDStr, userID)
 }
 
 // =============================================================================
@@ -391,14 +343,9 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 
 func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*TaskTemplate, error) {
 	// Verify ownership
-	existing, err := r.FindByID(ctx, id, userID)
+	_, err := r.FindByID(ctx, id, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	// Don't allow updating default templates
-	if existing.IsDefault {
-		return nil, errors.ErrBadRequest.WithMessage("Cannot modify default templates")
 	}
 
 	templateID := database.MustRecordID(Table, id)
@@ -417,21 +364,8 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	if req.Icon != nil {
 		updateData["icon"] = *req.Icon
 	}
-	if req.Color != nil {
-		updateData["color"] = *req.Color
-	}
 	if req.DefaultDuration != nil {
 		updateData["default_duration"] = *req.DefaultDuration
-	}
-	if req.DefaultPriority != nil {
-		updateData["default_priority"] = *req.DefaultPriority
-	}
-	if req.DefaultCategoryID != nil {
-		if *req.DefaultCategoryID == "" {
-			updateData["default_category"] = nil
-		} else {
-			updateData["default_category"] = database.MustRecordID("categories", *req.DefaultCategoryID)
-		}
 	}
 	if req.IsQuickLog != nil {
 		updateData["is_quick_log"] = *req.IsQuickLog
@@ -445,9 +379,6 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	if req.QuantityDefault != nil {
 		updateData["quantity_default"] = *req.QuantityDefault
 	}
-	if req.QuantityUnit != nil {
-		updateData["quantity_unit"] = *req.QuantityUnit
-	}
 	if req.QuantityStep != nil {
 		updateData["quantity_step"] = *req.QuantityStep
 	}
@@ -456,37 +387,6 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 	if req.DefaultEmotionID != nil {
 		updateData["default_emotion_id"] = *req.DefaultEmotionID
-	}
-
-	if req.ShowFields != nil {
-		showFields := make(map[string]bool)
-		if existing.ShowFields != nil {
-			showFields["journal"] = existing.ShowFields.Journal
-			showFields["duration"] = existing.ShowFields.Duration
-			showFields["quantity"] = existing.ShowFields.Quantity
-			showFields["emotion"] = existing.ShowFields.Emotion
-			showFields["positives_negatives"] = existing.ShowFields.PositivesNegatives
-			showFields["notes"] = existing.ShowFields.Notes
-		}
-		if req.ShowFields.Journal != nil {
-			showFields["journal"] = *req.ShowFields.Journal
-		}
-		if req.ShowFields.Duration != nil {
-			showFields["duration"] = *req.ShowFields.Duration
-		}
-		if req.ShowFields.Quantity != nil {
-			showFields["quantity"] = *req.ShowFields.Quantity
-		}
-		if req.ShowFields.Emotion != nil {
-			showFields["emotion"] = *req.ShowFields.Emotion
-		}
-		if req.ShowFields.PositivesNegatives != nil {
-			showFields["positives_negatives"] = *req.ShowFields.PositivesNegatives
-		}
-		if req.ShowFields.Notes != nil {
-			showFields["notes"] = *req.ShowFields.Notes
-		}
-		updateData["show_fields"] = showFields
 	}
 
 	_, err = database.QueryAll[templateDB](ctx, r.db, `
@@ -531,14 +431,9 @@ func (r *repository) IncrementUseCount(ctx context.Context, id string) error {
 
 func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	// Verify ownership
-	existing, err := r.FindByID(ctx, id, userID)
+	_, err := r.FindByID(ctx, id, userID)
 	if err != nil {
 		return err
-	}
-
-	// Don't allow deleting default templates
-	if existing.IsDefault {
-		return errors.ErrBadRequest.WithMessage("Cannot delete default templates")
 	}
 
 	templateID := database.MustRecordID(Table, id)
@@ -563,6 +458,101 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 }
 
 // =============================================================================
+// GOAL LINKING (via template_goals relation)
+// =============================================================================
+
+func (r *repository) LinkGoal(ctx context.Context, templateID string, req *LinkGoalRequest, userID string) error {
+	tID := database.MustRecordID(Table, templateID)
+	gID := database.MustRecordID("goals", req.GoalID)
+	now := time.Now().UTC()
+
+	multiplier := req.QuantityMultiplier
+	if multiplier == 0 {
+		multiplier = 1.0
+	}
+
+	_, err := database.QueryAll[any](ctx, r.db, `
+		RELATE $template -> template_goals -> $goal SET {
+			auto_link_tasks: $auto_link,
+			quantity_multiplier: $multiplier,
+			created_by: $user,
+			created_at: $now
+		}
+	`, map[string]any{
+		"template":   tID,
+		"goal":       gID,
+		"auto_link":  req.AutoLinkTasks,
+		"multiplier": multiplier,
+		"user":       userID,
+		"now":        now,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("template", templateID).Str("goal", req.GoalID).Msg("link goal failed")
+		return err
+	}
+
+	return nil
+}
+
+func (r *repository) UnlinkGoal(ctx context.Context, templateID, goalID, userID string) error {
+	tID := database.MustRecordID(Table, templateID)
+	gID := database.MustRecordID("goals", goalID)
+
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE template_goals WHERE in = $template AND out = $goal
+	`, map[string]any{
+		"template": tID,
+		"goal":     gID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("template", templateID).Str("goal", goalID).Msg("unlink goal failed")
+		return err
+	}
+
+	return nil
+}
+
+// =============================================================================
+// CATEGORY LINKING (via in_category relation)
+// =============================================================================
+
+func (r *repository) linkCategory(ctx context.Context, templateID, categoryID, userID string) error {
+	tID := database.MustRecordID(Table, templateID)
+	now := time.Now().UTC()
+
+	// Remove existing category link
+	_, _ = database.QueryAll[any](ctx, r.db, `
+		DELETE in_category WHERE in = $template_id
+	`, map[string]any{
+		"template_id": tID,
+	})
+
+	if categoryID == "" {
+		return nil
+	}
+
+	cID := database.MustRecordID("categories", categoryID)
+
+	_, err := database.QueryAll[any](ctx, r.db, `
+		RELATE $template -> in_category -> $category SET {
+			created_by: $user,
+			created_at: $now
+		}
+	`, map[string]any{
+		"template": tID,
+		"category": cID,
+		"user":     userID,
+		"now":      now,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("template", templateID).Str("category", categoryID).Msg("link category failed")
+		return err
+	}
+
+	return nil
+}
+
+// =============================================================================
 // HELPERS
 // =============================================================================
 
@@ -570,11 +560,4 @@ func generateRecordID() models.RecordID {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return database.NewRecordID(Table, hex.EncodeToString(bytes))
-}
-
-func boolValue(b *bool) bool {
-	if b == nil {
-		return false
-	}
-	return *b
 }

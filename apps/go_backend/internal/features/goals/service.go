@@ -1,3 +1,4 @@
+// Package goals provides goal business logic.
 package goals
 
 import (
@@ -21,19 +22,16 @@ import (
 // The service layer:
 //   - Validates business rules
 //   - Orchestrates repository calls
-//   - Manages linked template creation
+//   - Computes goal stats on read
 //   - Handles cross-cutting concerns (logging, etc.)
 type Service interface {
 	// List retrieves paginated goals for a user with optional filters.
 	List(ctx context.Context, userID string, params pagination.Params, filters GoalFilters) (*pagination.Response[*Goal], error)
 
-	// Get retrieves a single goal by ID.
+	// Get retrieves a single goal by ID with computed stats.
 	Get(ctx context.Context, id, userID string) (*Goal, error)
 
-	// GetByActivityKey retrieves a goal by its activity key.
-	GetByActivityKey(ctx context.Context, activityKey, userID string) (*Goal, error)
-
-	// Create creates a new goal and optionally auto-creates a linked template.
+	// Create creates a new goal.
 	Create(ctx context.Context, req *CreateRequest, userID string) (*Goal, error)
 
 	// Update updates an existing goal.
@@ -45,11 +43,17 @@ type Service interface {
 	// GetTodayGoals retrieves recurring goals with today's completion status.
 	GetTodayGoals(ctx context.Context, userID string) (*TodayGoalsResponse, error)
 
-	// UpdateStreak updates streak information after a goal entry.
-	UpdateStreak(ctx context.Context, goalID, userID string, met bool) error
+	// GetChildren retrieves child goals for a grouped goal.
+	GetChildren(ctx context.Context, goalID, userID string) ([]*Goal, error)
 
-	// SetLinkedTemplate updates the linked template ID.
-	SetLinkedTemplate(ctx context.Context, goalID, templateID, userID string) error
+	// AddChild adds a child goal to a parent (grouped goal).
+	AddChild(ctx context.Context, parentID string, req *AddChildRequest, userID string) error
+
+	// RemoveChild removes a child goal from a parent.
+	RemoveChild(ctx context.Context, parentID, childID, userID string) error
+
+	// UpdateCategory updates the category for a goal.
+	UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error
 }
 
 // TemplateCreator is an interface for creating templates.
@@ -89,6 +93,14 @@ func (s *service) List(ctx context.Context, userID string, params pagination.Par
 		return nil, err
 	}
 
+	// Compute stats for each goal
+	for _, goal := range goals {
+		stats, err := s.repo.ComputeStats(ctx, goal.ID, userID)
+		if err == nil {
+			goal.Stats = stats
+		}
+	}
+
 	s.logger.Debug().
 		Str("user_id", userID).
 		Int("count", len(goals)).
@@ -113,17 +125,16 @@ func (s *service) Get(ctx context.Context, id, userID string) (*Goal, error) {
 		return nil, err
 	}
 
-	return goal, nil
-}
+	// Compute stats
+	stats, err := s.repo.ComputeStats(ctx, id, userID)
+	if err == nil {
+		goal.Stats = stats
+	}
 
-func (s *service) GetByActivityKey(ctx context.Context, activityKey, userID string) (*Goal, error) {
-	goal, err := s.repo.FindByActivityKey(ctx, activityKey, userID)
-	if err != nil {
-		if errors.Is(err, errors.ErrNotFound) {
-			return nil, errors.ErrNotFound
-		}
-		s.logger.Error().Err(err).Str("activity_key", activityKey).Msg("failed to get goal by activity key")
-		return nil, err
+	// Get children if this is a grouped goal
+	children, err := s.repo.FindChildren(ctx, id, userID)
+	if err == nil && len(children) > 0 {
+		goal.Children = children
 	}
 
 	return goal, nil
@@ -146,9 +157,18 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 		}
 	}
 
-	// Validate goal type and required fields
-	if req.GoalType == GoalTypeMeasurable && req.Target == nil {
-		return nil, errors.ErrBadRequest.WithMessage("Target is required for measurable goals")
+	// Validate target operator if provided
+	if req.Target != nil && req.Target.Operator != "" {
+		validOperator := false
+		for _, op := range ValidOperators {
+			if req.Target.Operator == op {
+				validOperator = true
+				break
+			}
+		}
+		if !validOperator {
+			return nil, errors.ErrBadRequest.WithMessage("Invalid target operator. Must be gte, lte, or eq")
+		}
 	}
 
 	// Create the goal
@@ -160,23 +180,17 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 
 	s.logger.Info().
 		Str("goal_id", goal.ID).
-		Str("activity_key", goal.ActivityKey).
 		Str("user_id", userID).
+		Bool("is_habit", goal.Recurrence != nil).
+		Bool("is_measurable", goal.Target != nil).
 		Msg("goal created")
 
 	// Auto-create linked template for recurring goals
 	if goal.Recurrence != nil && s.templateCreator != nil {
-		templateID, err := s.templateCreator.CreateForGoal(ctx, goal, userID)
+		_, err := s.templateCreator.CreateForGoal(ctx, goal, userID)
 		if err != nil {
 			s.logger.Warn().Err(err).Str("goal_id", goal.ID).Msg("failed to auto-create template")
 			// Don't fail goal creation for template creation failure
-		} else {
-			// Update goal with linked template
-			if err := s.repo.UpdateLinkedTemplate(ctx, goal.ID, templateID, userID); err != nil {
-				s.logger.Warn().Err(err).Str("goal_id", goal.ID).Msg("failed to link template to goal")
-			} else {
-				goal.LinkedTemplate = &templateID
-			}
 		}
 	}
 
@@ -197,6 +211,20 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 	if req.Deadline != nil {
 		if _, err := timeutil.ParseDateTime(*req.Deadline); err != nil {
 			return nil, errors.ErrBadRequest.WithMessage("Invalid deadline format")
+		}
+	}
+
+	// Validate status if provided
+	if req.Status != nil {
+		validStatus := false
+		for _, s := range ValidStatuses {
+			if *req.Status == s {
+				validStatus = true
+				break
+			}
+		}
+		if !validStatus {
+			return nil, errors.ErrBadRequest.WithMessage("Invalid status. Must be active, completed, or archived")
 		}
 	}
 
@@ -252,8 +280,8 @@ func (s *service) GetTodayGoals(ctx context.Context, userID string) (*TodayGoals
 		return nil, err
 	}
 
-	todayGoals := make([]*TodayGoal, len(goals))
-	for i, goal := range goals {
+	todayGoals := make([]*TodayGoal, 0, len(goals))
+	for _, goal := range goals {
 		// Check if goal should be active on this day of week
 		if goal.Recurrence != nil && len(goal.Recurrence.ActiveDays) > 0 {
 			dayName := strings.ToLower(today.Weekday().String()[:3])
@@ -269,11 +297,22 @@ func (s *service) GetTodayGoals(ctx context.Context, userID string) (*TodayGoals
 			}
 		}
 
-		todayGoals[i] = &TodayGoal{
+		// Compute stats to get today's status
+		stats, err := s.repo.ComputeStats(ctx, goal.ID, userID)
+
+		todayGoal := &TodayGoal{
 			Goal:     goal,
-			TodayMet: false, // Will be populated by goal entries lookup
-			Streak:   goal.CurrentStreak,
+			TodayMet: false,
+			Streak:   0,
 		}
+
+		if err == nil && stats != nil {
+			todayGoal.TodayMet = stats.TodayStatus == TodayStatusMet
+			todayGoal.TodayValue = &stats.CurrentValue
+			todayGoal.Streak = stats.CurrentStreak
+		}
+
+		todayGoals = append(todayGoals, todayGoal)
 	}
 
 	return &TodayGoalsResponse{
@@ -283,45 +322,86 @@ func (s *service) GetTodayGoals(ctx context.Context, userID string) (*TodayGoals
 }
 
 // =============================================================================
-// STREAK MANAGEMENT
+// CHILD GOAL MANAGEMENT
 // =============================================================================
 
-func (s *service) UpdateStreak(ctx context.Context, goalID, userID string, met bool) error {
-	goal, err := s.repo.FindByID(ctx, goalID, userID)
+func (s *service) GetChildren(ctx context.Context, goalID, userID string) ([]*Goal, error) {
+	children, err := s.repo.FindChildren(ctx, goalID, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("goal_id", goalID).Msg("failed to get child goals")
+		return nil, err
+	}
+
+	// Compute stats for each child
+	for _, child := range children {
+		stats, err := s.repo.ComputeStats(ctx, child.ID, userID)
+		if err == nil {
+			child.Stats = stats
+		}
+	}
+
+	return children, nil
+}
+
+func (s *service) AddChild(ctx context.Context, parentID string, req *AddChildRequest, userID string) error {
+	// Verify parent exists
+	_, err := s.repo.FindByID(ctx, parentID, userID)
 	if err != nil {
 		return err
 	}
 
-	now := time.Now().UTC()
-	var newStreak, newLongest int
-	var lastCompleted *time.Time
-
-	if met {
-		// Increment streak
-		newStreak = goal.CurrentStreak + 1
-		if newStreak > goal.LongestStreak {
-			newLongest = newStreak
-		} else {
-			newLongest = goal.LongestStreak
-		}
-		lastCompleted = &now
-	} else {
-		// Check grace days
-		if goal.Recurrence != nil && goal.GraceDaysUsed < goal.Recurrence.GraceDays {
-			// Use a grace day, streak continues
-			newStreak = goal.CurrentStreak
-			newLongest = goal.LongestStreak
-		} else {
-			// Streak broken
-			newStreak = 0
-			newLongest = goal.LongestStreak
-		}
-		lastCompleted = goal.LastCompletedDate
+	// Verify child exists
+	_, err = s.repo.FindByID(ctx, req.ChildGoalID, userID)
+	if err != nil {
+		return err
 	}
 
-	return s.repo.UpdateStreak(ctx, goalID, newStreak, newLongest, lastCompleted, userID)
+	required := true
+	if req.Required != nil {
+		required = *req.Required
+	}
+
+	if err := s.repo.AddChild(ctx, parentID, req.ChildGoalID, userID, req.Order, required); err != nil {
+		s.logger.Error().Err(err).Str("parent", parentID).Str("child", req.ChildGoalID).Msg("failed to add child")
+		return err
+	}
+
+	s.logger.Info().
+		Str("parent_id", parentID).
+		Str("child_id", req.ChildGoalID).
+		Msg("child goal added")
+
+	return nil
 }
 
-func (s *service) SetLinkedTemplate(ctx context.Context, goalID, templateID, userID string) error {
-	return s.repo.UpdateLinkedTemplate(ctx, goalID, templateID, userID)
+func (s *service) RemoveChild(ctx context.Context, parentID, childID, userID string) error {
+	if err := s.repo.RemoveChild(ctx, parentID, childID, userID); err != nil {
+		s.logger.Error().Err(err).Str("parent", parentID).Str("child", childID).Msg("failed to remove child")
+		return err
+	}
+
+	s.logger.Info().
+		Str("parent_id", parentID).
+		Str("child_id", childID).
+		Msg("child goal removed")
+
+	return nil
+}
+
+// =============================================================================
+// CATEGORY MANAGEMENT
+// =============================================================================
+
+func (s *service) UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error {
+	if err := s.repo.UpdateCategory(ctx, goalID, categoryID, userID); err != nil {
+		s.logger.Error().Err(err).Str("goal", goalID).Str("category", categoryID).Msg("failed to update category")
+		return err
+	}
+
+	s.logger.Info().
+		Str("goal_id", goalID).
+		Str("category_id", categoryID).
+		Msg("goal category updated")
+
+	return nil
 }

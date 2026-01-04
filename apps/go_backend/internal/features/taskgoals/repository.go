@@ -73,9 +73,12 @@ type taskGoalDB struct {
 	ImpactType      string               `json:"impact_type"`
 	ImpactMagnitude int                  `json:"impact_magnitude"`
 	QuantityValue   *float64             `json:"quantity_value,omitempty"`
-	QuantityUnit    *string              `json:"quantity_unit,omitempty"`
+	UnitID          *string              `json:"unit_id,omitempty"`
 	Notes           string               `json:"notes,omitempty"`
 	Source          string               `json:"source"`
+	IsMilestone     bool                 `json:"is_milestone"`
+	MilestoneLabel  string               `json:"milestone_label,omitempty"`
+	MilestoneOrder  int                  `json:"milestone_order"`
 	CreatedAt       database.SurrealTime `json:"created_at"`
 }
 
@@ -87,9 +90,12 @@ func (t *taskGoalDB) toTaskGoal() *TaskGoal {
 		ImpactType:      t.ImpactType,
 		ImpactMagnitude: t.ImpactMagnitude,
 		QuantityValue:   t.QuantityValue,
-		QuantityUnit:    t.QuantityUnit,
+		UnitID:          t.UnitID,
 		Notes:           t.Notes,
 		Source:          t.Source,
+		IsMilestone:     t.IsMilestone,
+		MilestoneLabel:  t.MilestoneLabel,
+		MilestoneOrder:  t.MilestoneOrder,
 		CreatedAt:       t.CreatedAt.Time,
 	}
 }
@@ -116,9 +122,12 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 			impact_type = $impact_type,
 			impact_magnitude = $impact_magnitude,
 			quantity_value = $quantity_value,
-			quantity_unit = $quantity_unit,
+			unit_id = $unit_id,
 			notes = $notes,
 			source = $source,
+			is_milestone = $is_milestone,
+			milestone_label = $milestone_label,
+			milestone_order = $milestone_order,
 			created_at = $created_at
 	`, map[string]any{
 		"task":             taskRecordID,
@@ -126,9 +135,12 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 		"impact_type":      req.ImpactType,
 		"impact_magnitude": impactMagnitude,
 		"quantity_value":   req.QuantityValue,
-		"quantity_unit":    req.QuantityUnit,
+		"unit_id":          req.UnitID,
 		"notes":            req.Notes,
 		"source":           source,
+		"is_milestone":     req.IsMilestone,
+		"milestone_label":  req.MilestoneLabel,
+		"milestone_order":  req.MilestoneOrder,
 		"created_at":       now,
 	})
 	if err != nil {

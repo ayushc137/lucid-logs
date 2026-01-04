@@ -1,21 +1,28 @@
-// Package goals provides goal/habit management functionality.
+// Package goals provides goal management functionality.
 //
 // This package implements:
-//   - CRUD operations for goals (one-time and recurring/habits)
-//   - Activity key auto-generation for template/task linking
+//   - CRUD operations for goals (simple, measurable, habits, grouped)
+//   - Graph-inferred goal nature (no goal_type enum)
+//   - Target with operators (gte, lte, eq) for achievement/avoidance goals
 //   - Streak tracking for recurring goals
-//   - Integration with templates for quick logging
+//   - Goal history via goal_logs relation
 //
-// Goal Types:
-//   - discrete: One-time goal without measurable target
-//   - measurable: Goal with quantifiable target (e.g., "Run 100km")
-//   - avoidance: Goal to NOT do something (e.g., "No junk food")
-//   - epic: Parent goal with child milestones
+// Goal Nature (Graph-Inferred):
+//   - Has children via goal_children → Grouped goal
+//   - Has recurrence → Habit
+//   - Has target → Measurable goal
+//   - Has target.operator="lte" or "eq" → Avoidance/limit goal
+//   - None of above → Simple goal (target.value=1 implied)
+//
+// Status:
+//   - active: Currently working on
+//   - completed: Goal achieved
+//   - archived: Hidden from active views
 //
 // Database Architecture:
-//   - Schemaless SurrealDB table with record links
-//   - activity_key enables automatic task-goal matching
-//   - linked_template holds auto-created template ID
+//   - Uses SurrealDB graph relations for categories (in_category)
+//   - Child goals via goal_children relation
+//   - History tracking via goal_logs relation
 package goals
 
 import (
@@ -28,104 +35,142 @@ import (
 // DOMAIN MODEL
 // =============================================================================
 
-// Goal represents a goal or habit in the system.
+// Goal represents a goal, habit, or project in the system.
 //
-// Goals and habits are unified: a habit is simply a goal with recurrence set.
-// This matches how users naturally think about goals.
+// The goal's nature is inferred from its structure:
+//   - Has children (via goal_children) → Grouped goal
+//   - Has recurrence → Habit
+//   - Has target → Measurable
+//   - target.operator="lte"/"eq" → Avoidance
+//
+// @Description Goal entity with graph-inferred nature
 type Goal struct {
-	ID          string `json:"id,omitempty"`
-	CreatedBy   string `json:"-"`
-	ActivityKey string `json:"activity_key"` // Auto-generated unique key for matching
+	ID        string `json:"id,omitempty"`
+	CreatedBy string `json:"-"`
 
 	// Core fields
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
-	Why         string `json:"why,omitempty"` // "Why does this matter?" - for retros
-	Icon        string `json:"icon,omitempty"`
-	Color       string `json:"color,omitempty"`
+	Icon        string `json:"icon,omitempty"` // Emoji
 
-	// Goal type
-	GoalType string `json:"goal_type"` // "discrete", "measurable", "epic", "avoidance"
-
-	// Recurrence (null = one-time, populated = recurring/habit)
-	Recurrence *Recurrence `json:"recurrence,omitempty"`
-
-	// Target (for measurable goals)
+	// Target (optional - defines measurable objectives)
+	// If nil, goal is a simple "complete it" goal (target.value=1 implied)
 	Target *Target `json:"target,omitempty"`
 
-	// Timeline
-	StartDate *time.Time `json:"start_date,omitempty"`
-	Deadline  *time.Time `json:"deadline,omitempty"`
+	// Recurrence (optional - if present, this is a habit)
+	Recurrence *Recurrence `json:"recurrence,omitempty"`
 
-	// Status & progress
-	Status         string     `json:"status"` // "active", "completed", "paused", "abandoned"
-	CompletionDate *time.Time `json:"completion_date,omitempty"`
+	// Status: only 3 states
+	Status string `json:"status"` // "active", "completed", "archived"
 
-	// Streak tracking (computed, for recurring goals)
-	CurrentStreak     int        `json:"current_streak"`
-	LongestStreak     int        `json:"longest_streak"`
-	LastCompletedDate *time.Time `json:"last_completed_date,omitempty"`
-	GraceDaysUsed     int        `json:"grace_days_used"`
-
-	// Completion settings (for epic goals)
-	CompletionMode string `json:"completion_mode,omitempty"` // "all" (AND) or "any" (OR)
+	// Computed statistics (populated on read, not stored)
+	Stats *GoalStats `json:"stats,omitempty"`
 
 	// Organization
-	Priority   int                  `json:"priority"`    // 1 (low), 2 (medium), 3 (high)
-	ValueScore int                  `json:"value_score"` // 1-5, how meaningful
-	Category   *categories.Category `json:"category,omitempty"`
-	ParentGoal *string              `json:"parent_goal,omitempty"` // For milestones under epics
-	LifeDomain string               `json:"life_domain,omitempty"` // health, work, learning, etc.
+	Priority int `json:"priority"` // 1-3
 
-	// Linked template (auto-created)
-	LinkedTemplate *string `json:"linked_template,omitempty"`
-
-	// Privacy
-	IsPrivate bool `json:"is_private"`
+	// Timeline
+	StartDate   *time.Time `json:"start_date,omitempty"`
+	Deadline    *time.Time `json:"deadline,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 
 	// Metadata
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 
-	// Linked tasks (populated via FETCH)
-	LinkedTasks []GoalTaskLink `json:"linked_tasks,omitempty"`
+	// Populated via graph queries (not stored on goal record)
+	Category    *categories.Category `json:"category,omitempty"`     // From in_category edge
+	LinkedTasks []GoalTaskLink       `json:"linked_tasks,omitempty"` // From task_goals
+	Children    []*Goal              `json:"children,omitempty"`     // From goal_children (forward)
+	Parent      *Goal                `json:"parent,omitempty"`       // From goal_children (reverse)
+}
 
-	// Child goals (populated for epic goals)
-	ChildGoals []*Goal `json:"child_goals,omitempty"`
+// Target defines what success looks like for a measurable goal.
+//
+// Operators:
+//   - "gte": At least (≥) - achievement goals (e.g., "Run 100km")
+//   - "lte": At most (≤) - limit goals (e.g., "Max 2 coffees/day")
+//   - "eq": Exactly (=) - strict goals (e.g., "Zero cigarettes")
+//
+// @Description Target for measurable goals with comparison operator
+type Target struct {
+	Value     float64 `json:"value"`      // Target amount (e.g., 100, 3, 0)
+	Operator  string  `json:"operator"`   // "gte", "lte", "eq"
+	UnitID    string  `json:"unit_id"`    // Reference to units table (e.g., "units:km")
+	PerPeriod bool    `json:"per_period"` // true = per recurrence period
+}
+
+// GoalStats contains computed statistics for a goal.
+// These are calculated on read from related data, not stored on the goal.
+//
+// @Description Computed goal statistics
+type GoalStats struct {
+	// Progress toward target
+	CurrentValue    float64 `json:"current_value"`    // Sum from task_goals
+	ProgressPercent float64 `json:"progress_percent"` // 0-100 (or >100 if exceeded)
+
+	// Streak tracking (for habits with recurrence)
+	CurrentStreak     int        `json:"current_streak"`
+	LongestStreak     int        `json:"longest_streak"`
+	LastCompletedDate *time.Time `json:"last_completed_date,omitempty"`
+	TodayStatus       string     `json:"today_status,omitempty"` // "pending", "met", "exceeded"
+
+	// For grouped goals (with children)
+	ChildrenTotal     int `json:"children_total,omitempty"`
+	ChildrenCompleted int `json:"children_completed,omitempty"`
+
+	// Overall metrics
+	TotalContributions int `json:"total_contributions"` // Count of task_goals links
 }
 
 // GoalTaskLink represents a linked task with impact metadata.
-// This is populated via SurrealDB FETCH from the task_goals relation.
+// This is populated via SurrealDB query from the task_goals relation.
+//
+// @Description Task linked to goal with impact data
 type GoalTaskLink struct {
 	TaskID          string   `json:"task_id"`
 	TaskTitle       string   `json:"task_title"`
 	ImpactType      string   `json:"impact_type"`      // "positive", "negative", "neutral"
 	ImpactMagnitude int      `json:"impact_magnitude"` // 1-5
 	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	QuantityUnit    *string  `json:"quantity_unit,omitempty"`
+	UnitID          *string  `json:"unit_id,omitempty"`
 }
 
 // Recurrence defines how often a recurring goal/habit should be completed.
+//
+// @Description Recurrence settings for habits
 type Recurrence struct {
 	Frequency  int      `json:"frequency"`             // Times per period (e.g., 5)
 	Period     string   `json:"period"`                // "day", "week", "month"
 	ActiveDays []string `json:"active_days,omitempty"` // ["mon", "tue", ...] or nil for all
-
-	// Time constraints
-	BeforeTime string `json:"before_time,omitempty"` // "22:00" (complete before 10pm)
-	AfterTime  string `json:"after_time,omitempty"`  // "06:00" (complete after 6am)
-
-	// Streak settings
-	GraceDays int `json:"grace_days,omitempty"` // Can miss X days without breaking streak
+	BeforeTime string   `json:"before_time,omitempty"` // "22:00" (complete before)
+	AfterTime  string   `json:"after_time,omitempty"`  // "06:00" (complete after)
+	GraceDays  int      `json:"grace_days,omitempty"`  // Can miss X days without breaking streak
 }
 
-// Target defines the measurable target for a goal.
-type Target struct {
-	Value        float64 `json:"value"`                // e.g., 1000, 3
-	Unit         string  `json:"unit"`                 // "km", "L", "pages", "minutes"
-	CurrentValue float64 `json:"current_value"`        // Auto-computed from linked tasks
-	PerPeriod    bool    `json:"per_period,omitempty"` // true = "3L per day", false = "1000km total"
+// =============================================================================
+// GOAL NATURE HELPERS
+// =============================================================================
+
+// IsHabit returns true if this goal has a recurrence defined.
+func (g *Goal) IsHabit() bool {
+	return g.Recurrence != nil
+}
+
+// IsMeasurable returns true if this goal has a target defined.
+func (g *Goal) IsMeasurable() bool {
+	return g.Target != nil
+}
+
+// IsGrouped returns true if this goal has children.
+func (g *Goal) IsGrouped() bool {
+	return len(g.Children) > 0
+}
+
+// IsAvoidance returns true if this goal has a limit/avoidance target.
+func (g *Goal) IsAvoidance() bool {
+	return g.Target != nil && (g.Target.Operator == OperatorLTE || g.Target.Operator == OperatorEQ)
 }
 
 // =============================================================================
@@ -134,33 +179,48 @@ type Target struct {
 
 // CreateRequest is the request payload for creating a new goal.
 //
+// The goal's nature is inferred from the provided fields:
+//   - Provide recurrence → creates a habit
+//   - Provide target → creates a measurable goal
+//   - Neither → creates a simple goal (auto target.value=1)
+//
 // @Description Request payload for creating a goal
 type CreateRequest struct {
 	Title       string `json:"title" validate:"required,min=1,max=500" example:"Drink 3L water daily"`
-	Description string `json:"description,omitempty" validate:"max=2000" example:"Stay hydrated throughout the day for better health and focus"`
-	Why         string `json:"why,omitempty" validate:"max=1000" example:"Improve energy levels and skin health"`
+	Description string `json:"description,omitempty" validate:"max=2000" example:"Stay hydrated throughout the day"`
 	Icon        string `json:"icon,omitempty" validate:"max=50" example:"💧"`
-	Color       string `json:"color,omitempty" validate:"max=20" example:"#3B82F6"`
 
-	GoalType string `json:"goal_type" validate:"required,oneof=discrete measurable epic avoidance" example:"measurable"`
+	// Target (optional - if nil, implies simple goal with target=1)
+	Target *TargetInput `json:"target,omitempty"`
 
+	// Recurrence (optional - if set, creates a habit)
 	Recurrence *RecurrenceInput `json:"recurrence,omitempty"`
-	Target     *TargetInput     `json:"target,omitempty"`
 
+	// Timeline
 	StartDate *string `json:"start_date,omitempty" validate:"omitempty,datetime_flexible" example:"2025-01-01T00:00:00Z"`
 	Deadline  *string `json:"deadline,omitempty" validate:"omitempty,datetime_flexible" example:"2025-12-31T23:59:59Z"`
 
-	Priority       int    `json:"priority,omitempty" validate:"min=0,max=3" example:"2"`
-	ValueScore     int    `json:"value_score,omitempty" validate:"min=0,max=5" example:"4"`
-	CategoryID     string `json:"category_id,omitempty" example:"categories:health123"`
-	ParentGoal     string `json:"parent_goal,omitempty" example:"goals:epic456"`
-	LifeDomain     string `json:"life_domain,omitempty" validate:"max=50" example:"health"`
-	CompletionMode string `json:"completion_mode,omitempty" validate:"omitempty,oneof=all any" example:"all"`
+	// Organization
+	Priority   int    `json:"priority,omitempty" validate:"min=0,max=3" example:"2"`
+	CategoryID string `json:"category_id,omitempty" example:"categories:health123"`
 
-	IsPrivate bool `json:"is_private,omitempty" example:"false"`
+	// Parent goal (optional - adds this as child of parent via goal_children)
+	ParentGoalID string `json:"parent_goal_id,omitempty" example:"goals:launch_saas"`
+}
+
+// TargetInput is the input format for target settings.
+//
+// @Description Target configuration for measurable goals
+type TargetInput struct {
+	Value     float64 `json:"value" validate:"required,gte=0" example:"3"`
+	Operator  string  `json:"operator,omitempty" validate:"omitempty,oneof=gte lte eq" example:"gte"`
+	UnitID    string  `json:"unit_id" validate:"required" example:"units:l"`
+	PerPeriod bool    `json:"per_period,omitempty" example:"true"`
 }
 
 // RecurrenceInput is the input format for recurrence settings.
+//
+// @Description Recurrence configuration for habits
 type RecurrenceInput struct {
 	Frequency  int      `json:"frequency" validate:"required,min=1,max=365" example:"1"`
 	Period     string   `json:"period" validate:"required,oneof=day week month" example:"day"`
@@ -168,13 +228,6 @@ type RecurrenceInput struct {
 	BeforeTime string   `json:"before_time,omitempty" example:"22:00"`
 	AfterTime  string   `json:"after_time,omitempty" example:"06:00"`
 	GraceDays  int      `json:"grace_days,omitempty" validate:"min=0,max=7" example:"1"`
-}
-
-// TargetInput is the input format for target settings.
-type TargetInput struct {
-	Value     float64 `json:"value" validate:"required,gt=0" example:"3"`
-	Unit      string  `json:"unit" validate:"required,min=1,max=50" example:"liters"`
-	PerPeriod bool    `json:"per_period,omitempty" example:"true"`
 }
 
 // UpdateRequest is the request payload for updating a goal.
@@ -185,27 +238,27 @@ type TargetInput struct {
 type UpdateRequest struct {
 	Title       *string `json:"title,omitempty" validate:"omitempty,min=1,max=500"`
 	Description *string `json:"description,omitempty" validate:"omitempty,max=2000"`
-	Why         *string `json:"why,omitempty" validate:"omitempty,max=1000"`
 	Icon        *string `json:"icon,omitempty" validate:"omitempty,max=50"`
-	Color       *string `json:"color,omitempty" validate:"omitempty,max=20"`
 
-	GoalType *string `json:"goal_type,omitempty" validate:"omitempty,oneof=discrete measurable epic avoidance"`
-
-	Recurrence *RecurrenceInput `json:"recurrence,omitempty"`
 	Target     *TargetInput     `json:"target,omitempty"`
+	Recurrence *RecurrenceInput `json:"recurrence,omitempty"`
 
 	StartDate *string `json:"start_date,omitempty" validate:"omitempty,datetime_flexible"`
 	Deadline  *string `json:"deadline,omitempty" validate:"omitempty,datetime_flexible"`
 
-	Status *string `json:"status,omitempty" validate:"omitempty,oneof=active completed paused abandoned"`
+	Status   *string `json:"status,omitempty" validate:"omitempty,oneof=active completed archived"`
+	Priority *int    `json:"priority,omitempty" validate:"omitempty,min=0,max=3"`
 
-	Priority       *int    `json:"priority,omitempty" validate:"omitempty,min=0,max=3"`
-	ValueScore     *int    `json:"value_score,omitempty" validate:"omitempty,min=0,max=5"`
-	CategoryID     *string `json:"category_id,omitempty"`
-	LifeDomain     *string `json:"life_domain,omitempty" validate:"omitempty,max=50"`
-	CompletionMode *string `json:"completion_mode,omitempty" validate:"omitempty,oneof=all any"`
+	CategoryID *string `json:"category_id,omitempty"`
+}
 
-	IsPrivate *bool `json:"is_private,omitempty"`
+// AddChildRequest is the request for adding a child goal to a grouped goal.
+//
+// @Description Request for adding a child to a grouped goal
+type AddChildRequest struct {
+	ChildGoalID string `json:"child_goal_id" validate:"required" example:"goals:design_ui"`
+	Order       int    `json:"order,omitempty" example:"1"`
+	Required    *bool  `json:"required,omitempty" example:"true"`
 }
 
 // =============================================================================
@@ -213,6 +266,8 @@ type UpdateRequest struct {
 // =============================================================================
 
 // GoalPageResponse documents the paginated response returned by the List endpoint.
+//
+// @Description Paginated list of goals
 type GoalPageResponse struct {
 	Items   []*Goal `json:"items"`
 	Total   int64   `json:"total"`
@@ -222,6 +277,8 @@ type GoalPageResponse struct {
 }
 
 // TodayGoal represents a recurring goal with today's status.
+//
+// @Description Today's status for a habit/recurring goal
 type TodayGoal struct {
 	Goal       *Goal    `json:"goal"`
 	TodayMet   bool     `json:"today_met"`
@@ -230,9 +287,20 @@ type TodayGoal struct {
 }
 
 // TodayGoalsResponse is the response for GET /goals/today.
+//
+// @Description Today's habits and their status
 type TodayGoalsResponse struct {
 	Date  string       `json:"date"` // YYYY-MM-DD
 	Goals []*TodayGoal `json:"goals"`
+}
+
+// ChildGoalLink represents a child goal in a grouped goal.
+//
+// @Description Child goal in a group with ordering
+type ChildGoalLink struct {
+	GoalID   string `json:"goal_id"`
+	Order    int    `json:"order"`
+	Required bool   `json:"required"`
 }
 
 // =============================================================================
@@ -243,24 +311,32 @@ const (
 	// Table is the SurrealDB table name for goals.
 	Table = "goals"
 
-	// Goal types
-	GoalTypeDiscrete   = "discrete"
-	GoalTypeMeasurable = "measurable"
-	GoalTypeEpic       = "epic"
-	GoalTypeAvoidance  = "avoidance"
-
-	// Goal statuses
+	// Status values (only 3 now)
 	StatusActive    = "active"
 	StatusCompleted = "completed"
-	StatusPaused    = "paused"
-	StatusAbandoned = "abandoned"
+	StatusArchived  = "archived"
 
 	// Recurrence periods
 	PeriodDay   = "day"
 	PeriodWeek  = "week"
 	PeriodMonth = "month"
 
-	// Completion modes (for epic goals)
-	CompletionModeAll = "all" // AND logic: complete when ALL children are done
-	CompletionModeAny = "any" // OR logic: complete when ANY child is done
+	// Target operators
+	OperatorGTE = "gte" // Greater than or equal (≥) - achievement
+	OperatorLTE = "lte" // Less than or equal (≤) - limit/avoidance
+	OperatorEQ  = "eq"  // Exactly equal (=) - strict target
+
+	// Default operator
+	DefaultOperator = OperatorGTE
+
+	// Today status values
+	TodayStatusPending  = "pending"
+	TodayStatusMet      = "met"
+	TodayStatusExceeded = "exceeded"
 )
+
+// ValidStatuses for validation.
+var ValidStatuses = []string{StatusActive, StatusCompleted, StatusArchived}
+
+// ValidOperators for validation.
+var ValidOperators = []string{OperatorGTE, OperatorLTE, OperatorEQ}

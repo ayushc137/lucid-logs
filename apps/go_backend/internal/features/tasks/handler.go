@@ -3,7 +3,6 @@ package tasks
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -139,10 +138,10 @@ func (h *Handler) List(c *gin.Context) {
 		filters.CategoryID != "" ||
 		filters.NoCategoryFilter ||
 		filters.Status != "" ||
-		filters.PriorityMin != nil ||
-		filters.PriorityMax != nil ||
 		filters.StartDateFrom != "" ||
 		filters.StartDateTo != "" ||
+		filters.GoalID != "" ||
+		filters.TemplateID != "" ||
 		filters.SortField != ""
 
 	log.Debug().
@@ -183,22 +182,16 @@ func parseFilterParams(c *gin.Context) TaskFilterParams {
 		Status:           c.Query("status"),
 		StartDateFrom:    c.Query("start_date_from"),
 		StartDateTo:      c.Query("start_date_to"),
+		GoalID:           c.Query("goal_id"),
+		TemplateID:       c.Query("template_id"),
 		SortField:        c.Query("sort_field"),
 		SortOrder:        c.Query("sort_order"),
 	}
 
-	// Parse priority_min
-	if minStr := c.Query("priority_min"); minStr != "" {
-		if min, err := strconv.Atoi(minStr); err == nil && min >= 1 && min <= 10 {
-			filters.PriorityMin = &min
-		}
-	}
-
-	// Parse priority_max
-	if maxStr := c.Query("priority_max"); maxStr != "" {
-		if max, err := strconv.Atoi(maxStr); err == nil && max >= 1 && max <= 10 {
-			filters.PriorityMax = &max
-		}
+	// Parse has_quantity filter
+	if hasQty := c.Query("has_quantity"); hasQty != "" {
+		val := hasQty == "true"
+		filters.HasQuantity = &val
 	}
 
 	return filters

@@ -4,16 +4,22 @@
 //   - CRUD operations for task templates
 //   - Quick-log template management
 //   - Template instantiation (creating tasks from templates)
-//   - Activity key inheritance for goal linking
+//   - Template-goal linking via template_goals relation
 //
 // Templates are reusable blueprints for creating tasks quickly, especially
 // useful for habits where users log the same activity repeatedly.
+//
+// Database Architecture:
+//   - template_goals: RELATE table linking templates to goals
+//   - in_category: RELATE table for category assignment
+//   - created_from: RELATE table tracking task origin (on tasks table)
 package templates
 
 import (
 	"time"
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
+	"github.com/lucid-logs/go-backend/internal/features/goals"
 )
 
 // =============================================================================
@@ -22,24 +28,22 @@ import (
 
 // TaskTemplate represents a reusable task blueprint.
 //
-// Templates can be:
-// - Auto-created from goals (for quick logging)
-// - User-created for any recurring task
-// - System-provided defaults (is_default = true)
+// Templates are linked to goals via the template_goals relation.
+// When a task is created from a template with auto_link_tasks=true,
+// the task automatically gets linked to the goal via task_goals.
+//
+// @Description Reusable task blueprint
 type TaskTemplate struct {
 	ID        string `json:"id,omitempty"`
 	CreatedBy string `json:"-"`
 
-	// Core
+	// Core fields
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
-	Color       string `json:"color,omitempty"`
+	Icon        string `json:"icon,omitempty"` // Emoji
 
 	// Defaults for tasks created from this template
-	DefaultDuration int                  `json:"default_duration,omitempty"` // seconds
-	DefaultPriority int                  `json:"default_priority,omitempty"`
-	DefaultCategory *categories.Category `json:"default_category,omitempty"`
+	DefaultDuration int `json:"default_duration,omitempty"` // seconds
 
 	// Quick log settings
 	IsQuickLog    bool `json:"is_quick_log"`
@@ -48,25 +52,14 @@ type TaskTemplate struct {
 	// Quantity settings
 	QuantityEnabled bool    `json:"quantity_enabled"`
 	QuantityDefault float64 `json:"quantity_default,omitempty"`
-	QuantityUnit    string  `json:"quantity_unit,omitempty"`
 	QuantityStep    float64 `json:"quantity_step,omitempty"`
+	// Note: quantity unit is inherited from linked goal's target.unit_id
 
 	// Emotion defaults
 	ExpectedQuadrant string `json:"expected_quadrant,omitempty"` // green, yellow, red, blue
 	DefaultEmotionID string `json:"default_emotion_id,omitempty"`
 
-	// Goal/Activity linking
-	ActivityKey string `json:"activity_key,omitempty"` // For auto-linking to goals
-	GoalID      string `json:"goal_id,omitempty"`      // Source goal if auto-created
-
-	// Fields to show in quick-log UI
-	ShowFields *ShowFields `json:"show_fields,omitempty"`
-
-	// Source
-	IsDefault    bool   `json:"is_default"` // System-provided template
-	SourceTaskID string `json:"source_task_id,omitempty"`
-
-	// Usage stats
+	// Usage stats (auto-updated)
 	UseCount   int        `json:"use_count"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 
@@ -74,16 +67,19 @@ type TaskTemplate struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+
+	// Populated via graph queries (not stored on template)
+	Goals    []*goals.Goal        `json:"goals,omitempty"`    // From template_goals edge
+	Category *categories.Category `json:"category,omitempty"` // From in_category edge (or inherited)
 }
 
-// ShowFields controls which fields are displayed in the quick-log UI.
-type ShowFields struct {
-	Journal            bool `json:"journal"`
-	Duration           bool `json:"duration"`
-	Quantity           bool `json:"quantity"`
-	Emotion            bool `json:"emotion"`
-	PositivesNegatives bool `json:"positives_negatives"`
-	Notes              bool `json:"notes"`
+// TemplateGoalLink represents a link between a template and a goal.
+//
+// @Description Link metadata for template-goal relationship
+type TemplateGoalLink struct {
+	GoalID             string  `json:"goal_id"`
+	AutoLinkTasks      bool    `json:"auto_link_tasks"`     // Auto-link tasks to goal
+	QuantityMultiplier float64 `json:"quantity_multiplier"` // Multiply quantity when linking
 }
 
 // =============================================================================
@@ -97,37 +93,31 @@ type CreateRequest struct {
 	Title       string `json:"title" validate:"required,min=1,max=500" example:"Morning Run"`
 	Description string `json:"description,omitempty" validate:"max=2000" example:"Quick morning jog before work"`
 	Icon        string `json:"icon,omitempty" validate:"max=50" example:"🏃"`
-	Color       string `json:"color,omitempty" validate:"max=20" example:"#10B981"`
 
-	DefaultDuration   int    `json:"default_duration,omitempty" example:"1800"` // seconds (30 min)
-	DefaultPriority   int    `json:"default_priority,omitempty" validate:"min=0,max=3" example:"2"`
-	DefaultCategoryID string `json:"default_category_id,omitempty" example:"categories:fitness123"`
+	DefaultDuration int `json:"default_duration,omitempty" example:"1800"` // seconds (30 min)
 
 	IsQuickLog    bool `json:"is_quick_log,omitempty" example:"true"`
 	QuickLogOrder int  `json:"quick_log_order,omitempty" example:"1"`
 
 	QuantityEnabled bool    `json:"quantity_enabled,omitempty" example:"true"`
 	QuantityDefault float64 `json:"quantity_default,omitempty" validate:"min=0" example:"5.0"`
-	QuantityUnit    string  `json:"quantity_unit,omitempty" validate:"max=50" example:"km"`
 	QuantityStep    float64 `json:"quantity_step,omitempty" validate:"min=0" example:"0.5"`
 
 	ExpectedQuadrant string `json:"expected_quadrant,omitempty" validate:"omitempty,oneof=green yellow red blue" example:"yellow"`
 	DefaultEmotionID string `json:"default_emotion_id,omitempty" example:"emotions:E16"`
 
-	ActivityKey string `json:"activity_key,omitempty" example:"running"`
-	GoalID      string `json:"goal_id,omitempty" example:"goals:run100km"`
+	// Category assignment (creates in_category edge)
+	CategoryID string `json:"category_id,omitempty" example:"categories:health123"`
 
-	ShowFields *ShowFieldsInput `json:"show_fields,omitempty"`
+	// Goal linking (creates template_goals edge)
+	GoalLinks []GoalLinkInput `json:"goal_links,omitempty"`
 }
 
-// ShowFieldsInput is the input format for show_fields.
-type ShowFieldsInput struct {
-	Journal            *bool `json:"journal,omitempty" example:"false"`
-	Duration           *bool `json:"duration,omitempty" example:"true"`
-	Quantity           *bool `json:"quantity,omitempty" example:"true"`
-	Emotion            *bool `json:"emotion,omitempty" example:"true"`
-	PositivesNegatives *bool `json:"positives_negatives,omitempty" example:"false"`
-	Notes              *bool `json:"notes,omitempty" example:"true"`
+// GoalLinkInput is the input for linking a template to a goal.
+type GoalLinkInput struct {
+	GoalID             string  `json:"goal_id" validate:"required" example:"goals:hydration123"`
+	AutoLinkTasks      bool    `json:"auto_link_tasks,omitempty" example:"true"`
+	QuantityMultiplier float64 `json:"quantity_multiplier,omitempty" validate:"min=0" example:"1.0"`
 }
 
 // UpdateRequest is the request payload for updating a template.
@@ -137,24 +127,27 @@ type UpdateRequest struct {
 	Title       *string `json:"title,omitempty" validate:"omitempty,min=1,max=500" example:"Evening Run"`
 	Description *string `json:"description,omitempty" validate:"omitempty,max=2000" example:"Post-work stress relief run"`
 	Icon        *string `json:"icon,omitempty" validate:"omitempty,max=50" example:"🌙"`
-	Color       *string `json:"color,omitempty" validate:"omitempty,max=20" example:"#6366F1"`
 
-	DefaultDuration   *int    `json:"default_duration,omitempty" example:"2700"`
-	DefaultPriority   *int    `json:"default_priority,omitempty" validate:"omitempty,min=0,max=3" example:"2"`
-	DefaultCategoryID *string `json:"default_category_id,omitempty" example:"categories:fitness123"`
+	DefaultDuration *int `json:"default_duration,omitempty" example:"2700"`
 
 	IsQuickLog    *bool `json:"is_quick_log,omitempty" example:"true"`
 	QuickLogOrder *int  `json:"quick_log_order,omitempty" example:"2"`
 
 	QuantityEnabled *bool    `json:"quantity_enabled,omitempty" example:"true"`
 	QuantityDefault *float64 `json:"quantity_default,omitempty" validate:"omitempty,min=0" example:"7.0"`
-	QuantityUnit    *string  `json:"quantity_unit,omitempty" validate:"omitempty,max=50" example:"km"`
 	QuantityStep    *float64 `json:"quantity_step,omitempty" validate:"omitempty,min=0" example:"1.0"`
 
 	ExpectedQuadrant *string `json:"expected_quadrant,omitempty" validate:"omitempty,oneof=green yellow red blue" example:"green"`
 	DefaultEmotionID *string `json:"default_emotion_id,omitempty" example:"emotions:E25"`
+}
 
-	ShowFields *ShowFieldsInput `json:"show_fields,omitempty"`
+// LinkGoalRequest is the request for linking a template to a goal.
+//
+// @Description Request for linking template to goal
+type LinkGoalRequest struct {
+	GoalID             string  `json:"goal_id" validate:"required" example:"goals:hydration123"`
+	AutoLinkTasks      bool    `json:"auto_link_tasks,omitempty" example:"true"`
+	QuantityMultiplier float64 `json:"quantity_multiplier,omitempty" validate:"min=0" example:"1.0"`
 }
 
 // InstantiateRequest is the request for creating a task from a template.
@@ -172,12 +165,24 @@ type InstantiateRequest struct {
 // =============================================================================
 
 // TemplatePageResponse documents the paginated response returned by the List endpoint.
+//
+// @Description Paginated list of templates
 type TemplatePageResponse struct {
 	Items   []*TaskTemplate `json:"items"`
 	Total   int64           `json:"total"`
 	Limit   int             `json:"limit"`
 	Offset  int             `json:"offset"`
 	HasMore bool            `json:"has_more"`
+}
+
+// QuickLogTemplate represents a template configured for quick logging.
+//
+// @Description Quick log template with goal info
+type QuickLogTemplate struct {
+	Template *TaskTemplate `json:"template"`
+	GoalID   string        `json:"goal_id,omitempty"`
+	GoalIcon string        `json:"goal_icon,omitempty"`
+	UnitID   string        `json:"unit_id,omitempty"` // From linked goal's target
 }
 
 // =============================================================================
@@ -187,4 +192,7 @@ type TemplatePageResponse struct {
 const (
 	// Table is the SurrealDB table name for templates.
 	Table = "templates"
+
+	// TemplateGoalsTable is the SurrealDB relation table name.
+	TemplateGoalsTable = "template_goals"
 )

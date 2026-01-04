@@ -19,14 +19,15 @@ import (
 	"github.com/lucid-logs/go-backend/internal/features/auth"
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
-	"github.com/lucid-logs/go-backend/internal/features/goalactions"
 	"github.com/lucid-logs/go-backend/internal/features/goalentries"
+	"github.com/lucid-logs/go-backend/internal/features/goallogs"
 	"github.com/lucid-logs/go-backend/internal/features/goals"
 	"github.com/lucid-logs/go-backend/internal/features/health"
 	"github.com/lucid-logs/go-backend/internal/features/retrospectives"
 	"github.com/lucid-logs/go-backend/internal/features/taskgoals"
 	"github.com/lucid-logs/go-backend/internal/features/tasks"
 	"github.com/lucid-logs/go-backend/internal/features/templates"
+	"github.com/lucid-logs/go-backend/internal/features/units"
 	"github.com/lucid-logs/go-backend/internal/features/users"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
@@ -153,10 +154,13 @@ func NewRouter(cfg Config) *gin.Engine {
 			goalEntryService := goalentries.NewService(goalEntryRepo, goalRepo, goalService)
 			goalentries.RegisterRoutes(protected.Group("/goals/:id/entries"), goalEntryService, cfg.Validator)
 
-			// Goal Actions routes (nested under goals)
-			goalActionsRepo := goalactions.NewRepository(cfg.DB)
-			goalActionsService := goalactions.NewService(goalActionsRepo, goalService, goalRepo)
-			goalactions.RegisterRoutes(protected.Group("/goals/:id/actions"), goalActionsService, cfg.Validator)
+			// Goal Logs routes (nested under goals)
+			goalLogsRepo := goallogs.NewRepository(cfg.DB)
+			_ = goalLogsRepo // TODO: Add goal logs handler
+
+			// Units routes
+			unitsRepo := units.NewRepository(cfg.DB)
+			_ = unitsRepo // TODO: Add units handler
 
 			// Task-Goals linking routes (nested under tasks)
 			taskGoalsRepo := taskgoals.NewRepository(cfg.DB)

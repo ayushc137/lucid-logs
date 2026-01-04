@@ -174,13 +174,6 @@ func (s *service) Create(ctx context.Context, goalID, userID string, req *Create
 		return nil, err
 	}
 
-	// Update streak if entry is met
-	if req.Met {
-		if err := s.goalSvc.UpdateStreak(ctx, goalID, userID, true); err != nil {
-			s.logger.Warn().Err(err).Str("goal_id", goalID).Msg("failed to update streak")
-		}
-	}
-
 	s.logger.Info().
 		Str("entry_id", entry.ID).
 		Str("goal_id", goalID).

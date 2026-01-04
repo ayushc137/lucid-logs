@@ -66,9 +66,6 @@ func (c *GoalTemplateCreator) CreateForGoal(ctx context.Context, goal *goals.Goa
 		Title:       goal.Title,
 		Description: goal.Description,
 		Icon:        icon,
-		Color:       goal.Color,
-		ActivityKey: goal.ActivityKey,
-		GoalID:      goal.ID,
 		IsQuickLog:  true,
 	}
 
@@ -76,15 +73,13 @@ func (c *GoalTemplateCreator) CreateForGoal(ctx context.Context, goal *goals.Goa
 	if goal.Target != nil {
 		req.QuantityEnabled = true
 		req.QuantityDefault = goal.Target.Value
-		req.QuantityUnit = goal.Target.Unit
 		req.QuantityStep = 1
-	}
 
-	// Set show_fields for quick logging
-	req.ShowFields = &ShowFieldsInput{}
-	if goal.Target != nil {
-		t := true
-		req.ShowFields.Quantity = &t
+		// Link to the goal via template_goals
+		req.GoalLinks = []GoalLinkInput{{
+			GoalID:        goal.ID,
+			AutoLinkTasks: true,
+		}}
 	}
 
 	template, err := c.repo.Create(ctx, req, userID)
@@ -95,7 +90,6 @@ func (c *GoalTemplateCreator) CreateForGoal(ctx context.Context, goal *goals.Goa
 	log.Info().
 		Str("template_id", template.ID).
 		Str("goal_id", goal.ID).
-		Str("activity_key", goal.ActivityKey).
 		Msg("template auto-created for goal")
 
 	return template.ID, nil

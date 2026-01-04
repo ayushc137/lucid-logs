@@ -2,22 +2,20 @@
 //
 // This package implements:
 //   - CRUD operations for goals using typed SDK methods
-//   - Activity key generation and lookup
-//   - Category linking (record links)
+//   - Graph-inferred goal nature (no goal_type enum)
+//   - Category linking via in_category relation
+//   - Child goals via goal_children relation
 //   - Soft delete support
 //   - Pagination with filtering
 //
-// SDK Methods Used:
-//   - database.QueryFirst[T]() - Single record queries
-//   - database.QueryAll[T]() - Multi-record queries
-//   - database.QueryScalar[T]() - Scalar value queries
+// Database Architecture:
+//   - in_category: RELATE table for category assignment
+//   - goal_children: RELATE table for parent-child relationships
+//   - goal_logs: RELATE table for history tracking
 package goals
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"regexp"
 	"strings"
 	"time"
 
@@ -39,9 +37,6 @@ type Repository interface {
 	// FindByID retrieves a goal by ID for a specific user.
 	FindByID(ctx context.Context, id, userID string) (*Goal, error)
 
-	// FindByActivityKey retrieves a goal by its activity key.
-	FindByActivityKey(ctx context.Context, activityKey, userID string) (*Goal, error)
-
 	// FindPaginated retrieves goals for a user with pagination and filters.
 	FindPaginated(ctx context.Context, userID string, params pagination.Params, filters GoalFilters) ([]*Goal, int64, error)
 
@@ -54,28 +49,31 @@ type Repository interface {
 	// Update updates an existing goal.
 	Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Goal, error)
 
-	// UpdateStreak updates streak-related fields.
-	UpdateStreak(ctx context.Context, id string, currentStreak, longestStreak int, lastCompleted *time.Time, userID string) error
-
-	// UpdateLinkedTemplate sets the linked template ID.
-	UpdateLinkedTemplate(ctx context.Context, id string, templateID string, userID string) error
-
 	// Delete soft-deletes a goal.
 	Delete(ctx context.Context, id, userID string) error
 
-	// FindChildGoals retrieves all child goals of a parent goal.
-	FindChildGoals(ctx context.Context, parentGoalID, userID string) ([]*Goal, error)
+	// FindChildren retrieves all child goals of a parent goal.
+	FindChildren(ctx context.Context, parentGoalID, userID string) ([]*Goal, error)
 
-	// UpdateStatus updates a goal's status (for auto-completion).
-	UpdateStatus(ctx context.Context, id, status, userID string) error
+	// AddChild links a child goal to a parent.
+	AddChild(ctx context.Context, parentID, childID, userID string, order int, required bool) error
+
+	// RemoveChild removes a child goal from a parent.
+	RemoveChild(ctx context.Context, parentID, childID, userID string) error
+
+	// UpdateCategory sets or updates the category for a goal.
+	UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error
+
+	// ComputeStats calculates the current stats for a goal.
+	ComputeStats(ctx context.Context, goalID, userID string) (*GoalStats, error)
 }
 
 // GoalFilters contains optional filters for listing goals.
 type GoalFilters struct {
-	Status      string // Filter by status
-	GoalType    string // Filter by goal type
-	LifeDomain  string // Filter by life domain
+	Status      string // Filter by status (active, completed, archived)
 	IsRecurring *bool  // Filter recurring (true) vs one-time (false)
+	HasTarget   *bool  // Filter measurable goals
+	HasChildren *bool  // Filter grouped goals
 	Search      string // Search in title and description
 	SortBy      string // Sort field with optional -desc suffix
 }
@@ -103,44 +101,31 @@ func NewRepository(db *database.DB) Repository {
 
 // goalDB is the internal database representation of a goal.
 type goalDB struct {
-	ID          models.RecordID `json:"id,omitempty"`
-	CreatedBy   string          `json:"created_by"`
-	ActivityKey string          `json:"activity_key"`
+	ID        models.RecordID `json:"id,omitempty"`
+	CreatedBy string          `json:"created_by"`
 
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
-	Why         string `json:"why,omitempty"`
 	Icon        string `json:"icon,omitempty"`
-	Color       string `json:"color,omitempty"`
-
-	GoalType string `json:"goal_type"`
 
 	Recurrence map[string]any `json:"recurrence,omitempty"`
 	Target     map[string]any `json:"target,omitempty"`
 
-	StartDate *database.SurrealTime `json:"start_date,omitempty"`
-	Deadline  *database.SurrealTime `json:"deadline,omitempty"`
+	StartDate   *database.SurrealTime `json:"start_date,omitempty"`
+	Deadline    *database.SurrealTime `json:"deadline,omitempty"`
+	CompletedAt *database.SurrealTime `json:"completed_at,omitempty"`
 
-	Status         string                `json:"status"`
-	CompletionDate *database.SurrealTime `json:"completion_date,omitempty"`
-
-	CurrentStreak     int                   `json:"current_streak"`
-	LongestStreak     int                   `json:"longest_streak"`
-	LastCompletedDate *database.SurrealTime `json:"last_completed_date,omitempty"`
-	GraceDaysUsed     int                   `json:"grace_days_used"`
-
-	Priority       int         `json:"priority"`
-	ValueScore     int         `json:"value_score"`
-	Category       *categoryDB `json:"category,omitempty"`
-	ParentGoal     *string     `json:"parent_goal,omitempty"`
-	LifeDomain     string      `json:"life_domain,omitempty"`
-	LinkedTemplate *string     `json:"linked_template,omitempty"`
-	CompletionMode string      `json:"completion_mode,omitempty"`
-
-	IsPrivate bool `json:"is_private"`
+	Status   string `json:"status"`
+	Priority int    `json:"priority"`
 
 	// Linked tasks (populated via subquery)
 	LinkedTasks []goalTaskDB `json:"linked_tasks,omitempty"`
+
+	// Category (populated via in_category edge)
+	Category *categoryDB `json:"category,omitempty"`
+
+	// Children (populated via goal_children edge)
+	Children []goalChildDB `json:"children,omitempty"`
 
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
@@ -154,7 +139,14 @@ type goalTaskDB struct {
 	ImpactType      string   `json:"impact_type"`
 	ImpactMagnitude int      `json:"impact_magnitude"`
 	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	QuantityUnit    *string  `json:"quantity_unit,omitempty"`
+	UnitID          *string  `json:"unit_id,omitempty"`
+}
+
+// goalChildDB represents a child goal link.
+type goalChildDB struct {
+	GoalID   string `json:"goal_id"`
+	Order    int    `json:"order"`
+	Required bool   `json:"required"`
 }
 
 // categoryDB is the database representation of a category when fetched.
@@ -191,31 +183,15 @@ func (c *categoryDB) toCategory() *categories.Category {
 // toGoal converts the database model to the domain model.
 func (g *goalDB) toGoal() *Goal {
 	goal := &Goal{
-		ID:          database.ToStringID(g.ID),
-		CreatedBy:   g.CreatedBy,
-		ActivityKey: g.ActivityKey,
+		ID:        database.ToStringID(g.ID),
+		CreatedBy: g.CreatedBy,
 
 		Title:       g.Title,
 		Description: g.Description,
-		Why:         g.Why,
 		Icon:        g.Icon,
-		Color:       g.Color,
 
-		GoalType: g.GoalType,
 		Status:   g.Status,
-
-		CurrentStreak: g.CurrentStreak,
-		LongestStreak: g.LongestStreak,
-		GraceDaysUsed: g.GraceDaysUsed,
-
-		Priority:       g.Priority,
-		ValueScore:     g.ValueScore,
-		ParentGoal:     g.ParentGoal,
-		LifeDomain:     g.LifeDomain,
-		LinkedTemplate: g.LinkedTemplate,
-		CompletionMode: g.CompletionMode,
-
-		IsPrivate: g.IsPrivate,
+		Priority: g.Priority,
 
 		CreatedAt: g.CreatedAt.Time,
 		UpdatedAt: g.UpdatedAt.Time,
@@ -235,13 +211,9 @@ func (g *goalDB) toGoal() *Goal {
 		t := g.Deadline.Time
 		goal.Deadline = &t
 	}
-	if g.CompletionDate != nil && !g.CompletionDate.IsZero() {
-		t := g.CompletionDate.Time
-		goal.CompletionDate = &t
-	}
-	if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
-		t := g.LastCompletedDate.Time
-		goal.LastCompletedDate = &t
+	if g.CompletedAt != nil && !g.CompletedAt.IsZero() {
+		t := g.CompletedAt.Time
+		goal.CompletedAt = &t
 	}
 	if g.DeletedAt != nil && !g.DeletedAt.IsZero() {
 		t := g.DeletedAt.Time
@@ -268,7 +240,7 @@ func (g *goalDB) toGoal() *Goal {
 				ImpactType:      lt.ImpactType,
 				ImpactMagnitude: lt.ImpactMagnitude,
 				QuantityValue:   lt.QuantityValue,
-				QuantityUnit:    lt.QuantityUnit,
+				UnitID:          lt.UnitID,
 			}
 		}
 	}
@@ -310,15 +282,17 @@ func mapToTarget(m map[string]any) *Target {
 	if m == nil {
 		return nil
 	}
-	t := &Target{}
+	t := &Target{
+		Operator: DefaultOperator, // Default to GTE
+	}
 	if v, ok := m["value"].(float64); ok {
 		t.Value = v
 	}
-	if v, ok := m["unit"].(string); ok {
-		t.Unit = v
+	if v, ok := m["unit_id"].(string); ok {
+		t.UnitID = v
 	}
-	if v, ok := m["current_value"].(float64); ok {
-		t.CurrentValue = v
+	if v, ok := m["operator"].(string); ok {
+		t.Operator = v
 	}
 	if v, ok := m["per_period"].(bool); ok {
 		t.PerPeriod = v
@@ -341,9 +315,10 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 				impact_type,
 				impact_magnitude,
 				quantity_value,
-				quantity_unit
-			 FROM task_goals WHERE out = $parent.id) as linked_tasks
-		FROM type::thing($id) FETCH category
+				unit_id
+			 FROM task_goals WHERE out = $parent.id) as linked_tasks,
+			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+		FROM type::thing($id)
 	`, map[string]any{
 		"id": goalID,
 	})
@@ -363,29 +338,6 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 	return goal.toGoal(), nil
 }
 
-func (r *repository) FindByActivityKey(ctx context.Context, activityKey, userID string) (*Goal, error) {
-	goal, err := database.QueryFirst[goalDB](ctx, r.db, `
-		SELECT * FROM goals 
-		WHERE created_by = $user 
-		  AND activity_key = $key 
-		  AND deleted_at IS NONE
-		FETCH category
-	`, map[string]any{
-		"user": userID,
-		"key":  activityKey,
-	})
-	if err != nil {
-		r.logger.Error().Err(err).Str("activity_key", activityKey).Msg("query failed for activity key lookup")
-		return nil, err
-	}
-
-	if goal == nil {
-		return nil, errors.ErrNotFound
-	}
-
-	return goal.toGoal(), nil
-}
-
 func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params, filters GoalFilters) ([]*Goal, int64, error) {
 	// Build WHERE clause dynamically
 	conditions := []string{"created_by = $user", "deleted_at IS NONE"}
@@ -399,14 +351,6 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		conditions = append(conditions, "status = $status")
 		queryVars["status"] = filters.Status
 	}
-	if filters.GoalType != "" {
-		conditions = append(conditions, "goal_type = $goal_type")
-		queryVars["goal_type"] = filters.GoalType
-	}
-	if filters.LifeDomain != "" {
-		conditions = append(conditions, "life_domain = $life_domain")
-		queryVars["life_domain"] = filters.LifeDomain
-	}
 	if filters.IsRecurring != nil {
 		if *filters.IsRecurring {
 			conditions = append(conditions, "recurrence IS NOT NONE")
@@ -414,7 +358,13 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 			conditions = append(conditions, "recurrence IS NONE")
 		}
 	}
-	// Search filter - search in title and description
+	if filters.HasTarget != nil {
+		if *filters.HasTarget {
+			conditions = append(conditions, "target IS NOT NONE")
+		} else {
+			conditions = append(conditions, "target IS NONE")
+		}
+	}
 	if filters.Search != "" {
 		conditions = append(conditions, "(string::lowercase(title) CONTAINS string::lowercase($search) OR string::lowercase(description) CONTAINS string::lowercase($search))")
 		queryVars["search"] = filters.Search
@@ -434,12 +384,9 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 			sortField = strings.TrimSuffix(sortField, "-asc")
 			sortDir = "ASC"
 		}
-		// Map allowed sort fields
 		switch sortField {
 		case "title":
 			orderClause = "ORDER BY title " + sortDir
-		case "streak":
-			orderClause = "ORDER BY current_streak " + sortDir
 		case "priority":
 			orderClause = "ORDER BY priority " + sortDir
 		case "updated_at":
@@ -460,7 +407,10 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Main query with linked tasks subquery
-	dataQuery := "SELECT *, (SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, quantity_unit FROM task_goals WHERE out = $parent.id) as linked_tasks FROM goals WHERE " + whereClause + " " + orderClause + " LIMIT $limit START $offset FETCH category"
+	dataQuery := `SELECT *, 
+		(SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, unit_id FROM task_goals WHERE out = $parent.id) as linked_tasks,
+		(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+		FROM goals WHERE ` + whereClause + " " + orderClause + " LIMIT $limit START $offset"
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, dataQuery, queryVars)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("list query failed")
@@ -482,7 +432,6 @@ func (r *repository) FindRecurringForDate(ctx context.Context, userID string, da
 		  AND deleted_at IS NONE
 		  AND status = "active"
 		  AND recurrence IS NOT NONE
-		FETCH category
 	`, map[string]any{
 		"user": userID,
 	})
@@ -504,38 +453,17 @@ func (r *repository) FindRecurringForDate(ctx context.Context, userID string, da
 // =============================================================================
 
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Goal, error) {
-	// Generate activity key from title
-	activityKey := generateActivityKey(req.Title)
-
-	// Check for duplicate activity key
-	existing, _ := r.FindByActivityKey(ctx, activityKey, userID)
-	if existing != nil {
-		// Make unique by appending random suffix
-		activityKey = activityKey + "_" + generateShortID()
-	}
-
-	goalID := generateRecordID()
 	now := time.Now().UTC()
 
 	createData := map[string]any{
-		"created_by":      userID,
-		"activity_key":    activityKey,
-		"title":           req.Title,
-		"description":     req.Description,
-		"why":             req.Why,
-		"icon":            req.Icon,
-		"color":           req.Color,
-		"goal_type":       req.GoalType,
-		"status":          StatusActive,
-		"current_streak":  0,
-		"longest_streak":  0,
-		"grace_days_used": 0,
-		"priority":        req.Priority,
-		"value_score":     req.ValueScore,
-		"life_domain":     req.LifeDomain,
-		"is_private":      req.IsPrivate,
-		"created_at":      now,
-		"updated_at":      now,
+		"created_by":  userID,
+		"title":       req.Title,
+		"description": req.Description,
+		"icon":        req.Icon,
+		"status":      StatusActive,
+		"priority":    req.Priority,
+		"created_at":  now,
+		"updated_at":  now,
 	}
 
 	// Handle recurrence
@@ -550,38 +478,40 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		}
 	}
 
-	// Handle target
+	// Handle target with operator
 	if req.Target != nil {
+		operator := req.Target.Operator
+		if operator == "" {
+			operator = DefaultOperator
+		}
 		createData["target"] = map[string]any{
-			"value":         req.Target.Value,
-			"unit":          req.Target.Unit,
-			"current_value": 0,
-			"per_period":    req.Target.PerPeriod,
+			"value":      req.Target.Value,
+			"unit_id":    req.Target.UnitID,
+			"operator":   operator,
+			"per_period": req.Target.PerPeriod,
 		}
 	}
 
-	// Handle category
-	if req.CategoryID != "" {
-		createData["category"] = database.MustRecordID("categories", req.CategoryID)
+	// Handle start date
+	if req.StartDate != nil {
+		startDate, err := time.Parse(time.RFC3339, *req.StartDate)
+		if err == nil {
+			createData["start_date"] = startDate
+		}
 	}
 
-	// Handle parent goal
-	if req.ParentGoal != "" {
-		createData["parent_goal"] = req.ParentGoal
-	}
-
-	// Handle completion mode (default to "all" for epic goals)
-	if req.CompletionMode != "" {
-		createData["completion_mode"] = req.CompletionMode
-	} else if req.GoalType == GoalTypeEpic {
-		createData["completion_mode"] = CompletionModeAll
+	// Handle deadline
+	if req.Deadline != nil {
+		deadline, err := time.Parse(time.RFC3339, *req.Deadline)
+		if err == nil {
+			createData["deadline"] = deadline
+		}
 	}
 
 	// Create the goal
-	_, err := database.QueryAll[goalDB](ctx, r.db, `
-		CREATE type::thing($id) CONTENT $data
+	result, err := database.QueryFirst[goalDB](ctx, r.db, `
+		CREATE goals CONTENT $data
 	`, map[string]any{
-		"id":   goalID,
 		"data": createData,
 	})
 	if err != nil {
@@ -589,9 +519,25 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		return nil, err
 	}
 
-	r.logger.Info().Str("goal_id", database.ToStringID(goalID)).Str("activity_key", activityKey).Msg("goal created")
+	goalID := database.ToStringID(result.ID)
 
-	return r.FindByID(ctx, database.ToStringID(goalID), userID)
+	// Link category via in_category relation
+	if req.CategoryID != "" {
+		if err := r.UpdateCategory(ctx, goalID, req.CategoryID, userID); err != nil {
+			r.logger.Warn().Err(err).Msg("failed to link category")
+		}
+	}
+
+	// Link to parent goal if specified
+	if req.ParentGoalID != "" {
+		if err := r.AddChild(ctx, req.ParentGoalID, goalID, userID, 0, true); err != nil {
+			r.logger.Warn().Err(err).Msg("failed to link to parent goal")
+		}
+	}
+
+	r.logger.Info().Str("goal_id", goalID).Msg("goal created")
+
+	return r.FindByID(ctx, goalID, userID)
 }
 
 // =============================================================================
@@ -618,45 +564,17 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	if req.Description != nil {
 		updateData["description"] = *req.Description
 	}
-	if req.Why != nil {
-		updateData["why"] = *req.Why
-	}
 	if req.Icon != nil {
 		updateData["icon"] = *req.Icon
-	}
-	if req.Color != nil {
-		updateData["color"] = *req.Color
-	}
-	if req.GoalType != nil {
-		updateData["goal_type"] = *req.GoalType
 	}
 	if req.Status != nil {
 		updateData["status"] = *req.Status
 		if *req.Status == StatusCompleted {
-			updateData["completion_date"] = now
+			updateData["completed_at"] = now
 		}
 	}
 	if req.Priority != nil {
 		updateData["priority"] = *req.Priority
-	}
-	if req.ValueScore != nil {
-		updateData["value_score"] = *req.ValueScore
-	}
-	if req.LifeDomain != nil {
-		updateData["life_domain"] = *req.LifeDomain
-	}
-	if req.IsPrivate != nil {
-		updateData["is_private"] = *req.IsPrivate
-	}
-	if req.CategoryID != nil {
-		if *req.CategoryID == "" {
-			updateData["category"] = nil
-		} else {
-			updateData["category"] = database.MustRecordID("categories", *req.CategoryID)
-		}
-	}
-	if req.CompletionMode != nil {
-		updateData["completion_mode"] = *req.CompletionMode
 	}
 
 	if req.Recurrence != nil {
@@ -671,9 +589,14 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	if req.Target != nil {
+		operator := req.Target.Operator
+		if operator == "" {
+			operator = DefaultOperator
+		}
 		updateData["target"] = map[string]any{
 			"value":      req.Target.Value,
-			"unit":       req.Target.Unit,
+			"unit_id":    req.Target.UnitID,
+			"operator":   operator,
 			"per_period": req.Target.PerPeriod,
 		}
 	}
@@ -689,60 +612,16 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		return nil, err
 	}
 
+	// Update category if provided
+	if req.CategoryID != nil {
+		if err := r.UpdateCategory(ctx, id, *req.CategoryID, userID); err != nil {
+			r.logger.Warn().Err(err).Msg("failed to update category")
+		}
+	}
+
 	r.logger.Info().Str("goal_id", id).Msg("goal updated")
 
 	return r.FindByID(ctx, id, userID)
-}
-
-func (r *repository) UpdateStreak(ctx context.Context, id string, currentStreak, longestStreak int, lastCompleted *time.Time, userID string) error {
-	goalID := database.MustRecordID(Table, id)
-	now := time.Now().UTC()
-
-	updateData := map[string]any{
-		"current_streak": currentStreak,
-		"longest_streak": longestStreak,
-		"updated_at":     now,
-	}
-	if lastCompleted != nil {
-		updateData["last_completed_date"] = *lastCompleted
-	}
-
-	_, err := database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data WHERE created_by = $user
-	`, map[string]any{
-		"id":   goalID,
-		"data": updateData,
-		"user": userID,
-	})
-	if err != nil {
-		r.logger.Error().Err(err).Str("goal_id", id).Msg("update streak failed")
-		return err
-	}
-
-	return nil
-}
-
-func (r *repository) UpdateLinkedTemplate(ctx context.Context, id string, templateID string, userID string) error {
-	goalID := database.MustRecordID(Table, id)
-	now := time.Now().UTC()
-
-	_, err := database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE {
-			linked_template: $template_id,
-			updated_at: $now
-		} WHERE created_by = $user
-	`, map[string]any{
-		"id":          goalID,
-		"template_id": templateID,
-		"now":         now,
-		"user":        userID,
-	})
-	if err != nil {
-		r.logger.Error().Err(err).Str("goal_id", id).Msg("update linked template failed")
-		return err
-	}
-
-	return nil
 }
 
 // =============================================================================
@@ -778,19 +657,19 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 }
 
 // =============================================================================
-// CHILD GOALS OPERATIONS
+// CHILD GOALS OPERATIONS (via goal_children relation)
 // =============================================================================
 
-func (r *repository) FindChildGoals(ctx context.Context, parentGoalID, userID string) ([]*Goal, error) {
+func (r *repository) FindChildren(ctx context.Context, parentGoalID, userID string) ([]*Goal, error) {
+	parentID := database.MustRecordID(Table, parentGoalID)
+
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
-		SELECT * FROM goals 
-		WHERE created_by = $user 
-		  AND parent_goal = $parent_id
-		  AND deleted_at IS NONE
-		FETCH category
+		SELECT out.* FROM goal_children 
+		WHERE in = $parent_id AND out.created_by = $user AND out.deleted_at IS NONE
+		ORDER BY order ASC
 	`, map[string]any{
+		"parent_id": parentID,
 		"user":      userID,
-		"parent_id": parentGoalID,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("parent_goal_id", parentGoalID).Msg("find child goals failed")
@@ -805,65 +684,175 @@ func (r *repository) FindChildGoals(ctx context.Context, parentGoalID, userID st
 	return goals, nil
 }
 
-func (r *repository) UpdateStatus(ctx context.Context, id, status, userID string) error {
-	goalID := database.MustRecordID(Table, id)
+func (r *repository) AddChild(ctx context.Context, parentID, childID, userID string, order int, required bool) error {
+	pID := database.MustRecordID(Table, parentID)
+	cID := database.MustRecordID(Table, childID)
 	now := time.Now().UTC()
 
-	updateData := map[string]any{
-		"status":     status,
-		"updated_at": now,
-	}
-
-	// Set completion_date if completing
-	if status == StatusCompleted {
-		updateData["completion_date"] = now
-	}
-
-	_, err := database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data WHERE created_by = $user
+	_, err := database.QueryAll[any](ctx, r.db, `
+		RELATE $parent -> goal_children -> $child SET {
+			order: $order,
+			required: $required,
+			created_by: $user,
+			created_at: $now
+		}
 	`, map[string]any{
-		"id":   goalID,
-		"data": updateData,
-		"user": userID,
+		"parent":   pID,
+		"child":    cID,
+		"order":    order,
+		"required": required,
+		"user":     userID,
+		"now":      now,
 	})
 	if err != nil {
-		r.logger.Error().Err(err).Str("goal_id", id).Msg("update status failed")
+		r.logger.Error().Err(err).Str("parent", parentID).Str("child", childID).Msg("add child goal failed")
 		return err
 	}
 
-	r.logger.Info().Str("goal_id", id).Str("status", status).Msg("goal status updated")
+	return nil
+}
+
+func (r *repository) RemoveChild(ctx context.Context, parentID, childID, userID string) error {
+	pID := database.MustRecordID(Table, parentID)
+	cID := database.MustRecordID(Table, childID)
+
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE goal_children WHERE in = $parent AND out = $child
+	`, map[string]any{
+		"parent": pID,
+		"child":  cID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("parent", parentID).Str("child", childID).Msg("remove child goal failed")
+		return err
+	}
+
 	return nil
 }
 
 // =============================================================================
-// HELPERS
+// CATEGORY OPERATIONS (via in_category relation)
 // =============================================================================
 
-// generateActivityKey creates a URL-safe key from the goal title.
-// Example: "Drink 3L water daily" → "drink_3l_water_daily"
-func generateActivityKey(title string) string {
-	key := strings.ToLower(title)
-	key = strings.ReplaceAll(key, " ", "_")
-	key = regexp.MustCompile(`[^a-z0-9_]`).ReplaceAllString(key, "")
-	// Remove consecutive underscores
-	key = regexp.MustCompile(`_+`).ReplaceAllString(key, "_")
-	// Trim underscores from ends
-	key = strings.Trim(key, "_")
-	// Limit length
-	if len(key) > 100 {
-		key = key[:100]
+func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error {
+	gID := database.MustRecordID(Table, goalID)
+	now := time.Now().UTC()
+
+	// First, remove existing category link
+	_, _ = database.QueryAll[any](ctx, r.db, `
+		DELETE in_category WHERE in = $goal_id
+	`, map[string]any{
+		"goal_id": gID,
+	})
+
+	// If empty category ID, just remove
+	if categoryID == "" {
+		return nil
 	}
-	return key
+
+	cID := database.MustRecordID("categories", categoryID)
+
+	// Create new category link
+	_, err := database.QueryAll[any](ctx, r.db, `
+		RELATE $goal -> in_category -> $category SET {
+			created_by: $user,
+			created_at: $now
+		}
+	`, map[string]any{
+		"goal":     gID,
+		"category": cID,
+		"user":     userID,
+		"now":      now,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("goal", goalID).Str("category", categoryID).Msg("update category failed")
+		return err
+	}
+
+	return nil
 }
 
-func generateRecordID() models.RecordID {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return database.NewRecordID(Table, hex.EncodeToString(bytes))
-}
+// =============================================================================
+// STATS COMPUTATION
+// =============================================================================
 
-func generateShortID() string {
-	bytes := make([]byte, 4)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
+func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*GoalStats, error) {
+	gID := database.MustRecordID(Table, goalID)
+
+	// Get goal first
+	goal, err := r.FindByID(ctx, goalID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &GoalStats{}
+
+	// Sum quantity values from task_goals
+	sumResult, err := database.QueryFirst[struct {
+		Total float64 `json:"total"`
+		Count int     `json:"count"`
+	}](ctx, r.db, `
+		SELECT 
+			math::sum(quantity_value) as total,
+			count() as count
+		FROM task_goals 
+		WHERE out = $goal_id
+		GROUP ALL
+	`, map[string]any{
+		"goal_id": gID,
+	})
+	if err == nil && sumResult != nil {
+		stats.CurrentValue = sumResult.Total
+		stats.TotalContributions = sumResult.Count
+	}
+
+	// Calculate progress percentage
+	if goal.Target != nil && goal.Target.Value > 0 {
+		stats.ProgressPercent = (stats.CurrentValue / goal.Target.Value) * 100
+
+		// Determine today status
+		switch goal.Target.Operator {
+		case OperatorGTE:
+			if stats.CurrentValue >= goal.Target.Value {
+				stats.TodayStatus = TodayStatusMet
+			} else {
+				stats.TodayStatus = TodayStatusPending
+			}
+		case OperatorLTE:
+			if stats.CurrentValue <= goal.Target.Value {
+				stats.TodayStatus = TodayStatusMet
+			} else {
+				stats.TodayStatus = TodayStatusExceeded
+			}
+		case OperatorEQ:
+			if stats.CurrentValue == goal.Target.Value {
+				stats.TodayStatus = TodayStatusMet
+			} else if stats.CurrentValue > goal.Target.Value {
+				stats.TodayStatus = TodayStatusExceeded
+			} else {
+				stats.TodayStatus = TodayStatusPending
+			}
+		}
+	}
+
+	// Count children if this is a grouped goal
+	childrenResult, err := database.QueryFirst[struct {
+		Total     int `json:"total"`
+		Completed int `json:"completed"`
+	}](ctx, r.db, `
+		SELECT 
+			count() as total,
+			count(out.status = "completed") as completed
+		FROM goal_children 
+		WHERE in = $goal_id
+		GROUP ALL
+	`, map[string]any{
+		"goal_id": gID,
+	})
+	if err == nil && childrenResult != nil {
+		stats.ChildrenTotal = childrenResult.Total
+		stats.ChildrenCompleted = childrenResult.Completed
+	}
+
+	return stats, nil
 }

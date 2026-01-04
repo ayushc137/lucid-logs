@@ -141,10 +141,13 @@ type taskDB struct {
 type taskGoalDB struct {
 	GoalID          string   `json:"goal_id"`
 	GoalTitle       string   `json:"goal_title"`
+	GoalIcon        string   `json:"goal_icon,omitempty"`
 	ImpactType      string   `json:"impact_type"`
 	ImpactMagnitude int      `json:"impact_magnitude"`
 	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	QuantityUnit    *string  `json:"quantity_unit,omitempty"`
+	UnitID          *string  `json:"unit_id,omitempty"`
+	IsMilestone     bool     `json:"is_milestone"`
+	MilestoneLabel  string   `json:"milestone_label,omitempty"`
 }
 
 // categoryDB is the database representation of a category when fetched.
@@ -208,10 +211,13 @@ func (t *taskDB) toTask() *Task {
 			linkedGoals[i] = TaskGoalLink{
 				GoalID:          lg.GoalID,
 				GoalTitle:       lg.GoalTitle,
+				GoalIcon:        lg.GoalIcon,
 				ImpactType:      lg.ImpactType,
 				ImpactMagnitude: lg.ImpactMagnitude,
 				QuantityValue:   lg.QuantityValue,
-				QuantityUnit:    lg.QuantityUnit,
+				UnitID:          lg.UnitID,
+				IsMilestone:     lg.IsMilestone,
+				MilestoneLabel:  lg.MilestoneLabel,
 			}
 		}
 	}
@@ -223,7 +229,6 @@ func (t *taskDB) toTask() *Task {
 		StartDate:       t.StartDate.Time,
 		EndDate:         t.EndDate.Time,
 		Completed:       t.Completed,
-		Priority:        t.Priority,
 		Source:          t.Source,
 		Note:            t.Note,
 		Positives:       t.Positives,
@@ -236,7 +241,6 @@ func (t *taskDB) toTask() *Task {
 		UpdatedAt:       t.UpdatedAt.Time,
 		DeletedAt:       deletedAt,
 		CreatedBy:       t.CreatedBy,
-		UpdatedBy:       t.UpdatedBy,
 	}
 }
 
@@ -254,19 +258,18 @@ type taskCreateData struct {
 	StartDate time.Time        `json:"start_date"`
 	EndDate   time.Time        `json:"end_date"`
 	Completed bool             `json:"completed"`
-	Priority  int              `json:"priority"`
 	Source    string           `json:"source"`
 	Note      string           `json:"note"`
 	Positives []TaskItem       `json:"positives"`
 	Negatives []TaskItem       `json:"negatives"`
 	Category  *models.RecordID `json:"category,omitempty"` // Record link or nil
+	Quantity  *Quantity        `json:"quantity,omitempty"` // Contribution quantity
 
 	// Emotion tracking
 	EmotionID       *string                   `json:"emotion_id,omitempty"`
 	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
 
 	CreatedBy string    `json:"created_by"`
-	UpdatedBy string    `json:"updated_by"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -435,14 +438,25 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 		// StatusAll or empty: no filter
 	}
 
-	// Priority range filter
-	if filters.PriorityMin != nil {
-		conditions = append(conditions, "priority >= $priority_min")
-		queryVars["priority_min"] = *filters.PriorityMin
+	// Goal ID filter
+	if filters.GoalID != "" {
+		conditions = append(conditions, "id IN (SELECT in FROM task_goals WHERE out = $goal_id)")
+		queryVars["goal_id"] = database.MustRecordID("goals", filters.GoalID)
 	}
-	if filters.PriorityMax != nil {
-		conditions = append(conditions, "priority <= $priority_max")
-		queryVars["priority_max"] = *filters.PriorityMax
+
+	// Template ID filter (via created_from edge)
+	if filters.TemplateID != "" {
+		conditions = append(conditions, "id IN (SELECT in FROM created_from WHERE out = $template_id)")
+		queryVars["template_id"] = database.MustRecordID("templates", filters.TemplateID)
+	}
+
+	// Has quantity filter
+	if filters.HasQuantity != nil {
+		if *filters.HasQuantity {
+			conditions = append(conditions, "quantity IS NOT NONE")
+		} else {
+			conditions = append(conditions, "quantity IS NONE")
+		}
 	}
 
 	// Date range filter - parse strings to time.Time for proper SurrealDB datetime comparison
@@ -542,8 +556,6 @@ func buildOrderClause(sortField, sortOrder string, hasSearch bool) string {
 	// Determine sort field
 	field := "start_date" // default
 	switch sortField {
-	case SortByPriority:
-		field = "priority"
 	case SortByTitle:
 		field = "title"
 	case SortByCreatedAt:
@@ -619,16 +631,15 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		StartDate:       startDate,
 		EndDate:         endDate,
 		Completed:       false,
-		Priority:        req.Priority,
 		Source:          source,
 		Note:            req.Note,
 		Positives:       positives,
 		Negatives:       negatives,
 		Category:        categoryLink,
+		Quantity:        convertQuantityInput(req.Quantity),
 		EmotionID:       req.EmotionID,
 		InferredEmotion: inferredEmotion,
 		CreatedBy:       userID,
-		UpdatedBy:       userID,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -729,9 +740,6 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	if req.Completed != nil {
 		updateData["completed"] = *req.Completed
 	}
-	if req.Priority != nil {
-		updateData["priority"] = *req.Priority
-	}
 	if req.Note != nil {
 		updateData["note"] = *req.Note
 	}
@@ -740,6 +748,9 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 	if req.Negatives != nil {
 		updateData["negatives"] = req.Negatives
+	}
+	if req.Quantity != nil {
+		updateData["quantity"] = convertQuantityInput(req.Quantity)
 	}
 
 	// Handle emotion fields
@@ -752,26 +763,6 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 			updateData["emotion_id"] = emotionID
 		}
 		emotionChanged = true
-	}
-
-	// Handle category update
-	if req.CategoryID != nil {
-		catID := strings.TrimSpace(*req.CategoryID)
-		if catID == "" {
-			// Remove category link - set to NONE in SurrealDB
-			updateData["category"] = nil
-		} else {
-			// Validate and set new category
-			categoryRID := database.MustRecordID(categories.Table, catID)
-			exists, err := r.validateCategoryOwnership(ctx, categoryRID, userID)
-			if err != nil {
-				return nil, err
-			}
-			if !exists {
-				return nil, errors.ErrCategoryNotFound
-			}
-			updateData["category"] = categoryRID
-		}
 	}
 
 	finalStart := existing.StartDate
@@ -1052,5 +1043,16 @@ func (r *repository) createEmotionEdge(ctx context.Context, taskID, emotionID, e
 			Str("emotion_id", emotionID).
 			Str("type", edgeType).
 			Msg("failed to create emotion edge")
+	}
+}
+
+// convertQuantityInput converts a QuantityInput to a Quantity.
+func convertQuantityInput(input *QuantityInput) *Quantity {
+	if input == nil {
+		return nil
+	}
+	return &Quantity{
+		Value:  input.Value,
+		UnitID: input.UnitID,
 	}
 }
