@@ -472,12 +472,11 @@ func (r *repository) LinkGoal(ctx context.Context, templateID string, req *LinkG
 	}
 
 	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $template -> template_goals -> $goal SET {
-			auto_link_tasks: $auto_link,
-			quantity_multiplier: $multiplier,
-			created_by: $user,
-			created_at: $now
-		}
+		RELATE $template -> template_goals -> $goal SET
+			auto_link_tasks = $auto_link,
+			quantity_multiplier = $multiplier,
+			created_by = $user,
+			created_at = $now
 	`, map[string]any{
 		"template":   tID,
 		"goal":       gID,
@@ -534,10 +533,9 @@ func (r *repository) linkCategory(ctx context.Context, templateID, categoryID, u
 	cID := database.MustRecordID("categories", categoryID)
 
 	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $template -> in_category -> $category SET {
-			created_by: $user,
-			created_at: $now
-		}
+		RELATE $template -> in_category -> $category SET
+			created_by = $user,
+			created_at = $now
 	`, map[string]any{
 		"template": tID,
 		"category": cID,

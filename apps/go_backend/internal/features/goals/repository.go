@@ -772,10 +772,9 @@ func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, use
 
 	// Create new category link
 	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $goal -> in_category -> $category SET {
-			created_by: $user,
-			created_at: $now
-		}
+		RELATE $goal -> in_category -> $category SET
+			created_by = $user,
+			created_at = $now
 	`, map[string]any{
 		"goal":     gID,
 		"category": cID,
