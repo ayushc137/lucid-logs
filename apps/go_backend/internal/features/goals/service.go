@@ -98,12 +98,6 @@ func (s *service) List(ctx context.Context, userID string, params pagination.Par
 	}
 
 	// Compute stats for each goal
-	for _, goal := range goals {
-		stats, err := s.repo.ComputeStats(ctx, goal.ID, userID)
-		if err == nil {
-			goal.Stats = stats
-		}
-	}
 
 	s.logger.Debug().
 		Str("user_id", userID).
@@ -130,10 +124,6 @@ func (s *service) Get(ctx context.Context, id, userID string) (*Goal, error) {
 	}
 
 	// Compute stats
-	stats, err := s.repo.ComputeStats(ctx, id, userID)
-	if err == nil {
-		goal.Stats = stats
-	}
 
 	// Get children if this is a grouped goal
 	children, err := s.repo.FindChildren(ctx, id, userID)

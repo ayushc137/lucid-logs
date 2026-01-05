@@ -324,13 +324,37 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	}
 
 	// Link goals via template_goals relation
-	for _, goalLink := range req.GoalLinks {
-		if err := r.LinkGoal(ctx, templateIDStr, &LinkGoalRequest{
-			GoalID:             goalLink.GoalID,
-			AutoLinkTasks:      goalLink.AutoLinkTasks,
-			QuantityMultiplier: goalLink.QuantityMultiplier,
-		}, userID); err != nil {
-			r.logger.Warn().Err(err).Str("goal_id", goalLink.GoalID).Msg("failed to link goal")
+	if len(req.GoalLinks) > 0 {
+		goalLinks := make([]map[string]any, len(req.GoalLinks))
+		for i, gl := range req.GoalLinks {
+			multiplier := gl.QuantityMultiplier
+			if multiplier == 0 {
+				multiplier = 1.0
+			}
+			goalLinks[i] = map[string]any{
+				"goal_id":             gl.GoalID,
+				"auto_link_tasks":     gl.AutoLinkTasks,
+				"quantity_multiplier": multiplier,
+			}
+		}
+
+		_, err := database.QueryAll[any](ctx, r.db, `
+			FOR $link IN $links {
+				LET $goal = type::thing("goals", $link.goal_id);
+				RELATE $template -> template_goals -> $goal SET
+					auto_link_tasks = $link.auto_link_tasks,
+					quantity_multiplier = $link.quantity_multiplier,
+					created_by = $user,
+					created_at = $now;
+			}
+		`, map[string]any{
+			"template": templateID,
+			"links":    goalLinks,
+			"user":     userID,
+			"now":      now,
+		})
+		if err != nil {
+			r.logger.Warn().Err(err).Int("count", len(req.GoalLinks)).Msg("failed to batch link goals to template")
 		}
 	}
 
@@ -519,29 +543,26 @@ func (r *repository) linkCategory(ctx context.Context, templateID, categoryID, u
 	tID := database.MustRecordID(Table, templateID)
 	now := time.Now().UTC()
 
-	// Remove existing category link
-	_, _ = database.QueryAll[any](ctx, r.db, `
-		DELETE in_category WHERE in = $template_id
-	`, map[string]any{
+	// Combine DELETE and RELATE into single transaction string
+	query := `DELETE in_category WHERE in = $template_id;`
+	params := map[string]any{
 		"template_id": tID,
-	})
-
-	if categoryID == "" {
-		return nil
 	}
 
-	cID := database.MustRecordID("categories", categoryID)
+	if categoryID != "" {
+		cID := database.MustRecordID("categories", categoryID)
+		query += `
+			RELATE $template -> in_category -> $category SET
+				created_by = $user,
+				created_at = $now;
+		`
+		params["template"] = tID
+		params["category"] = cID
+		params["user"] = userID
+		params["now"] = now
+	}
 
-	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $template -> in_category -> $category SET
-			created_by = $user,
-			created_at = $now
-	`, map[string]any{
-		"template": tID,
-		"category": cID,
-		"user":     userID,
-		"now":      now,
-	})
+	_, err := database.QueryAll[any](ctx, r.db, query, params)
 	if err != nil {
 		r.logger.Error().Err(err).Str("template", templateID).Str("category", categoryID).Msg("link category failed")
 		return err

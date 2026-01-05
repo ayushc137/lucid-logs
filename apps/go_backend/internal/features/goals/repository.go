@@ -136,6 +136,12 @@ type goalDB struct {
 	// Children (populated via goal_children edge)
 	Children []goalChildDB `json:"children,omitempty"`
 
+	// Computed stats (populated via subquery in optimized fetches)
+	ComputedCurrentValue      float64 `json:"computed_current_value,omitempty"`
+	ComputedTaskCount         int     `json:"computed_task_count,omitempty"`
+	ComputedChildrenTotal     int     `json:"computed_children_total,omitempty"`
+	ComputedChildrenCompleted int     `json:"computed_children_completed,omitempty"`
+
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
@@ -257,6 +263,54 @@ func (g *goalDB) toGoal() *Goal {
 		}
 	}
 
+	// Map computed stats from DB to Goal.Stats if present
+	// This supports the optimized single-query pattern
+	if g.ComputedTaskCount > 0 || g.ComputedChildrenTotal > 0 || g.Target != nil {
+		stats := &GoalStats{
+			CurrentValue:       g.ComputedCurrentValue,
+			TotalContributions: g.ComputedTaskCount,
+			CurrentStreak:      g.CurrentStreak,
+			LongestStreak:      g.LongestStreak,
+			ChildrenTotal:      g.ComputedChildrenTotal,
+			ChildrenCompleted:  g.ComputedChildrenCompleted,
+		}
+
+		if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
+			t := g.LastCompletedDate.Time
+			stats.LastCompletedDate = &t
+		}
+
+		// Calculate progress percent and status logic
+		if goal.Target != nil && goal.Target.Value > 0 {
+			stats.ProgressPercent = (stats.CurrentValue / goal.Target.Value) * 100
+
+			switch goal.Target.Operator {
+			case OperatorGTE:
+				if stats.CurrentValue >= goal.Target.Value {
+					stats.TodayStatus = TodayStatusMet
+				} else {
+					stats.TodayStatus = TodayStatusPending
+				}
+			case OperatorLTE:
+				if stats.CurrentValue <= goal.Target.Value {
+					stats.TodayStatus = TodayStatusMet
+				} else {
+					stats.TodayStatus = TodayStatusExceeded
+				}
+			case OperatorEQ:
+				if stats.CurrentValue == goal.Target.Value {
+					stats.TodayStatus = TodayStatusMet
+				} else if stats.CurrentValue > goal.Target.Value {
+					stats.TodayStatus = TodayStatusExceeded
+				} else {
+					stats.TodayStatus = TodayStatusPending
+				}
+			}
+		}
+
+		goal.Stats = stats
+	}
+
 	return goal
 }
 
@@ -332,7 +386,11 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 				quantity_value,
 				unit_id
 			 FROM task_goals WHERE out = $parent.id) as linked_tasks,
-			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category,
+			(SELECT math::sum(quantity_value) FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_current_value,
+			(SELECT count() FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_task_count,
+			(SELECT count() FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_total,
+			(SELECT count(out.status = 'completed') FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_completed
 		FROM type::thing($id)
 	`, map[string]any{
 		"id": goalID,
@@ -421,10 +479,14 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		return nil, 0, err
 	}
 
-	// Main query with linked tasks subquery
+	// Main query with linked tasks subquery and computed stats
 	dataQuery := `SELECT *, 
 		(SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, unit_id FROM task_goals WHERE out = $parent.id) as linked_tasks,
-		(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category
+		(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category,
+		(SELECT math::sum(quantity_value) FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_current_value,
+		(SELECT count() FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_task_count,
+		(SELECT count() FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_total,
+		(SELECT count(out.status = 'completed') FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_completed
 		FROM goals WHERE ` + whereClause + " " + orderClause + " LIMIT $limit START $offset"
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, dataQuery, queryVars)
 	if err != nil {
@@ -442,7 +504,10 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 
 func (r *repository) FindRecurringForDate(ctx context.Context, userID string, date time.Time) ([]*Goal, error) {
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
-		SELECT * FROM goals 
+		SELECT *,
+		(SELECT math::sum(quantity_value) FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_current_value,
+		(SELECT count() FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_task_count
+		FROM goals 
 		WHERE created_by = $user 
 		  AND deleted_at IS NONE
 		  AND status = "active"
@@ -761,31 +826,26 @@ func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, use
 	gID := database.MustRecordID(Table, goalID)
 	now := time.Now().UTC()
 
-	// First, remove existing category link
-	_, _ = database.QueryAll[any](ctx, r.db, `
-		DELETE in_category WHERE in = $goal_id
-	`, map[string]any{
+	// Combine DELETE and RELATE into single transaction string
+	query := `DELETE in_category WHERE in = $goal_id;`
+	params := map[string]any{
 		"goal_id": gID,
-	})
-
-	// If empty category ID, just remove
-	if categoryID == "" {
-		return nil
 	}
 
-	cID := database.MustRecordID("categories", categoryID)
+	if categoryID != "" {
+		cID := database.MustRecordID("categories", categoryID)
+		query += `
+			RELATE $goal -> in_category -> $category SET
+				created_by = $user,
+				created_at = $now;
+		`
+		params["goal"] = gID
+		params["category"] = cID
+		params["user"] = userID
+		params["now"] = now
+	}
 
-	// Create new category link
-	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $goal -> in_category -> $category SET
-			created_by = $user,
-			created_at = $now
-	`, map[string]any{
-		"goal":     gID,
-		"category": cID,
-		"user":     userID,
-		"now":      now,
-	})
+	_, err := database.QueryAll[any](ctx, r.db, query, params)
 	if err != nil {
 		r.logger.Error().Err(err).Str("goal", goalID).Str("category", categoryID).Msg("update category failed")
 		return err

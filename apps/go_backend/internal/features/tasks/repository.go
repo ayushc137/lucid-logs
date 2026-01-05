@@ -1001,8 +1001,11 @@ func toEmotionItems(positives, negatives []TaskItem) emotionItemsResult {
 //   - "primary": The main emotion selected for the task
 //   - "positive": Emotions from positive items
 //   - "negative": Emotions from negative items
+//
+// syncEmotionEdges creates graph edges linking task to emotions for analytics.
+// Optimized to use a single batch query for all edges.
 func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotionID *string, positives, negatives []TaskItem) {
-	// Delete existing edges for this task
+	// First, delete existing edges
 	_, err := database.QueryAll[any](ctx, r.db, `
 		DELETE task_emotions WHERE in = type::thing($task_id)
 	`, map[string]any{
@@ -1012,50 +1015,54 @@ func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotio
 		r.logger.Warn().Err(err).Str("task_id", taskID).Msg("failed to delete old emotion edges")
 	}
 
-	// Create edge for primary emotion
+	// Prepare data for batch insert
+	type edgeData struct {
+		EmotionID string  `json:"emotion_id"`
+		Type      string  `json:"type"`
+		Text      *string `json:"text,omitempty"`
+	}
+	edges := make([]edgeData, 0)
+
+	// Add primary emotion
 	if emotionID != nil && *emotionID != "" {
-		r.createEmotionEdge(ctx, taskID, *emotionID, "primary", nil)
+		edges = append(edges, edgeData{EmotionID: *emotionID, Type: "primary"})
 	}
 
-	// Create edges for positive items
+	// Add positive emotions
 	for _, item := range positives {
 		if item.EmotionID != nil && *item.EmotionID != "" {
-			r.createEmotionEdge(ctx, taskID, *item.EmotionID, "positive", &item.Text)
+			t := item.Text
+			edges = append(edges, edgeData{EmotionID: *item.EmotionID, Type: "positive", Text: &t})
 		}
 	}
 
-	// Create edges for negative items
+	// Add negative emotions
 	for _, item := range negatives {
 		if item.EmotionID != nil && *item.EmotionID != "" {
-			r.createEmotionEdge(ctx, taskID, *item.EmotionID, "negative", &item.Text)
+			t := item.Text
+			edges = append(edges, edgeData{EmotionID: *item.EmotionID, Type: "negative", Text: &t})
 		}
 	}
-}
 
-// createEmotionEdge creates a single task -> emotion edge.
-func (r *repository) createEmotionEdge(ctx context.Context, taskID, emotionID, edgeType string, text *string) {
-	data := map[string]any{
-		"type": edgeType,
-	}
-	if text != nil {
-		data["text"] = *text
+	if len(edges) == 0 {
+		return
 	}
 
-	// RELATE requires proper record IDs: tasks:xxx -> task_emotions -> emotions:E16
-	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $task_id->task_emotions->$emotion_id CONTENT $data
+	// Execute batch query
+	_, err = database.QueryAll[any](ctx, r.db, `
+		FOR $edge IN $edges {
+			LET $emotion = type::thing("emotions", $edge.emotion_id);
+			RELATE $task_id -> task_emotions -> $emotion SET
+				type = $edge.type,
+				text = $edge.text;
+		}
 	`, map[string]any{
-		"task_id":    database.MustRecordID(Table, taskID),
-		"emotion_id": database.NewRecordID("emotions", emotionID), // emotions:E16
-		"data":       data,
+		"task_id": database.MustRecordID(Table, taskID),
+		"edges":   edges,
 	})
+
 	if err != nil {
-		r.logger.Warn().
-			Err(err).
-			Str("task_id", taskID).
-			Str("emotion_id", emotionID).
-			Str("type", edgeType).
-			Msg("failed to create emotion edge")
+		r.logger.Warn().Err(err).Str("task_id", taskID).Int("count", len(edges)).Msg("failed to batch sync emotion edges")
 	}
 }
 
@@ -1075,6 +1082,7 @@ func convertQuantityInput(input *QuantityInput) *Quantity {
 // =============================================================================
 
 // syncGoalEdges creates graph edges linking task to goals.
+// syncGoalEdges creates graph edges linking task to goals using a batch query.
 func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []GoalLinkInput) {
 	// Delete existing edges for this task
 	_, err := database.QueryAll[any](ctx, r.db, `
@@ -1086,55 +1094,68 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 		r.logger.Warn().Err(err).Str("task_id", taskID).Msg("failed to delete old goal edges")
 	}
 
-	// Create new edges
-	for _, link := range links {
-		r.createGoalEdge(ctx, taskID, link)
-	}
-}
-
-// createGoalEdge creates a single task -> goal edge.
-func (r *repository) createGoalEdge(ctx context.Context, taskID string, link GoalLinkInput) {
-	data := map[string]any{
-		"impact_type":      link.ImpactType,
-		"impact_magnitude": link.ImpactMagnitude,
-		"is_milestone":     link.IsMilestone,
+	if len(links) == 0 {
+		return
 	}
 
-	if link.QuantityValue > 0 {
-		data["quantity_value"] = link.QuantityValue
-	}
-	if link.MilestoneLabel != "" {
-		data["milestone_label"] = link.MilestoneLabel
-	}
-	if link.MilestoneOrder > 0 {
-		data["milestone_order"] = link.MilestoneOrder
-	}
-	if link.Notes != "" {
-		data["notes"] = link.Notes
-	}
-
-	// Default impact type if missing
-	if link.ImpactType == "" {
-		data["impact_type"] = "neutral"
-	}
-	// Default magnitude if missing or invalid
-	if link.ImpactMagnitude < 1 {
-		data["impact_magnitude"] = 3
+	// Prepare batch data
+	type edgeData struct {
+		GoalID          string   `json:"goal_id"`
+		ImpactType      string   `json:"impact_type"`
+		ImpactMagnitude int      `json:"impact_magnitude"`
+		IsMilestone     bool     `json:"is_milestone"`
+		QuantityValue   *float64 `json:"quantity_value,omitempty"`
+		MilestoneLabel  string   `json:"milestone_label,omitempty"`
+		MilestoneOrder  int      `json:"milestone_order,omitempty"`
+		Notes           string   `json:"notes,omitempty"`
 	}
 
-	// RELATE task -> task_goals -> goal
-	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $task_id->task_goals->$goal_id CONTENT $data
+	edges := make([]edgeData, len(links))
+	for i, link := range links {
+		// Defaults
+		impactType := link.ImpactType
+		if impactType == "" {
+			impactType = "neutral"
+		}
+		magnitude := link.ImpactMagnitude
+		if magnitude < 1 {
+			magnitude = 3
+		}
+
+		edges[i] = edgeData{
+			GoalID:          link.GoalID,
+			ImpactType:      impactType,
+			ImpactMagnitude: magnitude,
+			IsMilestone:     link.IsMilestone,
+			QuantityValue:   nil, // Set below if > 0
+			MilestoneLabel:  link.MilestoneLabel,
+			MilestoneOrder:  link.MilestoneOrder,
+			Notes:           link.Notes,
+		}
+		if link.QuantityValue > 0 {
+			edges[i].QuantityValue = &link.QuantityValue
+		}
+	}
+
+	// Execute batch query
+	_, err = database.QueryAll[any](ctx, r.db, `
+		FOR $edge IN $edges {
+			LET $goal = type::thing("goals", $edge.goal_id);
+			RELATE $task_id -> task_goals -> $goal SET
+				impact_type = $edge.impact_type,
+				impact_magnitude = $edge.impact_magnitude,
+				is_milestone = $edge.is_milestone,
+				quantity_value = $edge.quantity_value,
+				milestone_label = $edge.milestone_label,
+				milestone_order = $edge.milestone_order,
+				notes = $edge.notes;
+		}
 	`, map[string]any{
 		"task_id": database.MustRecordID(Table, taskID),
-		"goal_id": database.NewRecordID("goals", link.GoalID),
-		"data":    data,
+		"edges":   edges,
 	})
+
 	if err != nil {
-		r.logger.Warn().
-			Err(err).
-			Str("task_id", taskID).
-			Str("goal_id", link.GoalID).
-			Msg("failed to create goal edge")
+		r.logger.Warn().Err(err).Str("task_id", taskID).Int("count", len(links)).Msg("failed to batch sync goal edges")
 	}
 }
