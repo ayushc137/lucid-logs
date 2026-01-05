@@ -170,21 +170,21 @@ func (r *repository) getCategoryBreakdown(ctx context.Context, userID string, st
 
 	// Calculate total for percentages
 	var totalSecs float64
-	for _, r := range results {
-		totalSecs += r.TotalSecs
+	for _, res := range results {
+		totalSecs += res.TotalSecs
 	}
 
 	categories := make([]CategoryBreakdown, len(results))
-	for i, r := range results {
+	for i, res := range results {
 		pct := 0.0
 		if totalSecs > 0 {
-			pct = (r.TotalSecs / totalSecs) * 100
+			pct = (res.TotalSecs / totalSecs) * 100
 		}
 		categories[i] = CategoryBreakdown{
-			CategoryID:   database.ToStringID(database.MustRecordID("categories", r.CategoryID)),
-			CategoryName: r.CategoryName,
-			TaskCount:    r.TaskCount,
-			Hours:        r.TotalSecs / 3600,
+			CategoryID:   database.ToStringID(database.MustRecordID("categories", res.CategoryID)),
+			CategoryName: res.CategoryName,
+			TaskCount:    res.TaskCount,
+			Hours:        res.TotalSecs / 3600,
 			Percentage:   pct,
 		}
 	}
@@ -221,8 +221,8 @@ func (r *repository) getPeakHours(ctx context.Context, userID string, start, end
 	}
 
 	hours := make([]int, len(results))
-	for i, r := range results {
-		hours[i] = r.Hour
+	for i, res := range results {
+		hours[i] = res.Hour
 	}
 	return hours, nil
 }
@@ -562,9 +562,9 @@ func (r *repository) GetTimeSeriesData(ctx context.Context, userID, metric, grou
 
 	labels := make([]string, len(results))
 	values := make([]float64, len(results))
-	for i, r := range results {
-		labels[i] = r.Date
-		values[i] = r.Value
+	for i, res := range results {
+		labels[i] = res.Date
+		values[i] = res.Value
 	}
 
 	return &TimeSeriesData{
@@ -670,11 +670,11 @@ func (r *repository) GetProductivityHeatmap(ctx context.Context, userID string, 
 	}
 
 	var maxVal float64
-	for _, r := range results {
-		if r.DayOfWeek >= 0 && r.DayOfWeek < 7 && r.Hour >= 0 && r.Hour < 24 {
-			values[r.DayOfWeek][r.Hour] = float64(r.Count)
-			if float64(r.Count) > maxVal {
-				maxVal = float64(r.Count)
+	for _, res := range results {
+		if res.DayOfWeek >= 0 && res.DayOfWeek < 7 && res.Hour >= 0 && res.Hour < 24 {
+			values[res.DayOfWeek][res.Hour] = float64(res.Count)
+			if float64(res.Count) > maxVal {
+				maxVal = float64(res.Count)
 			}
 		}
 	}

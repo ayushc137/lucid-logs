@@ -153,7 +153,8 @@ func findClosestEmotion(valence, arousal, dominance float64) string {
 //   - 0 = No dissonance (all emotions are aligned)
 //   - 1 = Maximum dissonance (opposing emotions)
 func calculateDissonance(inputs []emotionInput) float64 {
-	var positiveInputs, negativeInputs []emotionInput
+	positiveInputs := make([]emotionInput, 0, len(inputs))
+	negativeInputs := make([]emotionInput, 0, len(inputs))
 
 	for _, inp := range inputs {
 		if inp.emotion.Valence > 0.2 {
