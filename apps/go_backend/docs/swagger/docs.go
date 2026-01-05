@@ -3940,6 +3940,10 @@ const docTemplate = `{
                     "description": "true = per recurrence period",
                     "type": "boolean"
                 },
+                "track_completed_only": {
+                    "description": "true = only count completed tasks",
+                    "type": "boolean"
+                },
                 "unit_id": {
                     "description": "Reference to units table (e.g., \"units:km\")",
                     "type": "string"
@@ -3967,6 +3971,10 @@ const docTemplate = `{
                     "example": "gte"
                 },
                 "per_period": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "track_completed_only": {
                     "type": "boolean",
                     "example": true
                 },

@@ -309,6 +309,9 @@ func mapToTarget(m map[string]any) *Target {
 	if v, ok := m["per_period"].(bool); ok {
 		t.PerPeriod = v
 	}
+	if v, ok := m["track_completed_only"].(bool); ok {
+		t.TrackCompletedOnly = v
+	}
 	return t
 }
 
@@ -497,10 +500,11 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 			operator = DefaultOperator
 		}
 		createData["target"] = map[string]any{
-			"value":      req.Target.Value,
-			"unit_id":    req.Target.UnitID,
-			"operator":   operator,
-			"per_period": req.Target.PerPeriod,
+			"value":                req.Target.Value,
+			"unit_id":              req.Target.UnitID,
+			"operator":             operator,
+			"per_period":           req.Target.PerPeriod,
+			"track_completed_only": req.Target.TrackCompletedOnly,
 		}
 	}
 
@@ -606,10 +610,11 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 			operator = DefaultOperator
 		}
 		updateData["target"] = map[string]any{
-			"value":      req.Target.Value,
-			"unit_id":    req.Target.UnitID,
-			"operator":   operator,
-			"per_period": req.Target.PerPeriod,
+			"value":                req.Target.Value,
+			"unit_id":              req.Target.UnitID,
+			"operator":             operator,
+			"per_period":           req.Target.PerPeriod,
+			"track_completed_only": req.Target.TrackCompletedOnly,
 		}
 	}
 
@@ -809,6 +814,13 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		LastCompletedDate: goal.LastCompletedDate,
 	}
 
+	// Determine filter condition for tasks
+	taskFilter := "out = $goal_id"
+	if goal.Target != nil && goal.Target.TrackCompletedOnly {
+		// Only count completed tasks if configured
+		taskFilter += " AND in.completed = true"
+	}
+
 	// Sum quantity values from task_goals
 	sumResult, err := database.QueryFirst[struct {
 		Total float64 `json:"total"`
@@ -818,7 +830,7 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 			math::sum(quantity_value) as total,
 			count() as count
 		FROM task_goals 
-		WHERE out = $goal_id
+		WHERE `+taskFilter+`
 		GROUP ALL
 	`, map[string]any{
 		"goal_id": gID,

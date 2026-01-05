@@ -101,10 +101,11 @@ type Goal struct {
 //
 // @Description Target for measurable goals with comparison operator
 type Target struct {
-	Value     float64 `json:"value"`      // Target amount (e.g., 100, 3, 0)
-	Operator  string  `json:"operator"`   // "gte", "lte", "eq"
-	UnitID    string  `json:"unit_id"`    // Reference to units table (e.g., "units:km")
-	PerPeriod bool    `json:"per_period"` // true = per recurrence period
+	Value              float64 `json:"value"`                // Target amount (e.g., 100, 3, 0)
+	Operator           string  `json:"operator"`             // "gte", "lte", "eq"
+	UnitID             string  `json:"unit_id"`              // Reference to units table (e.g., "units:km")
+	PerPeriod          bool    `json:"per_period"`           // true = per recurrence period
+	TrackCompletedOnly bool    `json:"track_completed_only"` // true = only count completed tasks
 }
 
 // GoalStats contains computed statistics for a goal.
@@ -218,10 +219,11 @@ type CreateRequest struct {
 //
 // @Description Target configuration for measurable goals
 type TargetInput struct {
-	Value     float64 `json:"value" validate:"gte=0" example:"3"`
-	Operator  string  `json:"operator,omitempty" validate:"omitempty,oneof=gte lte eq" example:"gte"`
-	UnitID    string  `json:"unit_id" validate:"required" example:"units:l"`
-	PerPeriod bool    `json:"per_period,omitempty" example:"true"`
+	Value              float64 `json:"value" validate:"gte=0" example:"3"`
+	Operator           string  `json:"operator,omitempty" validate:"omitempty,oneof=gte lte eq" example:"gte"`
+	UnitID             string  `json:"unit_id" validate:"required" example:"units:l"`
+	PerPeriod          bool    `json:"per_period,omitempty" example:"true"`
+	TrackCompletedOnly bool    `json:"track_completed_only,omitempty" example:"true"`
 }
 
 // RecurrenceInput is the input format for recurrence settings.

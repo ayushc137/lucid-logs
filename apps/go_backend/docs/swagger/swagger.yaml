@@ -843,6 +843,9 @@ definitions:
       per_period:
         description: true = per recurrence period
         type: boolean
+      track_completed_only:
+        description: true = only count completed tasks
+        type: boolean
       unit_id:
         description: Reference to units table (e.g., "units:km")
         type: string
@@ -861,6 +864,9 @@ definitions:
         example: gte
         type: string
       per_period:
+        example: true
+        type: boolean
+      track_completed_only:
         example: true
         type: boolean
       unit_id:

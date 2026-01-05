@@ -52,6 +52,7 @@ export interface Target {
     unit: string;
     current_value: number;
     per_period?: boolean;
+    track_completed_only?: boolean;
 }
 
 export interface GoalTaskLink {
@@ -71,7 +72,7 @@ export interface CreateGoalRequest {
     color?: string;
     goal_type: 'discrete' | 'measurable' | 'epic' | 'avoidance';
     recurrence?: Recurrence;
-    target?: { value: number; unit: string; per_period?: boolean };
+    target?: { value: number; unit: string; per_period?: boolean; track_completed_only?: boolean };
     start_date?: string;
     deadline?: string;
     priority?: 1 | 2 | 3;
