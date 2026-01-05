@@ -1,4 +1,31 @@
 
+priority ui fixes 
+
+FE redo goal and templates 
+FE add goal logging 
+check completion of goal and task, does task completion is needed for goals
+completion, streak etc check and ui changes, also ui changes in goals based on tyep of goal 
+gial craation anf all 
+
+
+
+
+
+check all integration and use cases , all goal type , template etc
+ceheck all tranition, categories, prioritues etc
+
+
+Fe extra items and quick logs
+fe analytics + be analytics 
+
+
+
+
+
+
+
+
+
 footer is not sticky to bottom and there is padding on both end of footer why ??????
 
 

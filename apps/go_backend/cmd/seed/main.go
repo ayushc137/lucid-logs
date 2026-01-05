@@ -365,12 +365,18 @@ var categoryDefs = []struct {
 	name  string
 	color string
 }{
-	{"Work", "#3B82F6"},
-	{"Health", "#10B981"},
-	{"Learning", "#8B5CF6"},
-	{"Personal", "#F59E0B"},
-	{"Finance", "#06B6D4"},
-	{"Projects", "#0EA5E9"},
+	{"Work", "#3B82F6"},        // Blue - professional
+	{"Health", "#10B981"},      // Green - vitality
+	{"Learning", "#8B5CF6"},    // Purple - knowledge
+	{"Personal", "#F59E0B"},    // Amber - warm personal
+	{"Finance", "#06B6D4"},     // Cyan - money/growth
+	{"Projects", "#0EA5E9"},    // Sky blue - building
+	{"Family", "#EC4899"},      // Pink - love/family
+	{"Relationships", "#F97316"}, // Orange - social warmth
+	{"Hobbies", "#A855F7"},     // Violet - creative
+	{"Home", "#84CC16"},        // Lime - domestic/nature
+	{"Fitness", "#14B8A6"},     // Teal - active/energy
+	{"Mindfulness", "#6366F1"}, // Indigo - calm/spiritual
 }
 
 func seedCategories() (map[string]string, error) {
@@ -518,6 +524,237 @@ func seedGoals(categories map[string]string) (map[string]string, error) {
 			priority:    3,
 			target:      map[string]any{"value": 5000, "operator": "gte", "unit_id": "units:dollars", "per_period": false},
 			deadline:    &endOfYear,
+		},
+		// Sleep goal (MAJOR MISSING ITEM)
+		{
+			title:       "Sleep 7-8 Hours",
+			description: "Maintain healthy sleep schedule",
+			icon:        "😴",
+			category:    "Health",
+			priority:    3,
+			target:      map[string]any{"value": 7, "operator": "gte", "unit_id": "units:hr", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		// Meditation habit
+		{
+			title:       "Meditate 10 Min Daily",
+			description: "Daily mindfulness practice",
+			icon:        "🧘",
+			category:    "Personal",
+			priority:    2,
+			target:      map[string]any{"value": 10, "operator": "gte", "unit_id": "units:min", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		// Steps goal
+		{
+			title:       "Walk 10,000 Steps Daily",
+			description: "Stay active throughout the day",
+			icon:        "🚶",
+			category:    "Health",
+			priority:    2,
+			target:      map[string]any{"value": 10000, "operator": "gte", "unit_id": "units:steps", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		// Meal tracking (healthy eating)
+		{
+			title:       "Cook Healthy Meals",
+			description: "Prepare nutritious home-cooked meals",
+			icon:        "🥗",
+			category:    "Health",
+			priority:    2,
+			target:      map[string]any{"value": 2, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		// Screen time limit (avoidance)
+		{
+			title:       "Limit Social Media",
+			description: "Max 1 hour per day",
+			icon:        "📱",
+			category:    "Personal",
+			priority:    2,
+			target:      map[string]any{"value": 60, "operator": "lte", "unit_id": "units:min", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		// Weekly deep work goal
+		{
+			title:       "20 Hours Deep Work Weekly",
+			description: "Focused work sessions each week",
+			icon:        "🎯",
+			category:    "Work",
+			priority:    3,
+			target:      map[string]any{"value": 20, "operator": "gte", "unit_id": "units:hr", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		// Social connections
+		{
+			title:       "Connect with Friends Weekly",
+			description: "Maintain social relationships",
+			icon:        "👥",
+			category:    "Personal",
+			priority:    2,
+			target:      map[string]any{"value": 2, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		// Learning goal
+		{
+			title:       "Learn 5 Hours Weekly",
+			description: "Continuous learning and skill development",
+			icon:        "📖",
+			category:    "Learning",
+			priority:    2,
+			target:      map[string]any{"value": 5, "operator": "gte", "unit_id": "units:hr", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		// === FAMILY & RELATIONSHIPS GOALS ===
+		{
+			title:       "Weekly Family Dinner",
+			description: "Have dinner with family once per week",
+			icon:        "👨‍👩‍👧‍👦",
+			category:    "Family",
+			priority:    3,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week", "active_days": []string{"sun"}},
+		},
+		{
+			title:       "Call Parents Weekly",
+			description: "Stay in touch with parents",
+			icon:        "📞",
+			category:    "Family",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		{
+			title:       "Date Night Bi-weekly",
+			description: "Quality time with partner",
+			icon:        "💑",
+			category:    "Relationships",
+			priority:    3,
+			target:      map[string]any{"value": 2, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "month"},
+		},
+		// === HOBBIES & CREATIVE GOALS ===
+		{
+			title:       "Practice Guitar 3x Weekly",
+			description: "Regular music practice",
+			icon:        "🎸",
+			category:    "Hobbies",
+			priority:    2,
+			target:      map[string]any{"value": 3, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		{
+			title:       "Create Art Weekly",
+			description: "Paint, draw, or craft something",
+			icon:        "🎨",
+			category:    "Hobbies",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		// === HOME & MAINTENANCE GOALS ===
+		{
+			title:       "Deep Clean Home Weekly",
+			description: "Thorough house cleaning",
+			icon:        "🧹",
+			category:    "Home",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week", "active_days": []string{"sat"}},
+		},
+		{
+			title:       "Organize One Area Monthly",
+			description: "Declutter and organize different spaces",
+			icon:        "📦",
+			category:    "Home",
+			priority:    1,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "month"},
+		},
+		// === FITNESS SPECIFIC GOALS (separate from general Health) ===
+		{
+			title:       "Strength Training 3x Week",
+			description: "Build muscle and strength",
+			icon:        "🏋️",
+			category:    "Fitness",
+			priority:    3,
+			target:      map[string]any{"value": 3, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week"},
+		},
+		{
+			title:       "Stretch Daily",
+			description: "Flexibility and recovery",
+			icon:        "🤸",
+			category:    "Fitness",
+			priority:    2,
+			target:      map[string]any{"value": 10, "operator": "gte", "unit_id": "units:min", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		// === MINDFULNESS & MENTAL HEALTH ===
+		{
+			title:       "Gratitude Journal Daily",
+			description: "Write 3 things grateful for",
+			icon:        "🙏",
+			category:    "Mindfulness",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		{
+			title:       "Weekly Reflection",
+			description: "Review and plan the week",
+			icon:        "📝",
+			category:    "Mindfulness",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "week", "active_days": []string{"sun"}},
+		},
+		// === ONE-TIME SPECIFIC GOALS (with deadlines) ===
+		{
+			title:       "Complete Online Course",
+			description: "Finish React advanced course",
+			icon:        "🎓",
+			category:    "Learning",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": false},
+			deadline:    &endOfMonth,
+		},
+		{
+			title:       "Read 5 Books This Year",
+			description: "Annual reading goal",
+			icon:        "📚",
+			category:    "Learning",
+			priority:    2,
+			target:      map[string]any{"value": 5, "operator": "gte", "unit_id": "units:count", "per_period": false},
+			deadline:    &endOfYear,
+		},
+		{
+			title:       "Organize Photo Library",
+			description: "Sort and backup all photos",
+			icon:        "📸",
+			category:    "Home",
+			priority:    1,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": false},
+			deadline:    &endOfMonth,
+		},
+		// === FINANCIAL GOALS (additional) ===
+		{
+			title:       "Track Expenses Daily",
+			description: "Log all spending",
+			icon:        "💵",
+			category:    "Finance",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "day"},
+		},
+		{
+			title:       "Budget Review Monthly",
+			description: "Review and adjust budget",
+			icon:        "📊",
+			category:    "Finance",
+			priority:    2,
+			target:      map[string]any{"value": 1, "operator": "gte", "unit_id": "units:count", "per_period": true},
+			recurrence:  map[string]any{"frequency": 1, "period": "month"},
 		},
 	}
 
@@ -673,6 +910,72 @@ func seedTemplates(categories, goals map[string]string) (map[string]string, erro
 			quantityEnabled: true,
 			quantityDefault: 90,
 			quantityStep:    30,
+			goalTitle:       "20 Hours Deep Work Weekly",
+		},
+		{
+			title:           "Sleep",
+			description:     "Log sleep duration",
+			icon:            "😴",
+			category:        "Health",
+			defaultDuration: 28800, // 8 hours
+			isQuickLog:      true,
+			quickLogOrder:   7,
+			quantityEnabled: true,
+			quantityDefault: 8,
+			quantityStep:    0.5,
+			goalTitle:       "Sleep 7-8 Hours",
+		},
+		{
+			title:           "Meditation",
+			description:     "Mindfulness practice",
+			icon:            "🧘",
+			category:        "Personal",
+			defaultDuration: 600, // 10 min
+			isQuickLog:      true,
+			quickLogOrder:   8,
+			quantityEnabled: true,
+			quantityDefault: 10,
+			quantityStep:    5,
+			goalTitle:       "Meditate 10 Min Daily",
+		},
+		{
+			title:           "Walk/Steps",
+			description:     "Log daily steps",
+			icon:            "🚶",
+			category:        "Health",
+			defaultDuration: 3600,
+			isQuickLog:      true,
+			quickLogOrder:   9,
+			quantityEnabled: true,
+			quantityDefault: 5000,
+			quantityStep:    1000,
+			goalTitle:       "Walk 10,000 Steps Daily",
+		},
+		{
+			title:           "Healthy Meal",
+			description:     "Log home-cooked meal",
+			icon:            "🥗",
+			category:        "Health",
+			defaultDuration: 3600,
+			isQuickLog:      true,
+			quickLogOrder:   10,
+			quantityEnabled: true,
+			quantityDefault: 1,
+			quantityStep:    1,
+			goalTitle:       "Cook Healthy Meals",
+		},
+		{
+			title:           "Social Media",
+			description:     "Track screen time",
+			icon:            "📱",
+			category:        "Personal",
+			defaultDuration: 1800,
+			isQuickLog:      true,
+			quickLogOrder:   11,
+			quantityEnabled: true,
+			quantityDefault: 30,
+			quantityStep:    15,
+			goalTitle:       "Limit Social Media",
 		},
 	}
 
@@ -727,8 +1030,8 @@ func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, 
 	// Track streaks state in memory to simulate realistic progression
 	streaks := make(map[string]int)
 
-	// Seed past 12 days + today + 3 future days (approx 15 days total)
-	for dayOffset := -12; dayOffset <= 3; dayOffset++ {
+	// Seed past 20 days + today + 3 future days (focus on density per day, not length)
+	for dayOffset := -20; dayOffset <= 3; dayOffset++ {
 		day := now.AddDate(0, 0, dayOffset)
 		tasks, links := seedTasksForDay(ctx, db, day, dayOffset, categories, goals, templates, streaks)
 		totalTasks += tasks
@@ -745,6 +1048,87 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 
 	// Track daily totals for this day to trigger goal logs
 	dailyTotals := make(map[string]float64)
+
+	// =========================================================================
+	// SLEEP TRACKING (Every night - MAJOR MISSING ITEM)
+	// =========================================================================
+	sleepGoalTitle := "Sleep 7-8 Hours"
+	if isPast || dayOffset == 0 {
+		// Sleep from previous night (22:00 to 6:00)
+		sleepHours := 6.5 + rand.Float64()*2.0 // 6.5-8.5 hours
+		sleepStart := day.Add(-6 * time.Hour)  // 22:00 previous day
+		sleepEnd := day.Add(time.Duration(sleepHours-2) * time.Hour)
+
+		payload := map[string]any{
+			"title":       "Sleep",
+			"start_date":  sleepStart.Format(time.RFC3339),
+			"end_date":    sleepEnd.Format(time.RFC3339),
+			"category_id": categories["Health"],
+			"source":      "template",
+			"goal_links": []map[string]any{{
+				"goal_id":        goals[sleepGoalTitle],
+				"impact_type":    "positive",
+				"quantity_value": sleepHours,
+			}},
+		}
+
+		// Add emotion based on sleep quality
+		if sleepHours >= 7.5 {
+			payload["emotion_id"] = "emotions:E25" // Well-rested, happy
+			if rand.Float32() < 0.3 {
+				payload["positives"] = []map[string]any{{"text": "Woke up refreshed"}}
+			}
+		} else if sleepHours < 6.5 {
+			payload["emotion_id"] = "emotions:E72" // Tired
+			if rand.Float32() < 0.4 {
+				payload["negatives"] = []map[string]any{{"text": "Didn't sleep enough"}}
+			}
+		}
+
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+			dailyTotals[sleepGoalTitle] += sleepHours
+		}
+	}
+
+	// =========================================================================
+	// MORNING ROUTINE (6:00-9:00)
+	// =========================================================================
+	if isPast || dayOffset == 0 {
+		// Morning meditation (70% consistency)
+		meditationGoalTitle := "Meditate 10 Min Daily"
+		if rand.Float32() < 0.7 {
+			minutes := float64(10 + rand.Intn(10))
+			if createTaskWithDetails(day, 6, 30, int(minutes*60), "Morning Meditation", "🧘",
+				categories["Personal"], &minutes, "units:min", meditationGoalTitle, goals, isPast, nil, nil, "template") {
+				tasks++
+				links++
+				dailyTotals[meditationGoalTitle] += minutes
+			}
+		}
+
+		// Breakfast (healthy meal)
+		mealGoalTitle := "Cook Healthy Meals"
+		if rand.Float32() < 0.8 {
+			mealCount := 1.0
+			if createTaskWithDetails(day, 7, 0, 30, "Breakfast", "🍳",
+				categories["Health"], &mealCount, "units:count", mealGoalTitle, goals, isPast, nil, nil, "quick") {
+				tasks++
+				links++
+				dailyTotals[mealGoalTitle] += mealCount
+			}
+		}
+
+		// Morning commute (weekdays only)
+		if !isWeekend {
+			commuteMin := 25 + rand.Intn(20) // 25-45 min
+			if createTaskWithDetails(day, 8, 0, commuteMin, "Commute to Work", "🚗",
+				categories["Work"], nil, "", "", nil, isPast, nil, nil, "manual") {
+				tasks++
+			}
+		}
+	}
 
 	// =========================================================================
 	// SCENARIO 1: ONE GOAL, MULTIPLE TASKS (Hydration)
@@ -780,6 +1164,42 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		streaks[hydrationGoalTitle] = 0
 		if streaks[hydrationGoalTitle] > 0 {
 			_ = createGoalLog(ctx, db, goals[hydrationGoalTitle], "streak_broken", nil, day)
+		}
+	}
+
+	// =========================================================================
+	// MULTIPLE SNACK/DRINK LOGS (Throughout day - realistic overlaps)
+	// =========================================================================
+	if rand.Float32() < 0.6 {
+		// Mid-morning snack
+		if createTaskWithDetails(day, 10, 30, 10, "Morning Snack", "🍎",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
+		}
+	}
+	if rand.Float32() < 0.5 {
+		// Afternoon tea/snack
+		if createTaskWithDetails(day, 15, 30, 15, "Afternoon Tea", "🍵",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
+		}
+	}
+
+	// =========================================================================
+	// MICRO-BREAKS & BATHROOM BREAKS (Realistic daily interruptions)
+	// =========================================================================
+	if !isWeekend && rand.Float32() < 0.5 {
+		// Quick bathroom/stretch break
+		if createTaskWithDetails(day, 10+rand.Intn(6), 0, 5, "Quick Break", "🚶",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
+		}
+	}
+	if !isWeekend && rand.Float32() < 0.4 {
+		// Another micro-break
+		if createTaskWithDetails(day, 14+rand.Intn(3), 0, 5, "Stretch Break", "🧘",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
 		}
 	}
 
@@ -1027,13 +1447,29 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 	}
 
 	// ---------------------------
-	// WORK TASKS (Weekdays only)
+	// WORK TASKS (Weekdays only - MUCH MORE DETAILED)
 	// ---------------------------
 	if !isWeekend {
+		// Morning email check (realistic overlap with morning)
+		if rand.Float32() < 0.7 {
+			emailDur := 15 + rand.Intn(20)
+			negatives := []map[string]any{}
+			if rand.Float32() < 0.2 {
+				negatives = []map[string]any{{"text": "Too many emails to process"}}
+			}
+			if createTaskWithDetails(day, 9, 0, emailDur, "Check Emails", "📧",
+				categories["Work"], nil, "", "", nil, isPast, nil, negatives, "quick") {
+				tasks++
+			}
+		}
+
 		// Daily Standup
 		var standupPositives, standupNegatives []map[string]any
 		if rand.Float32() < 0.2 {
 			standupPositives = []map[string]any{{"text": "Clear priorities for the day"}}
+		}
+		if rand.Float32() < 0.1 {
+			standupNegatives = []map[string]any{{"text": "Meeting ran long"}}
 		}
 
 		if createTaskWithDetails(day, 9, 30, 15, "Daily Standup", "👥", categories["Work"],
@@ -1041,51 +1477,142 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			tasks++
 		}
 
-		// Deep Work Session
-		if rand.Float32() < 0.8 {
-			minutes := float64(60 + rand.Intn(60))
+		// Slack/Teams messages throughout day (multiple quick logs)
+		slackCount := 2 + rand.Intn(4) // 2-5 Slack sessions
+		for i := 0; i < slackCount; i++ {
+			hour := 10 + i*2 + rand.Intn(2)
+			dur := 5 + rand.Intn(15)
+			if createTaskWithDetails(day, hour, 0, dur, "Team Chat", "💬",
+				categories["Work"], nil, "", "", nil, isPast, nil, nil, "quick") {
+				tasks++
+			}
+		}
+
+		// Deep Work Sessions (multiple throughout day)
+		deepWorkCount := 1 + rand.Intn(3) // 1-3 deep work sessions
+		for i := 0; i < deepWorkCount; i++ {
+			startHour := 10 + i*3
+			minutes := float64(45 + rand.Intn(75)) // 45-120 min
 			journal := ""
-			if rand.Float32() < 0.3 {
+			if rand.Float32() < 0.4 {
 				journal = randomElement([]string{
 					"Focused on feature implementation. Good progress.",
 					"Debugging session. Found and fixed the issue.",
 					"Code review and documentation updates.",
 					"Architecture planning and design work.",
+					"Refactoring legacy code. Making good improvements.",
+					"Writing tests for new features.",
+					"Performance optimization work.",
+					"API design and implementation.",
 				})
 			}
 
 			positives := []map[string]any{}
 			negatives := []map[string]any{}
-			if rand.Float32() < 0.4 {
+			if rand.Float32() < 0.5 {
 				positives = []map[string]any{{"text": randomElement([]string{
 					"Flow state achieved",
 					"Completed ahead of schedule",
 					"Clean code written",
-				})}}
+					"Tests passing",
+					"Good progress made",
+					"Solved complex problem",
+				}), "emotion_id": randomElement([]string{"emotions:E25", "emotions:E35", "emotions:E44"})}}
 			}
-			if rand.Float32() < 0.15 {
+			if rand.Float32() < 0.2 {
 				negatives = []map[string]any{{"text": randomElement([]string{
 					"Too many interruptions",
 					"Unexpected complexity",
 					"Need to revisit approach",
-				})}}
+					"Blocked by dependencies",
+					"Struggling with unclear requirements",
+				}), "emotion_id": randomElement([]string{"emotions:E52", "emotions:E61", "emotions:E71"})}}
 			}
 
-			if createTaskWithDetailsAndJournal(day, 10+rand.Intn(3), 0, int(minutes), "Deep Work Session", "🎯",
-				categories["Work"], &minutes, "units:min", "", nil, isPast, positives, negatives, journal, "template") {
+			if createTaskWithDetailsAndJournal(day, startHour, 0, int(minutes), "Deep Work Session", "🎯",
+				categories["Work"], &minutes, "units:min", "20 Hours Deep Work Weekly", goals, isPast, positives, negatives, journal, "template") {
+				tasks++
+				links++
+			}
+		}
+
+		// Code Reviews (realistic for developers)
+		if rand.Float32() < 0.6 {
+			dur := 20 + rand.Intn(40)
+			positives := []map[string]any{}
+			if rand.Float32() < 0.3 {
+				positives = []map[string]any{{"text": "Caught important issues"}}
+			}
+			if createTaskWithDetails(day, 14+rand.Intn(3), 0, dur, "Code Review", "🔍",
+				categories["Work"], nil, "", "", nil, isPast, positives, nil, "manual") {
 				tasks++
 			}
 		}
 
-		// Meetings (1-3 per day)
-		numMeetings := rand.Intn(3) + 1
+		// Meetings (2-4 per day with variety)
+		numMeetings := 2 + rand.Intn(3)
+		meetingTypes := []struct {
+			title, icon string
+			emotions    []string
+		}{
+			{"Team Sync", "👥", []string{"emotions:E15", "emotions:E25"}},
+			{"1:1 Meeting", "🤝", []string{"emotions:E25", "emotions:E35"}},
+			{"Project Review", "📊", []string{"emotions:E44", "emotions:E52"}},
+			{"Planning Session", "📋", []string{"emotions:E15", "emotions:E44"}},
+			{"Client Call", "📞", []string{"emotions:E52", "emotions:E25"}},
+			{"Sprint Planning", "🎯", []string{"emotions:E15", "emotions:E44"}},
+			{"Retrospective", "🔄", []string{"emotions:E15", "emotions:E25"}},
+			{"Tech Discussion", "💡", []string{"emotions:E44", "emotions:E35"}},
+		}
+
 		for i := 0; i < numMeetings; i++ {
 			hour := 11 + i*2 + rand.Intn(2)
 			dur := 30 + rand.Intn(30)
-			title := randomElement([]string{"Team Sync", "1:1 Meeting", "Project Review", "Planning Session", "Client Call"})
+			meeting := meetingTypes[rand.Intn(len(meetingTypes))]
 
-			if createTaskWithDetails(day, hour, 0, dur, title, "📅", categories["Work"],
-				nil, "", "", nil, isPast, nil, nil, "manual") {
+			positives := []map[string]any{}
+			negatives := []map[string]any{}
+			var emotionID string
+
+			if rand.Float32() < 0.3 {
+				positives = []map[string]any{{"text": randomElement([]string{
+					"Productive discussion",
+					"Clear action items",
+					"Good collaboration",
+					"Made important decisions",
+				})}}
+				emotionID = meeting.emotions[0]
+			}
+			if rand.Float32() < 0.15 {
+				negatives = []map[string]any{{"text": randomElement([]string{
+					"Meeting could have been an email",
+					"Ran over time",
+					"Off-topic discussions",
+					"No clear outcomes",
+				})}}
+				emotionID = "emotions:E61"
+			}
+
+			if createTaskWithEmotionAndReflections(day, hour, 0, dur, meeting.title, meeting.icon,
+				categories["Work"], nil, "", "", nil, isPast, positives, negatives, emotionID, "manual") {
+				tasks++
+			}
+		}
+
+		// Afternoon email processing
+		if rand.Float32() < 0.6 {
+			emailDur := 10 + rand.Intn(15)
+			if createTaskWithDetails(day, 16+rand.Intn(2), 0, emailDur, "Process Emails", "📧",
+				categories["Work"], nil, "", "", nil, isPast, nil, nil, "quick") {
+				tasks++
+			}
+		}
+
+		// End of day wrap-up tasks
+		if rand.Float32() < 0.4 {
+			dur := 10 + rand.Intn(15)
+			if createTaskWithDetails(day, 17, 0, dur, "Update Task Board", "📝",
+				categories["Work"], nil, "", "", nil, isPast, nil, nil, "manual") {
 				tasks++
 			}
 		}
@@ -1131,21 +1658,149 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 	}
 
 	// ---------------------------
-	// MEDITATION / MINDFULNESS (Random days)
+	// LUNCH BREAK (Weekdays)
 	// ---------------------------
-	if rand.Float32() < 0.3 {
-		minutes := float64(10 + rand.Intn(15)) // 10-25 minutes
-		hour := 7 + rand.Intn(2)               // Morning
+	if !isWeekend && (isPast || dayOffset == 0) {
+		lunchHour := 12 + rand.Intn(2) // 12:00-14:00
+		lunchDur := 30 + rand.Intn(30) // 30-60 min
 
-		positives := []map[string]any{}
+		// Sometimes cook, sometimes eat out
 		if rand.Float32() < 0.6 {
-			positives = []map[string]any{
-				{"text": randomElement([]string{"Felt calm and centered", "Good focus today", "Mind felt clear afterwards"}), "emotion_id": "emotions:E15"},
+			mealCount := 1.0
+			if createTaskWithDetails(day, lunchHour, 0, lunchDur, "Lunch", "🍜",
+				categories["Health"], &mealCount, "units:count", "Cook Healthy Meals", goals, isPast, nil, nil, "quick") {
+				tasks++
+				links++
+			}
+		} else {
+			if createTaskWithDetails(day, lunchHour, 0, lunchDur, "Lunch Out", "🍽️",
+				categories["Personal"], nil, "", "", nil, isPast, nil, nil, "manual") {
+				tasks++
 			}
 		}
+	}
 
-		if createTaskWithDetails(day, hour, 0, int(minutes), "Morning Meditation", "🧘", categories["Personal"],
-			nil, "", "", nil, isPast, positives, nil, "template") {
+	// ---------------------------
+	// AFTERNOON BREAKS & SNACKS
+	// ---------------------------
+	if !isWeekend && rand.Float32() < 0.7 {
+		// Quick walk or break
+		if createTaskWithDetails(day, 15, 0, 15, "Afternoon Walk", "🚶",
+			categories["Health"], nil, "", "", nil, isPast, nil, nil, "manual") {
+			tasks++
+		}
+	}
+
+	// ---------------------------
+	// EVENING COMMUTE (Weekdays)
+	// ---------------------------
+	if !isWeekend && (isPast || dayOffset == 0) {
+		commuteMin := 30 + rand.Intn(25) // Evening traffic is worse
+		if createTaskWithDetails(day, 17+rand.Intn(2), 0, commuteMin, "Commute Home", "🚗",
+			categories["Work"], nil, "", "", nil, isPast, nil, nil, "manual") {
+			tasks++
+		}
+	}
+
+	// ---------------------------
+	// DINNER (Every day)
+	// ---------------------------
+	if isPast || dayOffset == 0 {
+		dinnerHour := 18 + rand.Intn(2)
+		dinnerDur := 45 + rand.Intn(30)
+
+		// Most dinners are home-cooked
+		if rand.Float32() < 0.7 {
+			mealCount := 1.0
+			positives := []map[string]any{}
+			if rand.Float32() < 0.3 {
+				positives = []map[string]any{{"text": randomElement([]string{
+					"Tried new recipe", "Family dinner", "Delicious meal", "Healthy and satisfying",
+				})}}
+			}
+
+			if createTaskWithDetails(day, dinnerHour, 0, dinnerDur, "Dinner", "🍝",
+				categories["Health"], &mealCount, "units:count", "Cook Healthy Meals", goals, isPast, positives, nil, "quick") {
+				tasks++
+				links++
+			}
+		}
+	}
+
+	// ---------------------------
+	// DAILY STEPS TRACKING
+	// ---------------------------
+	stepsGoalTitle := "Walk 10,000 Steps Daily"
+	if isPast || dayOffset == 0 {
+		// Combine all daily movement into step count
+		baseSteps := 5000.0 + float64(rand.Intn(5000)) // 5k-10k base
+		// Add bonus steps for active days
+		if dailyTotals["Exercise 30 min Daily"] > 30 || dailyTotals["Run 100km This Month"] > 0 {
+			baseSteps += float64(rand.Intn(5000)) // 0-5k bonus
+		}
+
+		steps := baseSteps
+		payload := map[string]any{
+			"title":       "Daily Steps",
+			"start_date":  day.Add(6 * time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(22 * time.Hour).Format(time.RFC3339),
+			"category_id": categories["Health"],
+			"source":      "template",
+			"goal_links": []map[string]any{{
+				"goal_id":        goals[stepsGoalTitle],
+				"impact_type":    "positive",
+				"quantity_value": steps,
+			}},
+		}
+
+		if steps >= 10000 {
+			payload["positives"] = []map[string]any{{"text": "Hit my step goal!"}}
+		}
+
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// ---------------------------
+	// SOCIAL MEDIA TRACKING (Avoidance goal)
+	// ---------------------------
+	socialMediaGoalTitle := "Limit Social Media"
+	if rand.Float32() < 0.9 { // Most days
+		minutes := float64(20 + rand.Intn(80)) // 20-100 min (sometimes exceeds limit)
+		hour := 19 + rand.Intn(3)
+
+		negatives := []map[string]any{}
+		if minutes > 60 {
+			negatives = []map[string]any{{"text": "Spent too much time scrolling"}}
+		}
+
+		if createTaskWithDetails(day, hour, 0, int(minutes), "Social Media", "📱",
+			categories["Personal"], &minutes, "units:min", socialMediaGoalTitle, goals, isPast, nil, negatives, "template") {
+			tasks++
+			links++
+		}
+	}
+
+	// ---------------------------
+	// EVENING ACTIVITIES (Various)
+	// ---------------------------
+	if rand.Float32() < 0.4 {
+		activities := []struct {
+			title, icon string
+			duration    int
+		}{
+			{"Watch TV Show", "📺", 45},
+			{"Video Games", "🎮", 60},
+			{"YouTube", "🎬", 30},
+			{"Podcast", "🎧", 40},
+			{"Journal Writing", "📝", 20},
+		}
+		activity := activities[rand.Intn(len(activities))]
+
+		if createTaskWithDetails(day, 20+rand.Intn(2), 0, activity.duration, activity.title, activity.icon,
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "manual") {
 			tasks++
 		}
 	}
@@ -1153,57 +1808,196 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 	// ---------------------------
 	// LEARNING ACTIVITIES (Weekends - online courses)
 	// ---------------------------
-	if isWeekend && rand.Float32() < 0.6 {
-		minutes := float64(45 + rand.Intn(45))
-		topics := []string{"Go Advanced Patterns", "System Design", "Cloud Architecture", "Database Optimization"}
+	learningGoalTitle := "Learn 5 Hours Weekly"
+	if isWeekend && rand.Float32() < 0.7 {
+		hours := 1.0 + rand.Float64()*2.0 // 1-3 hours
+		minutes := hours * 60
+		topics := []string{"Go Advanced Patterns", "System Design", "Cloud Architecture", "Database Optimization",
+			"React Deep Dive", "GraphQL APIs", "Kubernetes", "Security Best Practices"}
 		topic := randomElement(topics)
 
 		positives := []map[string]any{{"text": "Learned something new", "emotion_id": "emotions:E44"}}
 		journal := fmt.Sprintf("Studied: %s. Great content!", topic)
 
-		if createTaskWithDetailsAndJournal(day, 10+rand.Intn(4), 0, int(minutes),
-			fmt.Sprintf("Online Course: %s", topic), "🎓", categories["Learning"],
-			nil, "", "", nil, isPast, positives, nil, journal, "manual") {
+		payload := map[string]any{
+			"title":       fmt.Sprintf("Online Course: %s", topic),
+			"start_date":  day.Add(time.Duration(10+rand.Intn(4)) * time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(time.Duration(10+rand.Intn(4))*time.Hour + time.Duration(minutes)*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Learning"],
+			"source":      "manual",
+			"journal":     journal,
+			"positives":   positives,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals[learningGoalTitle],
+				"impact_type":    "positive",
+				"quantity_value": hours,
+			}},
+		}
+
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
 			tasks++
+			links++
 		}
 	}
 
 	// ---------------------------
-	// PERSONAL ERRANDS (Weekends)
+	// PERSONAL ERRANDS (Weekends - more variety)
 	// ---------------------------
-	if isWeekend && rand.Float32() < 0.5 {
-		errands := []string{"Grocery Shopping", "House Cleaning", "Cooking Meal Prep", "Laundry", "Car Maintenance"}
-		title := randomElement(errands)
-		dur := 30 + rand.Intn(60)
+	if isWeekend {
+		// Multiple errands per weekend day
+		numErrands := 1 + rand.Intn(3) // 1-3 errands
+		errands := []struct {
+			title, icon string
+			duration    int
+		}{
+			{"Grocery Shopping", "🛒", 60},
+			{"House Cleaning", "🧹", 90},
+			{"Cooking Meal Prep", "🍳", 120},
+			{"Laundry", "👔", 45},
+			{"Car Maintenance", "🚗", 30},
+			{"Garden Work", "🌱", 60},
+			{"Home Repairs", "🔧", 90},
+			{"Organize Closet", "📦", 60},
+		}
 
-		if createTaskWithDetails(day, 10+rand.Intn(6), 0, dur, title, "🏠", categories["Personal"],
-			nil, "", "", nil, isPast, nil, nil, "manual") {
-			tasks++
+		for i := 0; i < numErrands; i++ {
+			errand := errands[rand.Intn(len(errands))]
+			startHour := 9 + i*3 + rand.Intn(2)
+
+			if createTaskWithDetails(day, startHour, 0, errand.duration, errand.title, errand.icon,
+				categories["Personal"], nil, "", "", nil, isPast, nil, nil, "manual") {
+				tasks++
+			}
 		}
 	}
 
 	// ---------------------------
-	// SOCIAL ACTIVITIES (Occasional)
+	// HOBBY ACTIVITIES (Weekends - Multiple with different emotions)
 	// ---------------------------
-	if rand.Float32() < 0.15 {
+	if isWeekend {
+		// Morning hobby/activity
+		if rand.Float32() < 0.6 {
+			morningHobbies := []struct {
+				title, icon, emotionID string
+				duration               int
+				positives              []map[string]any
+			}{
+				{"Photography Walk", "📷", "emotions:E35", 90, []map[string]any{{"text": "Captured beautiful shots", "emotion_id": "emotions:E35"}}},
+				{"Morning Yoga", "🧘", "emotions:E15", 45, []map[string]any{{"text": "Feeling centered and calm", "emotion_id": "emotions:E15"}}},
+				{"Bike Ride", "🚴", "emotions:E44", 60, []map[string]any{{"text": "Great exercise and fresh air", "emotion_id": "emotions:E44"}}},
+				{"Farmers Market", "🥕", "emotions:E25", 75, []map[string]any{{"text": "Found fresh produce", "emotion_id": "emotions:E25"}}},
+			}
+			hobby := morningHobbies[rand.Intn(len(morningHobbies))]
+
+			if createTaskWithEmotionAndReflections(day, 8+rand.Intn(3), 0, hobby.duration, hobby.title, hobby.icon,
+				categories["Personal"], nil, "", "", nil, isPast, hobby.positives, nil, hobby.emotionID, "manual") {
+				tasks++
+			}
+		}
+
+		// Afternoon hobby (overlapping with other activities)
+		if rand.Float32() < 0.7 {
+			afternoonHobbies := []struct {
+				title, icon, emotionID string
+				duration               int
+				positives, negatives   []map[string]any
+			}{
+				{"Playing Guitar", "🎸", "emotions:E25", 60, []map[string]any{{"text": "Learned new song", "emotion_id": "emotions:E25"}}, nil},
+				{"Painting", "🎨", "emotions:E35", 120, []map[string]any{{"text": "Creative flow achieved", "emotion_id": "emotions:E35"}}, nil},
+				{"Gardening", "🌻", "emotions:E15", 75, []map[string]any{{"text": "Relaxing and productive", "emotion_id": "emotions:E15"}}, nil},
+				{"Baking", "🧁", "emotions:E44", 90, []map[string]any{{"text": "Delicious results!", "emotion_id": "emotions:E44"}}, nil},
+				{"Board Games", "🎲", "emotions:E26", 120, []map[string]any{{"text": "Fun and competitive", "emotion_id": "emotions:E26"}}, nil},
+				{"Reading Book", "📖", "emotions:E15", 90, []map[string]any{{"text": "Engaging story", "emotion_id": "emotions:E15"}}, nil},
+				{"Woodworking", "🔨", "emotions:E44", 150, []map[string]any{{"text": "Made good progress", "emotion_id": "emotions:E44"}}, []map[string]any{{"text": "Tool malfunction was frustrating", "emotion_id": "emotions:E61"}}},
+			}
+			hobby := afternoonHobbies[rand.Intn(len(afternoonHobbies))]
+
+			if createTaskWithEmotionAndReflections(day, 13+rand.Intn(4), 0, hobby.duration, hobby.title, hobby.icon,
+				categories["Personal"], nil, "", "", nil, isPast, hobby.positives, hobby.negatives, hobby.emotionID, "manual") {
+				tasks++
+			}
+		}
+
+		// Evening relaxation or entertainment (testing all emotion quadrants)
+		if rand.Float32() < 0.8 {
+			eveningActivities := []struct {
+				title, icon, emotionID string
+				duration               int
+				positives, negatives   []map[string]any
+			}{
+				// Yellow quadrant (high energy, pleasant)
+				{"Dance Party at Home", "💃", "emotions:E26", 60, []map[string]any{{"text": "High energy, felt great!", "emotion_id": "emotions:E26"}}, nil},
+				{"Exciting Movie", "🎬", "emotions:E36", 120, []map[string]any{{"text": "Edge of my seat!", "emotion_id": "emotions:E36"}}, nil},
+				// Green quadrant (low energy, pleasant)
+				{"Relaxing Bath", "🛁", "emotions:E05", 45, []map[string]any{{"text": "Very relaxing", "emotion_id": "emotions:E05"}}, nil},
+				{"Calm Documentary", "📺", "emotions:E15", 90, []map[string]any{{"text": "Interesting and peaceful", "emotion_id": "emotions:E15"}}, nil},
+				// Red quadrant (high energy, unpleasant) - occasional stressful activities
+				{"Intense Horror Movie", "😱", "emotions:E86", 110, nil, []map[string]any{{"text": "Too scary, couldn't sleep", "emotion_id": "emotions:E86"}}},
+				{"Argued about Plans", "😤", "emotions:E73", 30, nil, []map[string]any{{"text": "Disagreement with partner", "emotion_id": "emotions:E73"}}},
+				// Blue quadrant (low energy, unpleasant) - occasional down time
+				{"Feeling Lonely", "😔", "emotions:E95", 60, nil, []map[string]any{{"text": "Missing friends", "emotion_id": "emotions:E95"}}},
+				{"Bored Scrolling", "📱", "emotions:E85", 45, nil, []map[string]any{{"text": "Wasted time scrolling", "emotion_id": "emotions:E85"}}},
+			}
+			activity := eveningActivities[rand.Intn(len(eveningActivities))]
+
+			if createTaskWithEmotionAndReflections(day, 19+rand.Intn(3), 0, activity.duration, activity.title, activity.icon,
+				categories["Personal"], nil, "", "", nil, isPast, activity.positives, activity.negatives, activity.emotionID, "manual") {
+				tasks++
+			}
+		}
+	}
+
+	// ---------------------------
+	// SOCIAL ACTIVITIES (Link to weekly social goal)
+	// ---------------------------
+	socialGoalTitle := "Connect with Friends Weekly"
+	socialChance := float32(0.25)
+	if isWeekend {
+		socialChance = 0.4 // Higher on weekends
+	}
+
+	if rand.Float32() < socialChance {
 		activities := []struct {
 			title, icon string
+			duration    int
 		}{
-			{"Dinner with Friends", "🍽️"},
-			{"Movie Night", "🎬"},
-			{"Phone Call with Family", "📱"},
-			{"Game Night", "🎮"},
+			{"Dinner with Friends", "🍽️", 120},
+			{"Movie Night", "🎬", 150},
+			{"Phone Call with Family", "📞", 45},
+			{"Game Night", "🎮", 180},
+			{"Coffee with Friend", "☕", 90},
+			{"Video Call", "💻", 60},
+			{"Party", "🎉", 180},
+			{"Brunch", "🥞", 120},
 		}
 		activity := activities[rand.Intn(len(activities))]
 		hour := 18 + rand.Intn(3)
-		dur := 60 + rand.Intn(120)
+		if isWeekend {
+			hour = 11 + rand.Intn(8) // More flexible timing on weekends
+		}
 
 		positives := []map[string]any{{"text": "Quality time with loved ones", "emotion_id": "emotions:E16"}}
 		emotionID := randomElement([]string{"emotions:E25", "emotions:E26", "emotions:E35", "emotions:E36"})
 
-		if createTaskWithEmotionAndReflections(day, hour, 0, dur, activity.title, activity.icon,
-			categories["Personal"], nil, "", "", nil, isPast, positives, nil, emotionID, "manual") {
+		socialCount := 1.0
+		payload := map[string]any{
+			"title":       activity.title,
+			"start_date":  day.Add(time.Duration(hour) * time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(time.Duration(hour)*time.Hour + time.Duration(activity.duration)*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Personal"],
+			"source":      "manual",
+			"emotion_id":  emotionID,
+			"positives":   positives,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals[socialGoalTitle],
+				"impact_type":    "positive",
+				"quantity_value": socialCount,
+			}},
+		}
+
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
 			tasks++
+			links++
 		}
 	}
 
@@ -1222,6 +2016,376 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			&qty, "units:count", "Stay Smoke-Free", goals, negatives) {
 			tasks++
 			links++
+		}
+	}
+
+	// =========================================================================
+	// NEW CATEGORIES & GOALS - REALISTIC DAILY LIFE
+	// =========================================================================
+
+	// FAMILY ACTIVITIES (Sundays and random)
+	if day.Weekday() == time.Sunday && rand.Float32() < 0.8 {
+		familyCount := 1.0
+		positives := []map[string]any{
+			{"text": "Quality time together", "emotion_id": "emotions:E25"},
+			{"text": "Good conversations", "emotion_id": "emotions:E35"},
+		}
+		payload := map[string]any{
+			"title":       "Family Dinner",
+			"start_date":  day.Add(18*time.Hour + 30*time.Minute).Format(time.RFC3339),
+			"end_date":    day.Add(20 * time.Hour).Format(time.RFC3339),
+			"category_id": categories["Family"],
+			"source":      "manual",
+			"emotion_id":  "emotions:E25",
+			"positives":   positives,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals["Weekly Family Dinner"],
+				"impact_type":    "positive",
+				"quantity_value": familyCount,
+			}},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// Call parents weekly (randomized during week)
+	if rand.Float32() < 0.15 {
+		callCount := 1.0
+		dur := 20 + rand.Intn(40) // 20-60 min calls
+		positives := []map[string]any{{"text": "Caught up on family news", "emotion_id": "emotions:E25"}}
+
+		payload := map[string]any{
+			"title":       "Call with Parents",
+			"start_date":  day.Add(time.Duration(19+rand.Intn(3))*time.Hour + 15*time.Minute).Format(time.RFC3339),
+			"end_date":    day.Add(time.Duration(19+rand.Intn(3))*time.Hour + time.Duration(15+dur)*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Family"],
+			"source":      "manual",
+			"emotion_id":  "emotions:E15",
+			"positives":   positives,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals["Call Parents Weekly"],
+				"impact_type":    "positive",
+				"quantity_value": callCount,
+			}},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// HOBBIES - Guitar practice
+	if rand.Float32() < 0.4 {
+		practiceCount := 1.0
+		minutes := 30.0 + float64(rand.Intn(30)) // 30-60 min
+		positives := []map[string]any{{"text": randomElement([]string{
+			"Learned new chord progression",
+			"Nailed that difficult part",
+			"Felt in the zone",
+			"Making progress on song",
+		}), "emotion_id": "emotions:E35"}}
+
+		payload := map[string]any{
+			"title":       "Guitar Practice",
+			"start_date":  day.Add(time.Duration(19+rand.Intn(3))*time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(time.Duration(19+rand.Intn(3))*time.Hour + time.Duration(minutes)*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Hobbies"],
+			"source":      "manual",
+			"emotion_id":  "emotions:E35",
+			"positives":   positives,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals["Practice Guitar 3x Weekly"],
+				"impact_type":    "positive",
+				"quantity_value": practiceCount,
+			}},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// HOME - Weekly deep clean (Saturdays)
+	if day.Weekday() == time.Saturday && rand.Float32() < 0.7 {
+		cleanCount := 1.0
+		dur := 90 + rand.Intn(60) // 90-150 min
+		positives := []map[string]any{{"text": "House feels fresh and organized", "emotion_id": "emotions:E15"}}
+		negatives := []map[string]any{}
+		if rand.Float32() < 0.3 {
+			negatives = []map[string]any{{"text": "Exhausting work", "emotion_id": "emotions:E72"}}
+		}
+
+		payload := map[string]any{
+			"title":       "Deep Clean House",
+			"start_date":  day.Add(time.Duration(10+rand.Intn(3))*time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(time.Duration(10+rand.Intn(3))*time.Hour + time.Duration(dur)*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Home"],
+			"source":      "manual",
+			"emotion_id":  "emotions:E15",
+			"positives":   positives,
+			"negatives":   negatives,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals["Deep Clean Home Weekly"],
+				"impact_type":    "positive",
+				"quantity_value": cleanCount,
+			}},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// FITNESS - Strength training (3x week)
+	if !isWeekend && rand.Float32() < 0.4 {
+		workoutCount := 1.0
+		minutes := 45.0 + float64(rand.Intn(30)) // 45-75 min
+
+		// Complex task with MULTIPLE reflections (5+ items)
+		positives := []map[string]any{
+			{"text": "Hit new PR on squats!", "emotion_id": "emotions:E35"},
+			{"text": "Felt strong throughout", "emotion_id": "emotions:E44"},
+			{"text": "Good form maintained", "emotion_id": "emotions:E25"},
+		}
+		negatives := []map[string]any{}
+		if rand.Float32() < 0.2 {
+			negatives = []map[string]any{
+				{"text": "Gym was crowded", "emotion_id": "emotions:E61"},
+			}
+		}
+
+		payload := map[string]any{
+			"title":       "Strength Training",
+			"start_date":  day.Add(time.Duration(17+rand.Intn(2))*time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(time.Duration(17+rand.Intn(2))*time.Hour + time.Duration(minutes)*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Fitness"],
+			"source":      "manual",
+			"emotion_id":  "emotions:E44",
+			"positives":   positives,
+			"negatives":   negatives,
+			"goal_links": []map[string]any{
+				{
+					"goal_id":        goals["Strength Training 3x Week"],
+					"impact_type":    "positive",
+					"quantity_value": workoutCount,
+				},
+				{
+					"goal_id":        goals["Exercise 30 min Daily"],
+					"impact_type":    "positive",
+					"quantity_value": minutes,
+				},
+			},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links += 2
+		}
+	}
+
+	// MINDFULNESS - Daily gratitude journal
+	if rand.Float32() < 0.6 {
+		gratitudeCount := 1.0
+		// Complex journal entry with multiple things
+		journal := randomElement([]string{
+			"Grateful for: 1) Healthy body 2) Supportive family 3) Meaningful work",
+			"Today I'm thankful for: 1) Morning coffee 2) Good conversation with friend 3) Beautiful weather",
+			"Three blessings: 1) My health 2) Roof over my head 3) Opportunities to learn",
+			"Gratitude list: 1) Progress on goals 2) Kind words from colleague 3) Peaceful evening",
+		})
+
+		payload := map[string]any{
+			"title":       "Gratitude Journaling",
+			"start_date":  day.Add(21*time.Hour + 30*time.Minute).Format(time.RFC3339),
+			"end_date":    day.Add(21*time.Hour + 40*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Mindfulness"],
+			"source":      "manual",
+			"journal":     journal,
+			"emotion_id":  "emotions:E15",
+			"goal_links": []map[string]any{{
+				"goal_id":        goals["Gratitude Journal Daily"],
+				"impact_type":    "positive",
+				"quantity_value": gratitudeCount,
+			}},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// FINANCE - Expense tracking (daily)
+	if rand.Float32() < 0.8 {
+		expenseCount := 1.0
+		spent := 20.0 + float64(rand.Intn(100)) // Random daily spending
+		note := fmt.Sprintf("Tracked $%.2f in expenses today", spent)
+
+		payload := map[string]any{
+			"title":       "Daily Expense Log",
+			"start_date":  day.Add(20 * time.Hour).Format(time.RFC3339),
+			"end_date":    day.Add(20*time.Hour + 10*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Finance"],
+			"source":      "quick",
+			"note":        note,
+			"goal_links": []map[string]any{{
+				"goal_id":        goals["Track Expenses Daily"],
+				"impact_type":    "positive",
+				"quantity_value": expenseCount,
+			}},
+		}
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links++
+		}
+	}
+
+	// =========================================================================
+	// EDGE CASES & SPECIAL SCENARIOS (Testing all features)
+	// =========================================================================
+
+	// Task with NO CATEGORY (edge case)
+	if rand.Float32() < 0.1 {
+		if createTaskWithDetails(day, 12+rand.Intn(8), 0, 10, "Random Thought", "💭",
+			"", nil, "", "", nil, isPast, nil, nil, "manual") {
+			tasks++
+		}
+	}
+
+	// Task with MANY reflections (both positives and negatives)
+	if rand.Float32() < 0.15 {
+		manyPositives := []map[string]any{
+			{"text": "First positive thing", "emotion_id": "emotions:E25"},
+			{"text": "Second positive thing", "emotion_id": "emotions:E35"},
+			{"text": "Third positive thing", "emotion_id": "emotions:E44"},
+		}
+		manyNegatives := []map[string]any{
+			{"text": "First challenge", "emotion_id": "emotions:E61"},
+			{"text": "Second frustration", "emotion_id": "emotions:E71"},
+		}
+		if createTaskWithDetails(day, 14, 0, 120, "Complex Mixed-Emotion Event", "🎭",
+			categories["Personal"], nil, "", "", nil, isPast, manyPositives, manyNegatives, "manual") {
+			tasks++
+		}
+	}
+
+	// Very SHORT task (< 5 minutes)
+	if rand.Float32() < 0.3 {
+		shortTasks := []string{"Quick Note", "Take Pill", "Check Weather", "Set Reminder"}
+		title := randomElement(shortTasks)
+		if createTaskWithDetails(day, 8+rand.Intn(12), 0, 1+rand.Intn(3), title, "⚡",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
+		}
+	}
+
+	// Very LONG task (4+ hours)
+	if rand.Float32() < 0.1 {
+		longTasks := []struct {
+			title, icon string
+			duration    int
+		}{
+			{"Long Drive to Visit Family", "🚗", 240},
+			{"All-Day Workshop", "📚", 360},
+			{"Home Renovation Project", "🔨", 300},
+			{"Marathon Gaming Session", "🎮", 480},
+		}
+		longTask := longTasks[rand.Intn(len(longTasks))]
+
+		journal := "This took much longer than expected, but it was worth it."
+		positives := []map[string]any{{"text": "Accomplished something big"}}
+
+		if createTaskWithDetailsAndJournal(day, 10, 0, longTask.duration, longTask.title, longTask.icon,
+			categories["Personal"], nil, "", "", nil, isPast, positives, nil, journal, "manual") {
+			tasks++
+		}
+	}
+
+	// OVERLAPPING concurrent tasks (multitasking - realistic scenario)
+	if rand.Float32() < 0.2 {
+		// Start background task (like laundry) while doing something else
+		if createTaskWithDetails(day, 10, 0, 90, "Laundry Running", "🧺",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
+		}
+		// Do another task at same time
+		if createTaskWithDetails(day, 10, 15, 45, "Clean Kitchen While Waiting", "🧹",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "manual") {
+			tasks++
+		}
+	}
+
+	// Task with LONG journal entry (testing journal field)
+	if rand.Float32() < 0.1 {
+		longJournal := `Today was a reflective day. I spent time thinking about my goals and where I'm heading.
+
+There were several insights that came to mind:
+1. I need to be more intentional with my time
+2. Quality over quantity in relationships
+3. Regular exercise really does improve my mood
+
+I also realized that I've been too hard on myself lately. Progress is not always linear, and that's okay.
+The important thing is to keep moving forward, even if it's just small steps.
+
+Looking forward to tomorrow with a renewed sense of purpose.`
+
+		positives := []map[string]any{{"text": "Gained clarity and perspective", "emotion_id": "emotions:E15"}}
+
+		if createTaskWithDetailsAndJournal(day, 21, 0, 30, "Evening Reflection & Journaling", "📔",
+			categories["Personal"], nil, "", "", nil, isPast, positives, nil, longJournal, "manual") {
+			tasks++
+		}
+	}
+
+	// Task linking to MULTIPLE goals (already done with running, but adding more variety)
+	if rand.Float32() < 0.1 && !isWeekend {
+		// Lunch walk - counts for steps AND social if with colleague
+		steps := 2000.0 + float64(rand.Intn(1000))
+		socialCount := 1.0
+
+		payload := map[string]any{
+			"title":       "Walking Meeting with Colleague",
+			"start_date":  day.Add(12*time.Hour + 30*time.Minute).Format(time.RFC3339),
+			"end_date":    day.Add(12*time.Hour + 50*time.Minute).Format(time.RFC3339),
+			"category_id": categories["Work"],
+			"source":      "manual",
+			"goal_links": []map[string]any{
+				{
+					"goal_id":        goals["Walk 10,000 Steps Daily"],
+					"impact_type":    "positive",
+					"quantity_value": steps,
+				},
+				{
+					"goal_id":        goals["Connect with Friends Weekly"],
+					"impact_type":    "positive",
+					"quantity_value": socialCount,
+				},
+			},
+		}
+
+		if _, err := apiRequest("POST", "/tasks", payload); err == nil {
+			tasks++
+			links += 2
+		}
+	}
+
+	// Task with NO emotion (testing optional field)
+	if rand.Float32() < 0.3 {
+		// Just a plain activity log without emotion tracking
+		if createTaskWithDetails(day, 16+rand.Intn(4), 0, 15, "Water Plants", "🌱",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "quick") {
+			tasks++
+		}
+	}
+
+	// Future task with NO start time yet (planning ahead)
+	if !isPast && dayOffset > 0 && rand.Float32() < 0.3 {
+		futurePlans := []string{"Doctor Appointment", "Car Service", "Dentist", "Hair Cut"}
+		title := randomElement(futurePlans)
+
+		if createTaskWithDetails(day, 10+rand.Intn(6), 0, 60, title, "📅",
+			categories["Personal"], nil, "", "", nil, false, nil, nil, "manual") {
+			tasks++
 		}
 	}
 

@@ -802,566 +802,6 @@
                         />
                     </div>
                 </Card>
-            </div>
-
-            <!-- Right Column: Meta Fields (1/3 width on desktop) -->
-            <div class="space-y-4">
-                <!-- Category -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-200 hover:shadow-md"
-                >
-                    <div class="flex items-center gap-2 mb-3">
-                        <Tag class="w-4 h-4 opacity-50" />
-                        <span class="text-xs font-semibold uppercase opacity-50"
-                            >Category</span
-                        >
-                    </div>
-                    {#if showNewCategory}
-                        <div class="space-y-3">
-                            <input
-                                type="text"
-                                bind:value={newCategoryName}
-                                placeholder="Category name"
-                                class={cn(
-                                    "input input-sm input-bordered w-full transition-all duration-200",
-                                    newCategoryName.length > 40 &&
-                                        "input-error",
-                                )}
-                                maxlength={40}
-                            />
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs opacity-60">Color</span>
-                                <label
-                                    class="flex items-center gap-2 cursor-pointer"
-                                >
-                                    <span class="text-xs opacity-60"
-                                        >Custom</span
-                                    >
-                                    <input
-                                        type="checkbox"
-                                        class="toggle toggle-xs toggle-primary"
-                                        bind:checked={useCustomCategoryColor}
-                                    />
-                                </label>
-                            </div>
-                            <ColorPicker
-                                bind:value={newCategoryColor}
-                                customMode={useCustomCategoryColor}
-                                size="sm"
-                            />
-                            <div class="flex gap-2">
-                                <button
-                                    class="btn btn-sm btn-primary flex-1 gap-1 transition-all duration-200 hover:shadow-md"
-                                    onclick={handleCreateCategory}
-                                    disabled={$createCategoryMut.isPending ||
-                                        !newCategoryName.trim()}
-                                >
-                                    {#if $createCategoryMut.isPending}
-                                        <span
-                                            class="loading loading-spinner loading-xs"
-                                        ></span>
-                                    {:else}
-                                        <Check class="w-3.5 h-3.5" />
-                                    {/if}
-                                    Create
-                                </button>
-                                <button
-                                    class="btn btn-sm btn-ghost transition-all duration-200 hover:bg-base-200"
-                                    onclick={() => (showNewCategory = false)}
-                                    >Cancel</button
-                                >
-                            </div>
-                        </div>
-                    {:else}
-                        <CategoryDropdown
-                            {categories}
-                            bind:value={categoryId}
-                            placeholder="Select category..."
-                            showCreateButton={true}
-                            onCreate={() => (showNewCategory = true)}
-                        />
-                    {/if}
-                </Card>
-
-                <!-- Schedule -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-200 hover:shadow-md"
-                >
-                    <div class="flex items-center gap-2 mb-3">
-                        <Calendar class="w-4 h-4 opacity-50" />
-                        <span class="text-xs font-semibold uppercase opacity-50"
-                            >Schedule</span
-                        >
-                    </div>
-
-                    <div
-                        class="bg-base-100 rounded-lg border border-base-300 p-3 space-y-3"
-                    >
-                        <!-- Quick toggles (only in create mode) -->
-                        {#if !isEditing}
-                            <div
-                                class="flex flex-wrap gap-2 pb-2 border-b border-base-200"
-                            >
-                                {#if lastTaskEndTime}
-                                    <label
-                                        class="flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            class="toggle toggle-xs toggle-primary"
-                                            bind:checked={useLastTaskStart}
-                                        />
-                                        <span
-                                            class="text-xs {useLastTaskStart
-                                                ? 'text-primary font-medium'
-                                                : 'opacity-60'}"
-                                        >
-                                            From last task
-                                        </span>
-                                    </label>
-                                {/if}
-                                <label
-                                    class="flex items-center gap-2 cursor-pointer ml-auto"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        class="toggle toggle-xs toggle-success"
-                                        bind:checked={liveEndTime}
-                                    />
-                                    <span
-                                        class="text-xs flex items-center gap-1 {liveEndTime
-                                            ? 'text-success font-medium'
-                                            : 'opacity-60'}"
-                                    >
-                                        {#if liveEndTime}
-                                            <span
-                                                class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
-                                            ></span>
-                                        {/if}
-                                        End at Now
-                                    </span>
-                                </label>
-                            </div>
-                        {/if}
-
-                        <div class="space-y-3">
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="start-date"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50"
-                                            >Start Date</span
-                                        >
-                                    </label>
-                                    <input
-                                        id="start-date"
-                                        type="date"
-                                        bind:value={startDate}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
-                                        disabled={useLastTaskStart}
-                                    />
-                                </div>
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="end-date"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50"
-                                            >End Date</span
-                                        >
-                                    </label>
-                                    <input
-                                        id="end-date"
-                                        type="date"
-                                        bind:value={endDate}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
-                                            ? 'input-success'
-                                            : ''}"
-                                        disabled={liveEndTime}
-                                    />
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="start-time"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50 flex items-center gap-1"
-                                        >
-                                            <Clock class="w-3 h-3" /> From
-                                        </span>
-                                    </label>
-                                    <input
-                                        id="start-time"
-                                        type="time"
-                                        step="1"
-                                        bind:value={startTime}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
-                                        disabled={useLastTaskStart}
-                                    />
-                                </div>
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="end-time"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50 flex items-center gap-1"
-                                        >
-                                            <Clock class="w-3 h-3" /> To
-                                            {#if liveEndTime}
-                                                <span
-                                                    class="badge badge-xs badge-success"
-                                                    >LIVE</span
-                                                >
-                                            {/if}
-                                        </span>
-                                    </label>
-                                    <input
-                                        id="end-time"
-                                        type="time"
-                                        step="1"
-                                        bind:value={endTime}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
-                                            ? 'input-success font-mono'
-                                            : ''}"
-                                        disabled={liveEndTime}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-
-                <!-- Priority -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-200 hover:shadow-md"
-                >
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                            <CircleAlert class="w-4 h-4 opacity-50" />
-                            <span
-                                class="text-xs font-semibold uppercase opacity-50"
-                                >Priority</span
-                            >
-                        </div>
-                        <span
-                            class={cn(
-                                "badge badge-sm",
-                                priorityColors[priority],
-                            )}>{priorityLabels[priority]}</span
-                        >
-                    </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="5"
-                        bind:value={priority}
-                        class="range range-sm range-primary transition-all duration-200"
-                        step="1"
-                    />
-                    <div
-                        class="flex justify-between text-[10px] px-1 mt-1.5 opacity-50"
-                    >
-                        {#each priorityLabels as label}
-                            <span class="text-center min-w-0 flex-1"
-                                >{label}</span
-                            >
-                        {/each}
-                    </div>
-                </Card>
-
-                <!-- Goals Section -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-200 hover:shadow-md"
-                >
-                    <GoalSelector
-                        value={goalLinks}
-                        onChange={(links) => (goalLinks = links)}
-                    />
-                </Card>
-
-                <!-- Emotion Section - Redesigned -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-300 hover:shadow-lg overflow-visible"
-                >
-                    <div class="flex items-center gap-2 mb-4">
-                        <Heart class="w-4 h-4 opacity-50" />
-                        <span class="text-xs font-semibold uppercase opacity-50"
-                            >Feeling</span
-                        >
-                    </div>
-
-                    <!-- Two-column display: Selected | Inferred -->
-                    <div class="grid grid-cols-1 gap-3">
-                        <!-- User Selected Emotion -->
-                        <div class="relative">
-                            <div
-                                class="text-[10px] uppercase font-semibold text-base-content/40 mb-2 flex items-center gap-1.5"
-                            >
-                                <span>Your Selection</span>
-                            </div>
-
-                            {#if selectedEmotion}
-                                {@const colors =
-                                    QUADRANT_COLORS[
-                                        selectedEmotion.quadrant as Quadrant
-                                    ]}
-                                {@const meta =
-                                    QUADRANT_META[
-                                        selectedEmotion.quadrant as Quadrant
-                                    ]}
-
-                                <div
-                                    class="tooltip tooltip-bottom w-full"
-                                    data-tip={selectedEmotion.description}
-                                >
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div
-                                        class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer group/card relative overflow-hidden border"
-                                        style="
-                                                background: linear-gradient(135deg, 
-                                                    color-mix(in srgb, {colors.primary} 12%, var(--b1)) 0%, 
-                                                    color-mix(in srgb, {colors.secondary} 8%, var(--b1)) 100%);
-                                                border-color: color-mix(in srgb, {colors.primary} 25%, transparent);
-                                            "
-                                        onclick={openEmotionForTask}
-                                        onkeydown={(e) =>
-                                            e.key === "Enter" &&
-                                            openEmotionForTask()}
-                                        role="button"
-                                        tabindex="0"
-                                    >
-                                        <!-- Background glow on hover -->
-                                        <div
-                                            class="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
-                                            style="background: radial-gradient(circle at 30% 50%, {colors.glow}, transparent 60%);"
-                                        ></div>
-
-                                        <!-- Emoji -->
-                                        <div
-                                            class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md group-hover/card:scale-110 transition-transform duration-300 relative z-10"
-                                            style="background: {colors.gradient};"
-                                        >
-                                            <OpenMoji
-                                                emoji={selectedEmotion.emoji}
-                                                alt={selectedEmotion.name}
-                                                size="md"
-                                            />
-                                        </div>
-
-                                        <!-- Info -->
-                                        <div
-                                            class="flex-1 min-w-0 text-left relative z-10"
-                                        >
-                                            <div
-                                                class="flex items-center gap-2"
-                                            >
-                                                <span
-                                                    class="text-sm font-bold truncate"
-                                                    style="color: {colors.secondary};"
-                                                >
-                                                    {selectedEmotion.name}
-                                                </span>
-                                                <span
-                                                    class="badge badge-xs font-bold uppercase tracking-wider px-1.5 shrink-0"
-                                                    style="background: {colors.primary}; color: white; border: none;"
-                                                >
-                                                    ✓
-                                                </span>
-                                            </div>
-                                            <div
-                                                class="text-[10px] opacity-60 mt-0.5"
-                                            >
-                                                {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
-                                            </div>
-                                        </div>
-
-                                        <!-- Clear button -->
-                                        <button
-                                            class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors relative z-10 opacity-0 group-hover/card:opacity-100"
-                                            onclick={(e) => {
-                                                e.stopPropagation();
-                                                clearTaskEmotion();
-                                            }}
-                                            title="Remove"
-                                        >
-                                            <X
-                                                class="w-4 h-4 opacity-60 hover:opacity-100"
-                                            />
-                                        </button>
-                                    </div>
-                                </div>
-                            {:else}
-                                <!-- Empty State -->
-                                <button
-                                    class="w-full rounded-xl border-2 border-dashed border-base-300 p-4 flex items-center justify-center gap-3 hover:border-primary hover:bg-primary/5 transition-all duration-300 text-base-content/50 hover:text-primary group/empty"
-                                    onclick={openEmotionForTask}
-                                >
-                                    <div
-                                        class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center group-hover/empty:bg-primary/20 transition-colors duration-300"
-                                    >
-                                        <Heart
-                                            class="w-5 h-5 group-hover/empty:scale-110 transition-transform duration-300"
-                                        />
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-sm font-semibold"
-                                            >Select Emotion</span
-                                        >
-                                        <p class="text-xs opacity-60">
-                                            How are you feeling?
-                                        </p>
-                                    </div>
-                                    <Plus
-                                        class="w-5 h-5 ml-auto opacity-40 group-hover/empty:opacity-100 transition-opacity"
-                                    />
-                                </button>
-                            {/if}
-                        </div>
-
-                        <!-- Inferred Emotion (side by side feel) -->
-                        {#if inferringEmotion || inferredEmotion || inferenceError}
-                            <div class="relative">
-                                <div
-                                    class="text-[10px] uppercase font-semibold text-primary/70 mb-2 flex items-center gap-1.5"
-                                >
-                                    <Sparkles
-                                        class="w-3 h-3 text-primary {inferringEmotion
-                                            ? 'animate-pulse'
-                                            : ''}"
-                                    />
-                                    <span>Suggested</span>
-                                    <div
-                                        class="tooltip tooltip-right cursor-help normal-case"
-                                        data-tip="Based on your reflections"
-                                    >
-                                        <Info class="w-3 h-3 text-primary/50" />
-                                    </div>
-                                    {#if inferringEmotion}
-                                        <span
-                                            class="loading loading-spinner loading-xs text-primary"
-                                        ></span>
-                                    {/if}
-                                </div>
-
-                                {#if inferenceError}
-                                    <!-- Error State -->
-                                    <div
-                                        class="w-full rounded-xl p-2.5 flex items-center gap-2 bg-error/10 border border-error/30"
-                                    >
-                                        <CircleAlert
-                                            class="w-4 h-4 text-error shrink-0"
-                                        />
-                                        <span class="text-xs text-error"
-                                            >{inferenceError}</span
-                                        >
-                                    </div>
-                                {:else if inferringEmotion}
-                                    <!-- Loading State -->
-                                    <div
-                                        class="w-full rounded-xl p-2.5 flex items-center gap-3 bg-base-200 border border-base-300 animate-pulse"
-                                    >
-                                        <div
-                                            class="w-9 h-9 rounded-lg bg-base-300"
-                                        ></div>
-                                        <div class="flex-1">
-                                            <div
-                                                class="h-3 bg-base-300 rounded w-24 mb-1"
-                                            ></div>
-                                            <div
-                                                class="h-2 bg-base-300 rounded w-32"
-                                            ></div>
-                                        </div>
-                                    </div>
-                                {:else if inferredEmotion}
-                                    {@const inferredQuadrant =
-                                        (inferredEmotionFull?.quadrant ||
-                                            inferredEmotion.quadrant ||
-                                            "green") as Quadrant}
-                                    {@const colors =
-                                        QUADRANT_COLORS[inferredQuadrant]}
-                                    {@const meta =
-                                        QUADRANT_META[inferredQuadrant]}
-                                    <!-- Emotion Display -->
-
-                                    <div
-                                        class="tooltip tooltip-bottom w-full"
-                                        data-tip={inferredEmotionFull?.description ||
-                                            "Calculated from your reflections"}
-                                    >
-                                        <button
-                                            class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
-                                            style="
-                                                background: linear-gradient(135deg,
-                                                    color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%,
-                                                    color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
-                                                border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
-                                            "
-                                            onclick={openEmotionForSuggested}
-                                        >
-                                            <!-- Emoji -->
-                                            <div
-                                                class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
-                                                style="background: {colors.gradient}; opacity: 0.9;"
-                                            >
-                                                {#if inferredEmotionFull}
-                                                    <OpenMoji
-                                                        emoji={inferredEmotionFull.emoji}
-                                                        alt={inferredEmotionFull?.name ||
-                                                            "Inferred Emotion"}
-                                                        size="md"
-                                                    />
-                                                {:else}
-                                                    <Sparkles
-                                                        class="w-4 h-4 text-white/80"
-                                                    />
-                                                {/if}
-                                            </div>
-
-                                            <!-- Info -->
-                                            <div
-                                                class="flex-1 min-w-0 text-left"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-2"
-                                                >
-                                                    <span
-                                                        class="text-sm font-semibold opacity-80"
-                                                    >
-                                                        {inferredEmotionFull?.name ||
-                                                            "Suggesting..."}
-                                                    </span>
-                                                </div>
-                                                <div
-                                                    class="text-[10px] opacity-50 mt-0.5"
-                                                >
-                                                    {meta?.energyLabel} Energy •
-                                                    {meta?.pleasantnessLabel}
-                                                </div>
-                                            </div>
-
-                                            <ChevronRight
-                                                class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
-                                            />
-                                        </button>
-                                    </div>
-                                {/if}
-                            </div>
-                        {/if}
-                    </div>
-                </Card>
 
                 <!-- Reflection Section - Redesigned -->
                 <Card
@@ -1812,6 +1252,566 @@
                                 {/each}
                             </div>
                         {/if}
+                    </div>
+                </Card>
+            </div>
+
+            <!-- Right Column: Meta Fields (1/3 width on desktop) -->
+            <div class="space-y-4">
+                <!-- Category -->
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
+                    <div class="flex items-center gap-2 mb-3">
+                        <Tag class="w-4 h-4 opacity-50" />
+                        <span class="text-xs font-semibold uppercase opacity-50"
+                            >Category</span
+                        >
+                    </div>
+                    {#if showNewCategory}
+                        <div class="space-y-3">
+                            <input
+                                type="text"
+                                bind:value={newCategoryName}
+                                placeholder="Category name"
+                                class={cn(
+                                    "input input-sm input-bordered w-full transition-all duration-200",
+                                    newCategoryName.length > 40 &&
+                                        "input-error",
+                                )}
+                                maxlength={40}
+                            />
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs opacity-60">Color</span>
+                                <label
+                                    class="flex items-center gap-2 cursor-pointer"
+                                >
+                                    <span class="text-xs opacity-60"
+                                        >Custom</span
+                                    >
+                                    <input
+                                        type="checkbox"
+                                        class="toggle toggle-xs toggle-primary"
+                                        bind:checked={useCustomCategoryColor}
+                                    />
+                                </label>
+                            </div>
+                            <ColorPicker
+                                bind:value={newCategoryColor}
+                                customMode={useCustomCategoryColor}
+                                size="sm"
+                            />
+                            <div class="flex gap-2">
+                                <button
+                                    class="btn btn-sm btn-primary flex-1 gap-1 transition-all duration-200 hover:shadow-md"
+                                    onclick={handleCreateCategory}
+                                    disabled={$createCategoryMut.isPending ||
+                                        !newCategoryName.trim()}
+                                >
+                                    {#if $createCategoryMut.isPending}
+                                        <span
+                                            class="loading loading-spinner loading-xs"
+                                        ></span>
+                                    {:else}
+                                        <Check class="w-3.5 h-3.5" />
+                                    {/if}
+                                    Create
+                                </button>
+                                <button
+                                    class="btn btn-sm btn-ghost transition-all duration-200 hover:bg-base-200"
+                                    onclick={() => (showNewCategory = false)}
+                                    >Cancel</button
+                                >
+                            </div>
+                        </div>
+                    {:else}
+                        <CategoryDropdown
+                            {categories}
+                            bind:value={categoryId}
+                            placeholder="Select category..."
+                            showCreateButton={true}
+                            onCreate={() => (showNewCategory = true)}
+                        />
+                    {/if}
+                </Card>
+
+                <!-- Emotion Section - Redesigned -->
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-300 hover:shadow-lg overflow-visible"
+                >
+                    <div class="flex items-center gap-2 mb-4">
+                        <Heart class="w-4 h-4 opacity-50" />
+                        <span class="text-xs font-semibold uppercase opacity-50"
+                            >Feeling</span
+                        >
+                    </div>
+
+                    <!-- Two-column display: Selected | Inferred -->
+                    <div class="grid grid-cols-1 gap-3">
+                        <!-- User Selected Emotion -->
+                        <div class="relative">
+                            <div
+                                class="text-[10px] uppercase font-semibold text-base-content/40 mb-2 flex items-center gap-1.5"
+                            >
+                                <span>Your Selection</span>
+                            </div>
+
+                            {#if selectedEmotion}
+                                {@const colors =
+                                    QUADRANT_COLORS[
+                                        selectedEmotion.quadrant as Quadrant
+                                    ]}
+                                {@const meta =
+                                    QUADRANT_META[
+                                        selectedEmotion.quadrant as Quadrant
+                                    ]}
+
+                                <div
+                                    class="tooltip tooltip-bottom w-full"
+                                    data-tip={selectedEmotion.description}
+                                >
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                    <div
+                                        class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer group/card relative overflow-hidden border"
+                                        style="
+                                                background: linear-gradient(135deg, 
+                                                    color-mix(in srgb, {colors.primary} 12%, var(--b1)) 0%, 
+                                                    color-mix(in srgb, {colors.secondary} 8%, var(--b1)) 100%);
+                                                border-color: color-mix(in srgb, {colors.primary} 25%, transparent);
+                                            "
+                                        onclick={openEmotionForTask}
+                                        onkeydown={(e) =>
+                                            e.key === "Enter" &&
+                                            openEmotionForTask()}
+                                        role="button"
+                                        tabindex="0"
+                                    >
+                                        <!-- Background glow on hover -->
+                                        <div
+                                            class="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
+                                            style="background: radial-gradient(circle at 30% 50%, {colors.glow}, transparent 60%);"
+                                        ></div>
+
+                                        <!-- Emoji -->
+                                        <div
+                                            class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md group-hover/card:scale-110 transition-transform duration-300 relative z-10"
+                                            style="background: {colors.gradient};"
+                                        >
+                                            <OpenMoji
+                                                emoji={selectedEmotion.emoji}
+                                                alt={selectedEmotion.name}
+                                                size="md"
+                                            />
+                                        </div>
+
+                                        <!-- Info -->
+                                        <div
+                                            class="flex-1 min-w-0 text-left relative z-10"
+                                        >
+                                            <div
+                                                class="flex items-center gap-2"
+                                            >
+                                                <span
+                                                    class="text-sm font-bold truncate"
+                                                    style="color: {colors.secondary};"
+                                                >
+                                                    {selectedEmotion.name}
+                                                </span>
+                                                <span
+                                                    class="badge badge-xs font-bold uppercase tracking-wider px-1.5 shrink-0"
+                                                    style="background: {colors.primary}; color: white; border: none;"
+                                                >
+                                                    ✓
+                                                </span>
+                                            </div>
+                                            <div
+                                                class="text-[10px] opacity-60 mt-0.5"
+                                            >
+                                                {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
+                                            </div>
+                                        </div>
+
+                                        <!-- Clear button -->
+                                        <button
+                                            class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors relative z-10 opacity-0 group-hover/card:opacity-100"
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                clearTaskEmotion();
+                                            }}
+                                            title="Remove"
+                                        >
+                                            <X
+                                                class="w-4 h-4 opacity-60 hover:opacity-100"
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            {:else}
+                                <!-- Empty State -->
+                                <button
+                                    class="w-full rounded-xl border-2 border-dashed border-base-300 p-4 flex items-center justify-center gap-3 hover:border-primary hover:bg-primary/5 transition-all duration-300 text-base-content/50 hover:text-primary group/empty"
+                                    onclick={openEmotionForTask}
+                                >
+                                    <div
+                                        class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center group-hover/empty:bg-primary/20 transition-colors duration-300"
+                                    >
+                                        <Heart
+                                            class="w-5 h-5 group-hover/empty:scale-110 transition-transform duration-300"
+                                        />
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-sm font-semibold"
+                                            >Select Emotion</span
+                                        >
+                                        <p class="text-xs opacity-60">
+                                            How are you feeling?
+                                        </p>
+                                    </div>
+                                    <Plus
+                                        class="w-5 h-5 ml-auto opacity-40 group-hover/empty:opacity-100 transition-opacity"
+                                    />
+                                </button>
+                            {/if}
+                        </div>
+
+                        <!-- Inferred Emotion (side by side feel) -->
+                        {#if inferringEmotion || inferredEmotion || inferenceError}
+                            <div class="relative">
+                                <div
+                                    class="text-[10px] uppercase font-semibold text-primary/70 mb-2 flex items-center gap-1.5"
+                                >
+                                    <Sparkles
+                                        class="w-3 h-3 text-primary {inferringEmotion
+                                            ? 'animate-pulse'
+                                            : ''}"
+                                    />
+                                    <span>Suggested</span>
+                                    <div
+                                        class="tooltip tooltip-right cursor-help normal-case"
+                                        data-tip="Based on your reflections"
+                                    >
+                                        <Info class="w-3 h-3 text-primary/50" />
+                                    </div>
+                                    {#if inferringEmotion}
+                                        <span
+                                            class="loading loading-spinner loading-xs text-primary"
+                                        ></span>
+                                    {/if}
+                                </div>
+
+                                {#if inferenceError}
+                                    <!-- Error State -->
+                                    <div
+                                        class="w-full rounded-xl p-2.5 flex items-center gap-2 bg-error/10 border border-error/30"
+                                    >
+                                        <CircleAlert
+                                            class="w-4 h-4 text-error shrink-0"
+                                        />
+                                        <span class="text-xs text-error"
+                                            >{inferenceError}</span
+                                        >
+                                    </div>
+                                {:else if inferringEmotion}
+                                    <!-- Loading State -->
+                                    <div
+                                        class="w-full rounded-xl p-2.5 flex items-center gap-3 bg-base-200 border border-base-300 animate-pulse"
+                                    >
+                                        <div
+                                            class="w-9 h-9 rounded-lg bg-base-300"
+                                        ></div>
+                                        <div class="flex-1">
+                                            <div
+                                                class="h-3 bg-base-300 rounded w-24 mb-1"
+                                            ></div>
+                                            <div
+                                                class="h-2 bg-base-300 rounded w-32"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                {:else if inferredEmotion}
+                                    {@const inferredQuadrant =
+                                        (inferredEmotionFull?.quadrant ||
+                                            inferredEmotion.quadrant ||
+                                            "green") as Quadrant}
+                                    {@const colors =
+                                        QUADRANT_COLORS[inferredQuadrant]}
+                                    {@const meta =
+                                        QUADRANT_META[inferredQuadrant]}
+                                    <!-- Emotion Display -->
+
+                                    <div
+                                        class="tooltip tooltip-bottom w-full"
+                                        data-tip={inferredEmotionFull?.description ||
+                                            "Calculated from your reflections"}
+                                    >
+                                        <button
+                                            class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
+                                            style="
+                                                background: linear-gradient(135deg,
+                                                    color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%,
+                                                    color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
+                                                border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
+                                            "
+                                            onclick={openEmotionForSuggested}
+                                        >
+                                            <!-- Emoji -->
+                                            <div
+                                                class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
+                                                style="background: {colors.gradient}; opacity: 0.9;"
+                                            >
+                                                {#if inferredEmotionFull}
+                                                    <OpenMoji
+                                                        emoji={inferredEmotionFull.emoji}
+                                                        alt={inferredEmotionFull?.name ||
+                                                            "Inferred Emotion"}
+                                                        size="md"
+                                                    />
+                                                {:else}
+                                                    <Sparkles
+                                                        class="w-4 h-4 text-white/80"
+                                                    />
+                                                {/if}
+                                            </div>
+
+                                            <!-- Info -->
+                                            <div
+                                                class="flex-1 min-w-0 text-left"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <span
+                                                        class="text-sm font-semibold opacity-80"
+                                                    >
+                                                        {inferredEmotionFull?.name ||
+                                                            "Suggesting..."}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="text-[10px] opacity-50 mt-0.5"
+                                                >
+                                                    {meta?.energyLabel} Energy •
+                                                    {meta?.pleasantnessLabel}
+                                                </div>
+                                            </div>
+
+                                            <ChevronRight
+                                                class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
+                                            />
+                                        </button>
+                                    </div>
+                                {/if}
+                            </div>
+                        {/if}
+                    </div>
+                </Card>
+
+                <!-- Schedule -->
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
+                    <div class="flex items-center gap-2 mb-3">
+                        <Calendar class="w-4 h-4 opacity-50" />
+                        <span class="text-xs font-semibold uppercase opacity-50"
+                            >Schedule</span
+                        >
+                    </div>
+
+                    <div
+                        class="bg-base-100 rounded-lg border border-base-300 p-3 space-y-3"
+                    >
+                        <!-- Quick toggles (only in create mode) -->
+                        {#if !isEditing}
+                            <div
+                                class="flex flex-wrap gap-2 pb-2 border-b border-base-200"
+                            >
+                                {#if lastTaskEndTime}
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="toggle toggle-xs toggle-primary"
+                                            bind:checked={useLastTaskStart}
+                                        />
+                                        <span
+                                            class="text-xs {useLastTaskStart
+                                                ? 'text-primary font-medium'
+                                                : 'opacity-60'}"
+                                        >
+                                            From last task
+                                        </span>
+                                    </label>
+                                {/if}
+                                <label
+                                    class="flex items-center gap-2 cursor-pointer ml-auto"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="toggle toggle-xs toggle-success"
+                                        bind:checked={liveEndTime}
+                                    />
+                                    <span
+                                        class="text-xs flex items-center gap-1 {liveEndTime
+                                            ? 'text-success font-medium'
+                                            : 'opacity-60'}"
+                                    >
+                                        {#if liveEndTime}
+                                            <span
+                                                class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
+                                            ></span>
+                                        {/if}
+                                        End at Now
+                                    </span>
+                                </label>
+                            </div>
+                        {/if}
+
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="start-date"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50"
+                                            >Start Date</span
+                                        >
+                                    </label>
+                                    <input
+                                        id="start-date"
+                                        type="date"
+                                        bind:value={startDate}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
+                                        disabled={useLastTaskStart}
+                                    />
+                                </div>
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="end-date"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50"
+                                            >End Date</span
+                                        >
+                                    </label>
+                                    <input
+                                        id="end-date"
+                                        type="date"
+                                        bind:value={endDate}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
+                                            ? 'input-success'
+                                            : ''}"
+                                        disabled={liveEndTime}
+                                    />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="start-time"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50 flex items-center gap-1"
+                                        >
+                                            <Clock class="w-3 h-3" /> From
+                                        </span>
+                                    </label>
+                                    <input
+                                        id="start-time"
+                                        type="time"
+                                        step="1"
+                                        bind:value={startTime}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
+                                        disabled={useLastTaskStart}
+                                    />
+                                </div>
+                                <div class="form-control">
+                                    <label
+                                        class="label py-0 pb-1"
+                                        for="end-time"
+                                    >
+                                        <span
+                                            class="label-text text-xs opacity-50 flex items-center gap-1"
+                                        >
+                                            <Clock class="w-3 h-3" /> To
+                                            {#if liveEndTime}
+                                                <span
+                                                    class="badge badge-xs badge-success"
+                                                    >LIVE</span
+                                                >
+                                            {/if}
+                                        </span>
+                                    </label>
+                                    <input
+                                        id="end-time"
+                                        type="time"
+                                        step="1"
+                                        bind:value={endTime}
+                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
+                                            ? 'input-success font-mono'
+                                            : ''}"
+                                        disabled={liveEndTime}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+
+                <!-- Goals Section -->
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
+                    <GoalSelector
+                        value={goalLinks}
+                        onChange={(links) => (goalLinks = links)}
+                    />
+                </Card>
+
+                <!-- Priority -->
+                <Card
+                    variant="bordered"
+                    class="transition-all duration-200 hover:shadow-md"
+                >
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <CircleAlert class="w-4 h-4 opacity-50" />
+                            <span
+                                class="text-xs font-semibold uppercase opacity-50"
+                                >Priority</span
+                            >
+                        </div>
+                        <span
+                            class={cn(
+                                "badge badge-sm",
+                                priorityColors[priority],
+                            )}>{priorityLabels[priority]}</span
+                        >
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        bind:value={priority}
+                        class="range range-sm range-primary transition-all duration-200"
+                        step="1"
+                    />
+                    <div
+                        class="flex justify-between text-[10px] px-1 mt-1.5 opacity-50"
+                    >
+                        {#each priorityLabels as label}
+                            <span class="text-center min-w-0 flex-1"
+                                >{label}</span
+                            >
+                        {/each}
                     </div>
                 </Card>
             </div>
