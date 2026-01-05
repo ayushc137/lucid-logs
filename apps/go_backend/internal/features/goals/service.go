@@ -54,6 +54,10 @@ type Service interface {
 
 	// UpdateCategory updates the category for a goal.
 	UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error
+
+	// RecordCompletion updates the denormalized streak fields when a goal/habit is completed.
+	// This should be called when a goal entry is marked as met or when a task contributes to a goal.
+	RecordCompletion(ctx context.Context, goalID, userID string, completedDate time.Time) error
 }
 
 // TemplateCreator is an interface for creating templates.
@@ -402,6 +406,91 @@ func (s *service) UpdateCategory(ctx context.Context, goalID, categoryID, userID
 		Str("goal_id", goalID).
 		Str("category_id", categoryID).
 		Msg("goal category updated")
+
+	return nil
+}
+
+// =============================================================================
+// STREAK MANAGEMENT (Denormalized/Materialized Fields)
+// =============================================================================
+
+// RecordCompletion updates the denormalized streak fields when a goal/habit is completed.
+// This is the "materialized view" pattern - we compute streaks on write rather than read.
+func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, completedDate time.Time) error {
+	goal, err := s.repo.FindByID(ctx, goalID, userID)
+	if err != nil {
+		return err
+	}
+
+	// Normalize to date only (no time component)
+	completedDate = completedDate.Truncate(24 * time.Hour)
+
+	// Calculate new streak values
+	newStreak := goal.CurrentStreak
+	longestStreak := goal.LongestStreak
+
+	// Determine the expected previous completion date based on recurrence
+	var expectedPrevDate time.Time
+	if goal.Recurrence != nil {
+		switch goal.Recurrence.Period {
+		case "day":
+			expectedPrevDate = completedDate.AddDate(0, 0, -goal.Recurrence.Frequency)
+		case "week":
+			expectedPrevDate = completedDate.AddDate(0, 0, -7*goal.Recurrence.Frequency)
+		case "month":
+			expectedPrevDate = completedDate.AddDate(0, -goal.Recurrence.Frequency, 0)
+		default:
+			expectedPrevDate = completedDate.AddDate(0, 0, -1) // Default to daily
+		}
+
+		// Add grace days if configured
+		if goal.Recurrence.GraceDays > 0 {
+			expectedPrevDate = expectedPrevDate.AddDate(0, 0, -goal.Recurrence.GraceDays)
+		}
+	} else {
+		// Non-recurring goal - just count completions
+		expectedPrevDate = completedDate.AddDate(0, 0, -1)
+	}
+
+	// Check if this continues the streak or starts a new one
+	if goal.LastCompletedDate != nil {
+		lastDate := goal.LastCompletedDate.Truncate(24 * time.Hour)
+
+		// Same day - don't increment
+		if lastDate.Equal(completedDate) {
+			// Already completed today, no streak change
+			return nil
+		}
+
+		// Check if within expected window (continues streak)
+		if lastDate.After(expectedPrevDate) || lastDate.Equal(expectedPrevDate) {
+			newStreak++
+		} else {
+			// Gap too large - streak broken, start new
+			newStreak = 1
+		}
+	} else {
+		// First completion ever
+		newStreak = 1
+	}
+
+	// Update longest streak if current beats it
+	if newStreak > longestStreak {
+		longestStreak = newStreak
+	}
+
+	// Persist the denormalized streak fields
+	if err := s.repo.UpdateStreaks(ctx, goalID, newStreak, longestStreak, &completedDate); err != nil {
+		s.logger.Error().Err(err).Str("goal_id", goalID).Msg("failed to update streaks")
+		return err
+	}
+
+	s.logger.Info().
+		Str("goal_id", goalID).
+		Int("current_streak", newStreak).
+		Int("longest_streak", longestStreak).
+		Time("completed_date", completedDate).
+		Msg("goal completion recorded, streaks updated")
 
 	return nil
 }

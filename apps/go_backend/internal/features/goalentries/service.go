@@ -165,7 +165,19 @@ func (s *service) Create(ctx context.Context, goalID, userID string, req *Create
 		if req.TaskIDs != nil {
 			updateReq.TaskIDs = req.TaskIDs
 		}
-		return s.repo.Update(ctx, existing.ID, updateReq)
+		entry, err := s.repo.Update(ctx, existing.ID, updateReq)
+		if err != nil {
+			return nil, err
+		}
+
+		// Update streaks if this entry is now met
+		if req.Met {
+			if err := s.goalSvc.RecordCompletion(ctx, goalID, userID, date); err != nil {
+				s.logger.Warn().Err(err).Str("goal_id", goalID).Msg("failed to update streaks")
+			}
+		}
+
+		return entry, nil
 	}
 
 	// Create new entry
@@ -180,6 +192,14 @@ func (s *service) Create(ctx context.Context, goalID, userID string, req *Create
 		Str("goal_id", goalID).
 		Bool("met", req.Met).
 		Msg("entry created")
+
+	// Update streaks if entry is marked as met (denormalized/materialized view pattern)
+	if req.Met {
+		if err := s.goalSvc.RecordCompletion(ctx, goalID, userID, date); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", goalID).Msg("failed to update streaks")
+			// Don't fail entry creation for streak update failure
+		}
+	}
 
 	// Log goal progress if measurable
 	if goal.Target != nil && req.Value != nil {

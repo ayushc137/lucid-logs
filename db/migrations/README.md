@@ -1,54 +1,66 @@
 # Database Migrations
 
-Simple migration files for SurrealDB. All migrations are idempotent (safe to run multiple times).
+This directory contains two migration files for Lucid Logs.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| 001_core.surql | Users, categories, tasks tables + indexes |
-| 002_task_emotions.surql | Edge table for emotion analytics |
+| `001_schema.surql` | Complete schema: all tables, indexes, and relations |
+| `002_seed_emotions.surql` | Seed 100 emotions reference data |
 
-## Run Migrations
+## How to Apply
 
+### Apply all migrations:
 ```bash
-# Run all migrations (same namespace/database as Go app)
-cat db/migrations/*.surql | surreal sql \
-  --endpoint http://localhost:8000 \
-  --username <username> --password <pass> \
-  --namespace daily_journal --database core \
-  --hide-welcome
-
-# Or run specific migration
-cat db/migrations/001_core.surql | surreal sql \
-  --endpoint http://localhost:8000 \
-  --username <username> --password <pass> \
-  --namespace daily_journal --database core \
-  --hide-welcome
+surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/001_schema.surql
+surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/002_seed_emotions.surql
 ```
 
-## Architecture
+### Or use the consolidated schema file:
+```bash
+surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/schema.surql
+```
 
-**Schemaless Tables**: We only define indexes for performance - data itself is flexible.
+## Schema Design
 
-**Record Links**: Tasks link to categories via `task.category = categories:abc123`
+### Schemaless + Essential Indexes
+- Tables auto-create fields on insert (no schema definitions)
+- Only define tables for permissions and indexes
+- TYPE RELATION for graph edges (provides in/out validation)
 
-**PERMISSIONS FULL**: The Go service handles authorization in code via `created_by` filters.
+### Denormalized Fields (Materialized View Pattern)
+Pre-computed values stored on records, updated on write:
 
-## Query Examples
+| Table | Fields | When Updated |
+|-------|--------|--------------|
+| `goals` | `current_streak`, `longest_streak`, `last_completed_date` | Goal entry marked met |
+
+### Graph Relations
+
+| Relation | Type | Notes |
+|----------|------|-------|
+| `task_emotions` | Explicit | Has type validation |
+| `task_goals` | Explicit | Has impact/milestone fields |
+| `goal_logs` | Explicit | Event history |
+| `in_category` | Auto | Created on RELATE |
+| `goal_children` | Auto | Created on RELATE |
+| `created_from` | Auto | Created on RELATE |
+| `template_goals` | Auto | Created on RELATE |
+
+## Quick Reference
 
 ```sql
+-- Goal with linked tasks
+SELECT *, 
+  (SELECT * FROM task_goals WHERE out = $parent.id) as linked_tasks 
+FROM goals:abc
+
 -- Task with category
-SELECT *, category.* FROM tasks:id FETCH category
+SELECT *,
+  (SELECT out FROM in_category WHERE in = $parent.id)[0].out as category
+FROM tasks:xyz
 
--- Task's emotions
-SELECT ->task_emotions.* FROM tasks:abc
-
--- All tasks with emotion E16
-SELECT <-task_emotions<-tasks.* FROM "E16"
-
--- Emotion frequency
-SELECT out as emotion, count() FROM task_emotions 
-WHERE in.created_by = $user GROUP BY out
+-- All tasks for a goal
+SELECT <-task_goals<-tasks.* FROM goals:abc
 ```
-

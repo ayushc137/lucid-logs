@@ -791,13 +791,18 @@ func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, use
 func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*GoalStats, error) {
 	gID := database.MustRecordID(Table, goalID)
 
-	// Get goal first
+	// Get goal first (includes denormalized streak fields)
 	goal, err := r.FindByID(ctx, goalID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	stats := &GoalStats{}
+	stats := &GoalStats{
+		// Use denormalized streak values from goal record (materialized view pattern)
+		CurrentStreak:     goal.CurrentStreak,
+		LongestStreak:     goal.LongestStreak,
+		LastCompletedDate: goal.LastCompletedDate,
+	}
 
 	// Sum quantity values from task_goals
 	sumResult, err := database.QueryFirst[struct {
@@ -818,11 +823,11 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		stats.TotalContributions = sumResult.Count
 	}
 
-	// Calculate progress percentage
+	// Calculate progress percentage and today status
 	if goal.Target != nil && goal.Target.Value > 0 {
 		stats.ProgressPercent = (stats.CurrentValue / goal.Target.Value) * 100
 
-		// Determine today status
+		// Determine today status based on operator
 		switch goal.Target.Operator {
 		case OperatorGTE:
 			if stats.CurrentValue >= goal.Target.Value {
