@@ -19,7 +19,6 @@ import (
 	"github.com/lucid-logs/go-backend/internal/features/auth"
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
-	"github.com/lucid-logs/go-backend/internal/features/goalentries"
 	"github.com/lucid-logs/go-backend/internal/features/goallogs"
 	"github.com/lucid-logs/go-backend/internal/features/goals"
 	"github.com/lucid-logs/go-backend/internal/features/health"
@@ -148,11 +147,6 @@ func NewRouter(cfg Config) *gin.Engine {
 			templateCreator := templates.NewGoalTemplateCreator(templateRepo)
 			goalService := goals.NewService(goalRepo, templateCreator)
 			goals.RegisterRoutes(protected.Group("/goals"), goalService, cfg.Validator)
-
-			// Goal Entry routes (nested under goals)
-			goalEntryRepo := goalentries.NewRepository(cfg.DB)
-			goalEntryService := goalentries.NewService(goalEntryRepo, goalRepo, goalService)
-			goalentries.RegisterRoutes(protected.Group("/goals/:id/entries"), goalEntryService, cfg.Validator)
 
 			// Goal Logs routes (nested under goals)
 			goalLogsRepo := goallogs.NewRepository(cfg.DB)

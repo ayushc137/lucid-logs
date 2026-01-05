@@ -673,6 +673,11 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	// Sync emotion edges for analytics (async-safe, errors logged not returned)
 	r.syncEmotionEdges(ctx, taskIDStr, req.EmotionID, positives, negatives)
 
+	// Sync goal edges (async-safe)
+	if len(req.GoalLinks) > 0 {
+		r.syncGoalEdges(ctx, taskIDStr, req.GoalLinks)
+	}
+
 	// Fetch and return the created task (with category hydrated)
 	return r.FindByID(ctx, taskIDStr, userID)
 }
@@ -820,6 +825,14 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	// Sync emotion edges for analytics (async-safe, errors logged not returned)
 	if req.Positives != nil || req.Negatives != nil || emotionChanged {
 		r.syncEmotionEdges(ctx, id, finalEmotionID, finalPositives, finalNegatives)
+	}
+
+	// Sync goal edges if provided
+	// Note: Client must send ALL current links as this replaces them
+	// If GoalLinks is nil, we don't touch existing links (partial update)
+	// To clear links, send empty array
+	if req.GoalLinks != nil {
+		r.syncGoalEdges(ctx, id, *req.GoalLinks)
 	}
 
 	// Fetch and return updated task with category hydrated
@@ -1054,5 +1067,74 @@ func convertQuantityInput(input *QuantityInput) *Quantity {
 	return &Quantity{
 		Value:  input.Value,
 		UnitID: input.UnitID,
+	}
+}
+
+// =============================================================================
+// GOAL EDGE SYNC
+// =============================================================================
+
+// syncGoalEdges creates graph edges linking task to goals.
+func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []GoalLinkInput) {
+	// Delete existing edges for this task
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE task_goals WHERE in = type::thing($task_id)
+	`, map[string]any{
+		"task_id": database.MustRecordID(Table, taskID),
+	})
+	if err != nil {
+		r.logger.Warn().Err(err).Str("task_id", taskID).Msg("failed to delete old goal edges")
+	}
+
+	// Create new edges
+	for _, link := range links {
+		r.createGoalEdge(ctx, taskID, link)
+	}
+}
+
+// createGoalEdge creates a single task -> goal edge.
+func (r *repository) createGoalEdge(ctx context.Context, taskID string, link GoalLinkInput) {
+	data := map[string]any{
+		"impact_type":      link.ImpactType,
+		"impact_magnitude": link.ImpactMagnitude,
+		"is_milestone":     link.IsMilestone,
+	}
+
+	if link.QuantityValue > 0 {
+		data["quantity_value"] = link.QuantityValue
+	}
+	if link.MilestoneLabel != "" {
+		data["milestone_label"] = link.MilestoneLabel
+	}
+	if link.MilestoneOrder > 0 {
+		data["milestone_order"] = link.MilestoneOrder
+	}
+	if link.Notes != "" {
+		data["notes"] = link.Notes
+	}
+
+	// Default impact type if missing
+	if link.ImpactType == "" {
+		data["impact_type"] = "neutral"
+	}
+	// Default magnitude if missing or invalid
+	if link.ImpactMagnitude < 1 {
+		data["impact_magnitude"] = 3
+	}
+
+	// RELATE task -> task_goals -> goal
+	_, err := database.QueryAll[any](ctx, r.db, `
+		RELATE $task_id->task_goals->$goal_id CONTENT $data
+	`, map[string]any{
+		"task_id": database.MustRecordID(Table, taskID),
+		"goal_id": database.NewRecordID("goals", link.GoalID),
+		"data":    data,
+	})
+	if err != nil {
+		r.logger.Warn().
+			Err(err).
+			Str("task_id", taskID).
+			Str("goal_id", link.GoalID).
+			Msg("failed to create goal edge")
 	}
 }

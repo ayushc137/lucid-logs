@@ -50,11 +50,6 @@ DEFINE INDEX IF NOT EXISTS idx_goals_status ON TABLE goals COLUMNS created_by, s
 DEFINE INDEX IF NOT EXISTS idx_goals_deleted ON TABLE goals COLUMNS created_by, deleted_at;
 DEFINE INDEX IF NOT EXISTS idx_goals_priority ON TABLE goals COLUMNS created_by, priority;
 
--- GOAL_ENTRIES (daily habit tracking)
-DEFINE TABLE IF NOT EXISTS goal_entries PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_goal_entries_goal_date ON TABLE goal_entries COLUMNS goal_id, date UNIQUE;
-DEFINE INDEX IF NOT EXISTS idx_goal_entries_goal ON TABLE goal_entries COLUMNS goal_id;
-
 -- GOAL_SNAPSHOTS (point-in-time state for history)
 DEFINE TABLE IF NOT EXISTS goal_snapshots PERMISSIONS FULL;
 DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_goal ON TABLE goal_snapshots COLUMNS goal_id;
@@ -128,13 +123,36 @@ DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_
 
 
 -- =============================================================================
--- AUTO-CREATED RELATIONS (no schema needed - created on RELATE)
 -- =============================================================================
--- in_category:     any -> categories     (universal category linking)
--- goal_children:   goals -> goals        (parent-child hierarchy)
--- created_from:    tasks -> templates    (task origin tracking)
--- template_goals:  templates -> goals    (template-goal linking)
+-- EXPLICIT RELATION TABLES (Optimized)
+-- =============================================================================
 
+-- IN_CATEGORY (Universal category linking)
+-- Maps: tasks/goals/templates -> categories
+DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | templates OUT categories PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_at ON in_category TYPE datetime DEFAULT time::now();
+-- Index for finding all items in a category (e.g. "Values" page)
+DEFINE INDEX IF NOT EXISTS idx_in_category_out ON TABLE in_category COLUMNS out;
+-- Index for checking category of an item quickly (if not traversing)
+DEFINE INDEX IF NOT EXISTS idx_in_category_in ON TABLE in_category COLUMNS in;
+
+-- GOAL_CHILDREN (Parent -> Child hierarchy)
+DEFINE TABLE IF NOT EXISTS goal_children TYPE RELATION IN goals OUT goals PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS order ON goal_children TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS required ON goal_children TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS created_at ON goal_children TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_goal_children_parent ON TABLE goal_children COLUMNS in, order;
+
+-- CREATED_FROM (Task -> Template origin)
+DEFINE TABLE IF NOT EXISTS created_from TYPE RELATION IN tasks OUT templates PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_at ON created_from TYPE datetime DEFAULT time::now();
+-- Index for template usage stats (how many tasks created from this template?)
+DEFINE INDEX IF NOT EXISTS idx_created_from_template ON TABLE created_from COLUMNS out;
+
+-- TEMPLATE_GOALS (Template -> Goal auto-linking)
+DEFINE TABLE IF NOT EXISTS template_goals TYPE RELATION IN templates OUT goals PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS auto_link_tasks ON template_goals TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS created_at ON template_goals TYPE datetime DEFAULT time::now();
 
 -- =============================================================================
 -- END SCHEMA

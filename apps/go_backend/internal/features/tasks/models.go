@@ -176,16 +176,17 @@ type GoalLinkInput struct {
 //
 // @Description Request payload for updating a task
 type UpdateRequest struct {
-	Title     *string        `json:"title,omitempty" validate:"omitempty,min=1,max=500"`
-	Journal   *string        `json:"journal,omitempty" validate:"omitempty,max=10000"`
-	StartDate *string        `json:"start_date,omitempty" validate:"omitempty,datetime_flexible"`
-	EndDate   *string        `json:"end_date,omitempty" validate:"omitempty,datetime_flexible"`
-	Completed *bool          `json:"completed,omitempty"`
-	Note      *string        `json:"note,omitempty" validate:"omitempty,max=5000"`
-	Positives []TaskItem     `json:"positives,omitempty"`
-	Negatives []TaskItem     `json:"negatives,omitempty"`
-	EmotionID *string        `json:"emotion_id,omitempty" validate:"omitempty,emotion_id"`
-	Quantity  *QuantityInput `json:"quantity,omitempty"`
+	Title     *string          `json:"title,omitempty" validate:"omitempty,min=1,max=500"`
+	Journal   *string          `json:"journal,omitempty" validate:"omitempty,max=10000"`
+	StartDate *string          `json:"start_date,omitempty" validate:"omitempty,datetime_flexible"`
+	EndDate   *string          `json:"end_date,omitempty" validate:"omitempty,datetime_flexible"`
+	Completed *bool            `json:"completed,omitempty"`
+	Note      *string          `json:"note,omitempty" validate:"omitempty,max=5000"`
+	Positives []TaskItem       `json:"positives,omitempty"`
+	Negatives []TaskItem       `json:"negatives,omitempty"`
+	EmotionID *string          `json:"emotion_id,omitempty" validate:"omitempty,emotion_id"`
+	Quantity  *QuantityInput   `json:"quantity,omitempty"`
+	GoalLinks *[]GoalLinkInput `json:"goal_links,omitempty"`
 }
 
 // LinkGoalRequest is the request for linking a task to a goal.

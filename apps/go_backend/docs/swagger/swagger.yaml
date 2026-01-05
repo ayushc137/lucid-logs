@@ -575,82 +575,6 @@ definitions:
     - CodeInternalError
     - CodeDatabaseError
     - CodeServiceError
-  goalentries.CreateRequest:
-    description: Request payload for creating a goal entry
-    properties:
-      date:
-        example: "2025-12-13"
-        type: string
-      met:
-        example: true
-        type: boolean
-      notes:
-        maxLength: 1000
-        type: string
-      task_ids:
-        items:
-          type: string
-        type: array
-      value:
-        example: 1.5
-        type: number
-    required:
-    - date
-    type: object
-  goalentries.EntrySummary:
-    properties:
-      met_days:
-        type: integer
-      missed_days:
-        type: integer
-      success_rate:
-        description: met / total * 100
-        type: number
-      total_days:
-        type: integer
-      total_value:
-        type: number
-    type: object
-  goalentries.GoalEntry:
-    properties:
-      created_at:
-        description: Metadata
-        type: string
-      date:
-        description: The date this entry is for (YYYY-MM-DD, time component ignored)
-        type: string
-      goal_id:
-        type: string
-      id:
-        type: string
-      met:
-        description: Was the target met for this period?
-        type: boolean
-      notes:
-        description: Optional notes
-        type: string
-      task_ids:
-        description: Task IDs that contributed to this entry
-        items:
-          type: string
-        type: array
-      updated_at:
-        type: string
-      value:
-        description: Actual value achieved (for measurable goals)
-        type: number
-    type: object
-  goalentries.GoalEntryListResponse:
-    properties:
-      entries:
-        items:
-          $ref: '#/definitions/goalentries.GoalEntry'
-        type: array
-      goal_id:
-        type: string
-      summary:
-        $ref: '#/definitions/goalentries.EntrySummary'
-    type: object
   goals.AddChildRequest:
     description: Request for adding a child to a grouped goal
     properties:
@@ -1679,6 +1603,10 @@ definitions:
         type: string
       end_date:
         type: string
+      goal_links:
+        items:
+          $ref: '#/definitions/tasks.GoalLinkInput'
+        type: array
       journal:
         maxLength: 10000
         type: string
@@ -2576,97 +2504,6 @@ paths:
       summary: Create goal
       tags:
       - goals
-  /api/v1/goals/{goalId}/entries:
-    get:
-      description: Get entries for a goal within a date range
-      parameters:
-      - description: Goal ID
-        in: path
-        name: goalId
-        required: true
-        type: string
-      - description: Start date (YYYY-MM-DD)
-        in: query
-        name: start_date
-        required: true
-        type: string
-      - description: End date (YYYY-MM-DD)
-        in: query
-        name: end_date
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/goalentries.GoalEntryListResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: List goal entries
-      tags:
-      - goal-entries
-    post:
-      consumes:
-      - application/json
-      description: Create or update a daily entry for a goal
-      parameters:
-      - description: Goal ID
-        in: path
-        name: goalId
-        required: true
-        type: string
-      - description: Entry data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/goalentries.CreateRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/goalentries.GoalEntry'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Log goal entry
-      tags:
-      - goal-entries
   /api/v1/goals/{id}:
     delete:
       description: Soft delete a goal
