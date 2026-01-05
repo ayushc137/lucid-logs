@@ -1550,6 +1550,15 @@ func randomElement(items []string) string {
 
 // createGoalLog simulates the goal logic creating a log entry
 func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, changes map[string]any, createdAt time.Time) error {
+	params := map[string]any{
+		"goal":  database.MustRecordID("goals", goalID),
+		"event": event,
+		"now":   createdAt,
+	}
+	if changes != nil {
+		params["changes"] = changes
+	}
+
 	_, err := database.QueryAll[any](ctx, db, `
 		LET $snapshot = (CREATE goal_snapshots CONTENT {
 			goal_id: $goal,
@@ -1563,12 +1572,7 @@ func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, c
 			created_at: $now,
 			created_by: "seed"
 		};
-	`, map[string]any{
-		"goal":    database.MustRecordID("goals", goalID),
-		"event":   event,
-		"changes": changes,
-		"now":     createdAt,
-	})
+	`, params)
 	return err
 }
 
