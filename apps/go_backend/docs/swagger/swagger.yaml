@@ -575,116 +575,6 @@ definitions:
     - CodeInternalError
     - CodeDatabaseError
     - CodeServiceError
-  goalactions.ActionListResponse:
-    properties:
-      actions:
-        items:
-          $ref: '#/definitions/goalactions.GoalAction'
-        type: array
-      count:
-        type: integer
-      goal_id:
-        type: string
-    type: object
-  goalactions.CreateRequest:
-    description: Request payload for creating a goal action
-    properties:
-      description:
-        example: Finish all lessons in Module 1 including exercises
-        maxLength: 2000
-        type: string
-      order:
-        example: 1
-        type: integer
-      quantity_unit:
-        example: km
-        maxLength: 50
-        type: string
-      quantity_value:
-        example: 5
-        type: number
-      title:
-        example: Complete Python Basics course
-        maxLength: 500
-        minLength: 1
-        type: string
-    required:
-    - title
-    type: object
-  goalactions.GoalAction:
-    properties:
-      completed:
-        description: Completion status (for discrete goals only)
-        type: boolean
-      completed_at:
-        type: string
-      created_at:
-        description: Metadata
-        type: string
-      deleted_at:
-        type: string
-      description:
-        type: string
-      goal_id:
-        description: Parent goal ID
-        type: string
-      id:
-        description: '"goal_actions:abc123"'
-        type: string
-      order:
-        description: Display order
-        type: integer
-      quantity_unit:
-        description: e.g., "km"
-        type: string
-      quantity_value:
-        description: Quantity (for measurable contributions)
-        type: number
-      title:
-        description: Action definition
-        type: string
-      updated_at:
-        type: string
-    type: object
-  goalactions.ReorderRequest:
-    description: Request payload for reordering goal actions
-    properties:
-      action_ids:
-        description: Ordered list of action IDs
-        items:
-          type: string
-        minItems: 1
-        type: array
-    required:
-    - action_ids
-    type: object
-  goalactions.UpdateRequest:
-    description: Request payload for updating a goal action
-    properties:
-      completed:
-        description: Set completion status
-        example: true
-        type: boolean
-      description:
-        example: Updated description
-        maxLength: 2000
-        type: string
-      order:
-        example: 2
-        type: integer
-      quantity_unit:
-        example: pages
-        maxLength: 50
-        type: string
-      quantity_value:
-        example: 10
-        type: number
-      title:
-        example: Complete Advanced Python
-        maxLength: 500
-        minLength: 1
-        type: string
-    type: object
   goalentries.CreateRequest:
     description: Request payload for creating a goal entry
     properties:
@@ -761,105 +651,89 @@ definitions:
       summary:
         $ref: '#/definitions/goalentries.EntrySummary'
     type: object
+  goals.AddChildRequest:
+    description: Request for adding a child to a grouped goal
+    properties:
+      child_goal_id:
+        example: goals:design_ui
+        type: string
+      order:
+        example: 1
+        type: integer
+      required:
+        example: true
+        type: boolean
+    required:
+    - child_goal_id
+    type: object
   goals.CreateRequest:
     description: Request payload for creating a goal
     properties:
       category_id:
         example: categories:health123
         type: string
-      color:
-        example: '#3B82F6'
-        maxLength: 20
-        type: string
-      completion_mode:
-        enum:
-        - all
-        - any
-        example: all
-        type: string
       deadline:
         example: "2025-12-31T23:59:59Z"
         type: string
       description:
-        example: Stay hydrated throughout the day for better health and focus
+        example: Stay hydrated throughout the day
         maxLength: 2000
-        type: string
-      goal_type:
-        enum:
-        - discrete
-        - measurable
-        - epic
-        - avoidance
-        example: measurable
         type: string
       icon:
         example: "\U0001F4A7"
         maxLength: 50
         type: string
-      is_private:
-        example: false
-        type: boolean
-      life_domain:
-        example: health
-        maxLength: 50
-        type: string
-      parent_goal:
-        example: goals:epic456
+      parent_goal_id:
+        description: Parent goal (optional - adds this as child of parent via goal_children)
+        example: goals:launch_saas
         type: string
       priority:
+        description: Organization
         example: 2
         maximum: 3
         minimum: 0
         type: integer
       recurrence:
-        $ref: '#/definitions/goals.RecurrenceInput'
+        allOf:
+        - $ref: '#/definitions/goals.RecurrenceInput'
+        description: Recurrence (optional - if set, creates a habit)
       start_date:
+        description: Timeline
         example: "2025-01-01T00:00:00Z"
         type: string
       target:
-        $ref: '#/definitions/goals.TargetInput'
+        allOf:
+        - $ref: '#/definitions/goals.TargetInput'
+        description: Target (optional - if nil, implies simple goal with target=1)
       title:
         example: Drink 3L water daily
         maxLength: 500
         minLength: 1
         type: string
-      value_score:
-        example: 4
-        maximum: 5
-        minimum: 0
-        type: integer
-      why:
-        example: Improve energy levels and skin health
-        maxLength: 1000
-        type: string
     required:
-    - goal_type
     - title
     type: object
   goals.Goal:
+    description: Goal entity with graph-inferred nature
     properties:
-      activity_key:
-        description: Auto-generated unique key for matching
-        type: string
       category:
-        $ref: '#/definitions/categories.Category'
-      child_goals:
-        description: Child goals (populated for epic goals)
+        allOf:
+        - $ref: '#/definitions/categories.Category'
+        description: Populated via graph queries (not stored on goal record)
+      children:
+        description: From goal_children (forward)
         items:
           $ref: '#/definitions/goals.Goal'
         type: array
-      color:
-        type: string
-      completion_date:
-        type: string
-      completion_mode:
-        description: Completion settings (for epic goals)
+      completed_at:
         type: string
       created_at:
         description: Metadata
         type: string
       current_streak:
-        description: Streak tracking (computed, for recurring goals)
+        description: |-
+          Denormalized streak fields (stored on goal for fast reads)
+          These are updated when tasks are completed, not computed on every read
         type: integer
       deadline:
         type: string
@@ -867,66 +741,57 @@ definitions:
         type: string
       description:
         type: string
-      goal_type:
-        description: Goal type
-        type: string
-      grace_days_used:
-        type: integer
       icon:
+        description: Emoji
         type: string
       id:
         type: string
-      is_private:
-        description: Privacy
-        type: boolean
       last_completed_date:
-        type: string
-      life_domain:
-        description: health, work, learning, etc.
+        description: Last time goal/habit was met
         type: string
       linked_tasks:
-        description: Linked tasks (populated via FETCH)
+        description: From task_goals
         items:
           $ref: '#/definitions/goals.GoalTaskLink'
         type: array
-      linked_template:
-        description: Linked template (auto-created)
-        type: string
       longest_streak:
+        description: All-time best streak
         type: integer
-      parent_goal:
-        description: For milestones under epics
-        type: string
+      parent:
+        allOf:
+        - $ref: '#/definitions/goals.Goal'
+        description: From goal_children (reverse)
       priority:
         description: Organization
         type: integer
       recurrence:
         allOf:
         - $ref: '#/definitions/goals.Recurrence'
-        description: Recurrence (null = one-time, populated = recurring/habit)
+        description: Recurrence (optional - if present, this is a habit)
       start_date:
         description: Timeline
         type: string
+      stats:
+        allOf:
+        - $ref: '#/definitions/goals.GoalStats'
+        description: Computed statistics (populated on read from related data)
       status:
-        description: Status & progress
+        description: 'Status: only 3 states'
         type: string
       target:
         allOf:
         - $ref: '#/definitions/goals.Target'
-        description: Target (for measurable goals)
+        description: |-
+          Target (optional - defines measurable objectives)
+          If nil, goal is a simple "complete it" goal (target.value=1 implied)
       title:
         description: Core fields
         type: string
       updated_at:
         type: string
-      value_score:
-        description: 1-5, how meaningful
-        type: integer
-      why:
-        description: '"Why does this matter?" - for retros'
-        type: string
     type: object
   goals.GoalPageResponse:
+    description: Paginated list of goals
     properties:
       has_more:
         type: boolean
@@ -941,7 +806,36 @@ definitions:
       total:
         type: integer
     type: object
+  goals.GoalStats:
+    description: Computed goal statistics
+    properties:
+      children_completed:
+        type: integer
+      children_total:
+        description: For grouped goals (with children)
+        type: integer
+      current_streak:
+        description: Streak tracking (for habits with recurrence)
+        type: integer
+      current_value:
+        description: Progress toward target
+        type: number
+      last_completed_date:
+        type: string
+      longest_streak:
+        type: integer
+      progress_percent:
+        description: 0-100 (or >100 if exceeded)
+        type: number
+      today_status:
+        description: '"pending", "met", "exceeded"'
+        type: string
+      total_contributions:
+        description: Overall metrics
+        type: integer
+    type: object
   goals.GoalTaskLink:
+    description: Task linked to goal with impact data
     properties:
       impact_magnitude:
         description: 1-5
@@ -949,16 +843,17 @@ definitions:
       impact_type:
         description: '"positive", "negative", "neutral"'
         type: string
-      quantity_unit:
-        type: string
       quantity_value:
         type: number
       task_id:
         type: string
       task_title:
         type: string
+      unit_id:
+        type: string
     type: object
   goals.Recurrence:
+    description: Recurrence settings for habits
     properties:
       active_days:
         description: '["mon", "tue", ...] or nil for all'
@@ -966,22 +861,23 @@ definitions:
           type: string
         type: array
       after_time:
-        description: '"06:00" (complete after 6am)'
+        description: '"06:00" (complete after)'
         type: string
       before_time:
-        description: Time constraints
+        description: '"22:00" (complete before)'
         type: string
       frequency:
         description: Times per period (e.g., 5)
         type: integer
       grace_days:
-        description: Streak settings
+        description: Can miss X days without breaking streak
         type: integer
       period:
         description: '"day", "week", "month"'
         type: string
     type: object
   goals.RecurrenceInput:
+    description: Recurrence configuration for habits
     properties:
       active_days:
         items:
@@ -1015,38 +911,46 @@ definitions:
     - period
     type: object
   goals.Target:
+    description: Target for measurable goals with comparison operator
     properties:
-      current_value:
-        description: Auto-computed from linked tasks
-        type: number
+      operator:
+        description: '"gte", "lte", "eq"'
+        type: string
       per_period:
-        description: true = "3L per day", false = "1000km total"
+        description: true = per recurrence period
         type: boolean
-      unit:
-        description: '"km", "L", "pages", "minutes"'
+      unit_id:
+        description: Reference to units table (e.g., "units:km")
         type: string
       value:
-        description: e.g., 1000, 3
+        description: Target amount (e.g., 100, 3, 0)
         type: number
     type: object
   goals.TargetInput:
+    description: Target configuration for measurable goals
     properties:
+      operator:
+        enum:
+        - gte
+        - lte
+        - eq
+        example: gte
+        type: string
       per_period:
         example: true
         type: boolean
-      unit:
-        example: liters
-        maxLength: 50
-        minLength: 1
+      unit_id:
+        example: units:l
         type: string
       value:
         example: 3
+        minimum: 0
         type: number
     required:
-    - unit
-    - value
+    - unit_id
     type: object
   goals.TodayGoal:
+    description: Today's status for a habit/recurring goal
     properties:
       goal:
         $ref: '#/definitions/goals.Goal'
@@ -1058,6 +962,7 @@ definitions:
         type: number
     type: object
   goals.TodayGoalsResponse:
+    description: Today's habits and their status
     properties:
       date:
         description: YYYY-MM-DD
@@ -1072,32 +977,12 @@ definitions:
     properties:
       category_id:
         type: string
-      color:
-        maxLength: 20
-        type: string
-      completion_mode:
-        enum:
-        - all
-        - any
-        type: string
       deadline:
         type: string
       description:
         maxLength: 2000
         type: string
-      goal_type:
-        enum:
-        - discrete
-        - measurable
-        - epic
-        - avoidance
-        type: string
       icon:
-        maxLength: 50
-        type: string
-      is_private:
-        type: boolean
-      life_domain:
         maxLength: 50
         type: string
       priority:
@@ -1112,21 +997,13 @@ definitions:
         enum:
         - active
         - completed
-        - paused
-        - abandoned
+        - archived
         type: string
       target:
         $ref: '#/definitions/goals.TargetInput'
       title:
         maxLength: 500
         minLength: 1
-        type: string
-      value_score:
-        maximum: 5
-        minimum: 0
-        type: integer
-      why:
-        maxLength: 1000
         type: string
     type: object
   health.HealthResponse:
@@ -1490,20 +1367,32 @@ definitions:
         - neutral
         example: positive
         type: string
+      is_milestone:
+        description: Milestone fields (for significant completions)
+        example: false
+        type: boolean
+      milestone_label:
+        example: Design Phase Complete
+        maxLength: 200
+        type: string
+      milestone_order:
+        example: 1
+        type: integer
       notes:
         maxLength: 1000
-        type: string
-      quantity_unit:
-        example: km
         type: string
       quantity_value:
         example: 5
         type: number
+      unit_id:
+        example: units:km
+        type: string
     required:
     - goal_id
     - impact_type
     type: object
   taskgoals.TaskGoal:
+    description: Task-goal relationship edge with impact data
     properties:
       created_at:
         description: Metadata
@@ -1520,11 +1409,17 @@ definitions:
       impact_type:
         description: Impact tracking
         type: string
+      is_milestone:
+        description: Milestone tracking (replaces goal_actions)
+        type: boolean
+      milestone_label:
+        description: e.g., "Module 3 Complete"
+        type: string
+      milestone_order:
+        description: Display order
+        type: integer
       notes:
         description: Context
-        type: string
-      quantity_unit:
-        description: e.g., "km"
         type: string
       quantity_value:
         description: Quantity (for measurable goals)
@@ -1533,22 +1428,34 @@ definitions:
         description: '"manual" or "auto"'
         type: string
       task_id:
-        description: Related entities
+        description: Related entities (populated as record IDs)
+        type: string
+      unit_id:
+        description: e.g., "units:km"
         type: string
     type: object
   tasks.CreateRequest:
     description: Request payload for creating a task
     properties:
       category_id:
+        description: Category (creates in_category edge)
         example: categories:work123
         type: string
+      completed:
+        example: false
+        type: boolean
       emotion_id:
-        description: Primary emotion
+        description: Emotion
         example: emotions:E16
         type: string
       end_date:
         example: "2025-12-06T09:30:00Z"
         type: string
+      goal_links:
+        description: Goal linking (creates task_goals edges)
+        items:
+          $ref: '#/definitions/tasks.GoalLinkInput'
+        type: array
       journal:
         example: Daily team sync meeting
         maxLength: 10000
@@ -1567,16 +1474,19 @@ definitions:
         items:
           $ref: '#/definitions/tasks.TaskItem'
         type: array
-      priority:
-        example: 1
-        maximum: 100
-        minimum: -100
-        type: integer
+      quantity:
+        allOf:
+        - $ref: '#/definitions/tasks.QuantityInput'
+        description: Quantity (for measurable contributions)
       source:
         example: manual
         type: string
       start_date:
         example: "2025-12-06T09:00:00Z"
+        type: string
+      template_id:
+        description: Template source (creates created_from edge)
+        example: templates:morning_run
         type: string
       title:
         example: Morning standup
@@ -1588,28 +1498,81 @@ definitions:
     - start_date
     - title
     type: object
-  tasks.Quantity:
+  tasks.GoalLinkInput:
     properties:
-      unit:
-        description: e.g., "ml", "minutes", "pages"
+      goal_id:
+        example: goals:hydration123
+        type: string
+      impact_magnitude:
+        example: 3
+        maximum: 5
+        minimum: 1
+        type: integer
+      impact_type:
+        enum:
+        - positive
+        - negative
+        - neutral
+        example: positive
+        type: string
+      is_milestone:
+        example: false
+        type: boolean
+      milestone_label:
+        example: Module 3 Complete
+        type: string
+      milestone_order:
+        example: 3
+        type: integer
+      notes:
+        example: Morning session
+        type: string
+      quantity_value:
+        example: 5
+        type: number
+    required:
+    - goal_id
+    type: object
+  tasks.Quantity:
+    description: Quantity measurement for task
+    properties:
+      unit_id:
+        description: e.g., "units:km", "units:min"
         type: string
       value:
-        description: e.g., 500, 30
+        description: e.g., 5.0, 30
         type: number
     type: object
-  tasks.Task:
+  tasks.QuantityInput:
     properties:
-      activity_key:
-        description: Goal/Template integration
+      unit_id:
+        example: units:km
         type: string
+      value:
+        example: 5
+        minimum: 0
+        type: number
+    required:
+    - unit_id
+    type: object
+  tasks.Task:
+    description: Task/journal entry entity
+    properties:
       category:
-        $ref: '#/definitions/categories.Category'
+        allOf:
+        - $ref: '#/definitions/categories.Category'
+        description: Populated via graph queries (not stored on task)
       completed:
         type: boolean
       created_at:
+        description: Metadata
         type: string
       deleted_at:
         type: string
+      emotion:
+        allOf:
+        - $ref: '#/definitions/emotions.EmotionDetail'
+        description: Full emotion details
       emotion_id:
         description: Emotion tracking
         type: string
@@ -1624,7 +1587,7 @@ definitions:
       journal:
         type: string
       linked_goals:
-        description: Goals linked to this task
+        description: From task_goals
         items:
           $ref: '#/definitions/tasks.TaskGoalLink'
         type: array
@@ -1638,26 +1601,29 @@ definitions:
         items:
           $ref: '#/definitions/tasks.TaskItem'
         type: array
-      priority:
-        type: integer
       quantity:
         allOf:
         - $ref: '#/definitions/tasks.Quantity'
-        description: For measurable goals
+        description: Quantity (for measurable goals)
       source:
+        description: '"manual", "template", "quick"'
         type: string
       start_date:
         type: string
-      template_id:
-        description: Source template (templates:xyz)
-        type: string
+      template:
+        allOf:
+        - $ref: '#/definitions/templates.TaskTemplate'
+        description: From created_from edge
       title:
         type: string
       updated_at:
         type: string
     type: object
   tasks.TaskGoalLink:
+    description: Goal linked to task with impact data
     properties:
+      goal_icon:
+        type: string
       goal_id:
         type: string
       goal_title:
@@ -1668,12 +1634,17 @@ definitions:
       impact_type:
         description: '"positive", "negative", "neutral"'
         type: string
-      quantity_unit:
+      is_milestone:
+        type: boolean
+      milestone_label:
         type: string
       quantity_value:
         type: number
+      unit_id:
+        type: string
     type: object
   tasks.TaskItem:
+    description: Positive/negative reflection item
     properties:
       emotion_id:
         description: 'Optional: emotions:E01-E100'
@@ -1684,6 +1655,7 @@ definitions:
         type: string
     type: object
   tasks.TaskPageResponse:
+    description: Paginated list of tasks
     properties:
       has_more:
         type: boolean
@@ -1701,12 +1673,9 @@ definitions:
   tasks.UpdateRequest:
     description: Request payload for updating a task
     properties:
-      category_id:
-        type: string
       completed:
         type: boolean
       emotion_id:
-        description: Primary emotion
         type: string
       end_date:
         type: string
@@ -1714,7 +1683,6 @@ definitions:
         maxLength: 10000
         type: string
       negatives:
-        description: '[{"text": "...", "emotion_id": "emotions:E61"}]'
         items:
           $ref: '#/definitions/tasks.TaskItem'
         type: array
@@ -1722,14 +1690,11 @@ definitions:
         maxLength: 5000
         type: string
       positives:
-        description: '[{"text": "...", "emotion_id": "emotions:E16"}]'
         items:
           $ref: '#/definitions/tasks.TaskItem'
         type: array
-      priority:
-        maximum: 100
-        minimum: -100
-        type: integer
+      quantity:
+        $ref: '#/definitions/tasks.QuantityInput'
       start_date:
         type: string
       title:
@@ -1740,15 +1705,9 @@ definitions:
   templates.CreateRequest:
     description: Request payload for creating a template
     properties:
-      activity_key:
-        example: running
-        type: string
-      color:
-        example: '#10B981'
-        maxLength: 20
-        type: string
-      default_category_id:
-        example: categories:fitness123
+      category_id:
+        description: Category assignment (creates in_category edge)
+        example: categories:health123
         type: string
       default_duration:
         description: seconds (30 min)
@@ -1757,11 +1716,6 @@ definitions:
       default_emotion_id:
         example: emotions:E16
         type: string
-      default_priority:
-        example: 2
-        maximum: 3
-        minimum: 0
-        type: integer
       description:
         example: Quick morning jog before work
         maxLength: 2000
@@ -1774,9 +1728,11 @@ definitions:
         - blue
         example: yellow
         type: string
-      goal_id:
-        example: goals:run100km
-        type: string
+      goal_links:
+        description: Goal linking (creates template_goals edge)
+        items:
+          $ref: '#/definitions/templates.GoalLinkInput'
+        type: array
       icon:
         example: "\U0001F3C3"
         maxLength: 50
@@ -1795,15 +1751,9 @@ definitions:
         example: 0.5
         minimum: 0
         type: number
-      quantity_unit:
-        example: km
-        maxLength: 50
-        type: string
       quick_log_order:
         example: 1
         type: integer
-      show_fields:
-        $ref: '#/definitions/templates.ShowFieldsInput'
       title:
         example: Morning Run
         maxLength: 500
@@ -1812,61 +1762,36 @@ definitions:
     required:
     - title
     type: object
-  templates.ShowFields:
+  templates.GoalLinkInput:
     properties:
-      duration:
-        type: boolean
-      emotion:
-        type: boolean
-      journal:
-        type: boolean
-      notes:
-        type: boolean
-      positives_negatives:
-        type: boolean
-      quantity:
-        type: boolean
-    type: object
-  templates.ShowFieldsInput:
-    properties:
-      duration:
+      auto_link_tasks:
         example: true
         type: boolean
-      emotion:
-        example: true
-        type: boolean
-      journal:
-        example: false
-        type: boolean
-      notes:
-        example: true
-        type: boolean
-      positives_negatives:
-        example: false
-        type: boolean
-      quantity:
-        example: true
-        type: boolean
+      goal_id:
+        example: goals:hydration123
+        type: string
+      quantity_multiplier:
+        example: 1
+        minimum: 0
+        type: number
+    required:
+    - goal_id
     type: object
   templates.TaskTemplate:
+    description: Reusable task blueprint
     properties:
-      activity_key:
-        description: Goal/Activity linking
-        type: string
-      color:
-        type: string
+      category:
+        allOf:
+        - $ref: '#/definitions/categories.Category'
+        description: From in_category edge (or inherited)
       created_at:
         description: Metadata
         type: string
-      default_category:
-        $ref: '#/definitions/categories.Category'
       default_duration:
         description: Defaults for tasks created from this template
         type: integer
       default_emotion_id:
         type: string
-      default_priority:
-        type: integer
       deleted_at:
         type: string
       description:
@@ -1874,16 +1799,16 @@ definitions:
       expected_quadrant:
         description: Emotion defaults
         type: string
-      goal_id:
-        description: Source goal if auto-created
-        type: string
+      goals:
+        description: Populated via graph queries (not stored on template)
+        items:
+          $ref: '#/definitions/goals.Goal'
+        type: array
       icon:
+        description: Emoji
         type: string
       id:
         type: string
-      is_default:
-        description: Source
-        type: boolean
       is_quick_log:
         description: Quick log settings
         type: boolean
@@ -1896,26 +1821,19 @@ definitions:
         type: boolean
       quantity_step:
         type: number
-      quantity_unit:
-        type: string
       quick_log_order:
         type: integer
-      show_fields:
-        allOf:
-        - $ref: '#/definitions/templates.ShowFields'
-        description: Fields to show in quick-log UI
-      source_task_id:
-        type: string
       title:
-        description: Core
+        description: Core fields
         type: string
       updated_at:
         type: string
       use_count:
-        description: Usage stats
+        description: Usage stats (auto-updated)
         type: integer
     type: object
   templates.TemplatePageResponse:
+    description: Paginated list of templates
     properties:
       has_more:
         type: boolean
@@ -1933,24 +1851,12 @@ definitions:
   templates.UpdateRequest:
     description: Request payload for updating a template
     properties:
-      color:
-        example: '#6366F1'
-        maxLength: 20
-        type: string
-      default_category_id:
-        example: categories:fitness123
-        type: string
       default_duration:
         example: 2700
         type: integer
       default_emotion_id:
         example: emotions:E25
         type: string
-      default_priority:
-        example: 2
-        maximum: 3
-        minimum: 0
-        type: integer
       description:
         example: Post-work stress relief run
         maxLength: 2000
@@ -1981,18 +1887,87 @@ definitions:
         example: 1
         minimum: 0
         type: number
-      quantity_unit:
-        example: km
-        maxLength: 50
-        type: string
       quick_log_order:
         example: 2
         type: integer
-      show_fields:
-        $ref: '#/definitions/templates.ShowFieldsInput'
       title:
         example: Evening Run
         maxLength: 500
+        minLength: 1
+        type: string
+    type: object
+  units.CreateRequest:
+    description: Request payload for creating a custom unit
+    properties:
+      name:
+        example: pomodoros
+        maxLength: 50
+        minLength: 1
+        type: string
+      symbol:
+        example: "\U0001F345"
+        maxLength: 10
+        minLength: 1
+        type: string
+      type:
+        enum:
+        - distance
+        - time
+        - volume
+        - count
+        - custom
+        example: custom
+        type: string
+    required:
+    - name
+    - symbol
+    type: object
+  units.Unit:
+    description: Unit of measurement for tracking quantities
+    properties:
+      created_at:
+        description: Metadata
+        type: string
+      id:
+        description: units:km, units:hr, etc.
+        type: string
+      is_system:
+        description: System flag
+        type: boolean
+      name:
+        description: Core fields
+        type: string
+      symbol:
+        description: '"km", "hr", "L"'
+        type: string
+      type:
+        description: '"distance", "time", "volume", "count", "custom"'
+        type: string
+      updated_at:
+        type: string
+    type: object
+  units.UnitListResponse:
+    description: List of available units
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/units.Unit'
+        type: array
+      system_only:
+        description: If filtered to system units only
+        type: boolean
+    type: object
+  units.UpdateRequest:
+    description: Request payload for updating a custom unit
+    properties:
+      name:
+        example: focus sessions
+        maxLength: 50
+        minLength: 1
+        type: string
+      symbol:
+        example: ⏱️
+        maxLength: 10
         minLength: 1
         type: string
     type: object
@@ -2801,13 +2776,11 @@ paths:
       summary: Update goal
       tags:
       - goals
-  /api/v1/goals/{id}/actions:
+  /api/v1/goals/{id}/children:
     get:
-      consumes:
-      - application/json
-      description: Retrieves all actions for a goal
+      description: Get all child goals for a grouped goal
       parameters:
-      - description: Goal ID
+      - description: Parent Goal ID
         in: path
         name: id
         required: true
@@ -2818,7 +2791,9 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/goalactions.ActionListResponse'
+            items:
+              $ref: '#/definitions/goals.Goal'
+            type: array
         "401":
           description: Unauthorized
           schema:
@@ -2827,74 +2802,38 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: List goal actions
-      tags:
-      - Goal Actions
-    patch:
-      consumes:
-      - application/json
-      description: Reorders actions within a goal
-      parameters:
-      - description: Goal ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Ordered list of action IDs
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/goalactions.ReorderRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.OperationMessage'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/response.APIResponse'
       security:
       - BearerAuth: []
-      summary: Reorder actions
+      summary: Get child goals
       tags:
-      - Goal Actions
+      - goals
     post:
       consumes:
       - application/json
-      description: Creates a new action for a goal
+      description: Add a child goal to a grouped goal
       parameters:
-      - description: Goal ID
+      - description: Parent Goal ID
         in: path
         name: id
         required: true
         type: string
-      - description: Action data
+      - description: Child goal data
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/goalactions.CreateRequest'
+          $ref: '#/definitions/goals.AddChildRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/goalactions.GoalAction'
+            $ref: '#/definitions/response.OperationMessage'
         "400":
           description: Bad Request
           schema:
@@ -2907,25 +2846,27 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
       security:
       - BearerAuth: []
-      summary: Create a goal action
+      summary: Add child goal
       tags:
-      - Goal Actions
-  /api/v1/goals/{id}/actions/{actionId}:
+      - goals
+  /api/v1/goals/{id}/children/{child_id}:
     delete:
-      consumes:
-      - application/json
-      description: Soft-deletes a goal action
+      description: Remove a child goal from a grouped goal
       parameters:
-      - description: Goal ID
+      - description: Parent Goal ID
         in: path
         name: id
         required: true
         type: string
-      - description: Action ID
+      - description: Child Goal ID
         in: path
-        name: actionId
+        name: child_id
         required: true
         type: string
       produces:
@@ -2943,92 +2884,15 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a goal action
-      tags:
-      - Goal Actions
-    get:
-      consumes:
-      - application/json
-      description: Retrieves a single goal action by ID
-      parameters:
-      - description: Goal ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Action ID
-        in: path
-        name: actionId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/goalactions.GoalAction'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/response.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get a goal action
+      summary: Remove child goal
       tags:
-      - Goal Actions
-    patch:
-      consumes:
-      - application/json
-      description: Updates an existing goal action. Set "completed" field to mark
-        complete/incomplete.
-      parameters:
-      - description: Goal ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Action ID
-        in: path
-        name: actionId
-        required: true
-        type: string
-      - description: Action data (all fields optional)
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/goalactions.UpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/goalactions.GoalAction'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Update a goal action
-      tags:
-      - Goal Actions
+      - goals
   /api/v1/goals/today:
     get:
       description: Get recurring goals with today's completion status
@@ -3753,6 +3617,186 @@ paths:
       summary: Get quick-log templates
       tags:
       - templates
+  /api/v1/units:
+    get:
+      description: Get all available units (system + user's custom units)
+      parameters:
+      - description: Only return system-provided units
+        in: query
+        name: system_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/units.UnitListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List units
+      tags:
+      - units
+    post:
+      consumes:
+      - application/json
+      description: Create a custom unit for tracking quantities
+      parameters:
+      - description: Unit data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/units.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/units.Unit'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create custom unit
+      tags:
+      - units
+  /api/v1/units/{id}:
+    delete:
+      description: Delete a custom unit (cannot delete system units)
+      parameters:
+      - description: Unit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "403":
+          description: Cannot delete system units
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete custom unit
+      tags:
+      - units
+    get:
+      description: Get a single unit by ID
+      parameters:
+      - description: Unit ID (e.g., km, mi, hr)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/units.Unit'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get unit
+      tags:
+      - units
+    put:
+      consumes:
+      - application/json
+      description: Update name or symbol of a custom unit (cannot modify system units)
+      parameters:
+      - description: Unit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/units.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/units.Unit'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "403":
+          description: Cannot modify system units
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update custom unit
+      tags:
+      - units
   /health:
     get:
       description: Returns 200 OK if the service is running

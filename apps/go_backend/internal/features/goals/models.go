@@ -218,7 +218,7 @@ type CreateRequest struct {
 //
 // @Description Target configuration for measurable goals
 type TargetInput struct {
-	Value     float64 `json:"value" validate:"required,gte=0" example:"3"`
+	Value     float64 `json:"value" validate:"gte=0" example:"3"`
 	Operator  string  `json:"operator,omitempty" validate:"omitempty,oneof=gte lte eq" example:"gte"`
 	UnitID    string  `json:"unit_id" validate:"required" example:"units:l"`
 	PerPeriod bool    `json:"per_period,omitempty" example:"true"`

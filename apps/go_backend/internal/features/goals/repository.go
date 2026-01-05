@@ -701,13 +701,19 @@ func (r *repository) AddChild(ctx context.Context, parentID, childID, userID str
 	cID := database.MustRecordID(Table, childID)
 	now := time.Now().UTC()
 
+	r.logger.Debug().
+		Str("parent_id", parentID).
+		Str("child_id", childID).
+		Interface("pID", pID).
+		Interface("cID", cID).
+		Msg("adding child goal")
+
 	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $parent -> goal_children -> $child SET {
-			order: $order,
-			required: $required,
-			created_by: $user,
-			created_at: $now
-		}
+		RELATE $parent -> goal_children -> $child SET
+			order = $order,
+			required = $required,
+			created_by = $user,
+			created_at = $now
 	`, map[string]any{
 		"parent":   pID,
 		"child":    cID,

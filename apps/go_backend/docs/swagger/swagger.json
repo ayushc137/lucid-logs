@@ -1293,28 +1293,25 @@
                 }
             }
         },
-        "/api/v1/goals/{id}/actions": {
+        "/api/v1/goals/{id}/children": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves all actions for a goal",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Get all child goals for a grouped goal",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Goal Actions"
+                    "goals"
                 ],
-                "summary": "List goal actions",
+                "summary": "Get child goals",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Goal ID",
+                        "description": "Parent Goal ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1324,7 +1321,10 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/goalactions.ActionListResponse"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/goals.Goal"
+                            }
                         }
                     },
                     "401": {
@@ -1335,6 +1335,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.APIResponse"
                         }
@@ -1347,7 +1353,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new action for a goal",
+                "description": "Add a child goal to a grouped goal",
                 "consumes": [
                     "application/json"
                 ],
@@ -1355,24 +1361,24 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Goal Actions"
+                    "goals"
                 ],
-                "summary": "Create a goal action",
+                "summary": "Add child goal",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Goal ID",
+                        "description": "Parent Goal ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Action data",
+                        "description": "Child goal data",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/goalactions.CreateRequest"
+                            "$ref": "#/definitions/goals.AddChildRequest"
                         }
                     }
                 ],
@@ -1380,68 +1386,6 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/goalactions.GoalAction"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Reorders actions within a goal",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Goal Actions"
-                ],
-                "summary": "Reorder actions",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Goal ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Ordered list of action IDs",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/goalactions.ReorderRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
                             "$ref": "#/definitions/response.OperationMessage"
                         }
                     },
@@ -1459,6 +1403,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.APIResponse"
                         }
@@ -1466,90 +1416,33 @@
                 }
             }
         },
-        "/api/v1/goals/{id}/actions/{actionId}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieves a single goal action by ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Goal Actions"
-                ],
-                "summary": "Get a goal action",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Goal ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Action ID",
-                        "name": "actionId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/goalactions.GoalAction"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            },
+        "/api/v1/goals/{id}/children/{child_id}": {
             "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Soft-deletes a goal action",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Remove a child goal from a grouped goal",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Goal Actions"
+                    "goals"
                 ],
-                "summary": "Delete a goal action",
+                "summary": "Remove child goal",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Goal ID",
+                        "description": "Parent Goal ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Action ID",
-                        "name": "actionId",
+                        "description": "Child Goal ID",
+                        "name": "child_id",
                         "in": "path",
                         "required": true
                     }
@@ -1572,72 +1465,9 @@
                         "schema": {
                             "$ref": "#/definitions/response.APIResponse"
                         }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Updates an existing goal action. Set \"completed\" field to mark complete/incomplete.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Goal Actions"
-                ],
-                "summary": "Update a goal action",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Goal ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
                     },
-                    {
-                        "type": "string",
-                        "description": "Action ID",
-                        "name": "actionId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Action data (all fields optional)",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/goalactions.UpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/goalactions.GoalAction"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.APIResponse"
                         }
@@ -2740,6 +2570,288 @@
                 }
             }
         },
+        "/api/v1/units": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all available units (system + user's custom units)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "List units",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Only return system-provided units",
+                        "name": "system_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/units.UnitListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a custom unit for tracking quantities",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "Create custom unit",
+                "parameters": [
+                    {
+                        "description": "Unit data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/units.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/units.Unit"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/units/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a single unit by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "Get unit",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID (e.g., km, mi, hr)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/units.Unit"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update name or symbol of a custom unit (cannot modify system units)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "Update custom unit",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/units.UpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/units.Unit"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Cannot modify system units",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a custom unit (cannot delete system units)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "units"
+                ],
+                "summary": "Delete custom unit",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Cannot delete system units",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Returns 200 OK if the service is running",
@@ -3585,157 +3697,6 @@
                 "CodeServiceError"
             ]
         },
-        "goalactions.ActionListResponse": {
-            "type": "object",
-            "properties": {
-                "actions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/goalactions.GoalAction"
-                    }
-                },
-                "count": {
-                    "type": "integer"
-                },
-                "goal_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "goalactions.CreateRequest": {
-            "description": "Request payload for creating a goal action",
-            "type": "object",
-            "required": [
-                "title"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "maxLength": 2000,
-                    "example": "Finish all lessons in Module 1 including exercises"
-                },
-                "order": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "quantity_unit": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "km"
-                },
-                "quantity_value": {
-                    "type": "number",
-                    "example": 5
-                },
-                "title": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 1,
-                    "example": "Complete Python Basics course"
-                }
-            }
-        },
-        "goalactions.GoalAction": {
-            "type": "object",
-            "properties": {
-                "completed": {
-                    "description": "Completion status (for discrete goals only)",
-                    "type": "boolean"
-                },
-                "completed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "description": "Metadata",
-                    "type": "string"
-                },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "goal_id": {
-                    "description": "Parent goal ID",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "\"goal_actions:abc123\"",
-                    "type": "string"
-                },
-                "order": {
-                    "description": "Display order",
-                    "type": "integer"
-                },
-                "quantity_unit": {
-                    "description": "e.g., \"km\"",
-                    "type": "string"
-                },
-                "quantity_value": {
-                    "description": "Quantity (for measurable contributions)",
-                    "type": "number"
-                },
-                "title": {
-                    "description": "Action definition",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "goalactions.ReorderRequest": {
-            "description": "Request payload for reordering goal actions",
-            "type": "object",
-            "required": [
-                "action_ids"
-            ],
-            "properties": {
-                "action_ids": {
-                    "description": "Ordered list of action IDs",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "goalactions.UpdateRequest": {
-            "description": "Request payload for updating a goal action",
-            "type": "object",
-            "properties": {
-                "completed": {
-                    "description": "Set completion status",
-                    "type": "boolean",
-                    "example": true
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 2000,
-                    "example": "Updated description"
-                },
-                "order": {
-                    "type": "integer",
-                    "example": 2
-                },
-                "quantity_unit": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "pages"
-                },
-                "quantity_value": {
-                    "type": "number",
-                    "example": 10
-                },
-                "title": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 1,
-                    "example": "Complete Advanced Python"
-                }
-            }
-        },
         "goalentries.CreateRequest": {
             "description": "Request payload for creating a goal entry",
             "type": "object",
@@ -3846,30 +3807,37 @@
                 }
             }
         },
+        "goals.AddChildRequest": {
+            "description": "Request for adding a child to a grouped goal",
+            "type": "object",
+            "required": [
+                "child_goal_id"
+            ],
+            "properties": {
+                "child_goal_id": {
+                    "type": "string",
+                    "example": "goals:design_ui"
+                },
+                "order": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "required": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "goals.CreateRequest": {
             "description": "Request payload for creating a goal",
             "type": "object",
             "required": [
-                "goal_type",
                 "title"
             ],
             "properties": {
                 "category_id": {
                     "type": "string",
                     "example": "categories:health123"
-                },
-                "color": {
-                    "type": "string",
-                    "maxLength": 20,
-                    "example": "#3B82F6"
-                },
-                "completion_mode": {
-                    "type": "string",
-                    "enum": [
-                        "all",
-                        "any"
-                    ],
-                    "example": "all"
                 },
                 "deadline": {
                     "type": "string",
@@ -3878,96 +3846,74 @@
                 "description": {
                     "type": "string",
                     "maxLength": 2000,
-                    "example": "Stay hydrated throughout the day for better health and focus"
-                },
-                "goal_type": {
-                    "type": "string",
-                    "enum": [
-                        "discrete",
-                        "measurable",
-                        "epic",
-                        "avoidance"
-                    ],
-                    "example": "measurable"
+                    "example": "Stay hydrated throughout the day"
                 },
                 "icon": {
                     "type": "string",
                     "maxLength": 50,
                     "example": "💧"
                 },
-                "is_private": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "life_domain": {
+                "parent_goal_id": {
+                    "description": "Parent goal (optional - adds this as child of parent via goal_children)",
                     "type": "string",
-                    "maxLength": 50,
-                    "example": "health"
-                },
-                "parent_goal": {
-                    "type": "string",
-                    "example": "goals:epic456"
+                    "example": "goals:launch_saas"
                 },
                 "priority": {
+                    "description": "Organization",
                     "type": "integer",
                     "maximum": 3,
                     "minimum": 0,
                     "example": 2
                 },
                 "recurrence": {
-                    "$ref": "#/definitions/goals.RecurrenceInput"
+                    "description": "Recurrence (optional - if set, creates a habit)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/goals.RecurrenceInput"
+                        }
+                    ]
                 },
                 "start_date": {
+                    "description": "Timeline",
                     "type": "string",
                     "example": "2025-01-01T00:00:00Z"
                 },
                 "target": {
-                    "$ref": "#/definitions/goals.TargetInput"
+                    "description": "Target (optional - if nil, implies simple goal with target=1)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/goals.TargetInput"
+                        }
+                    ]
                 },
                 "title": {
                     "type": "string",
                     "maxLength": 500,
                     "minLength": 1,
                     "example": "Drink 3L water daily"
-                },
-                "value_score": {
-                    "type": "integer",
-                    "maximum": 5,
-                    "minimum": 0,
-                    "example": 4
-                },
-                "why": {
-                    "type": "string",
-                    "maxLength": 1000,
-                    "example": "Improve energy levels and skin health"
                 }
             }
         },
         "goals.Goal": {
+            "description": "Goal entity with graph-inferred nature",
             "type": "object",
             "properties": {
-                "activity_key": {
-                    "description": "Auto-generated unique key for matching",
-                    "type": "string"
-                },
                 "category": {
-                    "$ref": "#/definitions/categories.Category"
+                    "description": "Populated via graph queries (not stored on goal record)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    ]
                 },
-                "child_goals": {
-                    "description": "Child goals (populated for epic goals)",
+                "children": {
+                    "description": "From goal_children (forward)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/goals.Goal"
                     }
                 },
-                "color": {
-                    "type": "string"
-                },
-                "completion_date": {
-                    "type": "string"
-                },
-                "completion_mode": {
-                    "description": "Completion settings (for epic goals)",
+                "completed_at": {
                     "type": "string"
                 },
                 "created_at": {
@@ -3975,7 +3921,7 @@
                     "type": "string"
                 },
                 "current_streak": {
-                    "description": "Streak tracking (computed, for recurring goals)",
+                    "description": "Denormalized streak fields (stored on goal for fast reads)\nThese are updated when tasks are completed, not computed on every read",
                     "type": "integer"
                 },
                 "deadline": {
@@ -3987,54 +3933,42 @@
                 "description": {
                     "type": "string"
                 },
-                "goal_type": {
-                    "description": "Goal type",
-                    "type": "string"
-                },
-                "grace_days_used": {
-                    "type": "integer"
-                },
                 "icon": {
+                    "description": "Emoji",
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
-                "is_private": {
-                    "description": "Privacy",
-                    "type": "boolean"
-                },
                 "last_completed_date": {
-                    "type": "string"
-                },
-                "life_domain": {
-                    "description": "health, work, learning, etc.",
+                    "description": "Last time goal/habit was met",
                     "type": "string"
                 },
                 "linked_tasks": {
-                    "description": "Linked tasks (populated via FETCH)",
+                    "description": "From task_goals",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/goals.GoalTaskLink"
                     }
                 },
-                "linked_template": {
-                    "description": "Linked template (auto-created)",
-                    "type": "string"
-                },
                 "longest_streak": {
+                    "description": "All-time best streak",
                     "type": "integer"
                 },
-                "parent_goal": {
-                    "description": "For milestones under epics",
-                    "type": "string"
+                "parent": {
+                    "description": "From goal_children (reverse)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/goals.Goal"
+                        }
+                    ]
                 },
                 "priority": {
                     "description": "Organization",
                     "type": "integer"
                 },
                 "recurrence": {
-                    "description": "Recurrence (null = one-time, populated = recurring/habit)",
+                    "description": "Recurrence (optional - if present, this is a habit)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/goals.Recurrence"
@@ -4045,12 +3979,20 @@
                     "description": "Timeline",
                     "type": "string"
                 },
+                "stats": {
+                    "description": "Computed statistics (populated on read from related data)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/goals.GoalStats"
+                        }
+                    ]
+                },
                 "status": {
-                    "description": "Status \u0026 progress",
+                    "description": "Status: only 3 states",
                     "type": "string"
                 },
                 "target": {
-                    "description": "Target (for measurable goals)",
+                    "description": "Target (optional - defines measurable objectives)\nIf nil, goal is a simple \"complete it\" goal (target.value=1 implied)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/goals.Target"
@@ -4063,18 +4005,11 @@
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "value_score": {
-                    "description": "1-5, how meaningful",
-                    "type": "integer"
-                },
-                "why": {
-                    "description": "\"Why does this matter?\" - for retros",
-                    "type": "string"
                 }
             }
         },
         "goals.GoalPageResponse": {
+            "description": "Paginated list of goals",
             "type": "object",
             "properties": {
                 "has_more": {
@@ -4097,7 +4032,47 @@
                 }
             }
         },
+        "goals.GoalStats": {
+            "description": "Computed goal statistics",
+            "type": "object",
+            "properties": {
+                "children_completed": {
+                    "type": "integer"
+                },
+                "children_total": {
+                    "description": "For grouped goals (with children)",
+                    "type": "integer"
+                },
+                "current_streak": {
+                    "description": "Streak tracking (for habits with recurrence)",
+                    "type": "integer"
+                },
+                "current_value": {
+                    "description": "Progress toward target",
+                    "type": "number"
+                },
+                "last_completed_date": {
+                    "type": "string"
+                },
+                "longest_streak": {
+                    "type": "integer"
+                },
+                "progress_percent": {
+                    "description": "0-100 (or \u003e100 if exceeded)",
+                    "type": "number"
+                },
+                "today_status": {
+                    "description": "\"pending\", \"met\", \"exceeded\"",
+                    "type": "string"
+                },
+                "total_contributions": {
+                    "description": "Overall metrics",
+                    "type": "integer"
+                }
+            }
+        },
         "goals.GoalTaskLink": {
+            "description": "Task linked to goal with impact data",
             "type": "object",
             "properties": {
                 "impact_magnitude": {
@@ -4108,9 +4083,6 @@
                     "description": "\"positive\", \"negative\", \"neutral\"",
                     "type": "string"
                 },
-                "quantity_unit": {
-                    "type": "string"
-                },
                 "quantity_value": {
                     "type": "number"
                 },
@@ -4119,10 +4091,14 @@
                 },
                 "task_title": {
                     "type": "string"
+                },
+                "unit_id": {
+                    "type": "string"
                 }
             }
         },
         "goals.Recurrence": {
+            "description": "Recurrence settings for habits",
             "type": "object",
             "properties": {
                 "active_days": {
@@ -4133,11 +4109,11 @@
                     }
                 },
                 "after_time": {
-                    "description": "\"06:00\" (complete after 6am)",
+                    "description": "\"06:00\" (complete after)",
                     "type": "string"
                 },
                 "before_time": {
-                    "description": "Time constraints",
+                    "description": "\"22:00\" (complete before)",
                     "type": "string"
                 },
                 "frequency": {
@@ -4145,7 +4121,7 @@
                     "type": "integer"
                 },
                 "grace_days": {
-                    "description": "Streak settings",
+                    "description": "Can miss X days without breaking streak",
                     "type": "integer"
                 },
                 "period": {
@@ -4155,6 +4131,7 @@
             }
         },
         "goals.RecurrenceInput": {
+            "description": "Recurrence configuration for habits",
             "type": "object",
             "required": [
                 "frequency",
@@ -4199,50 +4176,60 @@
             }
         },
         "goals.Target": {
+            "description": "Target for measurable goals with comparison operator",
             "type": "object",
             "properties": {
-                "current_value": {
-                    "description": "Auto-computed from linked tasks",
-                    "type": "number"
+                "operator": {
+                    "description": "\"gte\", \"lte\", \"eq\"",
+                    "type": "string"
                 },
                 "per_period": {
-                    "description": "true = \"3L per day\", false = \"1000km total\"",
+                    "description": "true = per recurrence period",
                     "type": "boolean"
                 },
-                "unit": {
-                    "description": "\"km\", \"L\", \"pages\", \"minutes\"",
+                "unit_id": {
+                    "description": "Reference to units table (e.g., \"units:km\")",
                     "type": "string"
                 },
                 "value": {
-                    "description": "e.g., 1000, 3",
+                    "description": "Target amount (e.g., 100, 3, 0)",
                     "type": "number"
                 }
             }
         },
         "goals.TargetInput": {
+            "description": "Target configuration for measurable goals",
             "type": "object",
             "required": [
-                "unit",
-                "value"
+                "unit_id"
             ],
             "properties": {
+                "operator": {
+                    "type": "string",
+                    "enum": [
+                        "gte",
+                        "lte",
+                        "eq"
+                    ],
+                    "example": "gte"
+                },
                 "per_period": {
                     "type": "boolean",
                     "example": true
                 },
-                "unit": {
+                "unit_id": {
                     "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1,
-                    "example": "liters"
+                    "example": "units:l"
                 },
                 "value": {
                     "type": "number",
+                    "minimum": 0,
                     "example": 3
                 }
             }
         },
         "goals.TodayGoal": {
+            "description": "Today's status for a habit/recurring goal",
             "type": "object",
             "properties": {
                 "goal": {
@@ -4260,6 +4247,7 @@
             }
         },
         "goals.TodayGoalsResponse": {
+            "description": "Today's habits and their status",
             "type": "object",
             "properties": {
                 "date": {
@@ -4281,17 +4269,6 @@
                 "category_id": {
                     "type": "string"
                 },
-                "color": {
-                    "type": "string",
-                    "maxLength": 20
-                },
-                "completion_mode": {
-                    "type": "string",
-                    "enum": [
-                        "all",
-                        "any"
-                    ]
-                },
                 "deadline": {
                     "type": "string"
                 },
@@ -4299,23 +4276,7 @@
                     "type": "string",
                     "maxLength": 2000
                 },
-                "goal_type": {
-                    "type": "string",
-                    "enum": [
-                        "discrete",
-                        "measurable",
-                        "epic",
-                        "avoidance"
-                    ]
-                },
                 "icon": {
-                    "type": "string",
-                    "maxLength": 50
-                },
-                "is_private": {
-                    "type": "boolean"
-                },
-                "life_domain": {
                     "type": "string",
                     "maxLength": 50
                 },
@@ -4335,8 +4296,7 @@
                     "enum": [
                         "active",
                         "completed",
-                        "paused",
-                        "abandoned"
+                        "archived"
                     ]
                 },
                 "target": {
@@ -4346,15 +4306,6 @@
                     "type": "string",
                     "maxLength": 500,
                     "minLength": 1
-                },
-                "value_score": {
-                    "type": "integer",
-                    "maximum": 5,
-                    "minimum": 0
-                },
-                "why": {
-                    "type": "string",
-                    "maxLength": 1000
                 }
             }
         },
@@ -4900,21 +4851,36 @@
                     ],
                     "example": "positive"
                 },
+                "is_milestone": {
+                    "description": "Milestone fields (for significant completions)",
+                    "type": "boolean",
+                    "example": false
+                },
+                "milestone_label": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "example": "Design Phase Complete"
+                },
+                "milestone_order": {
+                    "type": "integer",
+                    "example": 1
+                },
                 "notes": {
                     "type": "string",
                     "maxLength": 1000
                 },
-                "quantity_unit": {
-                    "type": "string",
-                    "example": "km"
-                },
                 "quantity_value": {
                     "type": "number",
                     "example": 5
+                },
+                "unit_id": {
+                    "type": "string",
+                    "example": "units:km"
                 }
             }
         },
         "taskgoals.TaskGoal": {
+            "description": "Task-goal relationship edge with impact data",
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4937,12 +4903,20 @@
                     "description": "Impact tracking",
                     "type": "string"
                 },
-                "notes": {
-                    "description": "Context",
+                "is_milestone": {
+                    "description": "Milestone tracking (replaces goal_actions)",
+                    "type": "boolean"
+                },
+                "milestone_label": {
+                    "description": "e.g., \"Module 3 Complete\"",
                     "type": "string"
                 },
-                "quantity_unit": {
-                    "description": "e.g., \"km\"",
+                "milestone_order": {
+                    "description": "Display order",
+                    "type": "integer"
+                },
+                "notes": {
+                    "description": "Context",
                     "type": "string"
                 },
                 "quantity_value": {
@@ -4954,7 +4928,11 @@
                     "type": "string"
                 },
                 "task_id": {
-                    "description": "Related entities",
+                    "description": "Related entities (populated as record IDs)",
+                    "type": "string"
+                },
+                "unit_id": {
+                    "description": "e.g., \"units:km\"",
                     "type": "string"
                 }
             }
@@ -4969,17 +4947,29 @@
             ],
             "properties": {
                 "category_id": {
+                    "description": "Category (creates in_category edge)",
                     "type": "string",
                     "example": "categories:work123"
                 },
+                "completed": {
+                    "type": "boolean",
+                    "example": false
+                },
                 "emotion_id": {
-                    "description": "Primary emotion",
+                    "description": "Emotion",
                     "type": "string",
                     "example": "emotions:E16"
                 },
                 "end_date": {
                     "type": "string",
                     "example": "2025-12-06T09:30:00Z"
+                },
+                "goal_links": {
+                    "description": "Goal linking (creates task_goals edges)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.GoalLinkInput"
+                    }
                 },
                 "journal": {
                     "type": "string",
@@ -5005,11 +4995,13 @@
                         "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
-                "priority": {
-                    "type": "integer",
-                    "maximum": 100,
-                    "minimum": -100,
-                    "example": 1
+                "quantity": {
+                    "description": "Quantity (for measurable contributions)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/tasks.QuantityInput"
+                        }
+                    ]
                 },
                 "source": {
                     "type": "string",
@@ -5019,6 +5011,11 @@
                     "type": "string",
                     "example": "2025-12-06T09:00:00Z"
                 },
+                "template_id": {
+                    "description": "Template source (creates created_from edge)",
+                    "type": "string",
+                    "example": "templates:morning_run"
+                },
                 "title": {
                     "type": "string",
                     "maxLength": 500,
@@ -5027,37 +5024,113 @@
                 }
             }
         },
+        "tasks.GoalLinkInput": {
+            "type": "object",
+            "required": [
+                "goal_id"
+            ],
+            "properties": {
+                "goal_id": {
+                    "type": "string",
+                    "example": "goals:hydration123"
+                },
+                "impact_magnitude": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1,
+                    "example": 3
+                },
+                "impact_type": {
+                    "type": "string",
+                    "enum": [
+                        "positive",
+                        "negative",
+                        "neutral"
+                    ],
+                    "example": "positive"
+                },
+                "is_milestone": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "milestone_label": {
+                    "type": "string",
+                    "example": "Module 3 Complete"
+                },
+                "milestone_order": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "notes": {
+                    "type": "string",
+                    "example": "Morning session"
+                },
+                "quantity_value": {
+                    "type": "number",
+                    "example": 5
+                }
+            }
+        },
         "tasks.Quantity": {
+            "description": "Quantity measurement for task",
             "type": "object",
             "properties": {
-                "unit": {
-                    "description": "e.g., \"ml\", \"minutes\", \"pages\"",
+                "unit_id": {
+                    "description": "e.g., \"units:km\", \"units:min\"",
                     "type": "string"
                 },
                 "value": {
-                    "description": "e.g., 500, 30",
+                    "description": "e.g., 5.0, 30",
                     "type": "number"
                 }
             }
         },
+        "tasks.QuantityInput": {
+            "type": "object",
+            "required": [
+                "unit_id"
+            ],
+            "properties": {
+                "unit_id": {
+                    "type": "string",
+                    "example": "units:km"
+                },
+                "value": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 5
+                }
+            }
+        },
         "tasks.Task": {
+            "description": "Task/journal entry entity",
             "type": "object",
             "properties": {
-                "activity_key": {
-                    "description": "Goal/Template integration",
-                    "type": "string"
-                },
                 "category": {
-                    "$ref": "#/definitions/categories.Category"
+                    "description": "Populated via graph queries (not stored on task)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    ]
                 },
                 "completed": {
                     "type": "boolean"
                 },
                 "created_at": {
+                    "description": "Metadata",
                     "type": "string"
                 },
                 "deleted_at": {
                     "type": "string"
+                },
+                "emotion": {
+                    "description": "Full emotion details",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/emotions.EmotionDetail"
+                        }
+                    ]
                 },
                 "emotion_id": {
                     "description": "Emotion tracking",
@@ -5081,7 +5154,7 @@
                     "type": "string"
                 },
                 "linked_goals": {
-                    "description": "Goals linked to this task",
+                    "description": "From task_goals",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/tasks.TaskGoalLink"
@@ -5102,11 +5175,8 @@
                         "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
-                "priority": {
-                    "type": "integer"
-                },
                 "quantity": {
-                    "description": "For measurable goals",
+                    "description": "Quantity (for measurable goals)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/tasks.Quantity"
@@ -5114,14 +5184,19 @@
                     ]
                 },
                 "source": {
+                    "description": "\"manual\", \"template\", \"quick\"",
                     "type": "string"
                 },
                 "start_date": {
                     "type": "string"
                 },
-                "template_id": {
-                    "description": "Source template (templates:xyz)",
-                    "type": "string"
+                "template": {
+                    "description": "From created_from edge",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/templates.TaskTemplate"
+                        }
+                    ]
                 },
                 "title": {
                     "type": "string"
@@ -5132,8 +5207,12 @@
             }
         },
         "tasks.TaskGoalLink": {
+            "description": "Goal linked to task with impact data",
             "type": "object",
             "properties": {
+                "goal_icon": {
+                    "type": "string"
+                },
                 "goal_id": {
                     "type": "string"
                 },
@@ -5148,15 +5227,22 @@
                     "description": "\"positive\", \"negative\", \"neutral\"",
                     "type": "string"
                 },
-                "quantity_unit": {
+                "is_milestone": {
+                    "type": "boolean"
+                },
+                "milestone_label": {
                     "type": "string"
                 },
                 "quantity_value": {
                     "type": "number"
+                },
+                "unit_id": {
+                    "type": "string"
                 }
             }
         },
         "tasks.TaskItem": {
+            "description": "Positive/negative reflection item",
             "type": "object",
             "properties": {
                 "emotion_id": {
@@ -5171,6 +5257,7 @@
             }
         },
         "tasks.TaskPageResponse": {
+            "description": "Paginated list of tasks",
             "type": "object",
             "properties": {
                 "has_more": {
@@ -5197,14 +5284,10 @@
             "description": "Request payload for updating a task",
             "type": "object",
             "properties": {
-                "category_id": {
-                    "type": "string"
-                },
                 "completed": {
                     "type": "boolean"
                 },
                 "emotion_id": {
-                    "description": "Primary emotion",
                     "type": "string"
                 },
                 "end_date": {
@@ -5215,7 +5298,6 @@
                     "maxLength": 10000
                 },
                 "negatives": {
-                    "description": "[{\"text\": \"...\", \"emotion_id\": \"emotions:E61\"}]",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/tasks.TaskItem"
@@ -5226,16 +5308,13 @@
                     "maxLength": 5000
                 },
                 "positives": {
-                    "description": "[{\"text\": \"...\", \"emotion_id\": \"emotions:E16\"}]",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/tasks.TaskItem"
                     }
                 },
-                "priority": {
-                    "type": "integer",
-                    "maximum": 100,
-                    "minimum": -100
+                "quantity": {
+                    "$ref": "#/definitions/tasks.QuantityInput"
                 },
                 "start_date": {
                     "type": "string"
@@ -5254,18 +5333,10 @@
                 "title"
             ],
             "properties": {
-                "activity_key": {
+                "category_id": {
+                    "description": "Category assignment (creates in_category edge)",
                     "type": "string",
-                    "example": "running"
-                },
-                "color": {
-                    "type": "string",
-                    "maxLength": 20,
-                    "example": "#10B981"
-                },
-                "default_category_id": {
-                    "type": "string",
-                    "example": "categories:fitness123"
+                    "example": "categories:health123"
                 },
                 "default_duration": {
                     "description": "seconds (30 min)",
@@ -5275,12 +5346,6 @@
                 "default_emotion_id": {
                     "type": "string",
                     "example": "emotions:E16"
-                },
-                "default_priority": {
-                    "type": "integer",
-                    "maximum": 3,
-                    "minimum": 0,
-                    "example": 2
                 },
                 "description": {
                     "type": "string",
@@ -5297,9 +5362,12 @@
                     ],
                     "example": "yellow"
                 },
-                "goal_id": {
-                    "type": "string",
-                    "example": "goals:run100km"
+                "goal_links": {
+                    "description": "Goal linking (creates template_goals edge)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/templates.GoalLinkInput"
+                    }
                 },
                 "icon": {
                     "type": "string",
@@ -5324,17 +5392,9 @@
                     "minimum": 0,
                     "example": 0.5
                 },
-                "quantity_unit": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "km"
-                },
                 "quick_log_order": {
                     "type": "integer",
                     "example": 1
-                },
-                "show_fields": {
-                    "$ref": "#/definitions/templates.ShowFieldsInput"
                 },
                 "title": {
                     "type": "string",
@@ -5344,74 +5404,42 @@
                 }
             }
         },
-        "templates.ShowFields": {
+        "templates.GoalLinkInput": {
             "type": "object",
+            "required": [
+                "goal_id"
+            ],
             "properties": {
-                "duration": {
-                    "type": "boolean"
-                },
-                "emotion": {
-                    "type": "boolean"
-                },
-                "journal": {
-                    "type": "boolean"
-                },
-                "notes": {
-                    "type": "boolean"
-                },
-                "positives_negatives": {
-                    "type": "boolean"
-                },
-                "quantity": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "templates.ShowFieldsInput": {
-            "type": "object",
-            "properties": {
-                "duration": {
+                "auto_link_tasks": {
                     "type": "boolean",
                     "example": true
                 },
-                "emotion": {
-                    "type": "boolean",
-                    "example": true
+                "goal_id": {
+                    "type": "string",
+                    "example": "goals:hydration123"
                 },
-                "journal": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "notes": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "positives_negatives": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "quantity": {
-                    "type": "boolean",
-                    "example": true
+                "quantity_multiplier": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 1
                 }
             }
         },
         "templates.TaskTemplate": {
+            "description": "Reusable task blueprint",
             "type": "object",
             "properties": {
-                "activity_key": {
-                    "description": "Goal/Activity linking",
-                    "type": "string"
-                },
-                "color": {
-                    "type": "string"
+                "category": {
+                    "description": "From in_category edge (or inherited)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    ]
                 },
                 "created_at": {
                     "description": "Metadata",
                     "type": "string"
-                },
-                "default_category": {
-                    "$ref": "#/definitions/categories.Category"
                 },
                 "default_duration": {
                     "description": "Defaults for tasks created from this template",
@@ -5419,9 +5447,6 @@
                 },
                 "default_emotion_id": {
                     "type": "string"
-                },
-                "default_priority": {
-                    "type": "integer"
                 },
                 "deleted_at": {
                     "type": "string"
@@ -5433,19 +5458,19 @@
                     "description": "Emotion defaults",
                     "type": "string"
                 },
-                "goal_id": {
-                    "description": "Source goal if auto-created",
-                    "type": "string"
+                "goals": {
+                    "description": "Populated via graph queries (not stored on template)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/goals.Goal"
+                    }
                 },
                 "icon": {
+                    "description": "Emoji",
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
-                },
-                "is_default": {
-                    "description": "Source",
-                    "type": "boolean"
                 },
                 "is_quick_log": {
                     "description": "Quick log settings",
@@ -5464,37 +5489,24 @@
                 "quantity_step": {
                     "type": "number"
                 },
-                "quantity_unit": {
-                    "type": "string"
-                },
                 "quick_log_order": {
                     "type": "integer"
                 },
-                "show_fields": {
-                    "description": "Fields to show in quick-log UI",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/templates.ShowFields"
-                        }
-                    ]
-                },
-                "source_task_id": {
-                    "type": "string"
-                },
                 "title": {
-                    "description": "Core",
+                    "description": "Core fields",
                     "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
                 },
                 "use_count": {
-                    "description": "Usage stats",
+                    "description": "Usage stats (auto-updated)",
                     "type": "integer"
                 }
             }
         },
         "templates.TemplatePageResponse": {
+            "description": "Paginated list of templates",
             "type": "object",
             "properties": {
                 "has_more": {
@@ -5521,15 +5533,6 @@
             "description": "Request payload for updating a template",
             "type": "object",
             "properties": {
-                "color": {
-                    "type": "string",
-                    "maxLength": 20,
-                    "example": "#6366F1"
-                },
-                "default_category_id": {
-                    "type": "string",
-                    "example": "categories:fitness123"
-                },
                 "default_duration": {
                     "type": "integer",
                     "example": 2700
@@ -5537,12 +5540,6 @@
                 "default_emotion_id": {
                     "type": "string",
                     "example": "emotions:E25"
-                },
-                "default_priority": {
-                    "type": "integer",
-                    "maximum": 3,
-                    "minimum": 0,
-                    "example": 2
                 },
                 "description": {
                     "type": "string",
@@ -5582,23 +5579,115 @@
                     "minimum": 0,
                     "example": 1
                 },
-                "quantity_unit": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "km"
-                },
                 "quick_log_order": {
                     "type": "integer",
                     "example": 2
-                },
-                "show_fields": {
-                    "$ref": "#/definitions/templates.ShowFieldsInput"
                 },
                 "title": {
                     "type": "string",
                     "maxLength": 500,
                     "minLength": 1,
                     "example": "Evening Run"
+                }
+            }
+        },
+        "units.CreateRequest": {
+            "description": "Request payload for creating a custom unit",
+            "type": "object",
+            "required": [
+                "name",
+                "symbol"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1,
+                    "example": "pomodoros"
+                },
+                "symbol": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "minLength": 1,
+                    "example": "🍅"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "distance",
+                        "time",
+                        "volume",
+                        "count",
+                        "custom"
+                    ],
+                    "example": "custom"
+                }
+            }
+        },
+        "units.Unit": {
+            "description": "Unit of measurement for tracking quantities",
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "Metadata",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "units:km, units:hr, etc.",
+                    "type": "string"
+                },
+                "is_system": {
+                    "description": "System flag",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Core fields",
+                    "type": "string"
+                },
+                "symbol": {
+                    "description": "\"km\", \"hr\", \"L\"",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"distance\", \"time\", \"volume\", \"count\", \"custom\"",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "units.UnitListResponse": {
+            "description": "List of available units",
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/units.Unit"
+                    }
+                },
+                "system_only": {
+                    "description": "If filtered to system units only",
+                    "type": "boolean"
+                }
+            }
+        },
+        "units.UpdateRequest": {
+            "description": "Request payload for updating a custom unit",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1,
+                    "example": "focus sessions"
+                },
+                "symbol": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "minLength": 1,
+                    "example": "⏱️"
                 }
             }
         }

@@ -40,12 +40,15 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 // RegisterRoutes registers the goal routes.
 //
 // Routes registered:
-//   - GET    /        : List goals with pagination
-//   - POST   /        : Create a new goal
-//   - GET    /today   : Get today's recurring goals with status
-//   - GET    /{id}    : Get goal by ID
-//   - PUT    /{id}    : Update goal
-//   - DELETE /{id}    : Soft delete goal
+//   - GET    /           : List goals with pagination
+//   - POST   /           : Create a new goal
+//   - GET    /today      : Get today's recurring goals with status
+//   - GET    /{id}       : Get goal by ID
+//   - PUT    /{id}       : Update goal
+//   - DELETE /{id}       : Soft delete goal
+//   - GET    /{id}/children     : Get child goals
+//   - POST   /{id}/children     : Add child goal
+//   - DELETE /{id}/children/{child_id} : Remove child goal
 func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
@@ -55,6 +58,11 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 	r.GET("/:id", h.Get)
 	r.PUT("/:id", h.Update)
 	r.DELETE("/:id", h.Delete)
+
+	// Child goal management (grouped goals)
+	r.GET("/:id/children", h.GetChildren)
+	r.POST("/:id/children", h.AddChild)
+	r.DELETE("/:id/children/:child_id", h.RemoveChild)
 }
 
 // =============================================================================
@@ -324,6 +332,117 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	response.Message(c, http.StatusOK, "Goal deleted")
+}
+
+// =============================================================================
+// CHILD GOAL MANAGEMENT
+// =============================================================================
+
+// GetChildren handles GET /goals/{id}/children - get child goals.
+//
+// @Summary      Get child goals
+// @Description  Get all child goals for a grouped goal
+// @Tags         goals
+// @Produce      json
+// @Param        id path string true "Parent Goal ID"
+// @Success      200 {array} Goal
+// @Failure      401 {object} response.APIResponse
+// @Failure      404 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/goals/{id}/children [get]
+func (h *Handler) GetChildren(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	goalID := c.Param("id")
+
+	children, err := h.service.GetChildren(c.Request.Context(), goalID, user.UserID)
+	if err != nil {
+		handleGoalError(c, err)
+		return
+	}
+
+	response.OK(c, children)
+}
+
+// AddChild handles POST /goals/{id}/children - add a child goal.
+//
+// @Summary      Add child goal
+// @Description  Add a child goal to a grouped goal
+// @Tags         goals
+// @Accept       json
+// @Produce      json
+// @Param        id      path string          true "Parent Goal ID"
+// @Param        request body AddChildRequest true "Child goal data"
+// @Success      201 {object} response.OperationMessage
+// @Failure      400 {object} response.APIResponse
+// @Failure      401 {object} response.APIResponse
+// @Failure      404 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/goals/{id}/children [post]
+func (h *Handler) AddChild(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	parentID := c.Param("id")
+
+	var req AddChildRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
+		return
+	}
+
+	if errs := h.validator.Validate(&req); errs != nil {
+		response.ValidationFailed(c, errs)
+		return
+	}
+
+	if err := h.service.AddChild(c.Request.Context(), parentID, &req, user.UserID); err != nil {
+		handleGoalError(c, err)
+		return
+	}
+
+	response.Created(c, response.OperationMessage{Message: "Child goal added"})
+}
+
+// RemoveChild handles DELETE /goals/{id}/children/{child_id} - remove a child goal.
+//
+// @Summary      Remove child goal
+// @Description  Remove a child goal from a grouped goal
+// @Tags         goals
+// @Produce      json
+// @Param        id       path string true "Parent Goal ID"
+// @Param        child_id path string true "Child Goal ID"
+// @Success      200 {object} response.OperationMessage
+// @Failure      401 {object} response.APIResponse
+// @Failure      404 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/goals/{id}/children/{child_id} [delete]
+func (h *Handler) RemoveChild(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	parentID := c.Param("id")
+	childID := c.Param("child_id")
+
+	if err := h.service.RemoveChild(c.Request.Context(), parentID, childID, user.UserID); err != nil {
+		handleGoalError(c, err)
+		return
+	}
+
+	response.Message(c, http.StatusOK, "Child goal removed")
 }
 
 // =============================================================================
