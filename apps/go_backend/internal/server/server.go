@@ -160,7 +160,8 @@ func NewRouter(cfg Config) *gin.Engine {
 
 			// Units routes
 			unitsRepo := units.NewRepository(cfg.DB)
-			_ = unitsRepo // TODO: Add units handler
+			unitsService := units.NewService(unitsRepo)
+			units.RegisterRoutes(protected.Group("/units"), unitsService, cfg.Validator)
 
 			// Task-Goals linking routes (nested under tasks)
 			taskGoalsRepo := taskgoals.NewRepository(cfg.DB)

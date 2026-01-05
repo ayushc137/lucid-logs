@@ -738,86 +738,353 @@ func seedTasksMultiDay(categories, goals, templates map[string]string) (totalTas
 func seedTasksForDay(day time.Time, dayOffset int, categories, goals, templates map[string]string) (tasks, links int) {
 	isPast := dayOffset < 0
 	isWeekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
+	dayOfMonth := day.Day()
 
-	// Random whether this day meets hydration goal
-	meetsHydration := rand.Float32() < 0.8 // 80% chance
-
-	// Water intake: 2-6 logs per day
+	// ---------------------------
+	// HYDRATION HABIT (80% success rate, demonstrates streaks)
+	// ---------------------------
+	meetsHydration := rand.Float32() < 0.8 // 80% chance of meeting goal
 	waterLogs := rand.Intn(5) + 2
 	if meetsHydration {
 		waterLogs = rand.Intn(3) + 4 // 4-6 to meet 3L
 	}
 
 	for i := 0; i < waterLogs; i++ {
-		hour := 7 + i*3 + rand.Intn(2)               // Spread throughout day
-		quantity := 0.5 + float64(rand.Intn(3))*0.25 // 0.5, 0.75, 1.0, 1.25
+		hour := 7 + i*3 + rand.Intn(2)
+		quantity := 0.5 + float64(rand.Intn(3))*0.25
 
-		if createTask(day, hour, 0, 5, "Log Water", "💧", categories["Health"],
-			&quantity, "units:l", "Drink 3L Water Daily", goals, isPast) {
+		if createTaskWithDetails(day, hour, 0, 5, "Log Water", "💧", categories["Health"],
+			&quantity, "units:l", "Drink 3L Water Daily", goals, isPast, nil, nil) {
 			tasks++
 			links++
 		}
 	}
 
-	// Running: 3-5 times per week on random days
+	// ---------------------------
+	// RUNNING / EXERCISE (3-5 times per week)
+	// ---------------------------
 	if rand.Float32() < 0.6 || !isWeekend {
 		hour := 6 + rand.Intn(2)
 		km := 3.0 + float64(rand.Intn(8)) // 3-10km
+		durationMin := 30 + int(km)*3
 
-		if createTask(day, hour, 0, 30+int(km)*3, "Morning Run", "🏃", categories["Health"],
-			&km, "units:km", "Run 100km This Month", goals, isPast) {
+		// Add emotions and reflections to morning runs
+		var positives, negatives []map[string]any
+		var emotionID string
+
+		if rand.Float32() < 0.5 {
+			emotionID = randomElement([]string{"emotions:E16", "emotions:E25", "emotions:E26", "emotions:E35"})
+		}
+		if rand.Float32() < 0.4 {
+			positives = []map[string]any{
+				{"text": randomElement([]string{"Great pace today!", "Beat my personal record", "Perfect weather", "Felt strong throughout"})},
+			}
+		}
+		if rand.Float32() < 0.2 {
+			negatives = []map[string]any{
+				{"text": randomElement([]string{"Legs felt heavy", "Started too fast", "Need better hydration strategy"})},
+			}
+		}
+
+		journal := ""
+		if rand.Float32() < 0.3 {
+			journal = randomElement([]string{
+				"Steady pace throughout. Feeling good about progress.",
+				"Pushed hard on the hills today.",
+				"Recovery run - kept it easy.",
+			})
+		}
+
+		if createTaskWithDetails(day, hour, 0, durationMin, "Morning Run", "🏃", categories["Health"],
+			&km, "units:km", "Run 100km This Month", goals, isPast, positives, negatives) {
+			tasks++
+			links++
+		}
+
+		// Also contribute to daily exercise goal
+		exerciseMin := float64(durationMin)
+		if createTaskWithDetails(day, hour, 0, durationMin, "Morning Run", "🏃", categories["Health"],
+			&exerciseMin, "units:min", "Exercise 30 min Daily", goals, isPast, nil, nil) {
+			links++ // Goal link only
+		}
+
+		_ = emotionID // Used in more detailed task creation
+		_ = journal   // Used in more detailed task creation
+	}
+
+	// ---------------------------
+	// GYM WORKOUT (2-3 times per week, weekdays)
+	// ---------------------------
+	if !isWeekend && rand.Float32() < 0.4 {
+		hour := 17 + rand.Intn(2) // After work
+		minutes := float64(45 + rand.Intn(30))
+
+		positives := []map[string]any{}
+		if rand.Float32() < 0.5 {
+			positives = []map[string]any{
+				{"text": randomElement([]string{"New PR on squats!", "Great pump", "Completed full routine", "Increased weight on bench"})},
+			}
+		}
+
+		if createTaskWithDetails(day, hour, 0, int(minutes), "Gym Workout", "💪", categories["Health"],
+			&minutes, "units:min", "Exercise 30 min Daily", goals, isPast, positives, nil) {
 			tasks++
 			links++
 		}
 	}
 
-	// Coffee: 1-4 per day
-	coffeeLogs := rand.Intn(4) + 1
+	// ---------------------------
+	// COFFEE (Limit goal - 1-4 per day, sometimes exceeds limit)
+	// ---------------------------
+	// Some days (10%) exceed the 3-cup limit to demonstrate avoidance tracking
+	exceeCoffeeLimit := rand.Float32() < 0.10
+	coffeeLogs := rand.Intn(3) + 1 // 1-3 normally
+	if exceeCoffeeLimit {
+		coffeeLogs = 4 + rand.Intn(2) // 4-5 on bad days
+	}
+
 	for i := 0; i < coffeeLogs; i++ {
-		hour := 7 + i*4 + rand.Intn(2)
+		hour := 7 + i*3 + rand.Intn(2)
 		qty := 1.0
 
-		if createTask(day, hour, 30, 15, "Coffee", "☕", categories["Health"],
-			&qty, "units:count", "Max 3 Coffees Per Day", goals, isPast) {
+		if createTaskWithDetails(day, hour, 30, 15, "Coffee", "☕", categories["Health"],
+			&qty, "units:count", "Max 3 Coffees Per Day", goals, isPast, nil, nil) {
 			tasks++
 			links++
 		}
 	}
 
-	// Reading: most days
+	// ---------------------------
+	// READING HABIT (70% consistency)
+	// ---------------------------
 	if rand.Float32() < 0.7 {
 		hour := 20 + rand.Intn(2)
-		minutes := float64(20 + rand.Intn(30)) // 20-50 minutes
+		minutes := float64(20 + rand.Intn(30))
 
-		if createTask(day, hour, 0, int(minutes), "Reading Session", "📚", categories["Learning"],
-			&minutes, "units:min", "Read 30 Minutes Daily", goals, isPast) {
+		positives := []map[string]any{}
+		if rand.Float32() < 0.3 {
+			positives = []map[string]any{
+				{"text": randomElement([]string{"Finished a chapter", "Great insights", "Learning so much", "Couldn't put it down"})},
+			}
+		}
+
+		if createTaskWithDetails(day, hour, 0, int(minutes), "Reading Session", "📚", categories["Learning"],
+			&minutes, "units:min", "Read 30 Minutes Daily", goals, isPast, positives, nil) {
 			tasks++
 			links++
 		}
 	}
 
-	// Work tasks on weekdays
+	// ---------------------------
+	// WORK TASKS (Weekdays only)
+	// ---------------------------
 	if !isWeekend {
-		// Standup
-		if createTask(day, 9, 30, 15, "Daily Standup", "👥", categories["Work"], nil, "", "", nil, isPast) {
+		// Daily Standup
+		var standupPositives, standupNegatives []map[string]any
+		if rand.Float32() < 0.2 {
+			standupPositives = []map[string]any{{"text": "Clear priorities for the day"}}
+		}
+
+		if createTaskWithDetails(day, 9, 30, 15, "Daily Standup", "👥", categories["Work"],
+			nil, "", "", nil, isPast, standupPositives, standupNegatives) {
 			tasks++
 		}
 
-		// Deep work
+		// Deep Work Session
 		if rand.Float32() < 0.8 {
 			minutes := float64(60 + rand.Intn(60))
-			if createTask(day, 10+rand.Intn(3), 0, int(minutes), "Deep Work Session", "🎯", categories["Work"],
-				&minutes, "units:min", "", nil, isPast) {
+			journal := ""
+			if rand.Float32() < 0.3 {
+				journal = randomElement([]string{
+					"Focused on feature implementation. Good progress.",
+					"Debugging session. Found and fixed the issue.",
+					"Code review and documentation updates.",
+					"Architecture planning and design work.",
+				})
+			}
+
+			positives := []map[string]any{}
+			negatives := []map[string]any{}
+			if rand.Float32() < 0.4 {
+				positives = []map[string]any{{"text": randomElement([]string{
+					"Flow state achieved",
+					"Completed ahead of schedule",
+					"Clean code written",
+				})}}
+			}
+			if rand.Float32() < 0.15 {
+				negatives = []map[string]any{{"text": randomElement([]string{
+					"Too many interruptions",
+					"Unexpected complexity",
+					"Need to revisit approach",
+				})}}
+			}
+
+			if createTaskWithDetailsAndJournal(day, 10+rand.Intn(3), 0, int(minutes), "Deep Work Session", "🎯",
+				categories["Work"], &minutes, "units:min", "", nil, isPast, positives, negatives, journal) {
 				tasks++
 			}
+		}
+
+		// Meetings (1-3 per day)
+		numMeetings := rand.Intn(3) + 1
+		for i := 0; i < numMeetings; i++ {
+			hour := 11 + i*2 + rand.Intn(2)
+			dur := 30 + rand.Intn(30)
+			title := randomElement([]string{"Team Sync", "1:1 Meeting", "Project Review", "Planning Session", "Client Call"})
+
+			if createTaskWithDetails(day, hour, 0, dur, title, "📅", categories["Work"],
+				nil, "", "", nil, isPast, nil, nil) {
+				tasks++
+			}
+		}
+	}
+
+	// ---------------------------
+	// SAVINGS CONTRIBUTIONS (Weekly on Fridays)
+	// ---------------------------
+	if day.Weekday() == time.Friday && isPast {
+		amount := float64(100 + rand.Intn(200)) // $100-300 contribution
+		if createTaskWithDetails(day, 12, 0, 5, "Weekly Savings Transfer", "💰", categories["Finance"],
+			&amount, "units:dollars", "Save $5000", goals, isPast, nil, nil) {
+			tasks++
+			links++
+		}
+	}
+
+	// ---------------------------
+	// PROJECT MILESTONES (For grouped goal "Launch Side Project")
+	// ---------------------------
+	// Design milestone - early in the period
+	if dayOffset == -25 && isPast {
+		qty := 1.0
+		positives := []map[string]any{{"text": "Design mockups completed and approved"}}
+		if createMilestoneTask(day, 15, 0, 120, "Complete UI Design Mockups", "🎨",
+			categories["Projects"], &qty, "units:count", "Design UI/UX", goals, positives,
+			"Design Phase Complete", 1) {
+			tasks++
+			links++
+		}
+	}
+
+	// MVP milestone - mid period
+	if dayOffset == -10 && isPast {
+		qty := 1.0
+		positives := []map[string]any{{"text": "Core features working, ready for testing"}}
+		if createMilestoneTask(day, 16, 0, 180, "MVP Feature Complete", "⚙️",
+			categories["Projects"], &qty, "units:count", "Build MVP", goals, positives,
+			"MVP Ready", 2) {
+			tasks++
+			links++
+		}
+	}
+
+	// ---------------------------
+	// MEDITATION / MINDFULNESS (Random days)
+	// ---------------------------
+	if rand.Float32() < 0.3 {
+		minutes := float64(10 + rand.Intn(15)) // 10-25 minutes
+		hour := 7 + rand.Intn(2)               // Morning
+
+		positives := []map[string]any{}
+		if rand.Float32() < 0.6 {
+			positives = []map[string]any{
+				{"text": randomElement([]string{"Felt calm and centered", "Good focus today", "Mind felt clear afterwards"})},
+			}
+		}
+
+		if createTaskWithDetails(day, hour, 0, int(minutes), "Morning Meditation", "🧘", categories["Personal"],
+			nil, "", "", nil, isPast, positives, nil) {
+			tasks++
+		}
+	}
+
+	// ---------------------------
+	// LEARNING ACTIVITIES (Weekends - online courses)
+	// ---------------------------
+	if isWeekend && rand.Float32() < 0.6 {
+		minutes := float64(45 + rand.Intn(45))
+		topics := []string{"Go Advanced Patterns", "System Design", "Cloud Architecture", "Database Optimization"}
+		topic := randomElement(topics)
+
+		positives := []map[string]any{{"text": "Learned something new"}}
+		journal := fmt.Sprintf("Studied: %s. Great content!", topic)
+
+		if createTaskWithDetailsAndJournal(day, 10+rand.Intn(4), 0, int(minutes),
+			fmt.Sprintf("Online Course: %s", topic), "🎓", categories["Learning"],
+			nil, "", "", nil, isPast, positives, nil, journal) {
+			tasks++
+		}
+	}
+
+	// ---------------------------
+	// PERSONAL ERRANDS (Weekends)
+	// ---------------------------
+	if isWeekend && rand.Float32() < 0.5 {
+		errands := []string{"Grocery Shopping", "House Cleaning", "Cooking Meal Prep", "Laundry", "Car Maintenance"}
+		title := randomElement(errands)
+		dur := 30 + rand.Intn(60)
+
+		if createTaskWithDetails(day, 10+rand.Intn(6), 0, dur, title, "🏠", categories["Personal"],
+			nil, "", "", nil, isPast, nil, nil) {
+			tasks++
+		}
+	}
+
+	// ---------------------------
+	// SOCIAL ACTIVITIES (Occasional)
+	// ---------------------------
+	if rand.Float32() < 0.15 {
+		activities := []struct {
+			title, icon string
+		}{
+			{"Dinner with Friends", "🍽️"},
+			{"Movie Night", "🎬"},
+			{"Phone Call with Family", "📱"},
+			{"Game Night", "🎮"},
+		}
+		activity := activities[rand.Intn(len(activities))]
+		hour := 18 + rand.Intn(3)
+		dur := 60 + rand.Intn(120)
+
+		positives := []map[string]any{{"text": "Quality time with loved ones"}}
+		emotionID := randomElement([]string{"emotions:E25", "emotions:E26", "emotions:E35", "emotions:E36"})
+
+		if createTaskWithEmotionAndReflections(day, hour, 0, dur, activity.title, activity.icon,
+			categories["Personal"], nil, "", "", nil, isPast, positives, nil, emotionID) {
+			tasks++
+		}
+	}
+
+	// ---------------------------
+	// SPECIAL: Smoke-free tracking (avoidance goal)
+	// ---------------------------
+	// Very rarely (2%) a slip-up occurs to demonstrate avoidance tracking
+	if rand.Float32() < 0.02 && isPast && dayOfMonth%7 == 0 {
+		qty := 1.0
+		negatives := []map[string]any{
+			{"text": "Stressful day led to slip-up"},
+			{"text": "Need to work on coping mechanisms"},
+		}
+		// This would be a negative impact on the smoke-free goal
+		if createTaskWithNegativeImpact(day, 20, 0, 5, "Smoking Slip", "🚬", categories["Health"],
+			&qty, "units:count", "Stay Smoke-Free", goals, negatives) {
+			tasks++
+			links++
 		}
 	}
 
 	return tasks, links
 }
 
-func createTask(day time.Time, hour, minute, durationMin int, title, icon, categoryID string,
-	quantity *float64, unitID, goalTitle string, goals map[string]string, completed bool) bool {
+// =============================================================================
+// ENHANCED TASK CREATION HELPERS
+// =============================================================================
+
+// createTaskWithDetails creates a task with positives/negatives reflections
+func createTaskWithDetails(day time.Time, hour, minute, durationMin int, title, icon, categoryID string,
+	quantity *float64, unitID, goalTitle string, goals map[string]string, completed bool,
+	positives, negatives []map[string]any) bool {
 
 	startTime := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, day.Location())
 	endTime := startTime.Add(time.Duration(durationMin) * time.Minute)
@@ -847,14 +1114,22 @@ func createTask(day time.Time, hour, minute, durationMin int, title, icon, categ
 			"impact_type": "positive",
 		}}
 		if quantity != nil {
-			//nolint:errcheck // acceptable in seeder - map assignment always succeeds
+			//nolint:errcheck // acceptable in seeder
 			payload["goal_links"].([]map[string]any)[0]["quantity_value"] = *quantity
 		}
 	}
 
-	// Add some emotions randomly
+	// Add reflections
+	if len(positives) > 0 {
+		payload["positives"] = positives
+	}
+	if len(negatives) > 0 {
+		payload["negatives"] = negatives
+	}
+
+	// Add random emotion
 	if rand.Float32() < 0.3 {
-		emotions := []string{"emotions:E16", "emotions:E26", "emotions:E44", "emotions:E31"}
+		emotions := []string{"emotions:E16", "emotions:E25", "emotions:E26", "emotions:E35", "emotions:E44"}
 		payload["emotion_id"] = emotions[rand.Intn(len(emotions))]
 	}
 
@@ -863,14 +1138,261 @@ func createTask(day time.Time, hour, minute, durationMin int, title, icon, categ
 		return false
 	}
 
-	// Mark completed if past
 	if completed {
 		if taskID, ok := resp["id"].(string); ok {
 			idPart := strings.TrimPrefix(taskID, "tasks:")
-			//nolint:errcheck // ignore PUT errors for marking complete
+			//nolint:errcheck // ignore PUT errors
 			_, _ = apiRequest("PUT", "/tasks/"+idPart, map[string]any{"completed": true})
 		}
 	}
 
 	return true
+}
+
+// createTaskWithDetailsAndJournal creates a task with journal entry and reflections
+func createTaskWithDetailsAndJournal(day time.Time, hour, minute, durationMin int, title, icon, categoryID string,
+	quantity *float64, unitID, goalTitle string, goals map[string]string, completed bool,
+	positives, negatives []map[string]any, journal string) bool {
+
+	startTime := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, day.Location())
+	endTime := startTime.Add(time.Duration(durationMin) * time.Minute)
+
+	payload := map[string]any{
+		"title":      title,
+		"start_date": startTime.Format(time.RFC3339),
+		"end_date":   endTime.Format(time.RFC3339),
+		"source":     "manual",
+	}
+
+	if categoryID != "" {
+		payload["category_id"] = categoryID
+	}
+	if journal != "" {
+		payload["journal"] = journal
+	}
+
+	if quantity != nil && unitID != "" {
+		payload["quantity"] = map[string]any{
+			"value":   *quantity,
+			"unit_id": unitID,
+		}
+	}
+
+	if goalTitle != "" && goals != nil && goals[goalTitle] != "" {
+		payload["goal_links"] = []map[string]any{{
+			"goal_id":     goals[goalTitle],
+			"impact_type": "positive",
+		}}
+		if quantity != nil {
+			//nolint:errcheck // acceptable in seeder
+			payload["goal_links"].([]map[string]any)[0]["quantity_value"] = *quantity
+		}
+	}
+
+	if len(positives) > 0 {
+		payload["positives"] = positives
+	}
+	if len(negatives) > 0 {
+		payload["negatives"] = negatives
+	}
+
+	// Add random emotion with higher probability when there's a journal
+	if rand.Float32() < 0.5 {
+		emotions := []string{"emotions:E16", "emotions:E25", "emotions:E26", "emotions:E35"}
+		payload["emotion_id"] = emotions[rand.Intn(len(emotions))]
+	}
+
+	resp, err := apiRequest("POST", "/tasks", payload)
+	if err != nil {
+		return false
+	}
+
+	if completed {
+		if taskID, ok := resp["id"].(string); ok {
+			idPart := strings.TrimPrefix(taskID, "tasks:")
+			//nolint:errcheck // ignore PUT errors
+			_, _ = apiRequest("PUT", "/tasks/"+idPart, map[string]any{"completed": true})
+		}
+	}
+
+	return true
+}
+
+// createTaskWithEmotionAndReflections creates a task with specific emotion and reflections
+func createTaskWithEmotionAndReflections(day time.Time, hour, minute, durationMin int, title, icon, categoryID string,
+	quantity *float64, unitID, goalTitle string, goals map[string]string, completed bool,
+	positives, negatives []map[string]any, emotionID string) bool {
+
+	startTime := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, day.Location())
+	endTime := startTime.Add(time.Duration(durationMin) * time.Minute)
+
+	payload := map[string]any{
+		"title":      title,
+		"start_date": startTime.Format(time.RFC3339),
+		"end_date":   endTime.Format(time.RFC3339),
+		"source":     "manual",
+	}
+
+	if categoryID != "" {
+		payload["category_id"] = categoryID
+	}
+	if emotionID != "" {
+		payload["emotion_id"] = emotionID
+	}
+
+	if quantity != nil && unitID != "" {
+		payload["quantity"] = map[string]any{
+			"value":   *quantity,
+			"unit_id": unitID,
+		}
+	}
+
+	if goalTitle != "" && goals != nil && goals[goalTitle] != "" {
+		payload["goal_links"] = []map[string]any{{
+			"goal_id":     goals[goalTitle],
+			"impact_type": "positive",
+		}}
+		if quantity != nil {
+			//nolint:errcheck // acceptable in seeder
+			payload["goal_links"].([]map[string]any)[0]["quantity_value"] = *quantity
+		}
+	}
+
+	if len(positives) > 0 {
+		payload["positives"] = positives
+	}
+	if len(negatives) > 0 {
+		payload["negatives"] = negatives
+	}
+
+	resp, err := apiRequest("POST", "/tasks", payload)
+	if err != nil {
+		return false
+	}
+
+	if completed {
+		if taskID, ok := resp["id"].(string); ok {
+			idPart := strings.TrimPrefix(taskID, "tasks:")
+			//nolint:errcheck // ignore PUT errors
+			_, _ = apiRequest("PUT", "/tasks/"+idPart, map[string]any{"completed": true})
+		}
+	}
+
+	return true
+}
+
+// createMilestoneTask creates a task that represents a milestone for a goal
+func createMilestoneTask(day time.Time, hour, minute, durationMin int, title, icon, categoryID string,
+	quantity *float64, unitID, goalTitle string, goals map[string]string,
+	positives []map[string]any, milestoneLabel string, milestoneOrder int) bool {
+
+	startTime := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, day.Location())
+	endTime := startTime.Add(time.Duration(durationMin) * time.Minute)
+
+	payload := map[string]any{
+		"title":      title,
+		"start_date": startTime.Format(time.RFC3339),
+		"end_date":   endTime.Format(time.RFC3339),
+		"source":     "manual",
+		"completed":  true,
+	}
+
+	if categoryID != "" {
+		payload["category_id"] = categoryID
+	}
+
+	if quantity != nil && unitID != "" {
+		payload["quantity"] = map[string]any{
+			"value":   *quantity,
+			"unit_id": unitID,
+		}
+	}
+
+	// Add milestone goal link
+	if goalTitle != "" && goals != nil && goals[goalTitle] != "" {
+		payload["goal_links"] = []map[string]any{{
+			"goal_id":         goals[goalTitle],
+			"impact_type":     "positive",
+			"is_milestone":    true,
+			"milestone_label": milestoneLabel,
+			"milestone_order": milestoneOrder,
+		}}
+		if quantity != nil {
+			//nolint:errcheck // acceptable in seeder
+			payload["goal_links"].([]map[string]any)[0]["quantity_value"] = *quantity
+		}
+	}
+
+	if len(positives) > 0 {
+		payload["positives"] = positives
+	}
+
+	// Milestones get positive emotions
+	emotions := []string{"emotions:E25", "emotions:E26", "emotions:E35"} // Joy, Excited, Proud
+	payload["emotion_id"] = emotions[rand.Intn(len(emotions))]
+
+	_, err := apiRequest("POST", "/tasks", payload)
+	return err == nil
+}
+
+// createTaskWithNegativeImpact creates a task with negative impact on a goal (for avoidance goals)
+func createTaskWithNegativeImpact(day time.Time, hour, minute, durationMin int, title, icon, categoryID string,
+	quantity *float64, unitID, goalTitle string, goals map[string]string, negatives []map[string]any) bool {
+
+	startTime := time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, day.Location())
+	endTime := startTime.Add(time.Duration(durationMin) * time.Minute)
+
+	payload := map[string]any{
+		"title":      title,
+		"start_date": startTime.Format(time.RFC3339),
+		"end_date":   endTime.Format(time.RFC3339),
+		"source":     "manual",
+		"completed":  true,
+	}
+
+	if categoryID != "" {
+		payload["category_id"] = categoryID
+	}
+
+	if quantity != nil && unitID != "" {
+		payload["quantity"] = map[string]any{
+			"value":   *quantity,
+			"unit_id": unitID,
+		}
+	}
+
+	// Add negative impact goal link
+	if goalTitle != "" && goals != nil && goals[goalTitle] != "" {
+		payload["goal_links"] = []map[string]any{{
+			"goal_id":     goals[goalTitle],
+			"impact_type": "negative", // Important: negative impact for avoidance
+		}}
+		if quantity != nil {
+			//nolint:errcheck // acceptable in seeder
+			payload["goal_links"].([]map[string]any)[0]["quantity_value"] = *quantity
+		}
+	}
+
+	if len(negatives) > 0 {
+		payload["negatives"] = negatives
+	}
+
+	// Slip-ups get low energy/negative emotions
+	emotions := []string{"emotions:E61", "emotions:E71", "emotions:E81"} // Disappointed, Guilty, Ashamed
+	payload["emotion_id"] = emotions[rand.Intn(len(emotions))]
+
+	_, err := apiRequest("POST", "/tasks", payload)
+	return err == nil
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+// randomElement returns a random element from a string slice
+func randomElement(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	return items[rand.Intn(len(items))]
 }

@@ -63,7 +63,13 @@ type Goal struct {
 	// Status: only 3 states
 	Status string `json:"status"` // "active", "completed", "archived"
 
-	// Computed statistics (populated on read, not stored)
+	// Denormalized streak fields (stored on goal for fast reads)
+	// These are updated when tasks are completed, not computed on every read
+	CurrentStreak     int        `json:"current_streak"`                // Current consecutive completion streak
+	LongestStreak     int        `json:"longest_streak"`                // All-time best streak
+	LastCompletedDate *time.Time `json:"last_completed_date,omitempty"` // Last time goal/habit was met
+
+	// Computed statistics (populated on read from related data)
 	Stats *GoalStats `json:"stats,omitempty"`
 
 	// Organization

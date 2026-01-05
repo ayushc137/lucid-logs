@@ -34,6 +34,10 @@ type Repository interface {
 	// Create creates a new task-goal link using RELATE.
 	Create(ctx context.Context, taskID, goalID string, req *LinkRequest, userID string) (*TaskGoal, error)
 
+	// CreateBatch creates multiple task-goal links in a single operation.
+	// This is more efficient than calling Create multiple times.
+	CreateBatch(ctx context.Context, taskID string, links []LinkRequest) ([]*TaskGoal, error)
+
 	// FindByTaskAndGoal checks if a link exists between a task and goal.
 	FindByTaskAndGoal(ctx context.Context, taskID, goalID string) (*TaskGoal, error)
 
@@ -42,6 +46,9 @@ type Repository interface {
 
 	// DeleteByEdgeID removes a link by its edge ID.
 	DeleteByEdgeID(ctx context.Context, edgeID string) error
+
+	// DeleteByTask removes all goal links for a task.
+	DeleteByTask(ctx context.Context, taskID string) error
 }
 
 // =============================================================================
@@ -165,6 +172,84 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 }
 
 // =============================================================================
+// CREATE BATCH
+// =============================================================================
+
+// CreateBatch creates multiple task-goal links efficiently in a single query.
+// This uses SurrealDB's FOR loop to minimize database round trips.
+func (r *repository) CreateBatch(ctx context.Context, taskID string, links []LinkRequest) ([]*TaskGoal, error) {
+	if len(links) == 0 {
+		return []*TaskGoal{}, nil
+	}
+
+	taskRecordID := database.MustRecordID("tasks", taskID)
+	now := time.Now().UTC()
+
+	// Build array of link data for batch insertion
+	linkData := make([]map[string]any, len(links))
+	for i, link := range links {
+		impactMagnitude := link.ImpactMagnitude
+		if impactMagnitude == 0 {
+			impactMagnitude = 1
+		}
+
+		linkData[i] = map[string]any{
+			"goal_id":          link.GoalID,
+			"impact_type":      link.ImpactType,
+			"impact_magnitude": impactMagnitude,
+			"quantity_value":   link.QuantityValue,
+			"unit_id":          link.UnitID,
+			"notes":            link.Notes,
+			"is_milestone":     link.IsMilestone,
+			"milestone_label":  link.MilestoneLabel,
+			"milestone_order":  link.MilestoneOrder,
+		}
+	}
+
+	// Use FOR loop for batch creation in single query
+	results, err := database.QueryAll[taskGoalDB](ctx, r.db, `
+		FOR $link IN $links {
+			LET $goal = type::thing("goals", string::split($link.goal_id, ":")[1]);
+			RELATE $task -> task_goals -> $goal SET
+				impact_type = $link.impact_type,
+				impact_magnitude = $link.impact_magnitude,
+				quantity_value = $link.quantity_value,
+				unit_id = $link.unit_id,
+				notes = $link.notes,
+				source = $source,
+				is_milestone = $link.is_milestone,
+				milestone_label = $link.milestone_label,
+				milestone_order = $link.milestone_order,
+				created_at = $now;
+		}
+	`, map[string]any{
+		"task":   taskRecordID,
+		"links":  linkData,
+		"source": SourceManual,
+		"now":    now,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).
+			Str("task_id", taskID).
+			Int("link_count", len(links)).
+			Msg("failed to create batch task-goal links")
+		return nil, errors.ErrDatabase.Wrap(err)
+	}
+
+	taskGoals := make([]*TaskGoal, len(results))
+	for i, tg := range results {
+		taskGoals[i] = tg.toTaskGoal()
+	}
+
+	r.logger.Info().
+		Str("task_id", taskID).
+		Int("link_count", len(links)).
+		Msg("batch task-goal links created")
+
+	return taskGoals, nil
+}
+
+// =============================================================================
 // FIND BY TASK AND GOAL
 // =============================================================================
 
@@ -238,5 +323,24 @@ func (r *repository) DeleteByEdgeID(ctx context.Context, edgeID string) error {
 	}
 
 	r.logger.Info().Str("edge_id", edgeID).Msg("task-goal link deleted by ID")
+	return nil
+}
+
+// DeleteByTask removes all goal links for a specific task.
+// This is useful when deleting a task or resetting all its goal associations.
+func (r *repository) DeleteByTask(ctx context.Context, taskID string) error {
+	taskRecordID := database.MustRecordID("tasks", taskID)
+
+	_, err := database.QueryAll[taskGoalDB](ctx, r.db, `
+		DELETE task_goals WHERE in = $task
+	`, map[string]any{
+		"task": taskRecordID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("task_id", taskID).Msg("failed to delete all task-goal links for task")
+		return errors.ErrDatabase.Wrap(err)
+	}
+
+	r.logger.Info().Str("task_id", taskID).Msg("all task-goal links deleted for task")
 	return nil
 }

@@ -66,6 +66,10 @@ type Repository interface {
 
 	// ComputeStats calculates the current stats for a goal.
 	ComputeStats(ctx context.Context, goalID, userID string) (*GoalStats, error)
+
+	// UpdateStreaks updates the denormalized streak fields on a goal.
+	// Called when a task is completed or a habit entry is logged.
+	UpdateStreaks(ctx context.Context, goalID string, currentStreak, longestStreak int, lastCompleted *time.Time) error
 }
 
 // GoalFilters contains optional filters for listing goals.
@@ -117,6 +121,11 @@ type goalDB struct {
 
 	Status   string `json:"status"`
 	Priority int    `json:"priority"`
+
+	// Denormalized streak fields (stored for fast reads)
+	CurrentStreak     int                   `json:"current_streak"`
+	LongestStreak     int                   `json:"longest_streak"`
+	LastCompletedDate *database.SurrealTime `json:"last_completed_date,omitempty"`
 
 	// Linked tasks (populated via subquery)
 	LinkedTasks []goalTaskDB `json:"linked_tasks,omitempty"`
@@ -193,8 +202,18 @@ func (g *goalDB) toGoal() *Goal {
 		Status:   g.Status,
 		Priority: g.Priority,
 
+		// Denormalized streak fields (stored for fast reads)
+		CurrentStreak: g.CurrentStreak,
+		LongestStreak: g.LongestStreak,
+
 		CreatedAt: g.CreatedAt.Time,
 		UpdatedAt: g.UpdatedAt.Time,
+	}
+
+	// Convert last completed date
+	if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
+		t := g.LastCompletedDate.Time
+		goal.LastCompletedDate = &t
 	}
 
 	// Convert category
@@ -848,4 +867,44 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 	}
 
 	return stats, nil
+}
+
+// =============================================================================
+// STREAK OPERATIONS
+// =============================================================================
+
+// UpdateStreaks updates the denormalized streak fields directly on the goal.
+// This is called when tasks are completed or habit entries are logged.
+func (r *repository) UpdateStreaks(ctx context.Context, goalID string, currentStreak, longestStreak int, lastCompleted *time.Time) error {
+	gID := database.MustRecordID(Table, goalID)
+	now := time.Now().UTC()
+
+	updateData := map[string]any{
+		"current_streak": currentStreak,
+		"longest_streak": longestStreak,
+		"updated_at":     now,
+	}
+
+	if lastCompleted != nil {
+		updateData["last_completed_date"] = *lastCompleted
+	}
+
+	_, err := database.QueryAll[goalDB](ctx, r.db, `
+		UPDATE type::thing($id) MERGE $data
+	`, map[string]any{
+		"id":   gID,
+		"data": updateData,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("goal_id", goalID).Msg("update streaks failed")
+		return err
+	}
+
+	r.logger.Debug().
+		Str("goal_id", goalID).
+		Int("current_streak", currentStreak).
+		Int("longest_streak", longestStreak).
+		Msg("goal streaks updated")
+
+	return nil
 }
