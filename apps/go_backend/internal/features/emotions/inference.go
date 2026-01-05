@@ -29,8 +29,8 @@ type emotionInput struct {
 //  4. Find closest matching emotion from grid
 //  5. Calculate dissonance score (internal conflict)
 func InferFromItems(positives, negatives []TaskItem) *InferredEmotion {
-	// Collect all items with emotions
-	var inputs []emotionInput
+	// Collect all items with emotions - pre-allocate with max capacity
+	inputs := make([]emotionInput, 0, len(positives)+len(negatives))
 	positiveCount := 0
 	negativeCount := 0
 

@@ -15,6 +15,9 @@
 //
 //	go run ./cmd/seed
 //	go run ./cmd/seed --reset  # Delete existing data first
+//
+//nolint:gosec // G404: math/rand is acceptable for seeding test data
+//nolint:gocritic // exitAfterDefer: we explicitly close resources before log.Fatal
 package main
 
 import (
@@ -24,7 +27,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand" //nolint:gosec // G404: weak random is fine for test data
 	"net/http"
 	"os"
 	"strings"
@@ -89,8 +92,10 @@ func main() {
 	httpClient = &http.Client{Timeout: 30 * time.Second}
 
 	// Authenticate and get token
-	authToken, err = authenticate(cfg.Admin.Username, cfg.Admin.Password)
+	authToken, err = authenticate(ctx, cfg.Admin.Username, cfg.Admin.Password)
 	if err != nil {
+		db.Close(ctx) //nolint:errcheck // cleanup before exit
+		//nolint:gocritic // exitAfterDefer: we explicitly close db above
 		log.Fatal().Err(err).Msg("Failed to authenticate - make sure backend is running")
 	}
 	log.Info().Str("email", cfg.Admin.Username).Msg("✅ Authenticated as admin user")
@@ -140,16 +145,29 @@ type loginResponse struct {
 	} `json:"data"`
 }
 
-func authenticate(email, password string) (string, error) {
-	payload, _ := json.Marshal(loginRequest{Username: email, Password: password})
-	resp, err := http.Post(apiBaseURL+"/auth/login", "application/json", bytes.NewBuffer(payload))
+func authenticate(ctx context.Context, email, password string) (string, error) {
+	payload, err := json.Marshal(loginRequest{Username: email, Password: password})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal login request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBaseURL+"/auth/login", bytes.NewBuffer(payload))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("login request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("login failed with status %d and could not read body", resp.StatusCode)
+		}
 		return "", fmt.Errorf("login failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -179,7 +197,7 @@ func apiRequest(method, path string, body any) (map[string]any, error) {
 		reqBody = bytes.NewBuffer(jsonBody)
 	}
 
-	req, err := http.NewRequest(method, apiBaseURL+path, reqBody)
+	req, err := http.NewRequestWithContext(context.Background(), method, apiBaseURL+path, reqBody)
 	if err != nil {
 		return nil, err
 	}
@@ -249,6 +267,7 @@ func resetSeededData(ctx context.Context, db *database.DB, userID string) error 
 	}
 
 	for _, table := range tables {
+		//nolint:errcheck // ignore delete errors in reset
 		_, _ = database.QueryAll[any](ctx, db, fmt.Sprintf(`
 			DELETE %s WHERE created_by = $user OR true
 		`, table), map[string]any{"user": userID})
@@ -281,6 +300,7 @@ func seedUnits(ctx context.Context, db *database.DB) error {
 	}
 
 	for _, u := range units {
+		//nolint:errcheck // ignore upsert errors for idempotent seeding
 		_, _ = database.QueryAll[any](ctx, db, `
 			UPSERT type::thing($id) CONTENT {
 				name: $name,
@@ -701,10 +721,8 @@ func seedTemplates(categories, goals map[string]string) (map[string]string, erro
 // TASK SEEDING (30 Days of Realistic Data)
 // =============================================================================
 
-func seedTasksMultiDay(categories, goals, templates map[string]string) (int, int) {
+func seedTasksMultiDay(categories, goals, templates map[string]string) (totalTasks, totalLinks int) {
 	now := time.Now()
-	totalTasks := 0
-	totalLinks := 0
 
 	// Seed past 30 days + today + 3 future days
 	for dayOffset := -30; dayOffset <= 3; dayOffset++ {
@@ -717,12 +735,9 @@ func seedTasksMultiDay(categories, goals, templates map[string]string) (int, int
 	return totalTasks, totalLinks
 }
 
-func seedTasksForDay(day time.Time, dayOffset int, categories, goals, templates map[string]string) (int, int) {
+func seedTasksForDay(day time.Time, dayOffset int, categories, goals, templates map[string]string) (tasks, links int) {
 	isPast := dayOffset < 0
 	isWeekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
-
-	tasks := 0
-	links := 0
 
 	// Random whether this day meets hydration goal
 	meetsHydration := rand.Float32() < 0.8 // 80% chance
@@ -832,6 +847,7 @@ func createTask(day time.Time, hour, minute, durationMin int, title, icon, categ
 			"impact_type": "positive",
 		}}
 		if quantity != nil {
+			//nolint:errcheck // acceptable in seeder - map assignment always succeeds
 			payload["goal_links"].([]map[string]any)[0]["quantity_value"] = *quantity
 		}
 	}
@@ -851,6 +867,7 @@ func createTask(day time.Time, hour, minute, durationMin int, title, icon, categ
 	if completed {
 		if taskID, ok := resp["id"].(string); ok {
 			idPart := strings.TrimPrefix(taskID, "tasks:")
+			//nolint:errcheck // ignore PUT errors for marking complete
 			_, _ = apiRequest("PUT", "/tasks/"+idPart, map[string]any{"completed": true})
 		}
 	}

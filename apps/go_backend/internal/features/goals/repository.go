@@ -234,14 +234,7 @@ func (g *goalDB) toGoal() *Goal {
 	if len(g.LinkedTasks) > 0 {
 		goal.LinkedTasks = make([]GoalTaskLink, len(g.LinkedTasks))
 		for i, lt := range g.LinkedTasks {
-			goal.LinkedTasks[i] = GoalTaskLink{
-				TaskID:          lt.TaskID,
-				TaskTitle:       lt.TaskTitle,
-				ImpactType:      lt.ImpactType,
-				ImpactMagnitude: lt.ImpactMagnitude,
-				QuantityValue:   lt.QuantityValue,
-				UnitID:          lt.UnitID,
-			}
+			goal.LinkedTasks[i] = GoalTaskLink(lt)
 		}
 	}
 

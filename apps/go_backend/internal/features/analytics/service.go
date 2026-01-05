@@ -142,12 +142,12 @@ func (s *service) GenerateChart(ctx context.Context, userID string, req *ChartRe
 // INDIVIDUAL METRICS
 // =============================================================================
 
-func (s *service) GetTaskMetrics(ctx context.Context, userID string, period string, start, end *time.Time) (*TaskMetrics, error) {
+func (s *service) GetTaskMetrics(ctx context.Context, userID, period string, start, end *time.Time) (*TaskMetrics, error) {
 	startTime, endTime := s.resolvePeriod(period, start, end)
 	return s.repo.GetTaskMetrics(ctx, userID, startTime, endTime)
 }
 
-func (s *service) GetEmotionMetrics(ctx context.Context, userID string, period string, start, end *time.Time) (*EmotionMetrics, error) {
+func (s *service) GetEmotionMetrics(ctx context.Context, userID, period string, start, end *time.Time) (*EmotionMetrics, error) {
 	startTime, endTime := s.resolvePeriod(period, start, end)
 	return s.repo.GetEmotionMetrics(ctx, userID, startTime, endTime)
 }
@@ -156,7 +156,7 @@ func (s *service) GetGoalMetrics(ctx context.Context, userID string) (*GoalMetri
 	return s.repo.GetGoalMetrics(ctx, userID)
 }
 
-func (s *service) GetCategoryMetrics(ctx context.Context, userID string, period string, start, end *time.Time) (*CategoryMetrics, error) {
+func (s *service) GetCategoryMetrics(ctx context.Context, userID, period string, start, end *time.Time) (*CategoryMetrics, error) {
 	startTime, endTime := s.resolvePeriod(period, start, end)
 	return s.repo.GetCategoryMetrics(ctx, userID, startTime, endTime)
 }
@@ -165,7 +165,7 @@ func (s *service) GetCategoryMetrics(ctx context.Context, userID string, period 
 // DASHBOARD
 // =============================================================================
 
-func (s *service) GetDashboard(ctx context.Context, userID string, period string) (*DashboardResponse, error) {
+func (s *service) GetDashboard(ctx context.Context, userID, period string) (*DashboardResponse, error) {
 	start, end := s.resolvePeriod(period, nil, nil)
 
 	tasks, err := s.repo.GetTaskMetrics(ctx, userID, start, end)
@@ -202,14 +202,12 @@ func (s *service) GetDashboard(ctx context.Context, userID string, period string
 // =============================================================================
 
 // resolvePeriod converts a period string to start/end times.
-func (s *service) resolvePeriod(period string, start, end *time.Time) (time.Time, time.Time) {
+func (s *service) resolvePeriod(period string, start, end *time.Time) (startTime, endTime time.Time) {
 	now := time.Now().UTC()
 
 	if period == PeriodCustom && start != nil && end != nil {
 		return *start, *end
 	}
-
-	var startTime, endTime time.Time
 
 	switch period {
 	case PeriodDay:

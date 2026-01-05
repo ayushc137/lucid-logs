@@ -279,8 +279,8 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 
 	// Check for duplicate name if changing
 	if req.Name != nil {
-		if err := r.checkDuplicateName(ctx, *req.Name, existing.ID, userID); err != nil {
-			return nil, err
+		if dupErr := r.checkDuplicateName(ctx, *req.Name, existing.ID, userID); dupErr != nil {
+			return nil, dupErr
 		}
 	}
 
@@ -392,6 +392,6 @@ func (r *repository) checkDuplicateName(ctx context.Context, name, excludeID, us
 // generateCategoryRecordID generates a unique category ID as models.RecordID.
 func generateCategoryRecordID() models.RecordID {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes) //nolint:errcheck // crypto/rand.Read never fails in practice
 	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }

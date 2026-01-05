@@ -1,8 +1,9 @@
 package emotions
 
 import (
-	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
+
+	"github.com/lucid-logs/go-backend/internal/shared/database"
 )
 
 // =============================================================================

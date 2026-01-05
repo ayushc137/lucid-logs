@@ -2,16 +2,17 @@
 package goals
 
 import (
+	stderrors "errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -334,7 +335,12 @@ func handleGoalError(c *gin.Context, err error) {
 	case errors.Is(err, errors.ErrNotFound):
 		response.NotFound(c)
 	case errors.Is(err, errors.ErrBadRequest):
-		response.Error(c, err.(*errors.AppError))
+		var appErr *errors.AppError
+		if stderrors.As(err, &appErr) {
+			response.Error(c, appErr)
+		} else {
+			response.ErrorFromErr(c, err)
+		}
 	default:
 		response.ErrorFromErr(c, err)
 	}

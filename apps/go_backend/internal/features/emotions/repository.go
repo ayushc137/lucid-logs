@@ -3,9 +3,10 @@ package emotions
 import (
 	"context"
 
-	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/lucid-logs/go-backend/internal/shared/database"
 )
 
 // =============================================================================

@@ -41,7 +41,7 @@ func main() {
 	featureDir := filepath.Join("internal", "features", name)
 
 	// Create directory
-	if err := os.MkdirAll(featureDir, 0755); err != nil {
+	if err := os.MkdirAll(featureDir, 0o755); err != nil {
 		fmt.Printf("Error creating directory: %v\n", err)
 		os.Exit(1)
 	}

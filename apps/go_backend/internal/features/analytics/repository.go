@@ -354,12 +354,7 @@ func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start
 
 	topEmotionsList := make([]EmotionCount, len(topEmotions))
 	for i, e := range topEmotions {
-		topEmotionsList[i] = EmotionCount{
-			EmotionID:   e.EmotionID,
-			EmotionName: e.EmotionName,
-			Quadrant:    e.Quadrant,
-			Count:       e.Count,
-		}
+		topEmotionsList[i] = EmotionCount(e)
 	}
 
 	// Calculate mood stability (1 - normalized std dev)
@@ -421,8 +416,8 @@ func (r *repository) GetGoalMetrics(ctx context.Context, userID string) (*GoalMe
 
 	var activeCount, completedCount, totalStreakDays int
 	var totalProgress float64
-	var progressList []GoalProgress
-	var streakLeaders []StreakInfo
+	progressList := make([]GoalProgress, 0, len(goals))
+	streakLeaders := make([]StreakInfo, 0, len(goals))
 
 	for _, g := range goals {
 		if g.Status == "active" {
@@ -444,7 +439,7 @@ func (r *repository) GetGoalMetrics(ctx context.Context, userID string) (*GoalMe
 		totalProgress += progress
 
 		progressList = append(progressList, GoalProgress{
-			GoalID:       fmt.Sprintf("%v", g.GoalID),
+			GoalID:       g.GoalID,
 			GoalTitle:    g.GoalTitle,
 			GoalType:     g.GoalType,
 			Progress:     progress,
@@ -455,7 +450,7 @@ func (r *repository) GetGoalMetrics(ctx context.Context, userID string) (*GoalMe
 
 		if g.CurrentStreak > 0 {
 			streakLeaders = append(streakLeaders, StreakInfo{
-				GoalID:        fmt.Sprintf("%v", g.GoalID),
+				GoalID:        g.GoalID,
 				GoalTitle:     g.GoalTitle,
 				CurrentStreak: g.CurrentStreak,
 				LongestStreak: g.LongestStreak,
@@ -508,7 +503,7 @@ type dailyValueDB struct {
 	Value float64 `json:"value"`
 }
 
-func (r *repository) GetTimeSeriesData(ctx context.Context, userID string, metric, groupBy string, start, end time.Time) (*TimeSeriesData, error) {
+func (r *repository) GetTimeSeriesData(ctx context.Context, userID, metric, groupBy string, start, end time.Time) (*TimeSeriesData, error) {
 	var query string
 
 	switch metric {

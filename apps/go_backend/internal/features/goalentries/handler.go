@@ -2,15 +2,16 @@
 package goalentries
 
 import (
+	stderrors "errors"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -163,8 +164,11 @@ func (h *Handler) Create(c *gin.Context) {
 			return
 		}
 		if errors.Is(err, errors.ErrBadRequest) {
-			response.Error(c, err.(*errors.AppError))
-			return
+			var appErr *errors.AppError
+			if stderrors.As(err, &appErr) {
+				response.Error(c, appErr)
+				return
+			}
 		}
 		response.ErrorFromErr(c, err)
 		return

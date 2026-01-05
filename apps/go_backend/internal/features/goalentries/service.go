@@ -151,6 +151,7 @@ func (s *service) Create(ctx context.Context, goalID, userID string, req *Create
 	}
 
 	// Check if entry already exists for this date
+	//nolint:errcheck // intentionally ignoring error - we just need to check existence
 	existing, _ := s.repo.FindByGoalAndDate(ctx, goalID, date)
 	if existing != nil {
 		// Update existing entry instead of creating duplicate
@@ -227,6 +228,7 @@ func (s *service) LogTaskContribution(ctx context.Context, goalID, taskID, userI
 	dateStr := today.Format("2006-01-02")
 
 	// Check if entry exists for today
+	//nolint:errcheck // intentionally ignoring error - we just need to check existence
 	existing, _ := s.repo.FindByGoalAndDate(ctx, goalID, today)
 
 	if existing != nil {

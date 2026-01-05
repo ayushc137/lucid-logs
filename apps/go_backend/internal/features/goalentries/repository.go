@@ -295,6 +295,6 @@ func (r *repository) Delete(ctx context.Context, id string) error {
 
 func generateRecordID() models.RecordID {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes) //nolint:errcheck // crypto/rand.Read never fails in practice
 	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }

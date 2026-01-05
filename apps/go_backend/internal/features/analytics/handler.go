@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
@@ -244,11 +245,9 @@ func (h *Handler) GetCategoryMetrics(c *gin.Context) {
 // HELPERS
 // =============================================================================
 
-func (h *Handler) parseDateRange(c *gin.Context) (*time.Time, *time.Time) {
+func (h *Handler) parseDateRange(c *gin.Context) (start, end *time.Time) {
 	startStr := c.Query("start_date")
 	endStr := c.Query("end_date")
-
-	var start, end *time.Time
 
 	if startStr != "" {
 		if t, err := time.Parse(time.RFC3339, startStr); err == nil {
