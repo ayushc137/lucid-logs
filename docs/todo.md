@@ -6,7 +6,7 @@ FE add goal logging
 check completion of goal and task, does task completion is needed for goals
 completion, streak etc check and ui changes, also ui changes in goals based on tyep of goal 
 gial craation anf all 
-
+goal chils, goals and tempaltes i nitmeline and agenda 
 
 
 

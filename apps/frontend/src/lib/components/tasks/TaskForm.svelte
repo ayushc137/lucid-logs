@@ -1801,16 +1801,27 @@
                         min="0"
                         max="5"
                         bind:value={priority}
-                        class="range range-sm range-primary transition-all duration-200"
+                        class="range range-sm range-primary w-full transition-all duration-200"
                         step="1"
                     />
                     <div
-                        class="flex justify-between text-[10px] px-1 mt-1.5 opacity-50"
+                        class="relative h-5 text-[10px] mt-1.5 opacity-50 mx-0.5"
                     >
-                        {#each priorityLabels as label}
-                            <span class="text-center min-w-0 flex-1"
-                                >{label}</span
+                        {#each priorityLabels as label, i}
+                            <span
+                                class="absolute top-0 whitespace-nowrap"
+                                style="
+                                    left: {(i / (priorityLabels.length - 1)) *
+                                    100}%;
+                                    transform: translateX({i === 0
+                                    ? '0%'
+                                    : i === priorityLabels.length - 1
+                                      ? '-100%'
+                                      : '-50%'});
+                                "
                             >
+                                {label}
+                            </span>
                         {/each}
                     </div>
                 </Card>
