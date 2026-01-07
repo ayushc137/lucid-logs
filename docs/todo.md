@@ -15,7 +15,7 @@ goal chils, goals and tempaltes i nitmeline and agenda
 optimise file structure, db queries, api calls and fe components setup 
 
 
-
+optimise emotion generation as it fucks up on every load 
 
 
 check all integration and use cases , all goal type , template etc
