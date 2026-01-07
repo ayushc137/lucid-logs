@@ -137,10 +137,16 @@ type goalDB struct {
 	Children []goalChildDB `json:"children,omitempty"`
 
 	// Computed stats (populated via subquery in optimized fetches)
-	ComputedCurrentValue      float64 `json:"computed_current_value,omitempty"`
-	ComputedTaskCount         int     `json:"computed_task_count,omitempty"`
-	ComputedChildrenTotal     int     `json:"computed_children_total,omitempty"`
-	ComputedChildrenCompleted int     `json:"computed_children_completed,omitempty"`
+	// Consolidating stats into single objects to reduce graph traversals
+	FilteredStats *struct {
+		Total any `json:"total"`
+		Count any `json:"count"`
+	} `json:"filtered_stats,omitempty"`
+
+	ChildrenStats *struct {
+		Total     any `json:"total"`
+		Completed any `json:"completed"`
+	} `json:"children_stats,omitempty"`
 
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
@@ -263,16 +269,29 @@ func (g *goalDB) toGoal() *Goal {
 		}
 	}
 
+	// Convert computed stats using helper functions for any -> numeric conversion
+	var computedTaskCount, computedChildrenTotal, computedChildrenCompleted int
+	var computedCurrentValue float64
+
+	if g.FilteredStats != nil {
+		computedTaskCount = anyToInt(g.FilteredStats.Count)
+		computedCurrentValue = anyToFloat64(g.FilteredStats.Total)
+	}
+	if g.ChildrenStats != nil {
+		computedChildrenTotal = anyToInt(g.ChildrenStats.Total)
+		computedChildrenCompleted = anyToInt(g.ChildrenStats.Completed)
+	}
+
 	// Map computed stats from DB to Goal.Stats if present
 	// This supports the optimized single-query pattern
-	if g.ComputedTaskCount > 0 || g.ComputedChildrenTotal > 0 || g.Target != nil {
+	if computedTaskCount > 0 || computedChildrenTotal > 0 || g.Target != nil {
 		stats := &GoalStats{
-			CurrentValue:       g.ComputedCurrentValue,
-			TotalContributions: g.ComputedTaskCount,
+			CurrentValue:       computedCurrentValue,
+			TotalContributions: computedTaskCount,
 			CurrentStreak:      g.CurrentStreak,
 			LongestStreak:      g.LongestStreak,
-			ChildrenTotal:      g.ComputedChildrenTotal,
-			ChildrenCompleted:  g.ComputedChildrenCompleted,
+			ChildrenTotal:      computedChildrenTotal,
+			ChildrenCompleted:  computedChildrenCompleted,
 		}
 
 		if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
@@ -314,12 +333,82 @@ func (g *goalDB) toGoal() *Goal {
 	return goal
 }
 
+// anyToFloat64 converts an any type (from SurrealDB) to float64
+func anyToFloat64(v any) float64 {
+	if v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case float32:
+		return float64(n)
+	case int64:
+		return float64(n)
+	case int32:
+		return float64(n)
+	case int:
+		return float64(n)
+	case uint64:
+		return float64(n)
+	case uint32:
+		return float64(n)
+	case uint:
+		return float64(n)
+	default:
+		return 0
+	}
+}
+
+// anyToInt converts an any type (from SurrealDB) to int
+func anyToInt(v any) int {
+	if v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case float32:
+		return int(n)
+	case int64:
+		return int(n)
+	case int32:
+		return int(n)
+	case int:
+		return n
+	case uint64:
+		return int(n)
+	case uint32:
+		return int(n)
+	case uint:
+		return int(n)
+	default:
+		return 0
+	}
+}
+
 func mapToRecurrence(m map[string]any) *Recurrence {
 	if m == nil {
 		return nil
 	}
 	r := &Recurrence{}
-	if v, ok := m["frequency"].(float64); ok {
+	// Handle frequency - SurrealDB SDK may return various numeric types
+	switch v := m["frequency"].(type) {
+	case float64:
+		r.Frequency = int(v)
+	case float32:
+		r.Frequency = int(v)
+	case int64:
+		r.Frequency = int(v)
+	case int32:
+		r.Frequency = int(v)
+	case int:
+		r.Frequency = v
+	case uint64:
+		r.Frequency = int(v)
+	case uint32:
+		r.Frequency = int(v)
+	case uint:
 		r.Frequency = int(v)
 	}
 	if v, ok := m["period"].(string); ok {
@@ -338,7 +427,23 @@ func mapToRecurrence(m map[string]any) *Recurrence {
 	if v, ok := m["after_time"].(string); ok {
 		r.AfterTime = v
 	}
-	if v, ok := m["grace_days"].(float64); ok {
+	// Handle grace_days - same as frequency
+	switch v := m["grace_days"].(type) {
+	case float64:
+		r.GraceDays = int(v)
+	case float32:
+		r.GraceDays = int(v)
+	case int64:
+		r.GraceDays = int(v)
+	case int32:
+		r.GraceDays = int(v)
+	case int:
+		r.GraceDays = v
+	case uint64:
+		r.GraceDays = int(v)
+	case uint32:
+		r.GraceDays = int(v)
+	case uint:
 		r.GraceDays = int(v)
 	}
 	return r
@@ -351,8 +456,24 @@ func mapToTarget(m map[string]any) *Target {
 	t := &Target{
 		Operator: DefaultOperator, // Default to GTE
 	}
-	if v, ok := m["value"].(float64); ok {
+	// Handle value - SurrealDB SDK may return various numeric types
+	switch v := m["value"].(type) {
+	case float64:
 		t.Value = v
+	case float32:
+		t.Value = float64(v)
+	case int64:
+		t.Value = float64(v)
+	case int32:
+		t.Value = float64(v)
+	case int:
+		t.Value = float64(v)
+	case uint64:
+		t.Value = float64(v)
+	case uint32:
+		t.Value = float64(v)
+	case uint:
+		t.Value = float64(v)
 	}
 	if v, ok := m["unit_id"].(string); ok {
 		t.UnitID = v
@@ -378,19 +499,38 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 
 	goal, err := database.QueryFirst[goalDB](ctx, r.db, `
 		SELECT *,
-			(SELECT 
+			(SELECT
 				type::string(in) as task_id,
 				in.title as task_title,
 				impact_type,
 				impact_magnitude,
 				quantity_value,
 				unit_id
-			 FROM task_goals WHERE out = $parent.id) as linked_tasks,
-			(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category,
-			(SELECT math::sum(quantity_value) FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_current_value,
-			(SELECT count() FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_task_count,
-			(SELECT count() FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_total,
-			(SELECT count(out.status = 'completed') FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_completed
+			 FROM <-task_goals) as linked_tasks,
+			(->in_category.out.*)[0] as category,
+			(SELECT 
+				math::sum(quantity_value) AS total,
+				count() AS count
+			 FROM <-task_goals 
+				WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
+				AND (
+					$parent.target.per_period IS NOT TRUE
+					OR $parent.recurrence IS NONE
+					OR (
+						$parent.recurrence.period = 'day' AND time::day(in.completed_at) = time::day()
+					)
+					OR (
+						$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week()
+					)
+					OR (
+						$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
+					)
+				)
+				GROUP ALL)[0] as filtered_stats,
+			(SELECT 
+				count() AS total,
+				count(out.status = 'completed') AS completed
+			 FROM ->goal_children GROUP ALL)[0] as children_stats
 		FROM type::thing($id)
 	`, map[string]any{
 		"id": goalID,
@@ -480,13 +620,33 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Main query with linked tasks subquery and computed stats
-	dataQuery := `SELECT *, 
-		(SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, unit_id FROM task_goals WHERE out = $parent.id) as linked_tasks,
-		(SELECT out as category FROM in_category WHERE in = $parent.id)[0].category as category,
-		(SELECT math::sum(quantity_value) FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_current_value,
-		(SELECT count() FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_task_count,
-		(SELECT count() FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_total,
-		(SELECT count(out.status = 'completed') FROM goal_children WHERE in = $parent.id GROUP ALL)[0] as computed_children_completed
+	// For per_period goals, filter tasks by current period based on recurrence
+	dataQuery := `SELECT *,
+		(SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, unit_id FROM <-task_goals) as linked_tasks,
+		(->in_category.out.*)[0] as category,
+		(SELECT 
+			math::sum(quantity_value) AS total,
+			count() AS count
+		 FROM <-task_goals 
+			WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
+			AND (
+				$parent.target.per_period IS NOT TRUE
+				OR $parent.recurrence IS NONE
+				OR (
+					$parent.recurrence.period = 'day' AND time::day(in.completed_at) = time::day()
+				)
+				OR (
+					$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week()
+				)
+				OR (
+					$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
+				)
+			)
+			GROUP ALL)[0] as filtered_stats,
+		(SELECT 
+			count() AS total,
+			count(out.status = 'completed') AS completed
+		 FROM ->goal_children GROUP ALL)[0] as children_stats
 		FROM goals WHERE ` + whereClause + " " + orderClause + " LIMIT $limit START $offset"
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, dataQuery, queryVars)
 	if err != nil {
@@ -505,10 +665,27 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 func (r *repository) FindRecurringForDate(ctx context.Context, userID string, date time.Time) ([]*Goal, error) {
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
 		SELECT *,
-		(SELECT math::sum(quantity_value) FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_current_value,
-		(SELECT count() FROM task_goals WHERE out = $parent.id AND ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true) GROUP ALL)[0] as computed_task_count
-		FROM goals 
-		WHERE created_by = $user 
+		(SELECT 
+			math::sum(quantity_value) AS total,
+			count() AS count
+		 FROM <-task_goals 
+			WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
+			AND (
+				$parent.target.per_period IS NOT TRUE
+				OR $parent.recurrence IS NONE
+				OR (
+					$parent.recurrence.period = 'day' AND time::day(in.completed_at) = time::day()
+				)
+				OR (
+					$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week()
+				)
+				OR (
+					$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
+				)
+			)
+			GROUP ALL)[0] as filtered_stats
+		FROM goals
+		WHERE created_by = $user
 		  AND deleted_at IS NONE
 		  AND status = "active"
 		  AND recurrence IS NOT NONE
@@ -746,9 +923,9 @@ func (r *repository) FindChildren(ctx context.Context, parentGoalID, userID stri
 	parentID := database.MustRecordID(Table, parentGoalID)
 
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
-		SELECT out.* FROM goal_children 
-		WHERE in = $parent_id AND out.created_by = $user AND out.deleted_at IS NONE
-		ORDER BY order ASC
+		SELECT out.* FROM $parent_id->goal_children 
+		WHERE out.created_by = $user AND out.deleted_at IS NONE
+		ORDER BY `+"`order`"+` ASC
 	`, map[string]any{
 		"parent_id": parentID,
 		"user":      userID,
@@ -780,7 +957,7 @@ func (r *repository) AddChild(ctx context.Context, parentID, childID, userID str
 
 	_, err := database.QueryAll[any](ctx, r.db, `
 		RELATE $parent -> goal_children -> $child SET
-			order = $order,
+			`+"`order`"+` = $order,
 			required = $required,
 			created_by = $user,
 			created_at = $now
@@ -805,7 +982,7 @@ func (r *repository) RemoveChild(ctx context.Context, parentID, childID, userID 
 	cID := database.MustRecordID(Table, childID)
 
 	_, err := database.QueryAll[any](ctx, r.db, `
-		DELETE goal_children WHERE in = $parent AND out = $child
+		DELETE $parent->goal_children WHERE out = $child
 	`, map[string]any{
 		"parent": pID,
 		"child":  cID,
@@ -827,7 +1004,7 @@ func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, use
 	now := time.Now().UTC()
 
 	// Combine DELETE and RELATE into single transaction string
-	query := `DELETE in_category WHERE in = $goal_id;`
+	query := `DELETE $goal_id->in_category;`
 	params := map[string]any{
 		"goal_id": gID,
 	}
@@ -874,11 +1051,28 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		LastCompletedDate: goal.LastCompletedDate,
 	}
 
-	// Determine filter condition for tasks
-	taskFilter := "out = $goal_id"
+	// Build filter condition for tasks with period-based filtering
+	// Build filter condition for tasks
+	conditions := []string{}
 	if goal.Target != nil && goal.Target.TrackCompletedOnly {
-		// Only count completed tasks if configured
-		taskFilter += " AND in.completed = true"
+		conditions = append(conditions, "in.completed = true")
+	}
+
+	// Add period filtering if target is per_period
+	if goal.Target != nil && goal.Target.PerPeriod && goal.Recurrence != nil {
+		switch goal.Recurrence.Period {
+		case PeriodDay:
+			conditions = append(conditions, "time::day(in.completed_at) = time::day()")
+		case PeriodWeek:
+			conditions = append(conditions, "time::week(in.completed_at) = time::week()")
+		case PeriodMonth:
+			conditions = append(conditions, "time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()")
+		}
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	// Sum quantity values from task_goals
@@ -886,11 +1080,11 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		Total float64 `json:"total"`
 		Count int     `json:"count"`
 	}](ctx, r.db, `
-		SELECT 
+		SELECT
 			math::sum(quantity_value) as total,
 			count() as count
-		FROM task_goals 
-		WHERE `+taskFilter+`
+		FROM $goal_id<-task_goals
+		`+whereClause+`
 		GROUP ALL
 	`, map[string]any{
 		"goal_id": gID,
@@ -937,8 +1131,7 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		SELECT 
 			count() as total,
 			count(out.status = "completed") as completed
-		FROM goal_children 
-		WHERE in = $goal_id
+		FROM $goal_id->goal_children 
 		GROUP ALL
 	`, map[string]any{
 		"goal_id": gID,

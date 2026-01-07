@@ -67,7 +67,7 @@
             impact_type: "positive",
             impact_magnitude: 3,
             quantity_value: goal.target ? undefined : undefined,
-            quantity_unit: goal.target?.unit,
+            quantity_unit: goal.target?.unit_id,
         };
         editingLink = newLink;
     }
@@ -145,7 +145,7 @@
                         <!-- Goal Icon -->
                         <div
                             class="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
-                            style="background-color: {goal.color ||
+                            style="background-color: {goal.category?.color ||
                                 '#6b7280'}20;"
                         >
                             {goal.icon || "🎯"}
@@ -245,7 +245,7 @@
                                             }}
                                         />
                                         <span class="text-[10px] opacity-60"
-                                            >{goal.target.unit}</span
+                                            >{goal.target.unit_id}</span
                                         >
                                     </div>
                                 {/if}
@@ -374,7 +374,7 @@
                                     step="0.1"
                                     min="0"
                                     class="input input-bordered input-xs w-20"
-                                    placeholder={goal.target.unit}
+                                    placeholder={goal.target.unit_id}
                                     bind:value={editingLink.quantity_value}
                                 />
                             {/if}
@@ -422,8 +422,8 @@
                             >
                                 <div
                                     class="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
-                                    style="background-color: {goal.color ||
-                                        '#6b7280'}20;"
+                                    style="background-color: {goal.category
+                                        ?.color || '#6b7280'}20;"
                                 >
                                     {goal.icon || "🎯"}
                                 </div>
@@ -433,11 +433,10 @@
                                         >{goal.title}</span
                                     >
                                     <span class="text-[10px] opacity-50">
-                                        {goal.goal_type}
                                         {#if goal.target}
-                                            · {goal.target.current_value}/{goal
-                                                .target.value}
-                                            {goal.target.unit}
+                                            · {goal.stats?.current_value ||
+                                                0}/{goal.target.value}
+                                            {goal.target.unit_id}
                                         {/if}
                                     </span>
                                 </div>

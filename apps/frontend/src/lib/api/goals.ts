@@ -8,34 +8,46 @@ export interface Goal {
     id: string;
     title: string;
     description?: string;
-    why?: string;
     icon?: string;
-    color?: string;
-    goal_type: 'discrete' | 'measurable' | 'epic' | 'avoidance';
-    recurrence?: Recurrence;
+
+    // Target (optional - if absent, implies simple completion goal)
     target?: Target;
+
+    // Recurrence (optional - if present, this is a habit)
+    recurrence?: Recurrence;
+
+    // Status: only 3 states
+    status: 'active' | 'completed' | 'archived';
+
+    // Computed statistics (populated on read)
+    stats?: GoalStats;
+
+    // Organization
+    priority: number; // 1-3
+
+    // Timeline
     start_date?: string;
     deadline?: string;
-    status: 'active' | 'completed' | 'paused' | 'abandoned';
-    completion_date?: string;
-    current_streak: number;
-    longest_streak: number;
-    last_completed_date?: string;
-    grace_days_used: number;
-    priority: 1 | 2 | 3;
-    value_score: 1 | 2 | 3 | 4 | 5;
-    category_id?: string;
-    parent_goal_id?: string;
-    life_domain?: string;
-    success_signal?: string;
-    linked_template_id?: string;
-    activity_key?: string;
-    is_private: boolean;
-    linked_tasks?: GoalTaskLink[];
-    child_goals?: Goal[];
+    completed_at?: string;
+
+    // Metadata
     created_at: string;
     updated_at: string;
     deleted_at?: string;
+
+    // Populated via graph queries (not stored on goal record)
+    category?: { id: string; name: string; color: string; icon: string }; // Simplified from Category type for now
+    linked_tasks?: GoalTaskLink[];
+    children?: Goal[];
+    parent?: Goal;
+}
+
+export interface Target {
+    value: number;
+    operator: 'gte' | 'lte' | 'eq';
+    unit_id: string;
+    per_period: boolean;
+    track_completed_only?: boolean;
 }
 
 export interface Recurrence {
@@ -47,41 +59,49 @@ export interface Recurrence {
     grace_days?: number;
 }
 
-export interface Target {
-    value: number;
-    unit: string;
+export interface GoalStats {
     current_value: number;
-    per_period?: boolean;
-    track_completed_only?: boolean;
+    progress_percent: number;
+    current_streak: number;
+    longest_streak: number;
+    last_completed_date?: string;
+    today_status?: 'pending' | 'met' | 'exceeded';
+    children_total?: number;
+    children_completed?: number;
+    total_contributions: number;
 }
 
 export interface GoalTaskLink {
     task_id: string;
     task_title: string;
-    impact_type: string;
+    impact_type: 'positive' | 'negative' | 'neutral';
     impact_magnitude: number;
     quantity_value?: number;
-    quantity_unit?: string;
+    unit_id?: string;
 }
 
 export interface CreateGoalRequest {
     title: string;
     description?: string;
-    why?: string;
     icon?: string;
-    color?: string;
-    goal_type: 'discrete' | 'measurable' | 'epic' | 'avoidance';
+
+    target?: {
+        value: number;
+        operator?: 'gte' | 'lte' | 'eq';
+        unit_id: string;
+        per_period?: boolean;
+        track_completed_only?: boolean;
+    };
+
     recurrence?: Recurrence;
-    target?: { value: number; unit: string; per_period?: boolean; track_completed_only?: boolean };
+
     start_date?: string;
     deadline?: string;
-    priority?: 1 | 2 | 3;
-    value_score?: 1 | 2 | 3 | 4 | 5;
+
+    priority?: number;
     category_id?: string;
+
     parent_goal_id?: string;
-    life_domain?: string;
-    activity_key?: string;
-    is_private?: boolean;
 }
 
 // =============================================================================

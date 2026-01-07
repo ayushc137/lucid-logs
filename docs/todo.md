@@ -11,6 +11,13 @@ goal chils, goals and tempaltes i nitmeline and agenda
 
 
 
+
+optimise file structure, db queries, api calls and fe components setup 
+
+
+
+
+
 check all integration and use cases , all goal type , template etc
 ceheck all tranition, categories, prioritues etc
 

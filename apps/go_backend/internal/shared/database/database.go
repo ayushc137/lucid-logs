@@ -474,7 +474,7 @@ func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string
 		return v, nil
 	}
 
-	// Handle numeric conversions (SurrealDB often returns float64)
+	// Handle numeric conversions (SurrealDB often returns float64 or int64)
 	if f, ok := val.(float64); ok {
 		switch any(zero).(type) {
 		case int64:
@@ -485,6 +485,34 @@ func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string
 			return any(float32(f)).(T), nil
 		case float64:
 			return any(f).(T), nil
+		}
+	}
+
+	// Handle int64 (SurrealDB SDK may return int64 for integers)
+	if i, ok := val.(int64); ok {
+		switch any(zero).(type) {
+		case int64:
+			return any(i).(T), nil
+		case int:
+			return any(int(i)).(T), nil
+		case float32:
+			return any(float32(i)).(T), nil
+		case float64:
+			return any(float64(i)).(T), nil
+		}
+	}
+
+	// Handle int
+	if i, ok := val.(int); ok {
+		switch any(zero).(type) {
+		case int64:
+			return any(int64(i)).(T), nil
+		case int:
+			return any(i).(T), nil
+		case float32:
+			return any(float32(i)).(T), nil
+		case float64:
+			return any(float64(i)).(T), nil
 		}
 	}
 

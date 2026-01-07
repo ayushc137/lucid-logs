@@ -354,6 +354,10 @@ func seedAll(ctx context.Context, db *database.DB, userID string) error {
 	totalTasks, totalLinks := seedTasksMultiDay(ctx, db, categories, goals, templates)
 	log.Info().Int("tasks", totalTasks).Int("links", totalLinks).Msg("✅ Tasks and goal links created")
 
+	// 5. Update goal streaks and create goal history
+	streakUpdates := seedGoalStreaksAndHistory(ctx, db, goals)
+	log.Info().Int("updated", streakUpdates).Msg("✅ Goal streaks and history updated")
+
 	return nil
 }
 
@@ -365,18 +369,18 @@ var categoryDefs = []struct {
 	name  string
 	color string
 }{
-	{"Work", "#3B82F6"},        // Blue - professional
-	{"Health", "#10B981"},      // Green - vitality
-	{"Learning", "#8B5CF6"},    // Purple - knowledge
-	{"Personal", "#F59E0B"},    // Amber - warm personal
-	{"Finance", "#06B6D4"},     // Cyan - money/growth
-	{"Projects", "#0EA5E9"},    // Sky blue - building
-	{"Family", "#EC4899"},      // Pink - love/family
+	{"Work", "#3B82F6"},          // Blue - professional
+	{"Health", "#10B981"},        // Green - vitality
+	{"Learning", "#8B5CF6"},      // Purple - knowledge
+	{"Personal", "#F59E0B"},      // Amber - warm personal
+	{"Finance", "#06B6D4"},       // Cyan - money/growth
+	{"Projects", "#0EA5E9"},      // Sky blue - building
+	{"Family", "#EC4899"},        // Pink - love/family
 	{"Relationships", "#F97316"}, // Orange - social warmth
-	{"Hobbies", "#A855F7"},     // Violet - creative
-	{"Home", "#84CC16"},        // Lime - domestic/nature
-	{"Fitness", "#14B8A6"},     // Teal - active/energy
-	{"Mindfulness", "#6366F1"}, // Indigo - calm/spiritual
+	{"Hobbies", "#A855F7"},       // Violet - creative
+	{"Home", "#84CC16"},          // Lime - domestic/nature
+	{"Fitness", "#14B8A6"},       // Teal - active/energy
+	{"Mindfulness", "#6366F1"},   // Indigo - calm/spiritual
 }
 
 func seedCategories() (map[string]string, error) {
@@ -2089,7 +2093,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 
 		payload := map[string]any{
 			"title":       "Guitar Practice",
-			"start_date":  day.Add(time.Duration(19+rand.Intn(3))*time.Hour).Format(time.RFC3339),
+			"start_date":  day.Add(time.Duration(19+rand.Intn(3)) * time.Hour).Format(time.RFC3339),
 			"end_date":    day.Add(time.Duration(19+rand.Intn(3))*time.Hour + time.Duration(minutes)*time.Minute).Format(time.RFC3339),
 			"category_id": categories["Hobbies"],
 			"source":      "manual",
@@ -2119,7 +2123,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 
 		payload := map[string]any{
 			"title":       "Deep Clean House",
-			"start_date":  day.Add(time.Duration(10+rand.Intn(3))*time.Hour).Format(time.RFC3339),
+			"start_date":  day.Add(time.Duration(10+rand.Intn(3)) * time.Hour).Format(time.RFC3339),
 			"end_date":    day.Add(time.Duration(10+rand.Intn(3))*time.Hour + time.Duration(dur)*time.Minute).Format(time.RFC3339),
 			"category_id": categories["Home"],
 			"source":      "manual",
@@ -2158,7 +2162,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 
 		payload := map[string]any{
 			"title":       "Strength Training",
-			"start_date":  day.Add(time.Duration(17+rand.Intn(2))*time.Hour).Format(time.RFC3339),
+			"start_date":  day.Add(time.Duration(17+rand.Intn(2)) * time.Hour).Format(time.RFC3339),
 			"end_date":    day.Add(time.Duration(17+rand.Intn(2))*time.Hour + time.Duration(minutes)*time.Minute).Format(time.RFC3339),
 			"category_id": categories["Fitness"],
 			"source":      "manual",
@@ -2698,6 +2702,129 @@ func createTaskWithNegativeImpact(day time.Time, hour, minute, durationMin int, 
 
 	_, err := apiRequest("POST", "/tasks", payload)
 	return err == nil
+}
+
+// =============================================================================
+// GOAL STREAK AND HISTORY SEEDING
+// =============================================================================
+
+// seedGoalStreaksAndHistory updates goal streaks and creates historical goal logs
+func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[string]string) int {
+	updated := 0
+	now := time.Now()
+
+	// Define streak data for habit goals (simulating consistent tracking)
+	habitStreaks := map[string]struct {
+		streak     int
+		daysAgo    int // last completed X days ago
+		logEntries int // number of log entries to create
+	}{
+		"Meditate 10 Min Daily":       {streak: 14, daysAgo: 0, logEntries: 20},
+		"Drink 8 Glasses Water":       {streak: 21, daysAgo: 0, logEntries: 25},
+		"Sleep 7-8 Hours":             {streak: 12, daysAgo: 0, logEntries: 20},
+		"Run 3x Weekly":               {streak: 8, daysAgo: 1, logEntries: 15},
+		"Read 30 Min Daily":           {streak: 6, daysAgo: 0, logEntries: 12},
+		"Weekly Family Dinner":        {streak: 4, daysAgo: 2, logEntries: 6},
+		"Call Parents Weekly":         {streak: 3, daysAgo: 5, logEntries: 5},
+		"Cook Healthy Meals":          {streak: 5, daysAgo: 0, logEntries: 10},
+		"Limit Social Media":          {streak: 7, daysAgo: 1, logEntries: 10},
+		"Weekly Reflection":           {streak: 3, daysAgo: 3, logEntries: 5},
+		"Connect with Friends Weekly": {streak: 2, daysAgo: 4, logEntries: 4},
+		"Date Night Bi-weekly":        {streak: 2, daysAgo: 10, logEntries: 3},
+	}
+
+	// Update streaks for habit goals
+	for goalTitle, data := range habitStreaks {
+		goalID, ok := goals[goalTitle]
+		if !ok {
+			continue
+		}
+
+		lastCompleted := now.AddDate(0, 0, -data.daysAgo)
+		if err := updateGoalStreak(ctx, db, goalID, data.streak, lastCompleted); err != nil {
+			log.Warn().Err(err).Str("goal", goalTitle).Msg("Failed to update streak")
+			continue
+		}
+
+		// Create historical log entries
+		for i := 0; i < data.logEntries; i++ {
+			// Create logs for past days
+			logDate := now.AddDate(0, 0, -(i + data.daysAgo))
+			eventType := "completed"
+			if i%5 == 4 {
+				eventType = "streak_milestone"
+			}
+
+			changes := map[string]any{
+				"streak_before": i,
+				"streak_after":  i + 1,
+			}
+
+			if err := createGoalLog(ctx, db, goalID, eventType, changes, logDate); err != nil {
+				log.Warn().Err(err).Str("goal", goalTitle).Int("day", i).Msg("Failed to create goal log")
+			}
+		}
+
+		updated++
+	}
+
+	// Update progress for measurable goals
+	measurableProgress := map[string]struct {
+		current    float64
+		target     float64
+		logEntries int
+	}{
+		"20 Hours Deep Work Weekly": {current: 14.5, target: 20, logEntries: 8},
+		"Save $5000":                {current: 2350, target: 5000, logEntries: 12},
+		"Read 5 Books This Year":    {current: 2, target: 5, logEntries: 5},
+		"Run 100km This Month":      {current: 42, target: 100, logEntries: 10},
+		"Complete 50 Workouts":      {current: 23, target: 50, logEntries: 15},
+		"Learn 500 Spanish Words":   {current: 180, target: 500, logEntries: 20},
+	}
+
+	for goalTitle, data := range measurableProgress {
+		goalID, ok := goals[goalTitle]
+		if !ok {
+			continue
+		}
+
+		// Update goal with current progress value
+		progress := (data.current / data.target) * 100
+		_, err := database.QueryAll[any](ctx, db, `
+			UPDATE type::thing($id) MERGE {
+				current_value: $current,
+				updated_at: $now
+			}
+		`, map[string]any{
+			"id":      database.MustRecordID("goals", goalID),
+			"current": data.current,
+			"now":     now,
+		})
+		if err != nil {
+			log.Warn().Err(err).Str("goal", goalTitle).Msg("Failed to update progress")
+			continue
+		}
+
+		// Create historical log entries showing progress
+		for i := 0; i < data.logEntries; i++ {
+			logDate := now.AddDate(0, 0, -(i * 2)) // Every 2 days
+			increment := data.current / float64(data.logEntries)
+
+			changes := map[string]any{
+				"value_before": increment * float64(i),
+				"value_after":  increment * float64(i+1),
+				"progress":     progress * float64(i+1) / float64(data.logEntries),
+			}
+
+			if err := createGoalLog(ctx, db, goalID, "progress_update", changes, logDate); err != nil {
+				log.Warn().Err(err).Str("goal", goalTitle).Msg("Failed to create progress log")
+			}
+		}
+
+		updated++
+	}
+
+	return updated
 }
 
 // =============================================================================

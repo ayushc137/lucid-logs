@@ -12,16 +12,13 @@
     Plus,
     Trash2,
     SquarePen,
-    Check,
-    X,
     Search,
     LoaderCircle,
     Clock,
     Hash,
     Play,
-    ChevronUp,
-    ChevronDown,
-    ArrowUpDown,
+    Tag,
+    X,
   } from "lucide-svelte";
   import { cn } from "$lib/utils";
   import {
@@ -177,23 +174,6 @@
     return remainMins > 0 ? `${hours}h ${remainMins}m` : `${hours}h`;
   }
 
-  const priorityLabels = [
-    "None",
-    "Low",
-    "Medium",
-    "High",
-    "Critical",
-    "Urgent",
-  ];
-  const priorityColors = [
-    "badge-ghost",
-    "badge-info",
-    "badge-success",
-    "badge-warning",
-    "badge-error",
-    "badge-error",
-  ];
-
   // Highlight search matches
   function highlightText(text: string, query: string): string {
     if (!query || !text) return text;
@@ -344,10 +324,10 @@
               <th class="w-12"></th>
               <th>Template</th>
               <th class="hidden md:table-cell">Duration</th>
-              <th class="hidden lg:table-cell">Priority</th>
+              <th class="hidden lg:table-cell">Category</th>
               <th class="hidden sm:table-cell">Quick Log</th>
               <th class="hidden md:table-cell">Uses</th>
-              <th class="w-32 text-right">Actions</th>
+              <th class="w-36"></th>
             </tr>
           </thead>
           <tbody>
@@ -360,7 +340,8 @@
                 <td>
                   <div
                     class="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
-                    style="background-color: {template.color || '#6366f1'}20;"
+                    style="background-color: {template.category?.color ||
+                      '#6366f1'}20;"
                   >
                     {template.icon || "⚡"}
                   </div>
@@ -401,17 +382,16 @@
                   </div>
                 </td>
 
-                <!-- Priority -->
+                <!-- Category -->
                 <td class="hidden lg:table-cell">
-                  {#if template.default_priority !== undefined && template.default_priority !== null}
-                    <span
-                      class={cn(
-                        "badge badge-sm",
-                        priorityColors[template.default_priority],
-                      )}
-                    >
-                      {priorityLabels[template.default_priority]}
-                    </span>
+                  {#if template.category}
+                    <div class="flex items-center gap-1.5">
+                      <div
+                        class="w-2 h-2 rounded-full"
+                        style="background-color: {template.category.color}"
+                      ></div>
+                      <span class="text-sm">{template.category.name}</span>
+                    </div>
                   {:else}
                     <span class="text-sm opacity-40">—</span>
                   {/if}
@@ -441,7 +421,7 @@
                 <!-- Actions -->
                 <td>
                   <div
-                    class="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="flex gap-1 justify-end transition-opacity opacity-0 group-hover:opacity-100"
                   >
                     <button
                       class="btn btn-ghost btn-sm gap-1 text-secondary"

@@ -1,24 +1,31 @@
 <script lang="ts">
-    import { createMutation, useQueryClient } from "@tanstack/svelte-query";
+    import {
+        createMutation,
+        createQuery,
+        useQueryClient,
+    } from "@tanstack/svelte-query";
     import {
         createTemplate,
         updateTemplate,
+        getGoals,
+        getCategories,
         type TaskTemplate,
         type CreateTemplateRequest,
+        type Goal,
     } from "$lib/api";
-    import { Modal, ColorPicker, CategoryDropdown } from "$lib/components/ui";
+    import { Modal, CategoryDropdown } from "$lib/components/ui";
     import {
         Zap,
         Save,
-        Clock,
+        Timer,
         Flag,
         AlertCircle,
         Plus,
         Heart,
-        FileText,
-        Timer,
         Hash,
-        Sparkles,
+        Target,
+        Trash2,
+        X,
     } from "lucide-svelte";
     import { cn } from "$lib/utils";
 
@@ -37,12 +44,14 @@
     let title = $state("");
     let description = $state("");
     let icon = $state("");
-    let color = $state("#10B981");
 
     // Defaults
     let defaultDuration = $state<number | undefined>(undefined);
-    let defaultPriority = $state(2);
     let defaultCategoryId = $state<string | undefined>(undefined);
+    let defaultEmotionId = $state<string | undefined>(undefined);
+    let expectedQuadrant = $state<
+        "green" | "yellow" | "red" | "blue" | undefined
+    >(undefined);
 
     // Quick log
     let isQuickLog = $state(false);
@@ -51,24 +60,33 @@
     // Quantity
     let quantityEnabled = $state(false);
     let quantityDefault = $state<number | undefined>(undefined);
-    let quantityUnit = $state("");
     let quantityStep = $state(1);
 
-    // Emotion
-    let expectedQuadrant = $state<
-        "green" | "yellow" | "red" | "blue" | undefined
-    >(undefined);
+    // Goals linking
+    interface TemplateGoalLinkState {
+        goalId: string;
+        autoLink: boolean;
+        quantityMultiplier: number;
+    }
+    let goalLinks = $state<TemplateGoalLinkState[]>([]);
 
-    // Show fields
-    let showJournal = $state(true);
-    let showDuration = $state(true);
-    let showQuantity = $state(false);
-    let showEmotion = $state(true);
-    let showPositivesNegatives = $state(false);
-    let showNotes = $state(true);
+    // Load available goals for linking
+    const goalsQuery = createQuery({
+        queryKey: ["goals", "active"],
+        queryFn: () => getGoals({ status: "active", limit: 100 }),
+        enabled: open, // Only fetch when modal is open
+    });
 
-    // Activity key
-    let activityKey = $state("");
+    const availableGoals = $derived($goalsQuery.data?.items || []);
+
+    // Load categories
+    const categoriesQuery = createQuery({
+        queryKey: ["categories"],
+        queryFn: () => getCategories({ limit: 100 }),
+        enabled: open,
+    });
+
+    const categories = $derived($categoriesQuery.data?.items || []);
 
     // UI state
     let showAdvanced = $state(false);
@@ -81,27 +99,31 @@
                 title = template.title;
                 description = template.description || "";
                 icon = template.icon || "";
-                color = template.color || "#10B981";
                 defaultDuration = template.default_duration;
-                defaultPriority = template.default_priority || 2;
-                defaultCategoryId = template.default_category?.id;
+                defaultCategoryId = template.category?.id;
+                defaultEmotionId = template.default_emotion_id;
+                expectedQuadrant = template.expected_quadrant;
+
                 isQuickLog = template.is_quick_log;
                 quickLogOrder = template.quick_log_order || 0;
+
                 quantityEnabled = template.quantity_enabled;
                 quantityDefault = template.quantity_default;
-                quantityUnit = template.quantity_unit || "";
                 quantityStep = template.quantity_step || 1;
-                expectedQuadrant = template.expected_quadrant;
-                activityKey = template.activity_key || "";
 
-                if (template.show_fields) {
-                    showJournal = template.show_fields.journal ?? true;
-                    showDuration = template.show_fields.duration ?? true;
-                    showQuantity = template.show_fields.quantity ?? false;
-                    showEmotion = template.show_fields.emotion ?? true;
-                    showPositivesNegatives =
-                        template.show_fields.positives_negatives ?? false;
-                    showNotes = template.show_fields.notes ?? true;
+                // Map existing goals to link state
+                // Note: The TaskTemplate struct has `goals: Goal[]` but we need to know the link properties (auto_link, multiplier)
+                // If the backend doesn't return link details in `goals`, we might default them for now or need a richer return type.
+                // Assuming `goals` in Template just lists them, we can just list them with default link props.
+                // Ideally backend returns `template_goals` relation info. For now, we'll just prepopulate IDs.
+                if (template.goals) {
+                    goalLinks = template.goals.map((g) => ({
+                        goalId: g.id,
+                        autoLink: true, // Default to true if we don't have this info
+                        quantityMultiplier: 1.0,
+                    }));
+                } else {
+                    goalLinks = [];
                 }
             } else {
                 resetForm();
@@ -113,24 +135,19 @@
         title = "";
         description = "";
         icon = "";
-        color = "#10B981";
         defaultDuration = undefined;
-        defaultPriority = 2;
         defaultCategoryId = undefined;
+        defaultEmotionId = undefined;
+        expectedQuadrant = undefined;
+
         isQuickLog = false;
         quickLogOrder = 0;
+
         quantityEnabled = false;
         quantityDefault = undefined;
-        quantityUnit = "";
         quantityStep = 1;
-        expectedQuadrant = undefined;
-        activityKey = "";
-        showJournal = true;
-        showDuration = true;
-        showQuantity = false;
-        showEmotion = true;
-        showPositivesNegatives = false;
-        showNotes = true;
+
+        goalLinks = [];
         showAdvanced = false;
         errors = {};
     }
@@ -173,16 +190,9 @@
 
     function validateForm(): boolean {
         const newErrors: Record<string, string> = {};
-
         if (!title.trim()) {
             newErrors.title = "Title is required";
         }
-
-        if (quantityEnabled && !quantityUnit.trim()) {
-            newErrors.quantityUnit =
-                "Unit is required when quantity is enabled";
-        }
-
         errors = newErrors;
         return Object.keys(newErrors).length === 0;
     }
@@ -194,26 +204,25 @@
             title: title.trim(),
             description: description.trim() || undefined,
             icon: icon || undefined,
-            color: color || undefined,
+
             default_duration: defaultDuration,
-            default_priority: defaultPriority,
-            default_category_id: defaultCategoryId,
+            expected_quadrant: expectedQuadrant,
+            default_emotion_id: defaultEmotionId,
+
+            category_id: defaultCategoryId,
+
             is_quick_log: isQuickLog,
             quick_log_order: isQuickLog ? quickLogOrder : undefined,
+
             quantity_enabled: quantityEnabled,
             quantity_default: quantityEnabled ? quantityDefault : undefined,
-            quantity_unit: quantityEnabled ? quantityUnit : undefined,
             quantity_step: quantityEnabled ? quantityStep : undefined,
-            expected_quadrant: expectedQuadrant,
-            activity_key: activityKey || undefined,
-            show_fields: {
-                journal: showJournal,
-                duration: showDuration,
-                quantity: showQuantity,
-                emotion: showEmotion,
-                positives_negatives: showPositivesNegatives,
-                notes: showNotes,
-            },
+
+            goal_links: goalLinks.map((l) => ({
+                goal_id: l.goalId,
+                auto_link_tasks: l.autoLink,
+                quantity_multiplier: l.quantityMultiplier,
+            })),
         };
 
         if (isEditing && template) {
@@ -242,7 +251,6 @@
     }
 
     function parseDuration(str: string): number | undefined {
-        // Parse formats like "30", "30m", "1h", "1h 30m"
         if (!str) return undefined;
         const match = str.match(
             /^(\d+)\s*(h|hr|hour|m|min|minute)?s?\s*(\d+)?\s*(m|min|minute)?s?$/i,
@@ -269,6 +277,19 @@
             durationInput = formatDuration(defaultDuration);
         }
     });
+
+    function addGoalLink(goalId: string) {
+        if (!goalLinks.some((l) => l.goalId === goalId)) {
+            goalLinks = [
+                ...goalLinks,
+                { goalId, autoLink: true, quantityMultiplier: 1.0 },
+            ];
+        }
+    }
+
+    function removeGoalLink(goalId: string) {
+        goalLinks = goalLinks.filter((l) => l.goalId !== goalId);
+    }
 </script>
 
 <Modal
@@ -297,7 +318,6 @@
 
         <!-- Title & Icon Row -->
         <div class="flex gap-3">
-            <!-- Icon Picker -->
             <div class="flex flex-col gap-1">
                 <label class="text-xs font-semibold uppercase opacity-50"
                     >Icon</label
@@ -327,15 +347,11 @@
                     {icon || "⚡"}
                 </button>
             </div>
-
-            <!-- Title -->
             <div class="flex-1">
                 <label
                     class="text-xs font-semibold uppercase opacity-50"
-                    for="template-title"
+                    for="template-title">Title *</label
                 >
-                    Title *
-                </label>
                 <input
                     id="template-title"
                     type="text"
@@ -354,56 +370,18 @@
         <div>
             <label
                 class="text-xs font-semibold uppercase opacity-50"
-                for="template-desc"
+                for="template-desc">Description</label
             >
-                Description
-            </label>
             <textarea
                 id="template-desc"
                 class="textarea textarea-bordered w-full mt-1 h-16"
-                placeholder="Brief description of this template..."
+                placeholder="Brief description..."
                 bind:value={description}
             ></textarea>
         </div>
 
-        <!-- Quick Log Toggle -->
-        <div
-            class="p-4 rounded-xl bg-secondary/10 border border-secondary/30 space-y-3"
-        >
-            <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                    type="checkbox"
-                    class="toggle toggle-secondary"
-                    bind:checked={isQuickLog}
-                />
-                <div class="flex items-center gap-2">
-                    <Zap class="w-4 h-4 text-secondary" />
-                    <span class="font-semibold text-sm">Quick Log Template</span
-                    >
-                </div>
-            </label>
-            {#if isQuickLog}
-                <p class="text-xs opacity-60">
-                    Quick log templates appear in the dashboard for one-tap
-                    logging.
-                </p>
-                <div>
-                    <label class="text-xs font-semibold uppercase opacity-50"
-                        >Display Order</label
-                    >
-                    <input
-                        type="number"
-                        min="0"
-                        class="input input-bordered input-sm w-24 mt-1"
-                        bind:value={quickLogOrder}
-                    />
-                </div>
-            {/if}
-        </div>
-
         <!-- Default Settings -->
         <div class="grid grid-cols-2 gap-4">
-            <!-- Duration -->
             <div>
                 <label
                     class="text-xs font-semibold uppercase opacity-50 flex items-center gap-1"
@@ -422,96 +400,21 @@
                     }}
                 />
             </div>
-
-            <!-- Priority -->
-            <div>
-                <label
-                    class="text-xs font-semibold uppercase opacity-50 flex items-center gap-1"
-                >
-                    <Flag class="w-3 h-3" />
-                    Default Priority
-                </label>
-                <select
-                    class="select select-bordered select-sm w-full mt-1"
-                    bind:value={defaultPriority}
-                >
-                    <option value={1}>Low</option>
-                    <option value={2}>Medium</option>
-                    <option value={3}>High</option>
-                </select>
-            </div>
+            <CategoryDropdown
+                {categories}
+                bind:value={defaultCategoryId}
+                size="sm"
+                label="Category"
+            />
         </div>
 
-        <!-- Quantity Settings -->
-        <div
-            class="p-4 rounded-xl bg-base-200/50 border border-base-200 space-y-3"
-        >
-            <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                    type="checkbox"
-                    class="toggle toggle-primary"
-                    bind:checked={quantityEnabled}
-                />
-                <div class="flex items-center gap-2">
-                    <Hash class="w-4 h-4 text-primary" />
-                    <span class="font-semibold text-sm">Track Quantity</span>
-                </div>
-            </label>
-
-            {#if quantityEnabled}
-                <div
-                    class="grid grid-cols-3 gap-3 pt-2 border-t border-base-200"
-                >
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Default</label
-                        >
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            class="input input-bordered input-sm w-full mt-1"
-                            bind:value={quantityDefault}
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Unit *</label
-                        >
-                        <input
-                            type="text"
-                            class="input input-bordered input-sm w-full mt-1"
-                            class:input-error={errors.quantityUnit}
-                            placeholder="km, L, pages"
-                            bind:value={quantityUnit}
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Step</label
-                        >
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            class="input input-bordered input-sm w-full mt-1"
-                            bind:value={quantityStep}
-                        />
-                    </div>
-                </div>
-            {/if}
-        </div>
-
-        <!-- Expected Quadrant -->
+        <!-- Emotion -->
         <div>
             <label
                 class="text-xs font-semibold uppercase opacity-50 flex items-center gap-1"
             >
                 <Heart class="w-3 h-3" />
-                Expected Emotion Quadrant
+                Expected Quadrant
             </label>
             <div class="grid grid-cols-4 gap-2 mt-2">
                 {#each quadrants as q}
@@ -539,130 +442,182 @@
             </div>
         </div>
 
-        <!-- Advanced Options Toggle -->
-        <button
-            type="button"
-            class="btn btn-ghost btn-sm gap-2"
-            onclick={() => (showAdvanced = !showAdvanced)}
+        <!-- Quick Log Toggle -->
+        <div
+            class="p-4 rounded-xl bg-secondary/10 border border-secondary/30 space-y-3"
         >
-            {showAdvanced ? "Hide" : "Show"} Advanced Options
-            <Plus
-                class={cn(
-                    "w-4 h-4 transition-transform",
-                    showAdvanced && "rotate-45",
-                )}
-            />
-        </button>
-
-        {#if showAdvanced}
-            <div
-                class="space-y-4 p-4 rounded-xl bg-base-200/30 border border-base-200"
-            >
-                <!-- Category & Color -->
-                <div class="grid grid-cols-2 gap-3">
-                    <CategoryDropdown
-                        bind:selectedId={defaultCategoryId}
-                        size="sm"
-                        showLabel={true}
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                    type="checkbox"
+                    class="toggle toggle-secondary"
+                    bind:checked={isQuickLog}
+                />
+                <div class="flex items-center gap-2">
+                    <Zap class="w-4 h-4 text-secondary" />
+                    <span class="font-semibold text-sm">Quick Log Template</span
+                    >
+                </div>
+            </label>
+            {#if isQuickLog}
+                <div>
+                    <label class="text-xs font-semibold uppercase opacity-50"
+                        >Display Order</label
+                    >
+                    <input
+                        type="number"
+                        min="0"
+                        class="input input-bordered input-sm w-24 mt-1"
+                        bind:value={quickLogOrder}
                     />
+                </div>
+            {/if}
+        </div>
+
+        <!-- Quantity Settings -->
+        <div
+            class="p-4 rounded-xl bg-base-200/50 border border-base-200 space-y-3"
+        >
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    bind:checked={quantityEnabled}
+                />
+                <div class="flex items-center gap-2">
+                    <Hash class="w-4 h-4 text-primary" />
+                    <span class="font-semibold text-sm">Track Quantity</span>
+                </div>
+            </label>
+
+            {#if quantityEnabled}
+                <div
+                    class="grid grid-cols-2 gap-3 pt-2 border-t border-base-200"
+                >
                     <div>
                         <label
                             class="text-xs font-semibold uppercase opacity-50"
-                            >Color</label
+                            >Default</label
                         >
-                        <div class="mt-1">
-                            <ColorPicker bind:value={color} cols={8} />
-                        </div>
+                        <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            class="input input-bordered input-sm w-full mt-1"
+                            bind:value={quantityDefault}
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="text-xs font-semibold uppercase opacity-50"
+                            >Step</label
+                        >
+                        <input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            class="input input-bordered input-sm w-full mt-1"
+                            bind:value={quantityStep}
+                        />
                     </div>
                 </div>
+            {/if}
+        </div>
 
-                <!-- Activity Key -->
-                <div>
-                    <label class="text-xs font-semibold uppercase opacity-50"
-                        >Activity Key</label
-                    >
-                    <input
-                        type="text"
-                        class="input input-bordered input-sm w-full mt-1"
-                        placeholder="For auto-linking to goals"
-                        bind:value={activityKey}
-                    />
-                    <p class="text-[10px] opacity-50 mt-1">
-                        Tasks created from this template will auto-link to goals
-                        with matching activity key.
-                    </p>
-                </div>
+        <!-- Goal Linking -->
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <label
+                    class="text-xs font-semibold uppercase opacity-50 flex items-center gap-1"
+                >
+                    <Target class="w-3 h-3" />
+                    Linked Goals
+                </label>
 
-                <!-- Show Fields -->
-                <div>
-                    <label class="text-xs font-semibold uppercase opacity-50"
-                        >Fields to Show in Quick Log</label
+                <div class="dropdown dropdown-end">
+                    <button
+                        type="button"
+                        tabindex="0"
+                        class="btn btn-ghost btn-xs gap-1"
                     >
-                    <div class="grid grid-cols-2 gap-2 mt-2">
-                        <label
-                            class="label cursor-pointer justify-start gap-2 py-1"
-                        >
-                            <input
-                                type="checkbox"
-                                class="checkbox checkbox-xs"
-                                bind:checked={showJournal}
-                            />
-                            <span class="label-text text-sm">Journal</span>
-                        </label>
-                        <label
-                            class="label cursor-pointer justify-start gap-2 py-1"
-                        >
-                            <input
-                                type="checkbox"
-                                class="checkbox checkbox-xs"
-                                bind:checked={showDuration}
-                            />
-                            <span class="label-text text-sm">Duration</span>
-                        </label>
-                        <label
-                            class="label cursor-pointer justify-start gap-2 py-1"
-                        >
-                            <input
-                                type="checkbox"
-                                class="checkbox checkbox-xs"
-                                bind:checked={showQuantity}
-                            />
-                            <span class="label-text text-sm">Quantity</span>
-                        </label>
-                        <label
-                            class="label cursor-pointer justify-start gap-2 py-1"
-                        >
-                            <input
-                                type="checkbox"
-                                class="checkbox checkbox-xs"
-                                bind:checked={showEmotion}
-                            />
-                            <span class="label-text text-sm">Emotion</span>
-                        </label>
-                        <label
-                            class="label cursor-pointer justify-start gap-2 py-1"
-                        >
-                            <input
-                                type="checkbox"
-                                class="checkbox checkbox-xs"
-                                bind:checked={showPositivesNegatives}
-                            />
-                            <span class="label-text text-sm">Reflections</span>
-                        </label>
-                        <label
-                            class="label cursor-pointer justify-start gap-2 py-1"
-                        >
-                            <input
-                                type="checkbox"
-                                class="checkbox checkbox-xs"
-                                bind:checked={showNotes}
-                            />
-                            <span class="label-text text-sm">Notes</span>
-                        </label>
-                    </div>
+                        <Plus class="w-3 h-3" /> Add
+                    </button>
+                    <ul
+                        tabindex="0"
+                        class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-60 overflow-y-auto"
+                    >
+                        {#each availableGoals.filter((g) => !goalLinks.some((l) => l.goalId === g.id)) as goal}
+                            <li>
+                                <button
+                                    type="button"
+                                    onclick={() => addGoalLink(goal.id)}
+                                >
+                                    {goal.icon}
+                                    {goal.title}
+                                </button>
+                            </li>
+                        {/each}
+                        {#if availableGoals.filter((g) => !goalLinks.some((l) => l.goalId === g.id)).length === 0}
+                            <li class="p-2 text-xs opacity-50 text-center">
+                                No more active goals
+                            </li>
+                        {/if}
+                    </ul>
                 </div>
             </div>
-        {/if}
+
+            {#if goalLinks.length > 0}
+                <div class="space-y-2">
+                    {#each goalLinks as link (link.goalId)}
+                        {@const goal = availableGoals.find(
+                            (g) => g.id === link.goalId,
+                        )}
+                        {#if goal}
+                            <div
+                                class="flex items-center gap-3 p-3 rounded-lg border border-base-200 bg-base-100"
+                            >
+                                <div
+                                    class="w-8 h-8 rounded bg-base-200 flex items-center justify-center text-lg"
+                                >
+                                    {goal.icon}
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-sm">
+                                        {goal.title}
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <label
+                                            class="label cursor-pointer justify-start gap-2 p-0"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                class="checkbox checkbox-xs"
+                                                bind:checked={link.autoLink}
+                                            />
+                                            <span class="label-text text-xs"
+                                                >Auto-link</span
+                                            >
+                                        </label>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="btn btn-ghost btn-xs btn-square text-error"
+                                    onclick={() => removeGoalLink(link.goalId)}
+                                >
+                                    <X class="w-3 h-3" />
+                                </button>
+                            </div>
+                        {/if}
+                    {/each}
+                </div>
+            {:else}
+                <div
+                    class="p-4 text-center rounded-lg border border-dashed border-base-200 text-xs opacity-50"
+                >
+                    No goals linked
+                </div>
+            {/if}
+        </div>
     </form>
 
     {#snippet actions()}

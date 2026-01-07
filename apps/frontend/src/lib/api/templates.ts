@@ -5,26 +5,19 @@ import type { Category } from './categories';
 // TEMPLATE TYPES (matching Go backend)
 // =============================================================================
 
-export interface ShowFields {
-    journal?: boolean;
-    duration?: boolean;
-    quantity?: boolean;
-    emotion?: boolean;
-    positives_negatives?: boolean;
-    notes?: boolean;
-}
+import type { Goal } from './goals';
+import type { Category } from './categories';
 
 export interface TaskTemplate {
     id: string;
     title: string;
     description?: string;
     icon?: string;
-    color?: string;
 
     // Defaults for tasks
     default_duration?: number; // seconds
-    default_priority?: number;
-    default_category?: Category;
+    default_emotion_id?: string;
+    expected_quadrant?: 'green' | 'yellow' | 'red' | 'blue';
 
     // Quick log settings
     is_quick_log: boolean;
@@ -33,23 +26,8 @@ export interface TaskTemplate {
     // Quantity settings
     quantity_enabled: boolean;
     quantity_default?: number;
-    quantity_unit?: string;
     quantity_step?: number;
-
-    // Emotion defaults
-    expected_quadrant?: 'green' | 'yellow' | 'red' | 'blue';
-    default_emotion_id?: string;
-
-    // Goal/Activity linking
-    activity_key?: string;
-    goal_id?: string;
-
-    // Fields to show
-    show_fields?: ShowFields;
-
-    // Source
-    is_default: boolean;
-    source_task_id?: string;
+    // Note: quantity unit is inherited from linked goal's target
 
     // Usage stats
     use_count: number;
@@ -59,57 +37,55 @@ export interface TaskTemplate {
     created_at: string;
     updated_at: string;
     deleted_at?: string;
+
+    // Populated via graph
+    goals?: Goal[];
+    category?: Category;
+}
+
+export interface GoalLinkInput {
+    goal_id: string;
+    auto_link_tasks?: boolean;
+    quantity_multiplier?: number;
 }
 
 export interface CreateTemplateRequest {
     title: string;
     description?: string;
     icon?: string;
-    color?: string;
 
     default_duration?: number;
-    default_priority?: number;
-    default_category_id?: string;
 
     is_quick_log?: boolean;
     quick_log_order?: number;
 
     quantity_enabled?: boolean;
     quantity_default?: number;
-    quantity_unit?: string;
     quantity_step?: number;
 
     expected_quadrant?: 'green' | 'yellow' | 'red' | 'blue';
     default_emotion_id?: string;
 
-    activity_key?: string;
-    goal_id?: string;
-
-    show_fields?: ShowFields;
+    category_id?: string;
+    goal_links?: GoalLinkInput[];
 }
 
 export interface UpdateTemplateRequest {
     title?: string;
     description?: string;
     icon?: string;
-    color?: string;
 
     default_duration?: number;
-    default_priority?: number;
-    default_category_id?: string;
 
     is_quick_log?: boolean;
     quick_log_order?: number;
 
     quantity_enabled?: boolean;
     quantity_default?: number;
-    quantity_unit?: string;
     quantity_step?: number;
 
     expected_quadrant?: 'green' | 'yellow' | 'red' | 'blue';
     default_emotion_id?: string;
-
-    show_fields?: ShowFields;
 }
 
 export interface InstantiateTemplateRequest {

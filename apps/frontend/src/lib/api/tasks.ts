@@ -70,6 +70,8 @@ export interface CreateTaskRequest {
     negatives?: TaskItem[];
     category_id?: string;
     emotion_id?: string;
+    quantity?: Quantity;
+    linked_goals?: TaskGoalLinkInput[];
 }
 
 export interface UpdateTaskRequest {
@@ -84,6 +86,16 @@ export interface UpdateTaskRequest {
     negatives?: TaskItem[];
     category_id?: string;
     emotion_id?: string;
+    quantity?: Quantity;
+    linked_goals?: TaskGoalLinkInput[];
+}
+
+export interface TaskGoalLinkInput {
+    goal_id: string;
+    impact_type: 'positive' | 'negative' | 'neutral';
+    impact_magnitude: number;
+    quantity_value?: number;
+    quantity_unit?: string;
 }
 
 // =============================================================================

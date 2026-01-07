@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
     // Shared cache for computed URLs to avoid re-computation across instances
     const urlCache = new Map<string, string>();
 
@@ -99,7 +99,7 @@
     let isLoaded = $state(false);
     let hasError = $state(false);
     let isVisible = $state(false);
-    let imgElement: HTMLImageElement;
+    let imgElement = $state<HTMLImageElement | null>(null);
 
     // React to URL changes - update isLoaded state
     $effect(() => {

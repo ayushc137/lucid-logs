@@ -46,7 +46,8 @@
             ? Math.min(
                   100,
                   Math.round(
-                      (goal.target.current_value / goal.target.value) * 100,
+                      ((goal.stats?.current_value || 0) / goal.target.value) *
+                          100,
                   ),
               )
             : 0,
@@ -65,6 +66,11 @@
         paused: Pause,
         abandoned: X,
     };
+
+    // Derived status icon for the current goal
+    const StatusIcon = $derived(
+        statusIcons[goal.status as keyof typeof statusIcons] || Play,
+    );
 
     const goalTypeLabels = {
         discrete: "One-time",
@@ -116,7 +122,7 @@
         <!-- Color Bar -->
         <div
             class="h-1.5 rounded-t-xl"
-            style="background-color: {goal.color || '#6b7280'};"
+            style="background-color: {goal.category?.color || '#6b7280'};"
         ></div>
 
         <div class="card-body p-4 gap-3">
@@ -125,7 +131,8 @@
                 <!-- Icon -->
                 <div
                     class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                    style="background-color: {goal.color || '#6b7280'}20;"
+                    style="background-color: {goal.category?.color ||
+                        '#6b7280'}20;"
                 >
                     {goal.icon || "🎯"}
                 </div>
@@ -139,16 +146,17 @@
                                 goal.status
                             ]} gap-1"
                         >
-                            <svelte:component
-                                this={statusIcons[goal.status]}
-                                class="w-3 h-3"
-                            />
+                            <StatusIcon class="w-3 h-3" />
                             {goal.status}
                         </span>
                         <span
                             class="text-[10px] uppercase font-medium opacity-50"
                         >
-                            {goalTypeLabels[goal.goal_type]}
+                            {goal.recurrence
+                                ? "Recurrence"
+                                : goal.target
+                                  ? "Measurable"
+                                  : "Goal"}
                         </span>
                     </div>
                 </div>
@@ -246,12 +254,13 @@
                 <div class="space-y-1">
                     <div class="flex items-center justify-between text-xs">
                         <span class="font-medium">
-                            {goal.target.current_value.toLocaleString()} / {goal.target.value.toLocaleString()}
-                            {goal.target.unit}
+                            {(goal.stats?.current_value || 0).toLocaleString()} /
+                            {goal.target.value.toLocaleString()}
+                            {goal.target.unit_id}
                         </span>
                         <span
                             class="font-bold"
-                            style="color: {goal.color || '#6b7280'};"
+                            style="color: {goal.category?.color || '#6b7280'};"
                             >{progress}%</span
                         >
                     </div>
@@ -260,8 +269,8 @@
                     >
                         <div
                             class="h-full rounded-full transition-all duration-500"
-                            style="width: {progress}%; background-color: {goal.color ||
-                                '#6b7280'};"
+                            style="width: {progress}%; background-color: {goal
+                                .category?.color || '#6b7280'};"
                         ></div>
                     </div>
                 </div>
@@ -313,7 +322,7 @@
         <!-- Icon -->
         <div
             class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
-            style="background-color: {goal.color || '#6b7280'}20;"
+            style="background-color: {goal.category?.color || '#6b7280'}20;"
         >
             {goal.icon || "🎯"}
         </div>
@@ -339,8 +348,8 @@
                 {/if}
                 {#if goal.target}
                     <span class="text-[10px] opacity-50">
-                        {goal.target.current_value}/{goal.target.value}
-                        {goal.target.unit}
+                        {goal.stats?.current_value || 0}/{goal.target.value}
+                        {goal.target.unit_id}
                     </span>
                 {/if}
             </div>
@@ -351,8 +360,8 @@
             <div class="w-12">
                 <div
                     class="radial-progress text-xs"
-                    style="--value:{progress}; --size:2rem; --thickness:3px; color: {goal.color ||
-                        '#6b7280'};"
+                    style="--value:{progress}; --size:2rem; --thickness:3px; color: {goal
+                        .category?.color || '#6b7280'};"
                     role="progressbar"
                 >
                     {progress}%

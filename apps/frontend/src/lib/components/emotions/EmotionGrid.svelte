@@ -80,8 +80,8 @@
     let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
 
     // Panzoom
-    let viewportElement: HTMLDivElement;
-    let gridElement: HTMLDivElement;
+    let viewportElement = $state<HTMLDivElement | null>(null);
+    let gridElement = $state<HTMLDivElement | null>(null);
     let pzInstance: PanZoom | null = null;
     let zoomLevel = $state(1);
     let isPzReady = $state(false);
@@ -95,7 +95,7 @@
     // Search state - client-side filtering
     let searchQuery = $state("");
     let showSearchDropdown = $state(false);
-    let searchInputElement: HTMLInputElement;
+    let searchInputElement = $state<HTMLInputElement | null>(null);
 
     // Computed search results - filters allEmotions client-side
     const searchResults = $derived.by(() => {
@@ -1030,11 +1030,6 @@
     .emotion-btn:hover .blob-svg:first-child,
     .emotion-btn.auto-hovered .blob-svg:first-child {
         filter: none;
-    }
-
-    .emotion-btn:hover .emoji,
-    .emotion-btn.auto-hovered .emoji {
-        animation: emojiBounce 0.8s ease-in-out infinite;
     }
 
     .emotion-btn:hover .name,

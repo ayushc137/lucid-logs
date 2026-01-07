@@ -1,161 +1,178 @@
 <script lang="ts">
-    import { createMutation, useQueryClient } from "@tanstack/svelte-query";
+    import {
+        createMutation,
+        useQueryClient,
+        createQuery,
+    } from "@tanstack/svelte-query";
     import {
         createGoal,
         updateGoal,
         type Goal,
         type CreateGoalRequest,
-        type Recurrence,
+        getCategories,
     } from "$lib/api";
-    import { Modal, ColorPicker, CategoryDropdown } from "$lib/components/ui";
-    import {
-        Target,
-        Save,
-        Repeat,
-        Calendar,
-        Flag,
-        Sparkles,
-        Trash2,
-        AlertCircle,
-        X,
-        Plus,
-        Check,
-    } from "lucide-svelte";
+    import { CategoryDropdown } from "$lib/components/ui";
     import { cn } from "$lib/utils";
 
+    import {
+        Save,
+        Repeat,
+        BarChart3,
+        Calendar,
+        Flag,
+        Tag,
+        X,
+        History,
+        Target,
+        TrendingUp,
+        Clock,
+        Flame,
+        CheckCircle2,
+        Circle,
+        ListTodo,
+        Check,
+        X as XIcon,
+        Minus,
+    } from "lucide-svelte";
+
     interface Props {
-        open: boolean;
+        open?: boolean;
         goal?: Goal | null;
-        onClose: () => void;
+        onClose?: () => void;
     }
 
-    let { open = $bindable(), goal = null, onClose }: Props = $props();
+    let { open = $bindable(false), goal = null, onClose }: Props = $props();
 
     const queryClient = useQueryClient();
-    const isEditing = $derived(!!goal);
+
+    // Fetch categories
+    const categoriesQuery = createQuery({
+        queryKey: ["categories"],
+        queryFn: () => getCategories({ limit: 100 }),
+    });
+
+    const categories = $derived($categoriesQuery.data?.items || []);
 
     // Form state
     let title = $state("");
     let description = $state("");
-    let why = $state("");
-    let icon = $state("");
-    let color = $state("#3B82F6");
-    let goalType = $state<"discrete" | "measurable" | "epic" | "avoidance">(
-        "discrete",
-    );
-    let status = $state<"active" | "completed" | "paused" | "abandoned">(
-        "active",
-    );
-    let priority = $state(2);
-    let valueScore = $state(3);
+    let icon = $state("🎯");
     let categoryId = $state<string | undefined>(undefined);
-    let lifeDomain = $state("");
-    let isPrivate = $state(false);
+    let priority = $state(2);
+    let startDate = $state("");
+    let deadline = $state("");
+    let status = $state("active");
 
-    // Recurrence state
-    let isRecurring = $state(false);
+    // Habit settings
+    let isHabit = $state(false);
     let frequency = $state(1);
     let period = $state<"day" | "week" | "month">("day");
     let activeDays = $state<string[]>([]);
-    let graceDays = $state(0);
 
-    // Target state (for measurable goals)
-    let targetValue = $state<number | undefined>(undefined);
+    // Target settings
+    let isMeasurable = $state(false);
+    let targetOperator = $state<"gte" | "lte" | "eq">("gte");
+    let targetValue = $state(10);
     let targetUnit = $state("");
     let targetPerPeriod = $state(false);
 
-    // Date state
-    let startDate = $state("");
-    let deadline = $state("");
+    // Tab state
+    let activeTab = $state<"details" | "tasks" | "history">("details");
 
-    // UI state
-    let showAdvanced = $state(false);
-    let errors = $state<Record<string, string>>({});
+    // Tasks tab filter
+    let taskFilter = $state<"all" | "positive" | "negative" | "neutral">("all");
 
-    // Initialize form when goal changes
-    $effect(() => {
-        if (open) {
-            if (goal) {
-                title = goal.title;
-                description = goal.description || "";
-                why = goal.why || "";
-                icon = goal.icon || "";
-                color = goal.color || "#3B82F6";
-                goalType = goal.goal_type;
-                status = goal.status;
-                priority = goal.priority || 2;
-                valueScore = goal.value_score || 3;
-                categoryId = goal.category_id;
-                lifeDomain = goal.life_domain || "";
-                isPrivate = goal.is_private;
+    // Emoji picker state
+    let showEmojiPicker = $state(false);
 
-                // Recurrence
-                isRecurring = !!goal.recurrence;
-                if (goal.recurrence) {
-                    frequency = goal.recurrence.frequency;
-                    period = goal.recurrence.period;
-                    activeDays = goal.recurrence.active_days || [];
-                    graceDays = goal.recurrence.grace_days || 0;
-                }
+    const isEditing = $derived(!!goal);
 
-                // Target
-                if (goal.target) {
-                    targetValue = goal.target.value;
-                    targetUnit = goal.target.unit;
-                    targetPerPeriod = goal.target.per_period || false;
-                }
+    // Common units
+    const commonUnits = [
+        { value: "count", label: "Times" },
+        { value: "hours", label: "Hours" },
+        { value: "minutes", label: "Minutes" },
+        { value: "steps", label: "Steps" },
+        { value: "km", label: "Kilometers" },
+        { value: "miles", label: "Miles" },
+        { value: "calories", label: "Calories" },
+        { value: "pages", label: "Pages" },
+        { value: "glasses", label: "Glasses" },
+        { value: "liters", label: "Liters" },
+        { value: "dollars", label: "Dollars" },
+    ];
 
-                // Dates
-                startDate = goal.start_date
-                    ? goal.start_date.split("T")[0]
-                    : "";
-                deadline = goal.deadline ? goal.deadline.split("T")[0] : "";
-            } else {
-                resetForm();
-            }
-        }
-    });
+    // Operator options
+    const operatorOptions = [
+        {
+            value: "gte",
+            label: "At least",
+            symbol: "≥",
+            desc: "Achieve or exceed",
+        },
+        {
+            value: "lte",
+            label: "At most",
+            symbol: "≤",
+            desc: "Stay under limit",
+        },
+        {
+            value: "eq",
+            label: "Exactly",
+            symbol: "=",
+            desc: "Hit exact target",
+        },
+    ];
 
-    function resetForm() {
-        title = "";
-        description = "";
-        why = "";
-        icon = "";
-        color = "#3B82F6";
-        goalType = "discrete";
-        status = "active";
-        priority = 2;
-        valueScore = 3;
-        categoryId = undefined;
-        lifeDomain = "";
-        isPrivate = false;
-        isRecurring = false;
-        frequency = 1;
-        period = "day";
-        activeDays = [];
-        graceDays = 0;
-        targetValue = undefined;
-        targetUnit = "";
-        targetPerPeriod = false;
-        startDate = "";
-        deadline = "";
-        showAdvanced = false;
-        errors = {};
-    }
+    // Popular emojis
+    const popularEmojis = [
+        "🎯",
+        "⭐",
+        "🏆",
+        "💪",
+        "🚀",
+        "📚",
+        "💰",
+        "❤️",
+        "🏃",
+        "🧘",
+        "🎨",
+        "✍️",
+        "🎵",
+        "🌱",
+        "⚡",
+        "🔥",
+        "💎",
+        "🌟",
+        "🎉",
+        "✅",
+        "📈",
+        "🧠",
+        "💡",
+        "🌈",
+    ];
 
-    // Create mutation
+    // Days
+    const dayOptions = [
+        { value: "mon", label: "M", full: "Monday" },
+        { value: "tue", label: "T", full: "Tuesday" },
+        { value: "wed", label: "W", full: "Wednesday" },
+        { value: "thu", label: "T", full: "Thursday" },
+        { value: "fri", label: "F", full: "Friday" },
+        { value: "sat", label: "S", full: "Saturday" },
+        { value: "sun", label: "S", full: "Sunday" },
+    ];
+
     const createMut = createMutation({
         mutationFn: (data: CreateGoalRequest) => createGoal(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["goals"] });
-            handleClose();
-        },
-        onError: (err: Error) => {
-            errors = { submit: err.message };
+            queryClient.invalidateQueries({ queryKey: ["goals-list"] });
+            resetForm();
+            onClose?.();
         },
     });
 
-    // Update mutation
     const updateMut = createMutation({
         mutationFn: ({
             id,
@@ -166,125 +183,133 @@
         }) => updateGoal(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["goals"] });
-            handleClose();
-        },
-        onError: (err: Error) => {
-            errors = { submit: err.message };
+            queryClient.invalidateQueries({ queryKey: ["goals-list"] });
+            resetForm();
+            onClose?.();
         },
     });
 
-    function handleClose() {
-        resetForm();
-        open = false;
-        onClose();
-    }
+    const isPending = $derived($createMut.isPending || $updateMut.isPending);
 
-    function validateForm(): boolean {
-        const newErrors: Record<string, string> = {};
+    // Load goal data when editing
+    $effect(() => {
+        if (open && goal) {
+            title = goal.title;
+            description = goal.description || "";
+            icon = goal.icon || "🎯";
+            categoryId =
+                goal.category?.id && goal.category.id !== ":<nil>"
+                    ? goal.category.id
+                    : undefined;
+            priority = goal.priority || 5;
+            status = goal.status || "active";
 
-        if (!title.trim()) {
-            newErrors.title = "Title is required";
+            if (goal.start_date) {
+                startDate = new Date(goal.start_date)
+                    .toISOString()
+                    .split("T")[0];
+            }
+            if (goal.deadline) {
+                deadline = new Date(goal.deadline).toISOString().split("T")[0];
+            }
+
+            if (goal.recurrence) {
+                isHabit = true;
+                frequency = goal.recurrence.frequency || 1;
+                period =
+                    (goal.recurrence.period as "day" | "week" | "month") ||
+                    "day";
+                activeDays = goal.recurrence.active_days || [];
+            } else {
+                isHabit = false;
+            }
+
+            if (goal.target && goal.target.value > 0) {
+                isMeasurable = true;
+                targetOperator =
+                    (goal.target.operator as "gte" | "lte" | "eq") || "gte";
+                targetValue = goal.target.value || 10;
+                targetUnit = goal.target.unit_id || "";
+                targetPerPeriod = goal.target.per_period || false;
+            } else {
+                isMeasurable = false;
+            }
+        } else if (open) {
+            resetForm();
         }
+    });
 
-        if (goalType === "measurable" && !targetValue) {
-            newErrors.targetValue =
-                "Target value is required for measurable goals";
-        }
-
-        if (goalType === "measurable" && !targetUnit.trim()) {
-            newErrors.targetUnit =
-                "Target unit is required for measurable goals";
-        }
-
-        errors = newErrors;
-        return Object.keys(newErrors).length === 0;
+    function resetForm() {
+        title = "";
+        description = "";
+        icon = "🎯";
+        categoryId = undefined;
+        priority = 5;
+        startDate = "";
+        deadline = "";
+        status = "active";
+        isHabit = false;
+        frequency = 1;
+        period = "day";
+        activeDays = [];
+        isMeasurable = false;
+        targetOperator = "gte";
+        targetValue = 10;
+        targetUnit = "";
+        targetPerPeriod = false;
+        activeTab = "details";
+        showEmojiPicker = false;
     }
 
     function handleSubmit() {
-        if (!validateForm()) return;
-
-        const recurrence: Recurrence | undefined = isRecurring
-            ? {
-                  frequency,
-                  period,
-                  active_days: activeDays.length > 0 ? activeDays : undefined,
-                  grace_days: graceDays > 0 ? graceDays : undefined,
-              }
-            : undefined;
-
-        const target =
-            goalType === "measurable" && targetValue
-                ? {
-                      value: targetValue,
-                      unit: targetUnit,
-                      per_period: targetPerPeriod,
-                  }
-                : undefined;
+        if (!title.trim()) return;
 
         const data: CreateGoalRequest = {
             title: title.trim(),
             description: description.trim() || undefined,
-            why: why.trim() || undefined,
-            icon: icon || undefined,
-            color: color || undefined,
-            goal_type: goalType,
-            recurrence,
-            target,
-            start_date: startDate ? `${startDate}T00:00:00Z` : undefined,
-            deadline: deadline ? `${deadline}T23:59:59Z` : undefined,
-            priority: priority as 1 | 2 | 3,
-            value_score: valueScore as 1 | 2 | 3 | 4 | 5,
+            icon,
+            priority,
             category_id: categoryId,
-            life_domain: lifeDomain || undefined,
-            is_private: isPrivate,
+            start_date: startDate || undefined,
+            deadline: deadline || undefined,
         };
 
+        if (isHabit) {
+            data.recurrence = {
+                frequency,
+                period,
+                active_days:
+                    period === "week" && activeDays.length > 0
+                        ? activeDays
+                        : undefined,
+            };
+        }
+
+        if (isMeasurable) {
+            data.target = {
+                value: targetValue,
+                operator: targetOperator,
+                unit_id: targetUnit || "count",
+                per_period: targetPerPeriod,
+            };
+        }
+
         if (isEditing && goal) {
-            $updateMut.mutate({ id: goal.id, data });
+            $updateMut.mutate({
+                id: goal.id,
+                data: { ...data, status } as any,
+            });
         } else {
             $createMut.mutate(data);
         }
     }
 
-    const isPending = $derived($createMut.isPending || $updateMut.isPending);
-
-    const goalTypes = [
-        {
-            value: "discrete",
-            label: "One-time",
-            desc: "Complete once",
-            icon: Check,
-        },
-        {
-            value: "measurable",
-            label: "Measurable",
-            desc: "Track progress",
-            icon: Target,
-        },
-        {
-            value: "avoidance",
-            label: "Avoidance",
-            desc: "Don't do",
-            icon: X,
-        },
-        { value: "epic", label: "Epic", desc: "Multi-step", icon: Flag },
-    ];
-
-    const periods = [
-        { value: "day", label: "Daily" },
-        { value: "week", label: "Weekly" },
-        { value: "month", label: "Monthly" },
-    ];
-
-    const weekdays = [
-        { value: "mon", label: "M" },
-        { value: "tue", label: "T" },
-        { value: "wed", label: "W" },
-        { value: "thu", label: "T" },
-        { value: "fri", label: "F" },
-        { value: "sat", label: "S" },
-        { value: "sun", label: "S" },
-    ];
+    function handleClose() {
+        if (!isPending) {
+            open = false;
+            onClose?.();
+        }
+    }
 
     function toggleDay(day: string) {
         if (activeDays.includes(day)) {
@@ -294,443 +319,827 @@
         }
     }
 
-    const lifeDomains = [
-        { value: "health", label: "🏃 Health" },
-        { value: "work", label: "💼 Work" },
-        { value: "learning", label: "📚 Learning" },
-        { value: "relationships", label: "❤️ Relationships" },
-        { value: "finance", label: "💰 Finance" },
-        { value: "hobbies", label: "🎨 Hobbies" },
-        { value: "mindfulness", label: "🧘 Mindfulness" },
-        { value: "other", label: "✨ Other" },
-    ];
+    // Computed values for display
+    const currentStreak = $derived(
+        goal?.stats?.current_streak || goal?.current_streak || 0,
+    );
+    const progressPercent = $derived(goal?.stats?.progress_percent || 0);
+    const currentValue = $derived(goal?.stats?.current_value || 0);
+
+    // Linked tasks
+    const linkedTasks = $derived(goal?.linked_tasks || []);
+    const filteredTasks = $derived(
+        taskFilter === "all"
+            ? linkedTasks
+            : linkedTasks.filter((t) => t.impact_type === taskFilter),
+    );
+    const taskCounts = $derived({
+        all: linkedTasks.length,
+        positive: linkedTasks.filter((t) => t.impact_type === "positive")
+            .length,
+        negative: linkedTasks.filter((t) => t.impact_type === "negative")
+            .length,
+        neutral: linkedTasks.filter((t) => t.impact_type === "neutral").length,
+    });
+
+    function getPeriodLabel(p: string): string {
+        const map: Record<string, string> = {
+            day: "Daily",
+            week: "Weekly",
+            month: "Monthly",
+        };
+        return map[p] || p;
+    }
 </script>
 
-<Modal
-    bind:open
-    size="lg"
-    title={isEditing ? "Edit Goal" : "Create Goal"}
-    onClose={handleClose}
->
-    {#snippet icon()}
-        <Target class="w-5 h-5 text-accent" />
-    {/snippet}
-
-    <form
-        onsubmit={(e) => {
-            e.preventDefault();
-            handleSubmit();
-        }}
-        class="space-y-5"
-    >
-        {#if errors.submit}
-            <div class="alert alert-error gap-2">
-                <AlertCircle class="w-4 h-4" />
-                <span class="text-sm">{errors.submit}</span>
-            </div>
-        {/if}
-
-        <!-- Title & Icon Row -->
-        <div class="flex gap-3">
+<!-- Modal -->
+<dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>
+    <div class="modal-box max-w-3xl p-0 flex flex-col bg-base-100 max-h-[90vh]">
+        <!-- Header -->
+        <div
+            class="flex items-center gap-4 px-6 py-5 border-b border-base-200 bg-gradient-to-r from-base-200/50 to-transparent"
+        >
             <!-- Icon Picker -->
-            <div class="flex flex-col gap-1">
-                <label class="text-xs font-semibold uppercase opacity-50"
-                    >Icon</label
-                >
+            <div class="relative">
                 <button
                     type="button"
-                    class="w-12 h-12 rounded-xl border-2 border-dashed border-base-300 hover:border-primary/50 flex items-center justify-center text-2xl transition-colors"
-                    onclick={() => {
-                        const emojis = [
-                            "🎯",
-                            "💪",
-                            "📚",
-                            "🏃",
-                            "💧",
-                            "🧘",
-                            "💤",
-                            "🍎",
-                            "✍️",
-                            "🎨",
-                        ];
-                        icon =
-                            emojis[Math.floor(Math.random() * emojis.length)];
-                    }}
+                    class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-3xl hover:from-primary/30 hover:to-primary/10 transition-all shadow-sm border border-primary/10"
+                    onclick={() => (showEmojiPicker = !showEmojiPicker)}
                 >
-                    {icon || "🎯"}
+                    {icon}
                 </button>
-            </div>
 
-            <!-- Title -->
-            <div class="flex-1">
-                <label
-                    class="text-xs font-semibold uppercase opacity-50"
-                    for="goal-title"
-                >
-                    Title *
-                </label>
-                <input
-                    id="goal-title"
-                    type="text"
-                    class="input input-bordered w-full mt-1"
-                    class:input-error={errors.title}
-                    placeholder="e.g., Run 5km every day"
-                    bind:value={title}
-                />
-                {#if errors.title}
-                    <p class="text-error text-xs mt-1">{errors.title}</p>
+                {#if showEmojiPicker}
+                    <div
+                        class="absolute top-16 left-0 z-50 bg-base-100 border border-base-300 rounded-2xl shadow-2xl p-4 w-80"
+                    >
+                        <p
+                            class="text-xs font-medium text-base-content/50 mb-3"
+                        >
+                            Choose an icon
+                        </p>
+                        <div class="grid grid-cols-8 gap-1.5">
+                            {#each popularEmojis as emoji}
+                                <button
+                                    type="button"
+                                    class={cn(
+                                        "w-9 h-9 rounded-xl text-xl hover:bg-base-200 transition-all flex items-center justify-center",
+                                        icon === emoji &&
+                                            "bg-primary/20 ring-2 ring-primary shadow-sm",
+                                    )}
+                                    onclick={() => {
+                                        icon = emoji;
+                                        showEmojiPicker = false;
+                                    }}
+                                >
+                                    {emoji}
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
                 {/if}
             </div>
+
+            <div class="flex-1">
+                <h3 class="text-xl font-bold text-base-content">
+                    {isEditing ? "Edit Goal" : "Create Goal"}
+                </h3>
+                {#if isEditing && goal}
+                    <div class="flex items-center gap-2 mt-1">
+                        <span
+                            class={cn(
+                                "badge badge-sm",
+                                goal.status === "active"
+                                    ? "badge-success"
+                                    : goal.status === "completed"
+                                      ? "badge-info"
+                                      : "badge-neutral",
+                            )}
+                        >
+                            {goal.status}
+                        </span>
+                        {#if currentStreak > 0}
+                            <span class="badge badge-sm badge-warning gap-1">
+                                <Flame class="w-3 h-3" />
+                                {currentStreak} streak
+                            </span>
+                        {/if}
+                    </div>
+                {/if}
+            </div>
+
+            <button
+                class="btn btn-ghost btn-sm btn-circle"
+                onclick={handleClose}
+            >
+                <X class="w-5 h-5" />
+            </button>
         </div>
 
-        <!-- Goal Type Selection -->
-        <div>
-            <label class="text-xs font-semibold uppercase opacity-50"
-                >Goal Type</label
+        <!-- Tabs -->
+        <div class="flex border-b border-base-200 px-6">
+            <button
+                class={cn(
+                    "px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2",
+                    activeTab === "details"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-base-content/60 hover:text-base-content",
+                )}
+                onclick={() => (activeTab = "details")}
             >
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                {#each goalTypes as type}
-                    {@const Icon = type.icon}
-                    <button
-                        type="button"
-                        class={cn(
-                            "flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all",
-                            goalType === type.value
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-base-200 hover:border-base-300",
-                        )}
-                        onclick={() =>
-                            (goalType = type.value as typeof goalType)}
+                <Target class="w-4 h-4" />
+                Details
+            </button>
+            {#if isEditing && linkedTasks.length > 0}
+                <button
+                    class={cn(
+                        "px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2",
+                        activeTab === "tasks"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-base-content/60 hover:text-base-content",
+                    )}
+                    onclick={() => (activeTab = "tasks")}
+                >
+                    <ListTodo class="w-4 h-4" />
+                    Tasks
+                    <span class="badge badge-xs badge-primary"
+                        >{linkedTasks.length}</span
                     >
-                        <Icon class="w-5 h-5" />
-                        <span class="text-sm font-semibold">{type.label}</span>
-                        <span class="text-[10px] opacity-60">{type.desc}</span>
-                    </button>
-                {/each}
-            </div>
+                </button>
+            {/if}
+            <button
+                class={cn(
+                    "px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2",
+                    activeTab === "history"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-base-content/60 hover:text-base-content",
+                )}
+                onclick={() => (activeTab = "history")}
+            >
+                <History class="w-4 h-4" />
+                History
+            </button>
         </div>
 
-        <!-- Measurable Target -->
-        {#if goalType === "measurable"}
-            <div
-                class="p-4 rounded-xl bg-base-200/50 border border-base-200 space-y-3"
-            >
-                <div class="flex items-center gap-2 text-sm font-semibold">
-                    <Target class="w-4 h-4 text-accent" />
-                    Target Settings
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Value *</label
-                        >
-                        <input
-                            type="number"
-                            class="input input-bordered input-sm w-full mt-1"
-                            class:input-error={errors.targetValue}
-                            placeholder="e.g., 100"
-                            bind:value={targetValue}
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Unit *</label
-                        >
-                        <input
-                            type="text"
-                            class="input input-bordered input-sm w-full mt-1"
-                            class:input-error={errors.targetUnit}
-                            placeholder="e.g., km, pages"
-                            bind:value={targetUnit}
-                        />
-                    </div>
-                </div>
-                <label class="label cursor-pointer justify-start gap-2">
-                    <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        bind:checked={targetPerPeriod}
-                    />
-                    <span class="label-text text-sm"
-                        >Per period (e.g., 3L per day)</span
-                    >
-                </label>
-            </div>
-        {/if}
-
-        <!-- Recurrence Toggle -->
-        <div
-            class="p-4 rounded-xl bg-base-200/50 border border-base-200 space-y-3"
-        >
-            <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                    type="checkbox"
-                    class="toggle toggle-primary"
-                    bind:checked={isRecurring}
-                />
-                <div class="flex items-center gap-2">
-                    <Repeat class="w-4 h-4 text-primary" />
-                    <span class="font-semibold text-sm">Make it a Habit</span>
-                </div>
-            </label>
-
-            {#if isRecurring}
-                <div class="space-y-3 pt-2 border-t border-base-200">
-                    <!-- Frequency -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label
-                                class="text-xs font-semibold uppercase opacity-50"
-                                >Times</label
-                            >
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto">
+            {#if activeTab === "details"}
+                <div class="p-6 space-y-6">
+                    <!-- Title & Description -->
+                    <div class="space-y-4">
+                        <div class="form-control">
+                            <label class="label" for="goal-title">
+                                <span class="label-text font-medium"
+                                    >Goal Title <span class="text-error">*</span
+                                    ></span
+                                >
+                            </label>
                             <input
-                                type="number"
-                                min="1"
-                                max="365"
-                                class="input input-bordered input-sm w-full mt-1"
-                                bind:value={frequency}
+                                id="goal-title"
+                                type="text"
+                                bind:value={title}
+                                placeholder="What do you want to achieve?"
+                                class="input input-bordered w-full text-lg"
                             />
                         </div>
-                        <div>
-                            <label
-                                class="text-xs font-semibold uppercase opacity-50"
-                                >Period</label
-                            >
-                            <select
-                                class="select select-bordered select-sm w-full mt-1"
-                                bind:value={period}
-                            >
-                                {#each periods as p}
-                                    <option value={p.value}>{p.label}</option>
-                                {/each}
-                            </select>
+
+                        <div class="form-control">
+                            <label class="label" for="goal-description">
+                                <span class="label-text font-medium"
+                                    >Description</span
+                                >
+                            </label>
+                            <textarea
+                                id="goal-description"
+                                bind:value={description}
+                                placeholder="Add more details about your goal..."
+                                class="textarea textarea-bordered w-full h-20 resize-none"
+                            ></textarea>
                         </div>
                     </div>
 
-                    <!-- Active Days (for weekly) -->
-                    {#if period === "week"}
-                        <div>
-                            <label
-                                class="text-xs font-semibold uppercase opacity-50"
-                                >Active Days</label
+                    <!-- Quick Settings Grid -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Category -->
+                        <div class="form-control">
+                            <label class="label py-1">
+                                <span
+                                    class="label-text text-xs font-medium flex items-center gap-1.5"
+                                >
+                                    <Tag class="w-3.5 h-3.5 opacity-50" />
+                                    Category
+                                </span>
+                            </label>
+                            <CategoryDropdown
+                                {categories}
+                                bind:value={categoryId}
+                                placeholder="Select..."
+                                size="sm"
+                            />
+                        </div>
+
+                        <!-- Priority -->
+                        <div class="form-control">
+                            <label class="label py-1">
+                                <span
+                                    class="label-text text-xs font-medium flex items-center gap-1.5"
+                                >
+                                    <Flag class="w-3.5 h-3.5 opacity-50" />
+                                    Priority
+                                </span>
+                            </label>
+                            <select
+                                class="select select-bordered select-sm w-full"
+                                bind:value={priority}
                             >
-                            <div class="flex gap-1 mt-2">
-                                {#each weekdays as day}
+                                <option value={0}>None</option>
+                                <option value={1}>Low</option>
+                                <option value={2}>Medium</option>
+                                <option value={3}>High</option>
+                            </select>
+                        </div>
+
+                        <!-- Start Date -->
+                        <div class="form-control">
+                            <label class="label py-1">
+                                <span
+                                    class="label-text text-xs font-medium flex items-center gap-1.5"
+                                >
+                                    <Calendar class="w-3.5 h-3.5 opacity-50" />
+                                    Start
+                                </span>
+                            </label>
+                            <input
+                                type="date"
+                                bind:value={startDate}
+                                class="input input-bordered input-sm w-full"
+                            />
+                        </div>
+
+                        <!-- Deadline -->
+                        <div class="form-control">
+                            <label class="label py-1">
+                                <span
+                                    class="label-text text-xs font-medium flex items-center gap-1.5"
+                                >
+                                    <Clock class="w-3.5 h-3.5 opacity-50" />
+                                    Deadline
+                                </span>
+                            </label>
+                            <input
+                                type="date"
+                                bind:value={deadline}
+                                class="input input-bordered input-sm w-full"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Goal Type Cards -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <!-- Recurring Habit -->
+                        <div
+                            class={cn(
+                                "rounded-2xl border-2 p-5 transition-all cursor-pointer",
+                                isHabit
+                                    ? "border-primary bg-primary/5 shadow-sm"
+                                    : "border-base-200 hover:border-base-300 bg-base-50",
+                            )}
+                            role="button"
+                            tabindex="0"
+                            onclick={() => (isHabit = !isHabit)}
+                            onkeydown={(e) =>
+                                e.key === "Enter" && (isHabit = !isHabit)}
+                        >
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class={cn(
+                                            "w-10 h-10 rounded-xl flex items-center justify-center",
+                                            isHabit
+                                                ? "bg-primary text-primary-content"
+                                                : "bg-base-200",
+                                        )}
+                                    >
+                                        <Repeat class="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold">
+                                            Recurring Habit
+                                        </p>
+                                        <p class="text-xs text-base-content/60">
+                                            Track daily, weekly, or monthly
+                                        </p>
+                                    </div>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    class="checkbox checkbox-primary"
+                                    checked={isHabit}
+                                    onclick={(e) => e.stopPropagation()}
+                                    onchange={() => (isHabit = !isHabit)}
+                                />
+                            </div>
+
+                            {#if isHabit}
+                                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                                <div
+                                    class="mt-5 pt-4 border-t border-base-200 space-y-4"
+                                    role="presentation"
+                                    onclick={(e) => e.stopPropagation()}
+                                >
+                                    <div class="flex gap-3">
+                                        <div class="form-control flex-1">
+                                            <label
+                                                class="label py-0 pb-1"
+                                                for="habit-frequency"
+                                            >
+                                                <span class="label-text text-xs"
+                                                    >Frequency</span
+                                                >
+                                            </label>
+                                            <input
+                                                id="habit-frequency"
+                                                type="number"
+                                                min="1"
+                                                max="30"
+                                                class="input input-bordered input-sm w-full"
+                                                bind:value={frequency}
+                                            />
+                                        </div>
+                                        <div class="form-control flex-1">
+                                            <label
+                                                class="label py-0 pb-1"
+                                                for="habit-period"
+                                            >
+                                                <span class="label-text text-xs"
+                                                    >Period</span
+                                                >
+                                            </label>
+                                            <select
+                                                id="habit-period"
+                                                class="select select-bordered select-sm w-full"
+                                                bind:value={period}
+                                            >
+                                                <option value="day"
+                                                    >Daily</option
+                                                >
+                                                <option value="week"
+                                                    >Weekly</option
+                                                >
+                                                <option value="month"
+                                                    >Monthly</option
+                                                >
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {#if period === "week"}
+                                        <div class="form-control">
+                                            <span class="label py-0 pb-2">
+                                                <span class="label-text text-xs"
+                                                    >Active Days</span
+                                                >
+                                            </span>
+                                            <div class="flex gap-1.5">
+                                                {#each dayOptions as day}
+                                                    <button
+                                                        type="button"
+                                                        class={cn(
+                                                            "w-9 h-9 rounded-lg text-xs font-medium transition-all",
+                                                            activeDays.includes(
+                                                                day.value,
+                                                            )
+                                                                ? "bg-primary text-primary-content"
+                                                                : "bg-base-200 hover:bg-base-300",
+                                                        )}
+                                                        onclick={() =>
+                                                            toggleDay(
+                                                                day.value,
+                                                            )}
+                                                        title={day.full}
+                                                    >
+                                                        {day.label}
+                                                    </button>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/if}
+                        </div>
+
+                        <!-- Measurable Target -->
+                        <div
+                            class={cn(
+                                "rounded-2xl border-2 p-5 transition-all cursor-pointer",
+                                isMeasurable
+                                    ? "border-accent bg-accent/5 shadow-sm"
+                                    : "border-base-200 hover:border-base-300 bg-base-50",
+                            )}
+                            role="button"
+                            tabindex="0"
+                            onclick={() => (isMeasurable = !isMeasurable)}
+                            onkeydown={(e) =>
+                                e.key === "Enter" &&
+                                (isMeasurable = !isMeasurable)}
+                        >
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class={cn(
+                                            "w-10 h-10 rounded-xl flex items-center justify-center",
+                                            isMeasurable
+                                                ? "bg-accent text-accent-content"
+                                                : "bg-base-200",
+                                        )}
+                                    >
+                                        <TrendingUp class="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold">
+                                            Measurable Target
+                                        </p>
+                                        <p class="text-xs text-base-content/60">
+                                            Track progress with numbers
+                                        </p>
+                                    </div>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    class="checkbox checkbox-accent"
+                                    checked={isMeasurable}
+                                    onclick={(e) => e.stopPropagation()}
+                                    onchange={() =>
+                                        (isMeasurable = !isMeasurable)}
+                                />
+                            </div>
+
+                            {#if isMeasurable}
+                                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                                <div
+                                    class="mt-5 pt-4 border-t border-base-200 space-y-4"
+                                    role="presentation"
+                                    onclick={(e) => e.stopPropagation()}
+                                >
+                                    <div class="form-control">
+                                        <span class="label py-0 pb-1">
+                                            <span class="label-text text-xs"
+                                                >Target Type</span
+                                            >
+                                        </span>
+                                        <div class="grid grid-cols-3 gap-2">
+                                            {#each operatorOptions as op}
+                                                <button
+                                                    type="button"
+                                                    class={cn(
+                                                        "btn btn-sm",
+                                                        targetOperator ===
+                                                            op.value
+                                                            ? "btn-accent"
+                                                            : "btn-ghost border border-base-300",
+                                                    )}
+                                                    onclick={() =>
+                                                        (targetOperator =
+                                                            op.value as
+                                                                | "gte"
+                                                                | "lte"
+                                                                | "eq")}
+                                                >
+                                                    <span class="font-bold"
+                                                        >{op.symbol}</span
+                                                    >
+                                                    <span
+                                                        class="hidden sm:inline text-xs"
+                                                        >{op.label}</span
+                                                    >
+                                                </button>
+                                            {/each}
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-3">
+                                        <div class="form-control flex-1">
+                                            <label
+                                                class="label py-0 pb-1"
+                                                for="target-value"
+                                            >
+                                                <span class="label-text text-xs"
+                                                    >Value</span
+                                                >
+                                            </label>
+                                            <input
+                                                id="target-value"
+                                                type="number"
+                                                min="1"
+                                                class="input input-bordered input-sm w-full"
+                                                bind:value={targetValue}
+                                            />
+                                        </div>
+                                        <div class="form-control flex-1">
+                                            <label
+                                                class="label py-0 pb-1"
+                                                for="target-unit"
+                                            >
+                                                <span class="label-text text-xs"
+                                                    >Unit</span
+                                                >
+                                            </label>
+                                            <select
+                                                id="target-unit"
+                                                class="select select-bordered select-sm w-full"
+                                                bind:value={targetUnit}
+                                            >
+                                                {#each commonUnits as unit}
+                                                    <option value={unit.value}
+                                                        >{unit.label}</option
+                                                    >
+                                                {/each}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <label
+                                        class="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="checkbox checkbox-xs checkbox-accent"
+                                            bind:checked={targetPerPeriod}
+                                        />
+                                        <span
+                                            class="text-xs text-base-content/70"
+                                            >Reset each period</span
+                                        >
+                                    </label>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+
+                    <!-- Status (only for editing) -->
+                    {#if isEditing}
+                        <div class="form-control">
+                            <span class="label">
+                                <span class="label-text font-medium"
+                                    >Status</span
+                                >
+                            </span>
+                            <div class="flex gap-2">
+                                {#each [{ value: "active", label: "Active", icon: Circle, color: "btn-success" }, { value: "completed", label: "Completed", icon: CheckCircle2, color: "btn-info" }, { value: "archived", label: "Archived", icon: History, color: "btn-neutral" }] as opt}
+                                    {@const Icon = opt.icon}
                                     <button
                                         type="button"
                                         class={cn(
-                                            "w-8 h-8 rounded-full text-xs font-bold transition-all",
-                                            activeDays.includes(day.value)
-                                                ? "bg-primary text-primary-content"
-                                                : "bg-base-200 hover:bg-base-300",
+                                            "btn btn-sm gap-1.5",
+                                            status === opt.value
+                                                ? opt.color
+                                                : "btn-ghost border border-base-300",
                                         )}
-                                        onclick={() => toggleDay(day.value)}
+                                        onclick={() => (status = opt.value)}
                                     >
-                                        {day.label}
+                                        <Icon class="w-4 h-4" />
+                                        {opt.label}
                                     </button>
                                 {/each}
                             </div>
                         </div>
                     {/if}
-
-                    <!-- Grace Days -->
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Grace Days</label
-                        >
-                        <input
-                            type="number"
-                            min="0"
-                            max="7"
-                            class="input input-bordered input-sm w-full mt-1"
-                            placeholder="Days you can miss without breaking streak"
-                            bind:value={graceDays}
-                        />
-                    </div>
                 </div>
-            {/if}
-        </div>
-
-        <!-- Description & Why -->
-        <div class="space-y-3">
-            <div>
-                <label
-                    class="text-xs font-semibold uppercase opacity-50"
-                    for="goal-desc"
-                >
-                    Description
-                </label>
-                <textarea
-                    id="goal-desc"
-                    class="textarea textarea-bordered w-full mt-1 h-20"
-                    placeholder="What do you want to achieve?"
-                    bind:value={description}
-                ></textarea>
-            </div>
-            <div>
-                <label
-                    class="text-xs font-semibold uppercase opacity-50"
-                    for="goal-why"
-                >
-                    <Sparkles class="w-3 h-3 inline mr-1" />
-                    Why does this matter?
-                </label>
-                <textarea
-                    id="goal-why"
-                    class="textarea textarea-bordered w-full mt-1 h-16"
-                    placeholder="Helpful for retrospectives..."
-                    bind:value={why}
-                ></textarea>
-            </div>
-        </div>
-
-        <!-- Advanced Options Toggle -->
-        <button
-            type="button"
-            class="btn btn-ghost btn-sm gap-2"
-            onclick={() => (showAdvanced = !showAdvanced)}
-        >
-            {showAdvanced ? "Hide" : "Show"} Advanced Options
-            <Plus
-                class={cn(
-                    "w-4 h-4 transition-transform",
-                    showAdvanced && "rotate-45",
-                )}
-            />
-        </button>
-
-        {#if showAdvanced}
-            <div
-                class="space-y-4 p-4 rounded-xl bg-base-200/30 border border-base-200"
-            >
-                <!-- Dates -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Start Date</label
-                        >
-                        <input
-                            type="date"
-                            class="input input-bordered input-sm w-full mt-1"
-                            bind:value={startDate}
-                        />
-                    </div>
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Deadline</label
-                        >
-                        <input
-                            type="date"
-                            class="input input-bordered input-sm w-full mt-1"
-                            bind:value={deadline}
-                        />
-                    </div>
-                </div>
-
-                <!-- Priority & Value -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Priority</label
-                        >
-                        <select
-                            class="select select-bordered select-sm w-full mt-1"
-                            bind:value={priority}
-                        >
-                            <option value={1}>Low</option>
-                            <option value={2}>Medium</option>
-                            <option value={3}>High</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Value Score</label
-                        >
-                        <select
-                            class="select select-bordered select-sm w-full mt-1"
-                            bind:value={valueScore}
-                        >
-                            <option value={1}>1 - Low</option>
-                            <option value={2}>2</option>
-                            <option value={3}>3 - Medium</option>
-                            <option value={4}>4</option>
-                            <option value={5}>5 - High</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Life Domain -->
-                <div>
-                    <label class="text-xs font-semibold uppercase opacity-50"
-                        >Life Domain</label
-                    >
-                    <select
-                        class="select select-bordered select-sm w-full mt-1"
-                        bind:value={lifeDomain}
-                    >
-                        <option value="">Select domain...</option>
-                        {#each lifeDomains as domain}
-                            <option value={domain.value}>{domain.label}</option>
-                        {/each}
-                    </select>
-                </div>
-
-                <!-- Category & Color -->
-                <div class="grid grid-cols-2 gap-3">
-                    <CategoryDropdown
-                        bind:selectedId={categoryId}
-                        size="sm"
-                        showLabel={true}
-                    />
-                    <div>
-                        <label
-                            class="text-xs font-semibold uppercase opacity-50"
-                            >Color</label
-                        >
-                        <div class="mt-1">
-                            <ColorPicker bind:value={color} cols={8} />
+            {:else if activeTab === "tasks"}
+                <!-- Tasks Tab -->
+                <div class="p-6">
+                    {#if linkedTasks.length > 0}
+                        <!-- Filter buttons -->
+                        <div class="flex gap-2 mb-4">
+                            <button
+                                class={cn(
+                                    "btn btn-sm gap-1",
+                                    taskFilter === "all"
+                                        ? "btn-primary"
+                                        : "btn-ghost",
+                                )}
+                                onclick={() => (taskFilter = "all")}
+                            >
+                                All
+                                <span class="badge badge-xs"
+                                    >{taskCounts.all}</span
+                                >
+                            </button>
+                            {#if taskCounts.positive > 0}
+                                <button
+                                    class={cn(
+                                        "btn btn-sm gap-1",
+                                        taskFilter === "positive"
+                                            ? "btn-success"
+                                            : "btn-ghost text-success",
+                                    )}
+                                    onclick={() => (taskFilter = "positive")}
+                                >
+                                    <Check class="w-3 h-3" />
+                                    Positive
+                                    <span class="badge badge-xs badge-success"
+                                        >{taskCounts.positive}</span
+                                    >
+                                </button>
+                            {/if}
+                            {#if taskCounts.negative > 0}
+                                <button
+                                    class={cn(
+                                        "btn btn-sm gap-1",
+                                        taskFilter === "negative"
+                                            ? "btn-error"
+                                            : "btn-ghost text-error",
+                                    )}
+                                    onclick={() => (taskFilter = "negative")}
+                                >
+                                    <XIcon class="w-3 h-3" />
+                                    Negative
+                                    <span class="badge badge-xs badge-error"
+                                        >{taskCounts.negative}</span
+                                    >
+                                </button>
+                            {/if}
+                            {#if taskCounts.neutral > 0}
+                                <button
+                                    class={cn(
+                                        "btn btn-sm gap-1",
+                                        taskFilter === "neutral"
+                                            ? "btn-neutral"
+                                            : "btn-ghost",
+                                    )}
+                                    onclick={() => (taskFilter = "neutral")}
+                                >
+                                    <Minus class="w-3 h-3" />
+                                    Neutral
+                                    <span class="badge badge-xs badge-neutral"
+                                        >{taskCounts.neutral}</span
+                                    >
+                                </button>
+                            {/if}
                         </div>
-                    </div>
+
+                        <!-- Task list -->
+                        <div class="space-y-2 max-h-[400px] overflow-y-auto">
+                            {#each filteredTasks as task (task.task_id)}
+                                <div
+                                    class="flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors"
+                                >
+                                    <!-- Impact indicator -->
+                                    <div
+                                        class={cn(
+                                            "w-8 h-8 rounded-lg flex items-center justify-center",
+                                            task.impact_type === "positive"
+                                                ? "bg-success/20 text-success"
+                                                : task.impact_type ===
+                                                    "negative"
+                                                  ? "bg-error/20 text-error"
+                                                  : "bg-base-300 text-base-content/50",
+                                        )}
+                                    >
+                                        {#if task.impact_type === "positive"}
+                                            <Check class="w-4 h-4" />
+                                        {:else if task.impact_type === "negative"}
+                                            <XIcon class="w-4 h-4" />
+                                        {:else}
+                                            <Minus class="w-4 h-4" />
+                                        {/if}
+                                    </div>
+
+                                    <!-- Task info -->
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-medium truncate">
+                                            {task.task_title}
+                                        </p>
+                                        <div
+                                            class="flex items-center gap-2 text-xs text-base-content/60"
+                                        >
+                                            {#if task.quantity_value}
+                                                <span
+                                                    class="badge badge-xs badge-ghost"
+                                                >
+                                                    +{task.quantity_value}
+                                                    {task.unit_id?.replace(
+                                                        "units:",
+                                                        "",
+                                                    ) || ""}
+                                                </span>
+                                            {/if}
+                                            {#if task.impact_magnitude && task.impact_magnitude > 0}
+                                                <span class="opacity-50"
+                                                    >Impact: {task.impact_magnitude}/5</span
+                                                >
+                                            {/if}
+                                        </div>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    {:else}
+                        <div class="text-center py-12 text-base-content/50">
+                            <ListTodo
+                                class="w-16 h-16 mx-auto mb-4 opacity-30"
+                            />
+                            <p class="font-medium">No linked tasks yet</p>
+                            <p class="text-sm mt-1">
+                                Tasks that contribute to this goal will appear
+                                here
+                            </p>
+                        </div>
+                    {/if}
                 </div>
+            {:else if activeTab === "history"}
+                <!-- History Tab -->
+                <div class="p-6">
+                    {#if isEditing && goal}
+                        <!-- Stats Summary -->
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="stat bg-base-200/50 rounded-xl p-4">
+                                <div class="stat-figure text-primary">
+                                    <Flame class="w-8 h-8" />
+                                </div>
+                                <div class="stat-title text-xs">
+                                    Current Streak
+                                </div>
+                                <div class="stat-value text-2xl text-primary">
+                                    {currentStreak}
+                                </div>
+                            </div>
+                            <div class="stat bg-base-200/50 rounded-xl p-4">
+                                <div class="stat-figure text-success">
+                                    <TrendingUp class="w-8 h-8" />
+                                </div>
+                                <div class="stat-title text-xs">Progress</div>
+                                <div class="stat-value text-2xl text-success">
+                                    {progressPercent}%
+                                </div>
+                            </div>
+                            <div class="stat bg-base-200/50 rounded-xl p-4">
+                                <div class="stat-figure text-info">
+                                    <BarChart3 class="w-8 h-8" />
+                                </div>
+                                <div class="stat-title text-xs">
+                                    Current Value
+                                </div>
+                                <div class="stat-value text-2xl text-info">
+                                    {currentValue}
+                                </div>
+                            </div>
+                        </div>
 
-                <!-- Privacy -->
-                <label class="label cursor-pointer justify-start gap-2">
-                    <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        bind:checked={isPrivate}
-                    />
-                    <span class="label-text text-sm"
-                        >Private goal (hidden from shares)</span
-                    >
-                </label>
-            </div>
-        {/if}
-    </form>
-
-    {#snippet actions()}
-        <button type="button" class="btn btn-ghost" onclick={handleClose}
-            >Cancel</button
-        >
-        <button
-            type="button"
-            class="btn btn-primary gap-2"
-            disabled={isPending}
-            onclick={handleSubmit}
-        >
-            {#if isPending}
-                <span class="loading loading-spinner loading-sm"></span>
-            {:else}
-                <Save class="w-4 h-4" />
+                        <div class="text-center py-8 text-base-content/50">
+                            <History
+                                class="w-12 h-12 mx-auto mb-3 opacity-30"
+                            />
+                            <p class="font-medium">
+                                Activity history coming soon
+                            </p>
+                            <p class="text-sm mt-1">
+                                Track your daily progress over time
+                            </p>
+                        </div>
+                    {:else}
+                        <div class="text-center py-12 text-base-content/50">
+                            <History
+                                class="w-16 h-16 mx-auto mb-4 opacity-30"
+                            />
+                            <p class="font-medium">Save your goal first</p>
+                            <p class="text-sm mt-1">
+                                History will appear after you create the goal
+                            </p>
+                        </div>
+                    {/if}
+                </div>
             {/if}
-            {isEditing ? "Update Goal" : "Create Goal"}
-        </button>
-    {/snippet}
-</Modal>
+        </div>
+
+        <!-- Footer -->
+        <div
+            class="flex items-center justify-end gap-3 px-6 py-4 border-t border-base-200 bg-base-200/30"
+        >
+            <button
+                class="btn btn-ghost"
+                onclick={handleClose}
+                disabled={isPending}
+            >
+                Cancel
+            </button>
+            <button
+                class="btn btn-primary gap-2 min-w-[140px]"
+                onclick={handleSubmit}
+                disabled={isPending || !title.trim()}
+            >
+                {#if isPending}
+                    <span class="loading loading-spinner loading-sm"></span>
+                {:else}
+                    <Save class="w-4 h-4" />
+                {/if}
+                {isEditing ? "Update Goal" : "Create Goal"}
+            </button>
+        </div>
+    </div>
+
+    <!-- Backdrop -->
+    <form method="dialog" class="modal-backdrop">
+        <button onclick={handleClose}>close</button>
+    </form>
+</dialog>

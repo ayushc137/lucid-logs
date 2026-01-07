@@ -12,22 +12,18 @@
     Plus,
     Trash2,
     SquarePen,
-    Check,
-    X,
     Search,
     LoaderCircle,
     Flame,
-    Pause,
-    Ban,
     ChevronUp,
     ChevronDown,
     ArrowUpDown,
-    Filter,
     Repeat,
     Crosshair,
     BarChart3,
     Layers,
     Shield,
+    X,
   } from "lucide-svelte";
   import { cn } from "$lib/utils";
   import {
@@ -39,7 +35,12 @@
   const queryClient = useQueryClient();
 
   // Initialize state from URL
-  const initialParams = getUrlParams({
+  const initialParams = getUrlParams<{
+    q: string;
+    status: string;
+    type: string;
+    sort: string;
+  }>({
     q: parsers.string(""),
     status: parsers.string(""),
     type: parsers.string(""),
@@ -82,7 +83,6 @@
     limit: 100,
     search: debouncedSearch || undefined,
     status: statusFilter || undefined,
-    goal_type: typeFilter || undefined,
     sort_by: sortBy || undefined,
   });
 
@@ -126,20 +126,6 @@
       await queryClient.invalidateQueries({ queryKey: ["goals"] });
       deleteConfirmOpen = false;
       deleteTargetId = null;
-    },
-  });
-
-  const statusMut = createMutation({
-    mutationFn: ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: "active" | "completed" | "paused" | "abandoned";
-    }) => updateGoal(id, { status }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["goals-list"] });
-      await queryClient.invalidateQueries({ queryKey: ["goals"] });
     },
   });
 
@@ -188,50 +174,78 @@
     return ArrowUpDown;
   }
 
+  // Derived sort icons for reactive updates
+  const TitleSortIcon = $derived(getSortIcon("title"));
+  const StreakSortIcon = $derived(getSortIcon("streak"));
+
   const isSearching = $derived(searchQuery !== debouncedSearch);
 
   const statusOptions = [
     { value: "", label: "All Statuses" },
     { value: "active", label: "Active" },
     { value: "completed", label: "Completed" },
-    { value: "paused", label: "Paused" },
-    { value: "abandoned", label: "Abandoned" },
+    { value: "archived", label: "Archived" },
   ];
-
-  const typeOptions = [
-    { value: "", label: "All Types" },
-    { value: "discrete", label: "One-time" },
-    { value: "measurable", label: "Measurable" },
-    { value: "avoidance", label: "Avoidance" },
-    { value: "epic", label: "Epic" },
-  ];
-
-  const typeIcons: Record<string, typeof Target> = {
-    discrete: Crosshair,
-    measurable: BarChart3,
-    epic: Layers,
-    avoidance: Shield,
-  };
 
   const statusColors: Record<string, string> = {
     active: "badge-success",
     completed: "badge-info",
-    paused: "badge-warning",
-    abandoned: "badge-error",
+    archived: "badge-neutral",
   };
 
+  const typeOptions = [
+    { value: "", label: "All Types" },
+    { value: "habit", label: "Habits" },
+    { value: "measurable", label: "Measurable" },
+    { value: "simple", label: "Simple" },
+  ];
+
   function getProgress(goal: Goal): number {
-    if (!goal.target) return 0;
-    return Math.min(
-      100,
-      Math.round((goal.target.current_value / goal.target.value) * 100),
-    );
+    if (goal.stats) return Math.min(100, goal.stats.progress_percent);
+    // Fallback if stats not populated but target exists
+    if (goal.target && goal.target.value > 0) {
+      return 0; // cant calc without stats currently
+    }
+    return 0;
   }
 
   function formatRecurrence(rec: Goal["recurrence"]): string {
     if (!rec) return "—";
-    const times = rec.frequency === 1 ? "" : `${rec.frequency}× `;
-    return `${times}${rec.period}ly`;
+    const freq = rec.frequency || 1;
+    const periodMap: Record<string, string> = {
+      day: "daily",
+      week: "weekly",
+      month: "monthly",
+    };
+    const periodLabel = periodMap[rec.period] || rec.period;
+    return freq > 1 ? `${freq}× ${periodLabel}` : periodLabel;
+  }
+
+  function getGoalTypeInfo(goal: Goal) {
+    if (goal.children && goal.children.length > 0)
+      return { icon: Layers, label: "Group" };
+
+    // For habits, show the recurrence period
+    if (goal.recurrence) {
+      const freq = goal.recurrence.frequency || 1;
+      const periodMap: Record<string, string> = {
+        day: "Daily",
+        week: "Weekly",
+        month: "Monthly",
+      };
+      const periodLabel =
+        periodMap[goal.recurrence.period] || goal.recurrence.period;
+      const habitLabel =
+        freq > 1 ? `${freq}× ${periodLabel} Habit` : `${periodLabel} Habit`;
+      return { icon: Repeat, label: habitLabel };
+    }
+
+    if (goal.target) {
+      if (goal.target.operator === "lte" || goal.target.operator === "eq")
+        return { icon: Shield, label: "Limit" };
+      return { icon: BarChart3, label: "Measurable" };
+    }
+    return { icon: Crosshair, label: "Goal" };
   }
 
   // Highlight search matches
@@ -258,7 +272,7 @@
     <div>
       <h1 class="text-3xl font-bold">Goals</h1>
       <p class="text-sm opacity-60 mt-1">
-        {#if debouncedSearch || statusFilter || typeFilter}
+        {#if debouncedSearch || statusFilter}
           Found {goals.length} matching goals
         {:else}
           {totalGoals} goals
@@ -311,7 +325,7 @@
 
         <!-- Status Filter -->
         <select
-          class="select select-bordered w-full sm:w-40"
+          class="select select-bordered select-sm w-full sm:w-36"
           bind:value={statusFilter}
         >
           {#each statusOptions as opt}
@@ -321,7 +335,7 @@
 
         <!-- Type Filter -->
         <select
-          class="select select-bordered w-full sm:w-40"
+          class="select select-bordered select-sm w-full sm:w-36"
           bind:value={typeFilter}
         >
           {#each typeOptions as opt}
@@ -349,7 +363,7 @@
   {:else if goals.length === 0}
     <div class="card bg-base-100 shadow-lg border border-base-200">
       <div class="card-body py-12 text-center">
-        {#if debouncedSearch || statusFilter || typeFilter}
+        {#if debouncedSearch || statusFilter}
           <Search class="w-12 h-12 opacity-30 mx-auto mb-4" />
           <h2 class="text-xl font-semibold">No matching goals</h2>
           <p class="opacity-60 mt-1">Try adjusting your filters</p>
@@ -359,7 +373,6 @@
               searchQuery = "";
               debouncedSearch = "";
               statusFilter = "";
-              typeFilter = "";
             }}
           >
             Clear filters
@@ -399,53 +412,37 @@
                   onclick={() => toggleSort("title")}
                 >
                   Goal
-                  <svelte:component
-                    this={getSortIcon("title")}
-                    class="w-3 h-3 opacity-50"
-                  />
+                  <TitleSortIcon class="w-3 h-3 opacity-50" />
                 </button>
               </th>
               <th class="hidden md:table-cell">Type</th>
-              <th class="hidden lg:table-cell">Recurrence</th>
               <th class="hidden sm:table-cell">
                 <button
                   class="flex items-center gap-1 hover:text-primary transition-colors"
                   onclick={() => toggleSort("streak")}
                 >
                   Streak
-                  <svelte:component
-                    this={getSortIcon("streak")}
-                    class="w-3 h-3 opacity-50"
-                  />
+                  <StreakSortIcon class="w-3 h-3 opacity-50" />
                 </button>
               </th>
               <th>Progress</th>
               <th class="hidden sm:table-cell">Status</th>
-              <th class="w-24 text-right">Actions</th>
+              <th class="w-28"></th>
             </tr>
           </thead>
           <tbody>
             {#each goals as goal (goal.id)}
               {@const progress = getProgress(goal)}
-              {@const TypeIcon = typeIcons[goal.goal_type] || Target}
-              {@const goalColor = goal.color || "#8b5cf6"}
+              {@const typeInfo = getGoalTypeInfo(goal)}
+              {@const TypeIcon = typeInfo.icon}
+              {@const goalColor = goal.category?.color || "#8b5cf6"}
               <tr
                 class="relative hover:bg-base-200/50 transition-colors group cursor-pointer overflow-hidden"
                 onclick={() => startEdit(goal)}
+                style={goal.target && progress > 0
+                  ? `background-image: linear-gradient(to right, ${goalColor}1a ${progress}%, transparent ${progress}%);`
+                  : ""}
               >
-                <!-- Full-width progress bar background -->
-                {#if goal.target && progress > 0}
-                  <td
-                    class="absolute inset-0 p-0 pointer-events-none"
-                    style="background: transparent;"
-                  >
-                    <div
-                      class="absolute inset-y-0 left-0 opacity-10 transition-all duration-500"
-                      style="width: {progress}%; background-color: {goalColor};"
-                    ></div>
-                  </td>
-                {/if}
-
                 <!-- Icon -->
                 <td class="relative z-10">
                   <div
@@ -481,34 +478,20 @@
                   </div>
                 </td>
 
-                <!-- Type -->
+                <!-- Type (includes habit frequency) -->
                 <td class="hidden md:table-cell relative z-10">
                   <div class="flex items-center gap-1.5">
                     <TypeIcon class="w-4 h-4 opacity-50" />
-                    <span class="text-sm capitalize">{goal.goal_type}</span>
+                    <span class="text-sm">{typeInfo.label}</span>
                   </div>
-                </td>
-
-                <!-- Recurrence -->
-                <td class="hidden lg:table-cell relative z-10">
-                  {#if goal.recurrence}
-                    <div class="flex items-center gap-1.5">
-                      <Repeat class="w-3.5 h-3.5 opacity-50" />
-                      <span class="text-sm"
-                        >{formatRecurrence(goal.recurrence)}</span
-                      >
-                    </div>
-                  {:else}
-                    <span class="text-sm opacity-40">—</span>
-                  {/if}
                 </td>
 
                 <!-- Streak -->
                 <td class="hidden sm:table-cell relative z-10">
-                  {#if goal.current_streak > 0}
+                  {#if goal.stats && goal.stats.current_streak > 0}
                     <div class="flex items-center gap-1 text-warning font-bold">
                       <Flame class="w-4 h-4" />
-                      <span>{goal.current_streak}</span>
+                      <span>{goal.stats.current_streak}</span>
                     </div>
                   {:else}
                     <span class="text-sm opacity-40">—</span>
@@ -524,14 +507,22 @@
                       >
                         <div
                           class="h-full rounded-full transition-all duration-500"
-                          style="width: {progress}%; background-color: {goal.color ||
-                            '#8b5cf6'};"
+                          style="width: {Math.min(
+                            100,
+                            progress,
+                          )}%; background-color: {goalColor};"
                         ></div>
                       </div>
                       <span class="text-xs font-medium w-10">
-                        {progress}%
+                        {Math.floor(progress)}%
                       </span>
                     </div>
+                  {:else if goal.children && goal.children.length > 0}
+                    <!-- Group progress -->
+                    <span class="text-sm opacity-60">
+                      {goal.stats?.children_completed || 0}/{goal.stats
+                        ?.children_total || 0}
+                    </span>
                   {:else}
                     <span class="text-sm opacity-40">—</span>
                   {/if}
@@ -541,7 +532,7 @@
                 <td class="hidden sm:table-cell relative z-10">
                   <span
                     class={cn(
-                      "badge badge-sm",
+                      "badge badge-xs capitalize",
                       statusColors[goal.status] || "badge-ghost",
                     )}
                   >

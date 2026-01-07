@@ -1137,10 +1137,10 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 		}
 	}
 
-	// Execute batch query
+	// Execute batch query - use type::record since goal_id is full ID like "goals:abc123"
 	_, err = database.QueryAll[any](ctx, r.db, `
 		FOR $edge IN $edges {
-			LET $goal = type::thing("goals", $edge.goal_id);
+			LET $goal = type::record($edge.goal_id);
 			RELATE $task_id -> task_goals -> $goal SET
 				impact_type = $edge.impact_type,
 				impact_magnitude = $edge.impact_magnitude,

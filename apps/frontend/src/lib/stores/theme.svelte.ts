@@ -34,16 +34,25 @@ const STORAGE_KEY = 'theme';
 const DEFAULT_THEME: ThemeId = 'dark';
 
 function createThemeStore() {
-  let current = $state<ThemeId>(DEFAULT_THEME);
-
-  // Initialize from localStorage
+  // Determine initial theme before creating state to avoid state_referenced_locally warning
+  let initialTheme: ThemeId = DEFAULT_THEME;
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem(STORAGE_KEY) as ThemeId | null;
     if (stored && THEMES.some((t) => t.id === stored)) {
-      current = stored;
+      initialTheme = stored;
     }
     // Apply theme immediately
-    document.documentElement.setAttribute('data-theme', current);
+    document.documentElement.setAttribute('data-theme', initialTheme);
+  }
+
+  let current = $state<ThemeId>(initialTheme);
+
+  function set(theme: ThemeId) {
+    current = theme;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, theme);
+      document.documentElement.setAttribute('data-theme', theme);
+    }
   }
 
   return {
@@ -53,13 +62,7 @@ function createThemeStore() {
     get currentTheme() {
       return THEMES.find((t) => t.id === current) || THEMES[0];
     },
-    set(theme: ThemeId) {
-      current = theme;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, theme);
-        document.documentElement.setAttribute('data-theme', theme);
-      }
-    },
+    set,
   };
 }
 

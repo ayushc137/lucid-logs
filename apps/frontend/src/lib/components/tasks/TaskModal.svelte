@@ -69,13 +69,11 @@
     const queryClient = useQueryClient();
 
     // Fetch last task end time only when modal is open and in create mode
-    const queryOptions = $derived({
+    const lastTaskEndTimeQuery = createQuery(() => ({
         queryKey: ["tasks", "last-end-time"],
         queryFn: getLastTaskEndTime,
         enabled: open && !task,
-    });
-
-    const lastTaskEndTimeQuery = createQuery(queryOptions);
+    }));
 
     const lastTaskEndTime = $derived(
         $lastTaskEndTimeQuery.data?.end_time

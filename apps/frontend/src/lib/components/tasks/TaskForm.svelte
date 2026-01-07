@@ -13,6 +13,7 @@
         type UpdateTaskRequest,
         type TaskItem,
         getLastTaskEndTime,
+        type TaskTemplate,
     } from "$lib/api";
     import { getCategories, createCategory } from "$lib/api/categories";
     import {
@@ -100,7 +101,7 @@
         enabled: !isEditing,
     });
 
-    const lastTaskEndTimeQuery = createQuery(queryOptions);
+    const lastTaskEndTimeQuery = createQuery(() => queryOptions);
 
     const lastTaskEndTime = $derived(
         $lastTaskEndTimeQuery.data?.end_time
@@ -205,6 +206,15 @@
             positives = task.positives || [];
             negatives = task.negatives || [];
             completed = task.completed || false;
+            goalLinks = (task.linked_goals || []).map((l) => ({
+                goal_id: l.goal_id,
+                impact_type:
+                    (l.impact_type as "positive" | "negative" | "neutral") ||
+                    "positive",
+                impact_magnitude: l.impact_magnitude,
+                quantity_value: l.quantity_value,
+                quantity_unit: l.quantity_unit,
+            }));
 
             const startDateObj = new Date(task.start_date);
             const endDateObj = new Date(task.end_date);
@@ -232,6 +242,61 @@
             if (initialCategoryId) {
                 categoryId = initialCategoryId;
             }
+
+            // Check for template
+            if (browser) {
+                const templateJson = sessionStorage.getItem("task-template");
+                if (templateJson) {
+                    try {
+                        const tmpl = JSON.parse(templateJson) as TaskTemplate;
+                        title = tmpl.title;
+                        if (tmpl.description) journal = tmpl.description;
+                        if (tmpl.icon) title = `${tmpl.icon} ${title}`; // Optional: prepend icon?
+
+                        if (tmpl.category) categoryId = tmpl.category.id;
+
+                        // Calculate end time based on default duration
+                        if (tmpl.default_duration) {
+                            const start = new Date(); // Or whatever start time is set to (now by default)
+                            // Actually start time is set to 'now' implicitly by user interaction or default state?
+                            // Default state for startTime/endTime is set to 09:00/10:00 in declarations...
+                            // If we want "Now" + duration:
+                            const now = new Date();
+                            const end = new Date(
+                                now.getTime() + tmpl.default_duration * 1000,
+                            );
+
+                            // Update start/end strings
+                            startDate = now.toISOString().split("T")[0];
+                            startTime = now.toTimeString().slice(0, 8);
+                            endDate = end.toISOString().split("T")[0];
+                            endTime = end.toTimeString().slice(0, 8);
+                        }
+
+                        if (tmpl.default_emotion_id) {
+                            const e = emotionStore.get(tmpl.default_emotion_id);
+                            if (e) selectedEmotion = e;
+                        }
+
+                        if (tmpl.goals) {
+                            goalLinks = tmpl.goals.map((g) => ({
+                                goal_id: g.id,
+                                impact_type: "positive",
+                                impact_magnitude: 3,
+                                quantity_value: tmpl.quantity_enabled
+                                    ? tmpl.quantity_default
+                                    : undefined,
+                                quantity_unit: g.target?.unit_id,
+                            }));
+                        }
+
+                        sessionStorage.removeItem("task-template");
+                    } catch (e) {
+                        console.error("Failed to parse task template", e);
+                    }
+                }
+            }
+
             // Initialize hash for empty arrays in create mode
             lastInferredHash = getReflectionsHash([], []);
         }
@@ -687,6 +752,16 @@
             negatives: negatives.length > 0 ? negatives : undefined,
             completed: completed,
             emotion_id: selectedEmotion?.id || undefined,
+            linked_goals:
+                goalLinks.length > 0
+                    ? goalLinks.map((l) => ({
+                          goal_id: l.goal_id,
+                          impact_type: l.impact_type,
+                          impact_magnitude: l.impact_magnitude,
+                          quantity_value: l.quantity_value,
+                          quantity_unit: l.quantity_unit,
+                      }))
+                    : undefined,
         };
 
         if (isEditing) {
