@@ -12,6 +12,165 @@
     },
     "basePath": "/",
     "paths": {
+        "/api/v1/activity": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of all activity for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activity"
+                ],
+                "summary": "List activity logs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of days to include (default 30)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activitylogs.ActivityLogsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activity/goals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get activity logs for goals only",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activity"
+                ],
+                "summary": "List goal activity",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activitylogs.ActivityLogsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activity/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get activity logs for tasks only",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activity"
+                ],
+                "summary": "List task activity",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activitylogs.ActivityLogsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/analytics/charts": {
             "post": {
                 "security": [
@@ -1312,6 +1471,128 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/goals/{id}/logs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of logs for a specific goal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goal-logs"
+                ],
+                "summary": "List goal logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Goal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items to skip (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/goallogs.GoalLogsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/goals/{id}/logs/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get aggregated history summary for a goal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goal-logs"
+                ],
+                "summary": "Get goal logs summary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Goal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of days to include (default 30)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/goallogs.GoalLogsSummary"
                         }
                     },
                     "401": {
@@ -2734,6 +3015,63 @@
         }
     },
     "definitions": {
+        "activitylogs.ActivityLog": {
+            "description": "Activity log entry for any entity",
+            "type": "object",
+            "properties": {
+                "changes": {
+                    "description": "What changed",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "description": "Metadata",
+                    "type": "string"
+                },
+                "entity_icon": {
+                    "description": "Icon of the entity for display",
+                    "type": "string"
+                },
+                "entity_id": {
+                    "description": "The actual entity ID",
+                    "type": "string"
+                },
+                "entity_title": {
+                    "description": "Display helpers (populated for frontend)",
+                    "type": "string"
+                },
+                "entity_type": {
+                    "description": "Entity information",
+                    "type": "string"
+                },
+                "event": {
+                    "description": "Event information",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "activity_logs:xxx",
+                    "type": "string"
+                }
+            }
+        },
+        "activitylogs.ActivityLogsResponse": {
+            "description": "Activity log list response",
+            "type": "object",
+            "properties": {
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activitylogs.ActivityLog"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "analytics.CategoryBreakdown": {
             "type": "object",
             "properties": {
@@ -3556,6 +3894,85 @@
                 "CodeDatabaseError",
                 "CodeServiceError"
             ]
+        },
+        "goallogs.GoalLog": {
+            "description": "Goal history event record",
+            "type": "object",
+            "properties": {
+                "changes": {
+                    "description": "What changed (optional, depends on event type)",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "created_at": {
+                    "description": "Metadata",
+                    "type": "string"
+                },
+                "event": {
+                    "description": "Event type",
+                    "type": "string"
+                },
+                "goal_id": {
+                    "description": "goals:xxx",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "goal_logs:xxx",
+                    "type": "string"
+                },
+                "snapshot_id": {
+                    "description": "Snapshot reference",
+                    "type": "string"
+                },
+                "triggered_by_task_id": {
+                    "description": "What triggered this event (optional)",
+                    "type": "string"
+                }
+            }
+        },
+        "goallogs.GoalLogsResponse": {
+            "description": "Goal history log entries",
+            "type": "object",
+            "properties": {
+                "goal_id": {
+                    "type": "string"
+                },
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/goallogs.GoalLog"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "goallogs.GoalLogsSummary": {
+            "description": "Summary of goal history",
+            "type": "object",
+            "properties": {
+                "avg_daily": {
+                    "type": "number"
+                },
+                "best_day": {
+                    "type": "object",
+                    "properties": {
+                        "date": {
+                            "type": "string"
+                        },
+                        "value": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "days_met": {
+                    "type": "integer"
+                },
+                "days_missed": {
+                    "type": "integer"
+                }
+            }
         },
         "goals.AddChildRequest": {
             "description": "Request for adding a child to a grouped goal",

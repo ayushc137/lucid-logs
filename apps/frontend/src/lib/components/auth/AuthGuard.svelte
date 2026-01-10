@@ -2,42 +2,64 @@
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { authStore, isDevAuthBypassEnabled } from "$lib/stores/auth.svelte";
+  import { emotionStore } from "$lib/stores/emotions.svelte";
+  import { enableAuthRedirect } from "$lib/api/client";
 
   let { children } = $props();
 
   let ready = $state(false);
 
+  // Prevent concurrent login attempts
+  let isLoggingIn = false;
+
   onMount(async () => {
-    // Check if dev auth bypass is enabled
-    if (isDevAuthBypassEnabled()) {
-      // Always perform fresh login in dev mode to handle database resets
-      // This ensures we always have a valid token for the current database state
-      const success = await authStore.devAutoLogin();
-      if (!success) {
-        console.error(
-          "[Dev Auth] Auto-login failed, redirecting to login page",
-        );
+    // Prevent concurrent login attempts
+    if (isLoggingIn) return;
+    isLoggingIn = true;
+
+    try {
+      // Check if dev auth bypass is enabled
+      if (isDevAuthBypassEnabled()) {
+        // Only auto-login if we don't already have a valid token
+        if (!authStore.hasToken) {
+          const success = await authStore.devAutoLogin();
+          if (!success) {
+            console.error(
+              "[Dev Auth] Auto-login failed, redirecting to login page",
+            );
+            goto("/login");
+            return;
+          }
+        }
+        // Initialize emotion store after auth is confirmed
+        await emotionStore.init();
+        // Enable 401 redirects now that auth is confirmed
+        enableAuthRedirect();
+        ready = true;
+        return;
+      }
+
+      // Normal auth flow
+      if (!authStore.hasToken) {
         goto("/login");
         return;
       }
+
+      // Validate token and load user
+      const isValid = await authStore.initialize();
+      if (!isValid) {
+        goto("/login");
+        return;
+      }
+
+      // Initialize emotion store after auth is confirmed
+      await emotionStore.init();
+      // Enable 401 redirects now that auth is confirmed
+      enableAuthRedirect();
       ready = true;
-      return;
+    } finally {
+      isLoggingIn = false;
     }
-
-    // Normal auth flow
-    if (!authStore.hasToken) {
-      goto("/login");
-      return;
-    }
-
-    // Validate token and load user
-    const isValid = await authStore.initialize();
-    if (!isValid) {
-      goto("/login");
-      return;
-    }
-
-    ready = true;
   });
 </script>
 

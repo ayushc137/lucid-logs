@@ -351,11 +351,11 @@ func seedAll(ctx context.Context, db *database.DB, userID string) error {
 	log.Info().Int("count", len(templates)).Msg("✅ Templates created")
 
 	// 4. Seed 60 days of tasks with realistic patterns
-	totalTasks, totalLinks := seedTasksMultiDay(ctx, db, categories, goals, templates)
+	totalTasks, totalLinks := seedTasksMultiDay(ctx, db, categories, goals, templates, userID)
 	log.Info().Int("tasks", totalTasks).Int("links", totalLinks).Msg("✅ Tasks and goal links created")
 
 	// 5. Update goal streaks and create goal history
-	streakUpdates := seedGoalStreaksAndHistory(ctx, db, goals)
+	streakUpdates := seedGoalStreaksAndHistory(ctx, db, goals, userID)
 	log.Info().Int("updated", streakUpdates).Msg("✅ Goal streaks and history updated")
 
 	return nil
@@ -1028,7 +1028,7 @@ func seedTemplates(categories, goals map[string]string) (map[string]string, erro
 // TASK SEEDING (30 Days of Realistic Data)
 // =============================================================================
 
-func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, templates map[string]string) (totalTasks, totalLinks int) {
+func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, templates map[string]string, userID string) (totalTasks, totalLinks int) {
 	now := time.Now()
 
 	// Track streaks state in memory to simulate realistic progression
@@ -1037,7 +1037,7 @@ func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, 
 	// Seed past 20 days + today + 3 future days (focus on density per day, not length)
 	for dayOffset := -20; dayOffset <= 3; dayOffset++ {
 		day := now.AddDate(0, 0, dayOffset)
-		tasks, links := seedTasksForDay(ctx, db, day, dayOffset, categories, goals, templates, streaks)
+		tasks, links := seedTasksForDay(ctx, db, day, dayOffset, categories, goals, templates, streaks, userID)
 		totalTasks += tasks
 		totalLinks += links
 	}
@@ -1045,7 +1045,7 @@ func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, 
 	return totalTasks, totalLinks
 }
 
-func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOffset int, categories, goals, templates map[string]string, streaks map[string]int) (tasks, links int) {
+func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOffset int, categories, goals, templates map[string]string, streaks map[string]int, userID string) (tasks, links int) {
 	isPast := dayOffset < 0
 	isWeekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
 	dayOfMonth := day.Day()
@@ -1162,12 +1162,12 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		_ = createGoalLog(ctx, db, goals[hydrationGoalTitle], "target_met", map[string]any{
 			"current_value": dailyTotals[hydrationGoalTitle],
 			"streak":        streaks[hydrationGoalTitle],
-		}, day)
+		}, day, userID)
 		_ = updateGoalStreak(ctx, db, goals[hydrationGoalTitle], streaks[hydrationGoalTitle], day)
 	} else if isPast {
 		streaks[hydrationGoalTitle] = 0
 		if streaks[hydrationGoalTitle] > 0 {
-			_ = createGoalLog(ctx, db, goals[hydrationGoalTitle], "streak_broken", nil, day)
+			_ = createGoalLog(ctx, db, goals[hydrationGoalTitle], "streak_broken", nil, day, userID)
 		}
 	}
 
@@ -1228,13 +1228,13 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			_ = createGoalLog(ctx, db, goals[readingGoalTitle], "target_met", map[string]any{
 				"current_value": dailyTotals[readingGoalTitle],
 				"streak":        streaks[readingGoalTitle],
-			}, day)
+			}, day, userID)
 			_ = updateGoalStreak(ctx, db, goals[readingGoalTitle], streaks[readingGoalTitle], day)
 		}
 	} else if isPast && streaks[readingGoalTitle] > 0 {
 		// Streak broken and never recovered
 		streaks[readingGoalTitle] = 0
-		_ = createGoalLog(ctx, db, goals[readingGoalTitle], "streak_broken", nil, day)
+		_ = createGoalLog(ctx, db, goals[readingGoalTitle], "streak_broken", nil, day, userID)
 	}
 
 	// =========================================================================
@@ -1315,7 +1315,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		_ = createGoalLog(ctx, db, goals[exerciseGoalTitle], "target_met", map[string]any{
 			"current_value": dailyTotals[exerciseGoalTitle],
 			"streak":        streaks[exerciseGoalTitle],
-		}, day)
+		}, day, userID)
 		_ = updateGoalStreak(ctx, db, goals[exerciseGoalTitle], streaks[exerciseGoalTitle], day)
 	} else if isPast {
 		streaks[exerciseGoalTitle] = 0
@@ -2709,7 +2709,7 @@ func createTaskWithNegativeImpact(day time.Time, hour, minute, durationMin int, 
 // =============================================================================
 
 // seedGoalStreaksAndHistory updates goal streaks and creates historical goal logs
-func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[string]string) int {
+func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[string]string, userID string) int {
 	updated := 0
 	now := time.Now()
 
@@ -2760,7 +2760,7 @@ func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[s
 				"streak_after":  i + 1,
 			}
 
-			if err := createGoalLog(ctx, db, goalID, eventType, changes, logDate); err != nil {
+			if err := createGoalLog(ctx, db, goalID, eventType, changes, logDate, userID); err != nil {
 				log.Warn().Err(err).Str("goal", goalTitle).Int("day", i).Msg("Failed to create goal log")
 			}
 		}
@@ -2816,7 +2816,7 @@ func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[s
 				"progress":     progress * float64(i+1) / float64(data.logEntries),
 			}
 
-			if err := createGoalLog(ctx, db, goalID, "progress_update", changes, logDate); err != nil {
+			if err := createGoalLog(ctx, db, goalID, "progress_update", changes, logDate, userID); err != nil {
 				log.Warn().Err(err).Str("goal", goalTitle).Msg("Failed to create progress log")
 			}
 		}
@@ -2839,31 +2839,46 @@ func randomElement(items []string) string {
 	return items[rand.Intn(len(items))]
 }
 
-// createGoalLog simulates the goal logic creating a log entry
-func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, changes map[string]any, createdAt time.Time) error {
-	params := map[string]any{
-		"goal":  database.MustRecordID("goals", goalID),
-		"event": event,
-		"now":   createdAt,
-	}
-	if changes != nil {
-		params["changes"] = changes
-	}
+// createGoalLog creates a log entry using the same format as the goallogs repository
+func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, changes map[string]any, createdAt time.Time, userID string) error {
+	goalRecordID := database.MustRecordID("goals", goalID)
 
-	_, err := database.QueryAll[any](ctx, db, `
-		LET $snapshot = (CREATE goal_snapshots CONTENT {
-			goal_id: $goal,
+	// First create a snapshot
+	snapshotResult, err := database.QueryFirst[struct {
+		ID any `json:"id"`
+	}](ctx, db, `
+		CREATE goal_snapshots CONTENT {
+			goal_id: $goal_id,
 			status: "active",
 			created_at: $now
-		});
-		
-		RELATE $goal->goal_logs->($snapshot[0].id) CONTENT {
+		}
+	`, map[string]any{
+		"goal_id": goalRecordID,
+		"now":     createdAt,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Then create the log entry using RELATE
+	// Ensure changes is not nil
+	if changes == nil {
+		changes = map[string]any{}
+	}
+
+	_, err = database.QueryAll[any](ctx, db, `
+		RELATE $goal_id->goal_logs->$snapshot_id CONTENT {
 			event_type: $event,
 			changes: $changes,
-			created_at: $now,
-			created_by: "seed"
-		};
-	`, params)
+			created_at: $now
+		}
+	`, map[string]any{
+		"goal_id":     goalRecordID,
+		"snapshot_id": snapshotResult.ID,
+		"event":       event,
+		"changes":     changes,
+		"now":         createdAt,
+	})
 	return err
 }
 

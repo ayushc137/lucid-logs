@@ -15,6 +15,7 @@ import (
 
 	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
 	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/features/activitylogs"
 	"github.com/lucid-logs/go-backend/internal/features/analytics"
 	"github.com/lucid-logs/go-backend/internal/features/auth"
 	"github.com/lucid-logs/go-backend/internal/features/categories"
@@ -60,14 +61,17 @@ type Config struct {
 //	    /auth/register          - User registration
 //	    /tasks                  - Task CRUD (protected)
 //	    /categories             - Category CRUD (protected)
+//
+// @title          Lucid Logs API
+// @version        1.0
+// @description    Time tracking and productivity API with rich analytics.
+// @host           localhost:8080
+// @BasePath       /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in             header
+// @name           Authorization
 func NewRouter(cfg Config) *gin.Engine {
-	// Set gin mode
-	if cfg.Cfg.IsDev() {
-		gin.SetMode(gin.DebugMode)
-	} else {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
+	// Initialize Gin router
 	r := gin.New()
 
 	// ==========================================================================
@@ -84,7 +88,27 @@ func NewRouter(cfg Config) *gin.Engine {
 	r.Use(middleware.Recovery())
 
 	// CORS configuration
-	r.Use(corsHandler(cfg.Cfg))
+	corsConfig := cors.DefaultConfig()
+
+	if cfg.Cfg.IsDev() {
+		// Development - allow all origins
+		corsConfig.AllowAllOrigins = true
+		corsConfig.AllowHeaders = append(corsConfig.AllowHeaders,
+			"Authorization",
+			"Content-Type",
+			"X-Request-ID",
+			"Accept",
+			"Origin",
+		)
+	} else {
+		// Production - restrict origins
+		corsConfig.AllowOrigins = []string{
+			"https://lucidlogs.app",
+			"https://www.lucidlogs.app",
+		}
+	}
+	corsConfig.AllowCredentials = true
+	r.Use(cors.New(corsConfig))
 
 	// ==========================================================================
 	// PUBLIC ROUTES
@@ -119,12 +143,17 @@ func NewRouter(cfg Config) *gin.Engine {
 			Database:  cfg.Cfg.Database.Database,
 		}))
 		{
+			// Activity logs (unified activity logging)
+			activityRepo := activitylogs.NewRepository(cfg.DB)
+			activityLogger := activitylogs.NewActivityLogger(activityRepo)
+			activitylogs.RegisterRoutes(protected.Group("/activity"), activityRepo)
+
 			// Emotion routes
 			emotions.RegisterRoutes(protected.Group("/emotions"), cfg.DB)
 
-			// Task routes
+			// Task routes (with activity logging)
 			taskRepo := tasks.NewRepository(cfg.DB)
-			taskService := tasks.NewService(taskRepo)
+			taskService := tasks.NewService(taskRepo, activityLogger)
 			tasks.RegisterRoutes(protected.Group("/tasks"), taskService, cfg.Validator)
 
 			// Category routes
@@ -142,15 +171,18 @@ func NewRouter(cfg Config) *gin.Engine {
 			templateService := templates.NewService(templateRepo)
 			templates.RegisterRoutes(protected.Group("/templates"), templateService, cfg.Validator)
 
-			// Goal routes (with linked template auto-creation)
-			goalRepo := goals.NewRepository(cfg.DB)
-			templateCreator := templates.NewGoalTemplateCreator(templateRepo)
-			goalService := goals.NewService(goalRepo, templateCreator)
-			goals.RegisterRoutes(protected.Group("/goals"), goalService, cfg.Validator)
-
 			// Goal Logs routes (nested under goals)
 			goalLogsRepo := goallogs.NewRepository(cfg.DB)
-			_ = goalLogsRepo // TODO: Add goal logs handler
+			goalLogger := goallogs.NewGoalLoggerAdapter(goalLogsRepo)
+
+			// Goal routes (with linked template auto-creation and auto-logging)
+			goalRepo := goals.NewRepository(cfg.DB)
+			templateCreator := templates.NewGoalTemplateCreator(templateRepo)
+			goalService := goals.NewService(goalRepo, templateCreator, goalLogger)
+			goals.RegisterRoutes(protected.Group("/goals"), goalService, cfg.Validator)
+
+			// Goal Logs API routes (for fetching history)
+			goallogs.RegisterRoutes(protected.Group("/goals"), goalLogsRepo)
 
 			// Units routes
 			unitsRepo := units.NewRepository(cfg.DB)
@@ -159,7 +191,7 @@ func NewRouter(cfg Config) *gin.Engine {
 
 			// Task-Goals linking routes (nested under tasks)
 			taskGoalsRepo := taskgoals.NewRepository(cfg.DB)
-			taskGoalsService := taskgoals.NewService(taskGoalsRepo, taskService, goalService)
+			taskGoalsService := taskgoals.NewService(taskGoalsRepo, taskService, goalService, goalLogger)
 			taskgoals.RegisterRoutes(protected.Group("/tasks/:id/goals"), taskGoalsService, cfg.Validator)
 
 			// Analytics routes

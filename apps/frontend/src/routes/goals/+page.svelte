@@ -24,6 +24,8 @@
     Layers,
     Shield,
     X,
+    CalendarDays,
+    Funnel,
   } from "lucide-svelte";
   import { cn } from "$lib/utils";
   import {
@@ -42,20 +44,38 @@
     sort: string;
   }>({
     q: parsers.string(""),
-    status: parsers.string(""),
-    type: parsers.string(""),
+    status: parsers.string("all"),
+    type: parsers.string("all"),
     sort: parsers.string("created_at-desc"),
+    today: parsers.boolean(true),
+    from: parsers.string(""),
+    to: parsers.string(""),
   });
+
+  const today = new Date();
+  const startOfDay = new Date(today);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(today);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const todayStart = startOfDay.toISOString();
+  const todayEnd = endOfDay.toISOString();
 
   // Search state
   let searchQuery = $state(initialParams.q);
   let debouncedSearch = $state(initialParams.q);
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  let showFilters = $state(false);
 
   // Filter state
-  let statusFilter = $state(initialParams.status);
-  let typeFilter = $state(initialParams.type);
+  let statusFilter = $state(initialParams.status || "all");
+  let typeFilter = $state(initialParams.type || "all");
   let sortBy = $state(initialParams.sort);
+
+  // Date range filter
+  let todayOnly = $state(initialParams.today);
+  let dateFrom = $state(initialParams.from);
+  let dateTo = $state(initialParams.to);
 
   function handleSearchInput(value: string) {
     searchQuery = value;
@@ -73,17 +93,32 @@
         status: statusFilter,
         type: typeFilter,
         sort: sortBy,
+        today: todayOnly,
+        from: dateFrom,
+        to: dateTo,
       },
       { replace: true, keepFocus: true },
     );
   });
 
   // Query params
-  const queryParams = $derived({
-    limit: 100,
-    search: debouncedSearch || undefined,
-    status: statusFilter || undefined,
-    sort_by: sortBy || undefined,
+  const queryParams = $derived.by(() => {
+    const params: Record<string, any> = {
+      limit: 100,
+      search: debouncedSearch || undefined,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      sort_by: sortBy || undefined,
+    };
+
+    if (todayOnly) {
+      params.from = todayStart;
+      params.to = todayEnd;
+    } else {
+      if (dateFrom) params.from = `${dateFrom}T00:00:00Z`;
+      if (dateTo) params.to = `${dateTo}T23:59:59Z`;
+    }
+
+    return params;
   });
 
   // Mutable ref for tracking param changes
@@ -272,7 +307,9 @@
     <div>
       <h1 class="text-3xl font-bold">Goals</h1>
       <p class="text-sm opacity-60 mt-1">
-        {#if debouncedSearch || statusFilter}
+        {#if todayOnly}
+          Today's goals ({totalGoals})
+        {:else if debouncedSearch || statusFilter !== "all"}
           Found {goals.length} matching goals
         {:else}
           {totalGoals} goals
@@ -291,7 +328,7 @@
   <!-- Search & Filters Card -->
   <div class="card bg-base-100 shadow-lg border border-base-200">
     <div class="card-body p-4">
-      <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
         <!-- Search -->
         <div class="relative flex-1">
           {#if isSearching || $query.isFetching}
@@ -323,26 +360,108 @@
           {/if}
         </div>
 
-        <!-- Status Filter -->
-        <select
-          class="select select-bordered select-sm w-full sm:w-36"
-          bind:value={statusFilter}
-        >
-          {#each statusOptions as opt}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
+        <!-- Today Only Toggle -->
+        <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2">
+          <CalendarDays class="w-4 h-4 opacity-60" />
+          <span class="text-sm font-medium">Today</span>
+          <input
+            type="checkbox"
+            class="toggle toggle-primary toggle-sm"
+            bind:checked={todayOnly}
+          />
+        </div>
 
-        <!-- Type Filter -->
-        <select
-          class="select select-bordered select-sm w-full sm:w-36"
-          bind:value={typeFilter}
+        <!-- Filter Toggle -->
+        <button
+          class={cn(
+            "btn gap-2",
+            showFilters ? "btn-primary" : "btn-ghost border border-base-300",
+          )}
+          onclick={() => (showFilters = !showFilters)}
         >
-          {#each typeOptions as opt}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
+          <Funnel class="w-4 h-4" />
+          Filters
+          {#if statusFilter !== "all" || typeFilter !== "all" || (!todayOnly && (dateFrom || dateTo))}
+            <span class="badge badge-sm badge-secondary">Active</span>
+          {/if}
+        </button>
       </div>
+
+      <!-- Expanded Filters -->
+      {#if showFilters}
+        <div
+          class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-base-200 mt-4"
+        >
+          <!-- Date Range (shows when todayOnly is off) -->
+          {#if !todayOnly}
+            <div class="form-control">
+              <label class="label py-1" for="dateFrom">
+                <span class="label-text text-xs font-medium opacity-70">
+                  From Date
+                </span>
+              </label>
+              <input
+                id="dateFrom"
+                type="date"
+                class="input input-bordered input-sm w-full"
+                bind:value={dateFrom}
+              />
+            </div>
+            <div class="form-control">
+              <label class="label py-1" for="dateTo">
+                <span class="label-text text-xs font-medium opacity-70">
+                  To Date
+                </span>
+              </label>
+              <input
+                id="dateTo"
+                type="date"
+                class="input input-bordered input-sm w-full"
+                bind:value={dateTo}
+              />
+            </div>
+          {/if}
+
+          <!-- Status Filter -->
+          <div class="form-control">
+            {#if !todayOnly}
+              <!-- Spacer if not today only to align grid -->
+            {/if}
+            <label class="label py-1" for="status">
+              <span class="label-text text-xs font-medium opacity-70">
+                Status
+              </span>
+            </label>
+            <select
+              id="status"
+              class="select select-bordered select-sm w-full"
+              bind:value={statusFilter}
+            >
+              {#each statusOptions as opt}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- Type Filter -->
+          <div class="form-control">
+            <label class="label py-1" for="type">
+              <span class="label-text text-xs font-medium opacity-70">
+                Type
+              </span>
+            </label>
+            <select
+              id="type"
+              class="select select-bordered select-sm w-full"
+              bind:value={typeFilter}
+            >
+              {#each typeOptions as opt}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -363,20 +482,35 @@
   {:else if goals.length === 0}
     <div class="card bg-base-100 shadow-lg border border-base-200">
       <div class="card-body py-12 text-center">
-        {#if debouncedSearch || statusFilter}
+        {#if debouncedSearch || statusFilter !== "all" || typeFilter !== "all"}
           <Search class="w-12 h-12 opacity-30 mx-auto mb-4" />
           <h2 class="text-xl font-semibold">No matching goals</h2>
           <p class="opacity-60 mt-1">Try adjusting your filters</p>
-          <button
-            class="btn btn-ghost btn-sm mt-4"
-            onclick={() => {
-              searchQuery = "";
-              debouncedSearch = "";
-              statusFilter = "";
-            }}
-          >
-            Clear filters
-          </button>
+          <div class="flex gap-2 justify-center mt-4">
+            {#if todayOnly}
+              <button
+                class="btn btn-ghost btn-sm"
+                onclick={() => {
+                  todayOnly = false;
+                }}
+              >
+                Show all dates
+              </button>
+            {/if}
+            <button
+              class="btn btn-ghost btn-sm"
+              onclick={() => {
+                searchQuery = "";
+                debouncedSearch = "";
+                statusFilter = "all";
+                typeFilter = "all";
+                dateFrom = "";
+                dateTo = "";
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
         {:else}
           <div
             class="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4"

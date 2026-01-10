@@ -45,11 +45,18 @@ type GoalLog struct {
 }
 
 // GoalSnapshot represents a point-in-time snapshot of goal state.
+// For period-based goals, this captures the stats for that specific period.
 //
 // @Description Point-in-time goal state snapshot
 type GoalSnapshot struct {
 	ID     string `json:"id,omitempty"` // goal_snapshots:xxx
 	GoalID string `json:"goal_id"`      // goals:xxx
+
+	// Period information (for period-end snapshots)
+	PeriodType  string     `json:"period_type,omitempty"`  // "day", "week", "month"
+	PeriodStart *time.Time `json:"period_start,omitempty"` // Start of the period
+	PeriodEnd   *time.Time `json:"period_end,omitempty"`   // End of the period
+	PeriodLabel string     `json:"period_label,omitempty"` // Human-readable label (e.g., "Week 1, Jan 2026")
 
 	// Snapshot of goal state at this point
 	Status string           `json:"status"`
@@ -71,12 +78,18 @@ const (
 	EventCompleted   = "completed"   // Status changed to completed
 	EventArchived    = "archived"    // Status changed to archived
 	EventReactivated = "reactivated" // Status changed back to active
+	EventDeleted     = "deleted"     // Goal was deleted
 
 	// Progress events
 	EventStreakUpdated  = "streak_updated"  // Streak value changed
+	EventStreakBroken   = "streak_broken"   // Streak was reset to 0
 	EventTargetMet      = "target_met"      // Current value reached target
 	EventTargetExceeded = "target_exceeded" // Avoidance goal exceeded limit
-	EventPeriodReset    = "period_reset"    // Recurring goal period ended, value reset
+	EventPeriodEnd      = "period_end"      // Period ended, snapshot created with period stats
+
+	// Task linking events
+	EventTaskLinked   = "task_linked"   // Task was linked to this goal
+	EventTaskUnlinked = "task_unlinked" // Task was unlinked from this goal
 
 	// Structure events
 	EventChildAdded   = "child_added"   // Child goal added to group
@@ -85,8 +98,9 @@ const (
 
 // ValidEvents for validation.
 var ValidEvents = []string{
-	EventCreated, EventUpdated, EventCompleted, EventArchived, EventReactivated,
-	EventStreakUpdated, EventTargetMet, EventTargetExceeded, EventPeriodReset,
+	EventCreated, EventUpdated, EventCompleted, EventArchived, EventReactivated, EventDeleted,
+	EventStreakUpdated, EventStreakBroken, EventTargetMet, EventTargetExceeded, EventPeriodEnd,
+	EventTaskLinked, EventTaskUnlinked,
 	EventChildAdded, EventChildRemoved,
 }
 

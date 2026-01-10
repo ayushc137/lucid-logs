@@ -12,6 +12,8 @@ export { default as CategoryDropdown } from "./CategoryDropdown.svelte";
 export { default as StatusDropdown } from "./StatusDropdown.svelte";
 export { default as PriorityDropdown } from "./PriorityDropdown.svelte";
 export { default as ColorPicker } from "./ColorPicker.svelte";
+export { default as UnitSelector } from "./UnitSelector.svelte";
+export { default as UnitDropdown } from "./UnitDropdown.svelte";
 
 // -----------------------------------------------------------------------------
 // Layout & Containers

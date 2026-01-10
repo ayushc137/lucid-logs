@@ -1,12 +1,6 @@
 import { api, unwrap, type PaginatedResponse } from './client';
 import type { Category } from './categories';
-
-// =============================================================================
-// TEMPLATE TYPES (matching Go backend)
-// =============================================================================
-
 import type { Goal } from './goals';
-import type { Category } from './categories';
 
 export interface TaskTemplate {
     id: string;

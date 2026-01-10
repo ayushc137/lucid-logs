@@ -41,11 +41,17 @@ export {
     updateGoal,
     deleteGoal,
     getTodayGoals,
+    getGoalLogs,
+    getGoalLogsSummary,
     type Goal,
     type Recurrence,
     type Target,
     type GoalTaskLink,
-    type CreateGoalRequest
+    type CreateGoalRequest,
+    type GoalLog,
+    type GoalLogEvent,
+    type GoalLogsResponse,
+    type GoalLogsSummary
 } from './goals';
 
 // Emotions
@@ -77,7 +83,6 @@ export {
     deleteTemplate,
     getQuickLogTemplates,
     type TaskTemplate,
-    type ShowFields,
     type CreateTemplateRequest,
     type UpdateTemplateRequest,
     type InstantiateTemplateRequest
@@ -114,3 +119,16 @@ export {
     type ReorderActionsRequest,
     type ActionListResponse
 } from './goalActions';
+
+// Units
+export {
+    getUnits,
+    getUnit,
+    createUnit,
+    updateUnit,
+    deleteUnit,
+    type Unit,
+    type UnitListResponse,
+    type CreateUnitRequest,
+    type UpdateUnitRequest
+} from './units';

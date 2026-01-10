@@ -108,8 +108,6 @@ coverage/
 *.lcov
 
 # Debug
-.debug/
-
-# Temporary files
+.debug/# Temporary files
 *.tmp
 *.temp

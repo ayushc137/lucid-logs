@@ -1,5 +1,46 @@
 basePath: /
 definitions:
+  activitylogs.ActivityLog:
+    description: Activity log entry for any entity
+    properties:
+      changes:
+        additionalProperties: {}
+        description: What changed
+        type: object
+      created_at:
+        type: string
+      created_by:
+        description: Metadata
+        type: string
+      entity_icon:
+        description: Icon of the entity for display
+        type: string
+      entity_id:
+        description: The actual entity ID
+        type: string
+      entity_title:
+        description: Display helpers (populated for frontend)
+        type: string
+      entity_type:
+        description: Entity information
+        type: string
+      event:
+        description: Event information
+        type: string
+      id:
+        description: activity_logs:xxx
+        type: string
+    type: object
+  activitylogs.ActivityLogsResponse:
+    description: Activity log list response
+    properties:
+      logs:
+        items:
+          $ref: '#/definitions/activitylogs.ActivityLog'
+        type: array
+      total:
+        type: integer
+    type: object
   analytics.CategoryBreakdown:
     properties:
       category_id:
@@ -575,6 +616,61 @@ definitions:
     - CodeInternalError
     - CodeDatabaseError
     - CodeServiceError
+  goallogs.GoalLog:
+    description: Goal history event record
+    properties:
+      changes:
+        additionalProperties: {}
+        description: What changed (optional, depends on event type)
+        type: object
+      created_at:
+        description: Metadata
+        type: string
+      event:
+        description: Event type
+        type: string
+      goal_id:
+        description: goals:xxx
+        type: string
+      id:
+        description: goal_logs:xxx
+        type: string
+      snapshot_id:
+        description: Snapshot reference
+        type: string
+      triggered_by_task_id:
+        description: What triggered this event (optional)
+        type: string
+    type: object
+  goallogs.GoalLogsResponse:
+    description: Goal history log entries
+    properties:
+      goal_id:
+        type: string
+      logs:
+        items:
+          $ref: '#/definitions/goallogs.GoalLog'
+        type: array
+      total:
+        type: integer
+    type: object
+  goallogs.GoalLogsSummary:
+    description: Summary of goal history
+    properties:
+      avg_daily:
+        type: number
+      best_day:
+        properties:
+          date:
+            type: string
+          value:
+            type: number
+        type: object
+      days_met:
+        type: integer
+      days_missed:
+        type: integer
+    type: object
   goals.AddChildRequest:
     description: Request for adding a child to a grouped goal
     properties:
@@ -1911,6 +2007,106 @@ info:
   title: Lucid Logs API
   version: "1.0"
 paths:
+  /api/v1/activity:
+    get:
+      description: Get paginated list of all activity for the authenticated user
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: Number of days to include (default 30)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activitylogs.ActivityLogsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List activity logs
+      tags:
+      - activity
+  /api/v1/activity/goals:
+    get:
+      description: Get activity logs for goals only
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activitylogs.ActivityLogsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List goal activity
+      tags:
+      - activity
+  /api/v1/activity/tasks:
+    get:
+      description: Get activity logs for tasks only
+      parameters:
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activitylogs.ActivityLogsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List task activity
+      tags:
+      - activity
   /api/v1/analytics/charts:
     post:
       consumes:
@@ -2736,6 +2932,84 @@ paths:
       summary: Remove child goal
       tags:
       - goals
+  /api/v1/goals/{id}/logs:
+    get:
+      description: Get paginated list of logs for a specific goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Items to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goallogs.GoalLogsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List goal logs
+      tags:
+      - goal-logs
+  /api/v1/goals/{id}/logs/summary:
+    get:
+      description: Get aggregated history summary for a goal
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Number of days to include (default 30)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goallogs.GoalLogsSummary'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get goal logs summary
+      tags:
+      - goal-logs
   /api/v1/goals/today:
     get:
       description: Get recurring goals with today's completion status

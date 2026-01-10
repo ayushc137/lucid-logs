@@ -46,21 +46,30 @@ type Service interface {
 	GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error)
 }
 
+// ActivityLogger is an interface for logging activity events.
+// This allows the tasks service to log activities without circular imports.
+type ActivityLogger interface {
+	Log(ctx context.Context, entityType, entityID, entityTitle, entityIcon, event, userID string, changes map[string]any) error
+}
+
 // =============================================================================
 // SERVICE IMPLEMENTATION
 // =============================================================================
 
 // service is the production implementation of Service.
 type service struct {
-	repo   Repository
-	logger zerolog.Logger
+	repo           Repository
+	activityLogger ActivityLogger
+	logger         zerolog.Logger
 }
 
 // NewService creates a new task Service.
-func NewService(repo Repository) Service {
+// activityLogger can be nil if activity logging is not needed.
+func NewService(repo Repository, activityLogger ActivityLogger) Service {
 	return &service{
-		repo:   repo,
-		logger: log.With().Str("service", "tasks").Logger(),
+		repo:           repo,
+		activityLogger: activityLogger,
+		logger:         log.With().Str("service", "tasks").Logger(),
 	}
 }
 
@@ -169,6 +178,22 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 		Str("user_id", userID).
 		Msg("task created")
 
+	// Log the activity
+	if s.activityLogger != nil {
+		changes := map[string]any{
+			"title":      task.Title,
+			"start_date": task.StartDate,
+			"end_date":   task.EndDate,
+			"completed":  task.Completed,
+		}
+		if task.Category != nil {
+			changes["category"] = task.Category.Name
+		}
+		if err := s.activityLogger.Log(ctx, "task", task.ID, task.Title, "", "created", userID, changes); err != nil {
+			s.logger.Warn().Err(err).Str("task_id", task.ID).Msg("failed to log task created activity")
+		}
+	}
+
 	return task, nil
 }
 
@@ -176,8 +201,10 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 // UPDATE
 // =============================================================================
 
-// Update updates an existing task with validation.
 func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
+	// Get old task for change detection
+	oldTask, _ := s.repo.FindByID(ctx, id, userID)
+
 	startDate, err := validateOptionalDate("start_date", req.StartDate)
 	if err != nil {
 		return nil, err
@@ -210,6 +237,43 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 		Str("user_id", userID).
 		Msg("task updated")
 
+	// Log the activity
+	if s.activityLogger != nil {
+		changes := make(map[string]any)
+		if req.Title != nil {
+			changes["title"] = *req.Title
+		}
+		if req.StartDate != nil {
+			changes["start_date"] = *req.StartDate
+		}
+		if req.EndDate != nil {
+			changes["end_date"] = *req.EndDate
+		}
+		if req.Completed != nil {
+			changes["completed"] = *req.Completed
+		}
+		if task.Category != nil {
+			changes["category"] = task.Category.Name
+		}
+		if req.Journal != nil {
+			changes["journal_updated"] = true
+		}
+		if req.EmotionID != nil {
+			changes["emotion_updated"] = true
+		}
+
+		// Detect completion changes
+		if oldTask != nil && task.Completed != oldTask.Completed {
+			changes["previous_completed"] = oldTask.Completed
+			changes["new_completed"] = task.Completed
+		}
+
+		title := task.Title
+		if err := s.activityLogger.Log(ctx, "task", id, title, "", "updated", userID, changes); err != nil {
+			s.logger.Warn().Err(err).Str("task_id", id).Msg("failed to log task updated activity")
+		}
+	}
+
 	return task, nil
 }
 
@@ -219,6 +283,9 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 
 // Delete soft-deletes a task.
 func (s *service) Delete(ctx context.Context, id, userID string) error {
+	// Get task info before deletion for logging
+	task, _ := s.repo.FindByID(ctx, id, userID)
+
 	err := s.repo.Delete(ctx, id, userID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
@@ -232,6 +299,19 @@ func (s *service) Delete(ctx context.Context, id, userID string) error {
 		Str("task_id", id).
 		Str("user_id", userID).
 		Msg("task deleted")
+
+	// Log the activity
+	if s.activityLogger != nil && task != nil {
+		changes := map[string]any{
+			"title": task.Title,
+		}
+		if task.Category != nil {
+			changes["category"] = task.Category.Name
+		}
+		if err := s.activityLogger.Log(ctx, "task", id, task.Title, "", "deleted", userID, changes); err != nil {
+			s.logger.Warn().Err(err).Str("task_id", id).Msg("failed to log task deleted activity")
+		}
+	}
 
 	return nil
 }

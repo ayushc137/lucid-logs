@@ -26,6 +26,12 @@ type Service interface {
 	Unlink(ctx context.Context, taskID, goalID, userID string) error
 }
 
+// GoalLogger is an interface for logging goal events.
+// This allows logging task link/unlink events without circular imports.
+type GoalLogger interface {
+	LogEvent(ctx context.Context, goalID, event, userID string, changes map[string]any, stats *goals.GoalStats) error
+}
+
 // =============================================================================
 // SERVICE IMPLEMENTATION
 // =============================================================================
@@ -34,15 +40,18 @@ type service struct {
 	repo        Repository
 	taskService tasks.Service
 	goalService goals.Service
+	goalLogger  GoalLogger
 	logger      zerolog.Logger
 }
 
 // NewService creates a new task-goal linking Service.
-func NewService(repo Repository, taskService tasks.Service, goalService goals.Service) Service {
+// goalLogger is optional - pass nil to disable goal event logging.
+func NewService(repo Repository, taskService tasks.Service, goalService goals.Service, goalLogger GoalLogger) Service {
 	return &service{
 		repo:        repo,
 		taskService: taskService,
 		goalService: goalService,
+		goalLogger:  goalLogger,
 		logger:      log.With().Str("service", "taskgoals").Logger(),
 	}
 }
@@ -58,7 +67,6 @@ func (s *service) Link(ctx context.Context, taskID string, req *LinkRequest, use
 		s.logger.Debug().Err(err).Str("task_id", taskID).Msg("task not found or not owned by user")
 		return nil, errors.ErrNotFound.WithMessage("Task not found")
 	}
-	_ = task // Used for ownership verification
 
 	// Verify goal exists and user owns it
 	goal, err := s.goalService.Get(ctx, req.GoalID, userID)
@@ -66,7 +74,6 @@ func (s *service) Link(ctx context.Context, taskID string, req *LinkRequest, use
 		s.logger.Debug().Err(err).Str("goal_id", req.GoalID).Msg("goal not found or not owned by user")
 		return nil, errors.ErrNotFound.WithMessage("Goal not found")
 	}
-	_ = goal // Used for ownership verification
 
 	// Check for duplicate link
 	existing, _ := s.repo.FindByTaskAndGoal(ctx, taskID, req.GoalID)
@@ -93,6 +100,33 @@ func (s *service) Link(ctx context.Context, taskID string, req *LinkRequest, use
 		Str("goal_id", req.GoalID).
 		Str("impact_type", req.ImpactType).
 		Msg("task linked to goal")
+
+	// Log the task_linked event to goal history
+	if s.goalLogger != nil {
+		changes := map[string]any{
+			"task_id":    taskID,
+			"task_title": task.Title,
+		}
+		if req.ImpactType != "" {
+			changes["impact_type"] = req.ImpactType
+		}
+		if req.ImpactMagnitude > 0 {
+			changes["impact_magnitude"] = req.ImpactMagnitude
+		}
+		if req.QuantityValue != nil && *req.QuantityValue > 0 {
+			changes["quantity_value"] = *req.QuantityValue
+		}
+		if err := s.goalLogger.LogEvent(ctx, req.GoalID, "task_linked", userID, changes, nil); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", req.GoalID).Msg("failed to log task_linked event")
+		}
+	}
+
+	// Update goal stats (record completion may update streak)
+	if task.Completed {
+		if err := s.goalService.RecordCompletion(ctx, goal.ID, userID, task.EndDate); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", goal.ID).Msg("failed to record completion")
+		}
+	}
 
 	return link, nil
 }
@@ -147,7 +181,6 @@ func (s *service) Unlink(ctx context.Context, taskID, goalID, userID string) err
 	if err != nil {
 		return errors.ErrNotFound.WithMessage("Task not found")
 	}
-	_ = task
 
 	// Check link exists
 	existing, err := s.repo.FindByTaskAndGoal(ctx, taskID, goalID)
@@ -172,6 +205,17 @@ func (s *service) Unlink(ctx context.Context, taskID, goalID, userID string) err
 		Str("task_id", taskID).
 		Str("goal_id", goalID).
 		Msg("task unlinked from goal")
+
+	// Log the task_unlinked event to goal history
+	if s.goalLogger != nil {
+		changes := map[string]any{
+			"task_id":    taskID,
+			"task_title": task.Title,
+		}
+		if err := s.goalLogger.LogEvent(ctx, goalID, "task_unlinked", userID, changes, nil); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", goalID).Msg("failed to log task_unlinked event")
+		}
+	}
 
 	return nil
 }

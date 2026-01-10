@@ -56,12 +56,11 @@ func NewRepository(db *database.DB) Repository {
 
 type goalLogDB struct {
 	ID                models.RecordID      `json:"id,omitempty"`
-	GoalID            models.RecordID      `json:"in"`  // RELATE in
-	SnapshotID        models.RecordID      `json:"out"` // RELATE out
-	Event             string               `json:"event"`
+	GoalID            models.RecordID      `json:"in"`                      // RELATE in
+	SnapshotID        models.RecordID      `json:"out"`                     // RELATE out
+	Event             string               `json:"event_type"`              // Changed to match schema
 	Changes           map[string]any       `json:"changes,omitempty"`
-	TriggeredByTaskID string               `json:"triggered_by,omitempty"`
-	CreatedBy         string               `json:"created_by"`
+	TriggeredByTaskID string               `json:"triggered_by_task_id,omitempty"` // Changed to match schema
 	CreatedAt         database.SurrealTime `json:"created_at"`
 }
 
@@ -73,7 +72,6 @@ func (l *goalLogDB) toGoalLog() *GoalLog {
 		Changes:           l.Changes,
 		TriggeredByTaskID: l.TriggeredByTaskID,
 		SnapshotID:        database.ToStringID(l.SnapshotID),
-		CreatedBy:         l.CreatedBy,
 		CreatedAt:         l.CreatedAt.Time,
 	}
 }
@@ -130,27 +128,59 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 	}
 
 	// Create the log entry using RELATE
-	logResult, err := database.QueryFirst[goalLogDB](ctx, r.db, `
-		LET $snapshot = IF $snapshot_id != "" THEN type::thing("goal_snapshots", $snapshot_id) ELSE NONE END;
-		LET $log = CREATE goal_logs CONTENT {
-			in: $goal_id,
-			out: $snapshot,
-			event: $event,
-			changes: $changes,
-			triggered_by: $triggered_by,
-			created_by: $user,
-			created_at: $now
-		};
-		RETURN $log[0];
-	`, map[string]any{
-		"goal_id":      goalID,
-		"snapshot_id":  snapshotID,
-		"event":        req.Event,
-		"changes":      req.Changes,
-		"triggered_by": req.TriggeredByTaskID,
-		"user":         userID,
-		"now":          now,
-	})
+	var logResult *goalLogDB
+	var err error
+
+	if snapshotID != "" {
+		snapshotRecordID := database.MustRecordID(SnapshotsTable, snapshotID)
+
+		// Prepare changes - use NONE if nil
+		changes := req.Changes
+		if changes == nil {
+			changes = map[string]any{}
+		}
+
+		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
+			RELATE $goal_id->goal_logs->$snapshot_id CONTENT {
+				event_type: $event,
+				changes: $changes,
+				triggered_by_task_id: $triggered_by,
+				created_at: $now
+			}
+		`, map[string]any{
+			"goal_id":      goalID,
+			"snapshot_id":  snapshotRecordID,
+			"event":        req.Event,
+			"changes":      changes,
+			"triggered_by": req.TriggeredByTaskID,
+			"now":          now,
+		})
+	} else {
+		// For events without snapshots, we still need a RELATE but with a null out
+		// We'll create a dummy snapshot or skip the out field
+
+		// Prepare changes - use NONE if nil
+		changes := req.Changes
+		if changes == nil {
+			changes = map[string]any{}
+		}
+
+		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
+			CREATE goal_logs SET
+				in = $goal_id,
+				out = NONE,
+				event_type = $event,
+				changes = $changes,
+				triggered_by_task_id = $triggered_by,
+				created_at = $now
+		`, map[string]any{
+			"goal_id":      goalID,
+			"event":        req.Event,
+			"changes":      changes,
+			"triggered_by": req.TriggeredByTaskID,
+			"now":          now,
+		})
+	}
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
@@ -256,4 +286,30 @@ func (r *repository) GetSummary(ctx context.Context, goalID, userID string, days
 	}
 
 	return summary, nil
+}
+
+// =============================================================================
+// GOAL LOGGER ADAPTER
+// =============================================================================
+
+// GoalLoggerAdapter implements goals.GoalLogger interface.
+// This adapter allows the goals service to log events without circular imports.
+type GoalLoggerAdapter struct {
+	repo Repository
+}
+
+// NewGoalLoggerAdapter creates a new adapter that implements goals.GoalLogger.
+func NewGoalLoggerAdapter(repo Repository) *GoalLoggerAdapter {
+	return &GoalLoggerAdapter{repo: repo}
+}
+
+// LogEvent logs a goal event with optional stats snapshot.
+func (a *GoalLoggerAdapter) LogEvent(ctx context.Context, goalID, event, userID string, changes map[string]any, stats *goals.GoalStats) error {
+	_, err := a.repo.LogEvent(ctx, &LogEventRequest{
+		GoalID:  goalID,
+		Event:   event,
+		Changes: changes,
+		Stats:   stats,
+	}, userID)
+	return err
 }

@@ -7,6 +7,18 @@ import { browser } from '$app/environment';
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /**
+ * Flag to prevent 401 redirect during initial auth check
+ */
+let suppressAuthRedirect = true;
+
+/**
+ * Call this after auth is confirmed to enable 401 redirects
+ */
+export function enableAuthRedirect() {
+    suppressAuthRedirect = false;
+}
+
+/**
  * Type-safe HTTP client for API calls
  * Includes automatic token handling and error management
  */
@@ -30,10 +42,14 @@ export const api = ky.create({
                 if (!response.ok) {
                     console.error('API Error:', response.status, response.statusText, await response.clone().text());
                 }
-                // Handle 401 Unauthorized - redirect to login
-                if (response.status === 401 && browser) {
-                    sessionStorage.removeItem('token');
-                    window.location.href = '/login';
+                // Handle 401 Unauthorized - only redirect if auth redirect is enabled
+                // and we're not already on the login page
+                if (response.status === 401 && browser && !suppressAuthRedirect) {
+                    const isOnLoginPage = window.location.pathname.startsWith('/login');
+                    if (!isOnLoginPage) {
+                        sessionStorage.removeItem('token');
+                        window.location.href = '/login';
+                    }
                 }
             }
         ]

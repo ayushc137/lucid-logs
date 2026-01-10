@@ -66,6 +66,12 @@ type TemplateCreator interface {
 	CreateForGoal(ctx context.Context, goal *Goal, userID string) (templateID string, err error)
 }
 
+// GoalLogger is an interface for logging goal events.
+// This allows the goals service to log events without circular imports with goallogs.
+type GoalLogger interface {
+	LogEvent(ctx context.Context, goalID, event, userID string, changes map[string]any, stats *GoalStats) error
+}
+
 // =============================================================================
 // SERVICE IMPLEMENTATION
 // =============================================================================
@@ -73,15 +79,17 @@ type TemplateCreator interface {
 type service struct {
 	repo            Repository
 	templateCreator TemplateCreator
+	goalLogger      GoalLogger
 	logger          zerolog.Logger
 }
 
 // NewService creates a new goal Service.
-// templateCreator can be nil if template auto-creation is not needed.
-func NewService(repo Repository, templateCreator TemplateCreator) Service {
+// templateCreator and goalLogger can be nil if not needed.
+func NewService(repo Repository, templateCreator TemplateCreator, goalLogger GoalLogger) Service {
 	return &service{
 		repo:            repo,
 		templateCreator: templateCreator,
+		goalLogger:      goalLogger,
 		logger:          log.With().Str("service", "goals").Logger(),
 	}
 }
@@ -188,6 +196,33 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 		}
 	}
 
+	// Log the created event
+	if s.goalLogger != nil {
+		changes := map[string]any{
+			"title":       goal.Title,
+			"description": goal.Description,
+			"icon":        goal.Icon,
+			"status":      goal.Status,
+			"priority":    goal.Priority,
+		}
+		if goal.Recurrence != nil {
+			changes["recurrence"] = map[string]any{
+				"frequency": goal.Recurrence.Frequency,
+				"period":    goal.Recurrence.Period,
+			}
+		}
+		if goal.Target != nil {
+			changes["target"] = map[string]any{
+				"value":    goal.Target.Value,
+				"operator": goal.Target.Operator,
+				"unit_id":  goal.Target.UnitID,
+			}
+		}
+		if err := s.goalLogger.LogEvent(ctx, goal.ID, "created", userID, changes, nil); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", goal.ID).Msg("failed to log goal created event")
+		}
+	}
+
 	return goal, nil
 }
 
@@ -196,6 +231,9 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 // =============================================================================
 
 func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Goal, error) {
+	// Get current state for change detection
+	oldGoal, _ := s.repo.FindByID(ctx, id, userID)
+
 	// Parse and validate dates if provided
 	if req.StartDate != nil {
 		if _, err := timeutil.ParseDateTime(*req.StartDate); err != nil {
@@ -236,6 +274,62 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 		Str("user_id", userID).
 		Msg("goal updated")
 
+	// Log the updated event
+	if s.goalLogger != nil {
+		// Determine event type based on status change
+		eventType := "updated"
+		changes := make(map[string]any)
+
+		// Detect status changes for special event types
+		if oldGoal != nil && req.Status != nil && *req.Status != oldGoal.Status {
+			switch *req.Status {
+			case StatusCompleted:
+				eventType = "completed"
+			case StatusArchived:
+				eventType = "archived"
+			case StatusActive:
+				if oldGoal.Status == StatusCompleted || oldGoal.Status == StatusArchived {
+					eventType = "reactivated"
+				}
+			}
+			changes["previous_status"] = oldGoal.Status
+			changes["new_status"] = *req.Status
+		}
+
+		// Record what was changed
+		if req.Title != nil {
+			changes["title"] = *req.Title
+		}
+		if req.Description != nil {
+			changes["description"] = *req.Description
+		}
+		if req.Icon != nil {
+			changes["icon"] = *req.Icon
+		}
+		if req.Priority != nil {
+			changes["priority"] = *req.Priority
+		}
+		if req.Status != nil {
+			changes["status"] = *req.Status
+		}
+		if req.Target != nil {
+			changes["target"] = map[string]any{
+				"value":    req.Target.Value,
+				"operator": req.Target.Operator,
+			}
+		}
+		if req.Recurrence != nil {
+			changes["recurrence"] = map[string]any{
+				"frequency": req.Recurrence.Frequency,
+				"period":    req.Recurrence.Period,
+			}
+		}
+
+		if err := s.goalLogger.LogEvent(ctx, id, eventType, userID, changes, nil); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", id).Msg("failed to log goal updated event")
+		}
+	}
+
 	return goal, nil
 }
 
@@ -244,6 +338,9 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 // =============================================================================
 
 func (s *service) Delete(ctx context.Context, id, userID string) error {
+	// Get goal info before deletion for logging
+	goal, _ := s.repo.FindByID(ctx, id, userID)
+
 	err := s.repo.Delete(ctx, id, userID)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotFound) {
@@ -257,6 +354,17 @@ func (s *service) Delete(ctx context.Context, id, userID string) error {
 		Str("goal_id", id).
 		Str("user_id", userID).
 		Msg("goal deleted")
+
+	// Log the deleted event
+	if s.goalLogger != nil && goal != nil {
+		changes := map[string]any{
+			"title":  goal.Title,
+			"status": goal.Status,
+		}
+		if err := s.goalLogger.LogEvent(ctx, id, "deleted", userID, changes, nil); err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", id).Msg("failed to log goal deleted event")
+		}
+	}
 
 	return nil
 }
@@ -406,6 +514,7 @@ func (s *service) UpdateCategory(ctx context.Context, goalID, categoryID, userID
 
 // RecordCompletion updates the denormalized streak fields when a goal/habit is completed.
 // This is the "materialized view" pattern - we compute streaks on write rather than read.
+// It also automatically logs the completion event.
 func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, completedDate time.Time) error {
 	goal, err := s.repo.FindByID(ctx, goalID, userID)
 	if err != nil {
@@ -416,6 +525,7 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 	completedDate = completedDate.Truncate(24 * time.Hour)
 
 	// Calculate new streak values
+	oldStreak := goal.CurrentStreak
 	newStreak := goal.CurrentStreak
 	longestStreak := goal.LongestStreak
 
@@ -443,6 +553,7 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 	}
 
 	// Check if this continues the streak or starts a new one
+	streakBroken := false
 	if goal.LastCompletedDate != nil {
 		lastDate := goal.LastCompletedDate.Truncate(24 * time.Hour)
 
@@ -458,6 +569,7 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 		} else {
 			// Gap too large - streak broken, start new
 			newStreak = 1
+			streakBroken = oldStreak > 0
 		}
 	} else {
 		// First completion ever
@@ -481,6 +593,63 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 		Int("longest_streak", longestStreak).
 		Time("completed_date", completedDate).
 		Msg("goal completion recorded, streaks updated")
+
+	// Auto-log the event if goal logger is configured
+	if s.goalLogger != nil {
+		// Determine event type
+		eventType := "streak_updated"
+		changes := map[string]any{
+			"previous_streak": oldStreak,
+			"current_streak":  newStreak,
+			"completed_date":  completedDate.Format("2006-01-02"),
+		}
+
+		// Log streak_broken as a separate event first
+		if streakBroken {
+			brokenChanges := map[string]any{
+				"previous_streak": oldStreak,
+				"days_missed":     0, // Can be computed if needed
+			}
+			if err := s.goalLogger.LogEvent(ctx, goalID, "streak_broken", userID, brokenChanges, nil); err != nil {
+				s.logger.Warn().Err(err).Str("goal_id", goalID).Msg("failed to log streak_broken event")
+			}
+		}
+
+		// Check if target was met
+		if goal.Target != nil && goal.Stats != nil {
+			targetMet := false
+			switch goal.Target.Operator {
+			case OperatorGTE:
+				targetMet = goal.Stats.CurrentValue >= goal.Target.Value
+			case OperatorLTE:
+				targetMet = goal.Stats.CurrentValue <= goal.Target.Value
+			case OperatorEQ:
+				targetMet = goal.Stats.CurrentValue == goal.Target.Value
+			}
+			if targetMet {
+				eventType = "target_met"
+				changes["target_value"] = goal.Target.Value
+				changes["current_value"] = goal.Stats.CurrentValue
+			}
+		}
+
+		// Create goal stats for snapshot
+		stats := &GoalStats{
+			CurrentStreak:     newStreak,
+			LongestStreak:     longestStreak,
+			LastCompletedDate: &completedDate,
+		}
+		if goal.Stats != nil {
+			stats.CurrentValue = goal.Stats.CurrentValue
+			stats.ProgressPercent = goal.Stats.ProgressPercent
+			stats.TotalContributions = goal.Stats.TotalContributions
+		}
+
+		if err := s.goalLogger.LogEvent(ctx, goalID, eventType, userID, changes, stats); err != nil {
+			// Log error but don't fail the operation
+			s.logger.Warn().Err(err).Str("goal_id", goalID).Str("event", eventType).Msg("failed to log goal event")
+		}
+	}
 
 	return nil
 }

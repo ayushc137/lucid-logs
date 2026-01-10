@@ -148,3 +148,75 @@ export async function deleteGoal(id: string): Promise<void> {
 export async function getTodayGoals(): Promise<Goal[]> {
     return unwrap(api.get('goals/today'));
 }
+
+// =============================================================================
+// GOAL LOGS TYPES
+// =============================================================================
+
+export interface GoalLog {
+    id: string;
+    goal_id: string;
+    event: GoalLogEvent;
+    changes?: Record<string, any>;
+    triggered_by_task_id?: string;
+    snapshot_id?: string;
+    created_at: string;
+}
+
+export type GoalLogEvent =
+    | 'created'
+    | 'updated'
+    | 'completed'
+    | 'archived'
+    | 'reactivated'
+    | 'deleted'
+    | 'streak_updated'
+    | 'streak_broken'
+    | 'target_met'
+    | 'target_exceeded'
+    | 'period_end'
+    | 'task_linked'
+    | 'task_unlinked'
+    | 'child_added'
+    | 'child_removed';
+
+export interface GoalLogsResponse {
+    goal_id: string;
+    logs: GoalLog[];
+    total: number;
+}
+
+export interface GoalLogsSummary {
+    days_met: number;
+    days_missed: number;
+    avg_daily?: number;
+    best_day?: {
+        date: string;
+        value: number;
+    };
+}
+
+// =============================================================================
+// GOAL LOGS API FUNCTIONS
+// =============================================================================
+
+export async function getGoalLogs(
+    goalId: string,
+    params?: { limit?: number; offset?: number }
+): Promise<GoalLogsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+
+    const query = searchParams.toString() ? `?${searchParams}` : '';
+    return unwrap(api.get(`goals/${goalId}/logs${query}`));
+}
+
+export async function getGoalLogsSummary(
+    goalId: string,
+    days?: number
+): Promise<GoalLogsSummary> {
+    const query = days ? `?days=${days}` : '';
+    return unwrap(api.get(`goals/${goalId}/logs/summary${query}`));
+}
+

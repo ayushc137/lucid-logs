@@ -74,12 +74,14 @@ type Repository interface {
 
 // GoalFilters contains optional filters for listing goals.
 type GoalFilters struct {
-	Status      string // Filter by status (active, completed, archived)
-	IsRecurring *bool  // Filter recurring (true) vs one-time (false)
-	HasTarget   *bool  // Filter measurable goals
-	HasChildren *bool  // Filter grouped goals
-	Search      string // Search in title and description
-	SortBy      string // Sort field with optional -desc suffix
+	Status      string     // Filter by status (active, completed, archived)
+	IsRecurring *bool      // Filter recurring (true) vs one-time (false)
+	HasTarget   *bool      // Filter measurable goals
+	HasChildren *bool      // Filter grouped goals
+	Search      string     // Search in title and description
+	SortBy      string     // Sort field with optional -desc suffix
+	DateFrom    *time.Time // Filter stats from this date
+	DateTo      *time.Time // Filter stats to this date
 }
 
 // =============================================================================
@@ -620,14 +622,15 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Main query with linked tasks subquery and computed stats
-	// For per_period goals, filter tasks by current period based on recurrence
+	// Use period-based filtering for per_period goals (day/week/month)
+	// This ensures stats show only current period data
 	dataQuery := `SELECT *,
 		(SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, unit_id FROM <-task_goals) as linked_tasks,
 		(->in_category.out.*)[0] as category,
-		(SELECT 
+		(SELECT
 			math::sum(quantity_value) AS total,
 			count() AS count
-		 FROM <-task_goals 
+		 FROM <-task_goals
 			WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
 			AND (
 				$parent.target.per_period IS NOT TRUE
@@ -643,7 +646,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 				)
 			)
 			GROUP ALL)[0] as filtered_stats,
-		(SELECT 
+		(SELECT
 			count() AS total,
 			count(out.status = 'completed') AS completed
 		 FROM ->goal_children GROUP ALL)[0] as children_stats

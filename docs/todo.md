@@ -169,3 +169,117 @@ make category unique by color
 
 Task Template
 Flomodoro + subtask 
+
+
+
+
+
+
+
+cjeck and remove all 
+Period-end snapshots are created automatically:
+Weekly goals: Snapshot on Monday at 00:01 UTC
+Monthly goals: Snapshot on the 1st of each month at 00:01 UTC
+
+and other scheduled, fix it 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+use daisy ui timeline to show it in history  tab 
+
+also detail out the tasks tab, add filter etc 
+for hostory allow with task and without tasks 
+
+make ui for goals, and goal modal prettier, cleaner and more user friendly , easy to use and easy to understand 
+
+
+
+
+
+check goal tasks remove it from goal  main api, get api , list api and make it to sepete api  with more task related details to show in fe 
+make sure there is a goal logs api to fetch all logs for goals logs and snapshot history for histortyy view 
+add start date for goals
+remove longest_streak from parent onject of goal as its already in stats 
+also make sure ther eis crud for unit 
+
+
+
+
+
+
+
+the modal is not showing  start date , end date, unti etc ?  
+alsothe 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+the modal is not showing  start date , end date, unti etc ?  
+
+
+
+
+
+
+
+
+create cub components for all huge components where ever its sensable throughtou the frontend 
+
+
+
+
+
+the priority and category do not seem to be aligned in terms of ui and heading  
+when not use same category selection ui as  create task page with color picker ?  
+
+
+make recurring target and habit section ui wise similar why is there a devider in habit but not in target ?
+i like the diivder so add it in target , but then can we remove the separate line fro  recurrence type like its there all in s a line for target 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fix seed errors :
