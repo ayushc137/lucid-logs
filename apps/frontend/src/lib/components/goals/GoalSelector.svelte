@@ -157,12 +157,12 @@
                                 <span class="font-medium text-sm truncate"
                                     >{goal.title}</span
                                 >
-                                {#if goal.current_streak > 0}
+                                {#if (goal.stats?.current_streak || 0) > 0}
                                     <div
                                         class="flex items-center gap-0.5 text-[10px] text-warning font-bold"
                                     >
                                         <Flame class="w-3 h-3" />
-                                        {goal.current_streak}
+                                        {goal.stats?.current_streak || 0}
                                     </div>
                                 {/if}
                             </div>
@@ -440,12 +440,12 @@
                                         {/if}
                                     </span>
                                 </div>
-                                {#if goal.current_streak > 0}
+                                {#if (goal.stats?.current_streak || 0) > 0}
                                     <div
                                         class="flex items-center gap-0.5 text-[10px] text-warning font-bold"
                                     >
                                         <Flame class="w-3 h-3" />
-                                        {goal.current_streak}
+                                        {goal.stats?.current_streak || 0}
                                     </div>
                                 {/if}
                                 <Plus class="w-4 h-4 opacity-40" />

@@ -43,7 +43,7 @@
     // Form state
     let title = $state("");
     let description = $state("");
-    let icon = $state("");
+    let templateIcon = $state("");
 
     // Defaults
     let defaultDuration = $state<number | undefined>(undefined);
@@ -98,7 +98,7 @@
             if (template) {
                 title = template.title;
                 description = template.description || "";
-                icon = template.icon || "";
+                templateIcon = template.icon || "";
                 defaultDuration = template.default_duration;
                 defaultCategoryId = template.category?.id;
                 defaultEmotionId = template.default_emotion_id;
@@ -134,7 +134,7 @@
     function resetForm() {
         title = "";
         description = "";
-        icon = "";
+        templateIcon = "";
         defaultDuration = undefined;
         defaultCategoryId = undefined;
         defaultEmotionId = undefined;
@@ -203,7 +203,7 @@
         const data: CreateTemplateRequest = {
             title: title.trim(),
             description: description.trim() || undefined,
-            icon: icon || undefined,
+            icon: templateIcon || undefined,
 
             default_duration: defaultDuration,
             expected_quadrant: expectedQuadrant,
@@ -340,11 +340,11 @@
                             "☕",
                             "🎯",
                         ];
-                        icon =
+                        templateIcon =
                             emojis[Math.floor(Math.random() * emojis.length)];
                     }}
                 >
-                    {icon || "⚡"}
+                    {templateIcon || "⚡"}
                 </button>
             </div>
             <div class="flex-1">
@@ -385,11 +385,13 @@
             <div>
                 <label
                     class="text-xs font-semibold uppercase opacity-50 flex items-center gap-1"
+                    for="default-duration"
                 >
                     <Timer class="w-3 h-3" />
                     Default Duration
                 </label>
                 <input
+                    id="default-duration"
                     type="text"
                     class="input input-bordered input-sm w-full mt-1"
                     placeholder="e.g., 30m, 1h"
@@ -460,10 +462,12 @@
             </label>
             {#if isQuickLog}
                 <div>
-                    <label class="text-xs font-semibold uppercase opacity-50"
-                        >Display Order</label
+                    <label
+                        class="text-xs font-semibold uppercase opacity-50"
+                        for="quick-log-order">Display Order</label
                     >
                     <input
+                        id="quick-log-order"
                         type="number"
                         min="0"
                         class="input input-bordered input-sm w-24 mt-1"
@@ -496,9 +500,10 @@
                     <div>
                         <label
                             class="text-xs font-semibold uppercase opacity-50"
-                            >Default</label
+                            for="qty-default">Default</label
                         >
                         <input
+                            id="qty-default"
                             type="number"
                             step="0.1"
                             min="0"
@@ -509,9 +514,10 @@
                     <div>
                         <label
                             class="text-xs font-semibold uppercase opacity-50"
-                            >Step</label
+                            for="qty-step">Step</label
                         >
                         <input
+                            id="qty-step"
                             type="number"
                             step="0.1"
                             min="0.1"
@@ -542,7 +548,6 @@
                         <Plus class="w-3 h-3" /> Add
                     </button>
                     <ul
-                        tabindex="0"
                         class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-60 overflow-y-auto"
                     >
                         {#each availableGoals.filter((g) => !goalLinks.some((l) => l.goalId === g.id)) as goal}

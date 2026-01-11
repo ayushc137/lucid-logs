@@ -103,6 +103,8 @@
                     QUADRANT_META[selectedEmotion.quadrant as Quadrant]}
                 {@const dots = getIndicatorDots(selectedEmotion)}
                 {@const icons = getQuadrantIcon(selectedEmotion.quadrant)}
+                {@const EnergyIcon = icons.energy}
+                {@const PleasantnessIcon = icons.pleasantness}
 
                 <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
                 <div
@@ -165,16 +167,10 @@
                         <div
                             class="flex items-center gap-2 mt-1 text-xs opacity-70"
                         >
-                            <svelte:component
-                                this={icons.energy}
-                                class="w-3 h-3"
-                            />
+                            <EnergyIcon class="w-3 h-3" />
                             <span>{meta?.energyLabel} Energy</span>
                             <span class="opacity-30">•</span>
-                            <svelte:component
-                                this={icons.pleasantness}
-                                class="w-3 h-3"
-                            />
+                            <PleasantnessIcon class="w-3 h-3" />
                             <span>{meta?.pleasantnessLabel}</span>
                         </div>
                         <!-- Indicator dots -->
@@ -235,17 +231,11 @@
                             class="flex gap-3 text-[10px] uppercase opacity-50"
                         >
                             <span class="flex items-center gap-1">
-                                <svelte:component
-                                    this={icons.energy}
-                                    class="w-3 h-3"
-                                />
+                                <EnergyIcon class="w-3 h-3" />
                                 {meta?.energyLabel} Energy
                             </span>
                             <span class="flex items-center gap-1">
-                                <svelte:component
-                                    this={icons.pleasantness}
-                                    class="w-3 h-3"
-                                />
+                                <PleasantnessIcon class="w-3 h-3" />
                                 {meta?.pleasantnessLabel}
                             </span>
                         </div>
@@ -285,6 +275,8 @@
                 {@const colors = QUADRANT_COLORS[inferredQuadrant]}
                 {@const meta = QUADRANT_META[inferredQuadrant]}
                 {@const icons = getQuadrantIcon(inferredQuadrant)}
+                {@const InferredEnergyIcon = icons.energy}
+                {@const InferredPleasantnessIcon = icons.pleasantness}
 
                 <div class="relative">
                     <div
@@ -348,16 +340,10 @@
                             <div
                                 class="flex items-center gap-2 mt-0.5 text-[10px] opacity-50"
                             >
-                                <svelte:component
-                                    this={icons.energy}
-                                    class="w-2.5 h-2.5"
-                                />
+                                <InferredEnergyIcon class="w-2.5 h-2.5" />
                                 <span>{meta?.energyLabel}</span>
                                 <span class="opacity-30">•</span>
-                                <svelte:component
-                                    this={icons.pleasantness}
-                                    class="w-2.5 h-2.5"
-                                />
+                                <InferredPleasantnessIcon class="w-2.5 h-2.5" />
                                 <span>{meta?.pleasantnessLabel}</span>
                             </div>
                         </div>

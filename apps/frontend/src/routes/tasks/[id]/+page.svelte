@@ -4,6 +4,7 @@
     import { getTask, type Task } from "$lib/api";
     import { createQuery } from "@tanstack/svelte-query";
     import { page } from "$app/stores";
+    import { writable } from "svelte/store";
 
     // Get task ID from URL
     const taskId = $derived($page.params.id);
@@ -19,11 +20,21 @@
     });
 
     // Fetch task data
-    const taskQuery = createQuery({
+    const taskOptions = writable({
         queryKey: ["task", taskId],
         queryFn: () => getTask(taskId!),
         enabled: !!taskId,
     });
+
+    $effect(() => {
+        taskOptions.set({
+            queryKey: ["task", taskId],
+            queryFn: () => getTask(taskId!),
+            enabled: !!taskId,
+        });
+    });
+
+    const taskQuery = createQuery<Task>(taskOptions);
 
     const task = $derived($taskQuery.data as Task | undefined);
     const taskTitle = $derived(task?.title || "Edit Task");

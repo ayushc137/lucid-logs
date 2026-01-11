@@ -17,7 +17,10 @@ export interface Goal {
     recurrence?: Recurrence;
 
     // Status: only 3 states
-    status: 'active' | 'completed' | 'archived';
+    status: 'active' | 'completed' | 'archived' | 'paused' | 'abandoned';
+
+
+
 
     // Computed statistics (populated on read)
     stats?: GoalStats;

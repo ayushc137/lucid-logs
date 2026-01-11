@@ -42,6 +42,9 @@
     status: string;
     type: string;
     sort: string;
+    today: boolean;
+    from: string;
+    to: string;
   }>({
     q: parsers.string(""),
     status: parsers.string("all"),

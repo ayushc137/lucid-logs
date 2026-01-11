@@ -889,7 +889,6 @@ ${isInferred ? "(Inferred)" : ""}`}
 <TaskModal
   bind:open={modalOpen}
   task={editingTask}
-  {lastTaskEndTime}
   onClose={handleModalClose}
   onOpenEmotionModal={handleOpenEmotionModal}
   {pendingEmotion}

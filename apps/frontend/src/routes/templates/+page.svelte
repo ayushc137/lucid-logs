@@ -33,7 +33,7 @@
   const queryClient = useQueryClient();
 
   // Initialize state from URL
-  const initialParams = getUrlParams({
+  const initialParams = getUrlParams<{ q: string; quick_log: string }>({
     q: parsers.string(""),
     quick_log: parsers.string(""),
   });
@@ -82,7 +82,7 @@
       items = items.filter(
         (t) =>
           t.title.toLowerCase().includes(search) ||
-          t.description?.toLowerCase().includes(search),
+          (t.description?.toLowerCase().includes(search) ?? false),
       );
     }
 

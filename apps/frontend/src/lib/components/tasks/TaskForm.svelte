@@ -63,6 +63,7 @@
     } from "lucide-svelte";
 
     import { onDestroy } from "svelte";
+    import { writable } from "svelte/store";
 
     // Context for emotion selection
     type EmotionSelectionContext = {
@@ -92,13 +93,24 @@
     const isEditing = $derived(!!task);
 
     // Fetch last task end time only in create mode
-    const queryOptions = $derived({
+    // Fetch last task end time only in create mode
+    const lastTaskEndTimeOptions = writable({
         queryKey: ["tasks", "last-end-time"],
         queryFn: getLastTaskEndTime,
         enabled: !isEditing,
     });
 
-    const lastTaskEndTimeQuery = createQuery(() => queryOptions);
+    $effect(() => {
+        lastTaskEndTimeOptions.set({
+            queryKey: ["tasks", "last-end-time"],
+            queryFn: getLastTaskEndTime,
+            enabled: !isEditing,
+        });
+    });
+
+    const lastTaskEndTimeQuery = createQuery<{ end_time: string | null }>(
+        lastTaskEndTimeOptions,
+    );
 
     const lastTaskEndTime = $derived(
         $lastTaskEndTimeQuery.data?.end_time

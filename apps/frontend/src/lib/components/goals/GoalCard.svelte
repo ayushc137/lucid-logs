@@ -13,6 +13,7 @@
         Pencil,
         Trash2,
         Play,
+        Archive,
     } from "lucide-svelte";
     import { cn } from "$lib/utils";
     import { fly } from "svelte/transition";
@@ -58,6 +59,7 @@
         completed: "badge-info",
         paused: "badge-warning",
         abandoned: "badge-error",
+        archived: "badge-ghost",
     };
 
     const statusIcons = {
@@ -65,6 +67,7 @@
         completed: Check,
         paused: Pause,
         abandoned: X,
+        archived: Archive,
     };
 
     // Derived status icon for the current goal
@@ -287,12 +290,12 @@
                             {formatRecurrence(goal.recurrence)}
                         </div>
                     {/if}
-                    {#if goal.current_streak > 0}
+                    {#if (goal.stats?.current_streak || 0) > 0}
                         <div
                             class="flex items-center gap-1 text-xs text-warning font-medium"
                         >
                             <Flame class="w-3 h-3" />
-                            {goal.current_streak}d streak
+                            {goal.stats?.current_streak || 0}d streak
                         </div>
                     {/if}
                 </div>
@@ -331,12 +334,12 @@
         <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
                 <h4 class="font-semibold text-sm truncate">{goal.title}</h4>
-                {#if goal.current_streak > 0}
+                {#if (goal.stats?.current_streak || 0) > 0}
                     <div
                         class="flex items-center gap-0.5 text-[10px] text-warning font-bold"
                     >
                         <Flame class="w-3 h-3" />
-                        {goal.current_streak}
+                        {goal.stats?.current_streak || 0}
                     </div>
                 {/if}
             </div>

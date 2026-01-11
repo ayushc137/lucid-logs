@@ -41,6 +41,7 @@
     } from "lucide-svelte";
 
     import { onMount, onDestroy } from "svelte";
+    import { writable } from "svelte/store";
 
     interface Props {
         open?: boolean;
@@ -69,11 +70,24 @@
     const queryClient = useQueryClient();
 
     // Fetch last task end time only when modal is open and in create mode
-    const lastTaskEndTimeQuery = createQuery(() => ({
+    // Fetch last task end time only when modal is open and in create mode
+    const lastTaskEndTimeOptions = writable({
         queryKey: ["tasks", "last-end-time"],
         queryFn: getLastTaskEndTime,
         enabled: open && !task,
-    }));
+    });
+
+    $effect(() => {
+        lastTaskEndTimeOptions.set({
+            queryKey: ["tasks", "last-end-time"],
+            queryFn: getLastTaskEndTime,
+            enabled: open && !task,
+        });
+    });
+
+    const lastTaskEndTimeQuery = createQuery<{ end_time: string | null }>(
+        lastTaskEndTimeOptions,
+    );
 
     const lastTaskEndTime = $derived(
         $lastTaskEndTimeQuery.data?.end_time

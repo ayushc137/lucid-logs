@@ -40,7 +40,7 @@
     const queryClient = useQueryClient();
 
     // Initialize state from URL
-    const initialParams = getUrlParams({
+    const initialParams = getUrlParams<{ q: string }>({
         q: parsers.string(""),
     });
 

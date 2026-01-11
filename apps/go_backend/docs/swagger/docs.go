@@ -4090,10 +4090,6 @@ const docTemplate = `{
                     "description": "Metadata",
                     "type": "string"
                 },
-                "current_streak": {
-                    "description": "Denormalized streak fields (stored on goal for fast reads)\nThese are updated when tasks are completed, not computed on every read",
-                    "type": "integer"
-                },
                 "deadline": {
                     "type": "string"
                 },
@@ -4110,20 +4106,12 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "last_completed_date": {
-                    "description": "Last time goal/habit was met",
-                    "type": "string"
-                },
                 "linked_tasks": {
                     "description": "From task_goals",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/goals.GoalTaskLink"
                     }
-                },
-                "longest_streak": {
-                    "description": "All-time best streak",
-                    "type": "integer"
                 },
                 "parent": {
                     "description": "From goal_children (reverse)",

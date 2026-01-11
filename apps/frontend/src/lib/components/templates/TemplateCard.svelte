@@ -80,7 +80,7 @@
         <!-- Color Bar -->
         <div
             class="h-1.5 rounded-t-xl"
-            style="background-color: {template.color || '#10b981'};"
+            style="background-color: {template.category?.color || '#10b981'};"
         ></div>
 
         <div class="card-body p-4 gap-3">
@@ -89,7 +89,8 @@
                 <!-- Icon -->
                 <div
                     class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                    style="background-color: {template.color || '#10b981'}20;"
+                    style="background-color: {template.category?.color ||
+                        '#10b981'}20;"
                 >
                     {template.icon || "⚡"}
                 </div>
@@ -106,7 +107,7 @@
                                 Quick Log
                             </span>
                         {/if}
-                        {#if template.goal_id}
+                        {#if template.goals && template.goals.length > 0}
                             <span class="badge badge-sm badge-accent gap-1">
                                 <Target class="w-3 h-3" />
                                 Goal Linked
@@ -190,7 +191,7 @@
                     <div class="flex items-center gap-1 opacity-60">
                         <Hash class="w-3 h-3" />
                         {template.quantity_default || 0}
-                        {template.quantity_unit}
+                        {template.goals?.[0]?.target?.unit_id || ""}
                     </div>
                 {/if}
             </div>
@@ -238,7 +239,7 @@
         <!-- Icon -->
         <div
             class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
-            style="background-color: {template.color || '#10b981'}20;"
+            style="background-color: {template.category?.color || '#10b981'}20;"
         >
             {template.icon || "⚡"}
         </div>
@@ -263,7 +264,7 @@
                 {#if template.quantity_enabled}
                     <span class="text-[10px] opacity-50">
                         {template.quantity_default || ""}
-                        {template.quantity_unit}
+                        {template.goals?.[0]?.target?.unit_id || ""}
                     </span>
                 {/if}
                 <span class="text-[10px] opacity-40"

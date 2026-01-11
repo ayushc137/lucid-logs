@@ -525,9 +525,15 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 	completedDate = completedDate.Truncate(24 * time.Hour)
 
 	// Calculate new streak values
-	oldStreak := goal.CurrentStreak
-	newStreak := goal.CurrentStreak
-	longestStreak := goal.LongestStreak
+	var oldStreak, newStreak, longestStreak int
+	var lastCompletedDate *time.Time
+
+	if goal.Stats != nil {
+		oldStreak = goal.Stats.CurrentStreak
+		newStreak = goal.Stats.CurrentStreak
+		longestStreak = goal.Stats.LongestStreak
+		lastCompletedDate = goal.Stats.LastCompletedDate
+	}
 
 	// Determine the expected previous completion date based on recurrence
 	var expectedPrevDate time.Time
@@ -554,8 +560,8 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 
 	// Check if this continues the streak or starts a new one
 	streakBroken := false
-	if goal.LastCompletedDate != nil {
-		lastDate := goal.LastCompletedDate.Truncate(24 * time.Hour)
+	if lastCompletedDate != nil {
+		lastDate := lastCompletedDate.Truncate(24 * time.Hour)
 
 		// Same day - don't increment
 		if lastDate.Equal(completedDate) {

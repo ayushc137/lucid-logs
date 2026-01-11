@@ -25,6 +25,7 @@
     } from "$lib/components/goals";
     import { cn } from "$lib/utils";
     import { onMount } from "svelte";
+    import { writable } from "svelte/store";
     import { browser } from "$app/environment";
 
     import {
@@ -98,14 +99,28 @@
     const goalId = $derived(goal?.id);
 
     // Fetch goal logs when editing
-    const logsQuery = createQuery({
-        queryKey: () => ["goal-logs", goalId],
+    // Fetch goal logs when editing
+    const logsOptions = writable({
+        queryKey: ["goal-logs", goalId],
         queryFn: () =>
             goalId
                 ? getGoalLogs(goalId, { limit: 50 })
                 : Promise.resolve({ goal_id: "", logs: [], total: 0 }),
         enabled: !!goalId && open,
     });
+
+    $effect(() => {
+        logsOptions.set({
+            queryKey: ["goal-logs", goalId],
+            queryFn: () =>
+                goalId
+                    ? getGoalLogs(goalId, { limit: 50 })
+                    : Promise.resolve({ goal_id: "", logs: [], total: 0 }),
+            enabled: !!goalId && open,
+        });
+    });
+
+    const logsQuery = createQuery(logsOptions);
 
     const logs = $derived($logsQuery.data?.logs || []);
 

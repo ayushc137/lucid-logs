@@ -36,8 +36,14 @@
     // Sort by streak (descending) and then by priority
     const sortedGoals = $derived(
         [...recurringGoals].sort((a, b) => {
-            if (b.current_streak !== a.current_streak) {
-                return b.current_streak - a.current_streak;
+            if (
+                (b.stats?.current_streak || 0) !==
+                (a.stats?.current_streak || 0)
+            ) {
+                return (
+                    (b.stats?.current_streak || 0) -
+                    (a.stats?.current_streak || 0)
+                );
             }
             return (b.priority || 2) - (a.priority || 2);
         }),
@@ -122,7 +128,8 @@
                     <!-- Icon -->
                     <div
                         class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 transition-transform group-hover:scale-110"
-                        style="background-color: {goal.color || '#8b5cf6'}20;"
+                        style="background-color: {goal.category?.color ||
+                            '#8b5cf6'}20;"
                     >
                         {goal.icon || "🎯"}
                     </div>
@@ -133,12 +140,12 @@
                             <span class="font-medium text-sm truncate"
                                 >{goal.title}</span
                             >
-                            {#if goal.current_streak > 0}
+                            {#if (goal.stats?.current_streak || 0) > 0}
                                 <div
                                     class="flex items-center gap-0.5 text-[10px] text-warning font-bold"
                                 >
                                     <Flame class="w-3 h-3" />
-                                    {goal.current_streak}
+                                    {goal.stats?.current_streak || 0}
                                 </div>
                             {/if}
                         </div>
@@ -151,9 +158,9 @@
                             </span>
                             {#if goal.target}
                                 <span class="text-[10px] opacity-50">
-                                    {goal.target.current_value}/{goal.target
-                                        .value}
-                                    {goal.target.unit}
+                                    {goal.stats?.current_value || 0}/{goal
+                                        .target.value}
+                                    {goal.target.unit_id}
                                 </span>
                             {/if}
                         </div>
@@ -164,15 +171,15 @@
                         {@const progress = Math.min(
                             100,
                             Math.round(
-                                (goal.target.current_value /
+                                ((goal.stats?.current_value || 0) /
                                     goal.target.value) *
                                     100,
                             ),
                         )}
                         <div
                             class="radial-progress text-xs font-bold"
-                            style="--value:{progress}; --size:2rem; --thickness:3px; color: {goal.color ||
-                                '#8b5cf6'};"
+                            style="--value:{progress}; --size:2rem; --thickness:3px; color: {goal
+                                .category?.color || '#8b5cf6'};"
                             role="progressbar"
                         >
                             {progress}%

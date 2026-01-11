@@ -216,18 +216,8 @@ func (g *goalDB) toGoal() *Goal {
 		Status:   g.Status,
 		Priority: g.Priority,
 
-		// Denormalized streak fields (stored for fast reads)
-		CurrentStreak: g.CurrentStreak,
-		LongestStreak: g.LongestStreak,
-
 		CreatedAt: g.CreatedAt.Time,
 		UpdatedAt: g.UpdatedAt.Time,
-	}
-
-	// Convert last completed date
-	if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
-		t := g.LastCompletedDate.Time
-		goal.LastCompletedDate = &t
 	}
 
 	// Convert category
@@ -284,53 +274,51 @@ func (g *goalDB) toGoal() *Goal {
 		computedChildrenCompleted = anyToInt(g.ChildrenStats.Completed)
 	}
 
-	// Map computed stats from DB to Goal.Stats if present
-	// This supports the optimized single-query pattern
-	if computedTaskCount > 0 || computedChildrenTotal > 0 || g.Target != nil {
-		stats := &GoalStats{
-			CurrentValue:       computedCurrentValue,
-			TotalContributions: computedTaskCount,
-			CurrentStreak:      g.CurrentStreak,
-			LongestStreak:      g.LongestStreak,
-			ChildrenTotal:      computedChildrenTotal,
-			ChildrenCompleted:  computedChildrenCompleted,
-		}
+	// Map computed stats from DB to Goal.Stats
+	// Always initialize stats with stored streak data
+	stats := &GoalStats{
+		CurrentValue:       computedCurrentValue,
+		TotalContributions: computedTaskCount,
+		CurrentStreak:      g.CurrentStreak,
+		LongestStreak:      g.LongestStreak,
+		ChildrenTotal:      computedChildrenTotal,
+		ChildrenCompleted:  computedChildrenCompleted,
+	}
 
-		if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
-			t := g.LastCompletedDate.Time
-			stats.LastCompletedDate = &t
-		}
+	if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
+		t := g.LastCompletedDate.Time
+		stats.LastCompletedDate = &t
+	}
 
-		// Calculate progress percent and status logic
-		if goal.Target != nil && goal.Target.Value > 0 {
-			stats.ProgressPercent = (stats.CurrentValue / goal.Target.Value) * 100
+	// Calculate progress percent and status logic
+	if goal.Target != nil && goal.Target.Value > 0 {
+		stats.ProgressPercent = (stats.CurrentValue / goal.Target.Value) * 100
 
-			switch goal.Target.Operator {
-			case OperatorGTE:
-				if stats.CurrentValue >= goal.Target.Value {
-					stats.TodayStatus = TodayStatusMet
-				} else {
-					stats.TodayStatus = TodayStatusPending
-				}
-			case OperatorLTE:
-				if stats.CurrentValue <= goal.Target.Value {
-					stats.TodayStatus = TodayStatusMet
-				} else {
-					stats.TodayStatus = TodayStatusExceeded
-				}
-			case OperatorEQ:
-				if stats.CurrentValue == goal.Target.Value {
-					stats.TodayStatus = TodayStatusMet
-				} else if stats.CurrentValue > goal.Target.Value {
-					stats.TodayStatus = TodayStatusExceeded
-				} else {
-					stats.TodayStatus = TodayStatusPending
-				}
+		switch goal.Target.Operator {
+		case OperatorGTE:
+			if stats.CurrentValue >= goal.Target.Value {
+				stats.TodayStatus = TodayStatusMet
+			} else {
+				stats.TodayStatus = TodayStatusPending
+			}
+		case OperatorLTE:
+			if stats.CurrentValue <= goal.Target.Value {
+				stats.TodayStatus = TodayStatusMet
+			} else {
+				stats.TodayStatus = TodayStatusExceeded
+			}
+		case OperatorEQ:
+			if stats.CurrentValue == goal.Target.Value {
+				stats.TodayStatus = TodayStatusMet
+			} else if stats.CurrentValue > goal.Target.Value {
+				stats.TodayStatus = TodayStatusExceeded
+			} else {
+				stats.TodayStatus = TodayStatusPending
 			}
 		}
-
-		goal.Stats = stats
 	}
+
+	goal.Stats = stats
 
 	return goal
 }
@@ -1047,11 +1035,11 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		return nil, err
 	}
 
-	stats := &GoalStats{
-		// Use denormalized streak values from goal record (materialized view pattern)
-		CurrentStreak:     goal.CurrentStreak,
-		LongestStreak:     goal.LongestStreak,
-		LastCompletedDate: goal.LastCompletedDate,
+	stats := &GoalStats{}
+	if goal.Stats != nil {
+		stats.CurrentStreak = goal.Stats.CurrentStreak
+		stats.LongestStreak = goal.Stats.LongestStreak
+		stats.LastCompletedDate = goal.Stats.LastCompletedDate
 	}
 
 	// Build filter condition for tasks with period-based filtering
