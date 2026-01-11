@@ -56,9 +56,9 @@ func NewRepository(db *database.DB) Repository {
 
 type goalLogDB struct {
 	ID                models.RecordID      `json:"id,omitempty"`
-	GoalID            models.RecordID      `json:"in"`                      // RELATE in
-	SnapshotID        models.RecordID      `json:"out"`                     // RELATE out
-	Event             string               `json:"event_type"`              // Changed to match schema
+	GoalID            models.RecordID      `json:"in"`         // RELATE in
+	SnapshotID        models.RecordID      `json:"out"`        // RELATE out
+	Event             string               `json:"event_type"` // Changed to match schema
 	Changes           map[string]any       `json:"changes,omitempty"`
 	TriggeredByTaskID string               `json:"triggered_by_task_id,omitempty"` // Changed to match schema
 	CreatedAt         database.SurrealTime `json:"created_at"`
@@ -167,8 +167,8 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 
 		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
 			CREATE goal_logs SET
-				in = $goal_id,
-				out = NONE,
+				`+"`in`"+` = $goal_id,
+				`+"`out`"+` = NONE,
 				event_type = $event,
 				changes = $changes,
 				triggered_by_task_id = $triggered_by,
@@ -200,7 +200,7 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 		Count int64 `json:"count"`
 	}](ctx, r.db, `
 		SELECT count() as count FROM goal_logs 
-		WHERE in = $goal_id AND created_by = $user
+		WHERE `+"`in`"+` = $goal_id AND created_by = $user
 	`, map[string]any{
 		"goal_id": gID,
 		"user":    userID,
@@ -217,7 +217,7 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 	// Fetch logs
 	logsDB, err := database.QueryAll[goalLogDB](ctx, r.db, `
 		SELECT * FROM goal_logs 
-		WHERE in = $goal_id AND created_by = $user
+		WHERE `+"`in`"+` = $goal_id AND created_by = $user
 		ORDER BY created_at DESC
 		LIMIT $limit OFFSET $offset
 	`, map[string]any{
@@ -262,7 +262,7 @@ func (r *repository) GetSummary(ctx context.Context, goalID, userID string, days
 
 	summary, err := database.QueryFirst[GoalLogsSummary](ctx, r.db, `
 		LET $logs = SELECT * FROM goal_logs 
-			WHERE in = $goal_id 
+			WHERE `+"`in`"+` = $goal_id  
 			AND created_by = $user
 			AND created_at >= $start_date;
 		

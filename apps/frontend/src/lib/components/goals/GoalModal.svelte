@@ -15,37 +15,33 @@
         getUnits,
         createUnit,
     } from "$lib/api";
+    import { CategoryDropdown, ColorPicker } from "$lib/components/ui";
     import {
-        CategoryDropdown,
-        ColorPicker,
-        UnitDropdown,
-    } from "$lib/components/ui";
-    import { GoalPrioritySlider, GoalTimeline } from "$lib/components/goals";
+        GoalPrioritySlider,
+        GoalRecurrenceSettings,
+        GoalTargetSettings,
+        GoalTasksTab,
+        GoalHistoryTab,
+    } from "$lib/components/goals";
     import { cn } from "$lib/utils";
+    import { onMount } from "svelte";
+    import { browser } from "$app/environment";
 
     import {
         Save,
-        Repeat,
         BarChart3,
         Calendar,
         Tag,
         X,
         History,
         Target,
-        TrendingUp,
         Clock,
         Flame,
+        Repeat,
+        ListTodo,
         CheckCircle2,
         Circle,
-        ListTodo,
         Check,
-        X as XIcon,
-        Minus,
-        ArrowUp,
-        ArrowDown,
-        Filter,
-        Search,
-        Award,
         Plus,
         Play,
     } from "lucide-svelte";
@@ -95,16 +91,6 @@
     // Tab state
     let activeTab = $state<"details" | "tasks" | "history">("details");
 
-    // Tasks tab state
-    let taskFilter = $state<"all" | "positive" | "negative" | "neutral">("all");
-    let taskSearch = $state("");
-    let taskSortBy = $state<"date" | "impact">("date");
-    let showTaskFilters = $state(false);
-
-    // History tab state
-    let historyFilter = $state<"all" | "with_tasks" | "without_tasks">("all");
-    let showEventDetails = $state<string | null>(null);
-
     // Emoji picker state
     let showEmojiPicker = $state(false);
 
@@ -140,39 +126,116 @@
 
     // Unit creation state
     let showCreateUnit = $state(false);
-    let newUnitName = $state("");
-    let newUnitSymbol = $state("");
-    let newUnitType = $state<
-        "count" | "time" | "distance" | "volume" | "custom"
-    >("count");
 
-    // Popular emojis
-    const popularEmojis = [
+    // Emoji picker
+    let emojiPickerRef = $state<HTMLDivElement | null>(null);
+    let emojiPickerReady = $state(false);
+    let showFullPicker = $state(false);
+
+    // Suggested emojis organized by goal categories
+    const suggestedEmojis = {
+        "Fitness & Health": [
+            "💪",
+            "🏃",
+            "🏋️",
+            "🧘",
+            "🚴",
+            "🏊",
+            "🥗",
+            "💊",
+            "😴",
+            "🧠",
+        ],
+        "Learning & Growth": [
+            "📚",
+            "✍️",
+            "🎓",
+            "💡",
+            "🔬",
+            "📝",
+            "🎯",
+            "📖",
+            "🧪",
+            "💭",
+        ],
+        "Finance & Career": [
+            "💰",
+            "📈",
+            "💼",
+            "🏆",
+            "⭐",
+            "🚀",
+            "💎",
+            "📊",
+            "🎖️",
+            "👔",
+        ],
+        "Lifestyle & Habits": [
+            "🌅",
+            "🧹",
+            "☕",
+            "🌱",
+            "⏰",
+            "📱",
+            "🎨",
+            "🎵",
+            "🏠",
+            "✨",
+        ],
+        Relationships: [
+            "❤️",
+            "👨‍👩‍👧",
+            "🤝",
+            "💬",
+            "📞",
+            "🎁",
+            "😊",
+            "🙏",
+            "💝",
+            "👥",
+        ],
+    };
+
+    // Flatten for quick access row
+    const quickEmojis = [
         "🎯",
-        "⭐",
-        "🏆",
         "💪",
-        "🚀",
         "📚",
         "💰",
         "❤️",
-        "🏃",
-        "🧘",
-        "🎨",
-        "✍️",
-        "🎵",
-        "🌱",
-        "⚡",
+        "🚀",
+        "⭐",
+        "🏆",
         "🔥",
-        "💎",
-        "🌟",
-        "🎉",
         "✅",
-        "📈",
-        "🧠",
+        "🌟",
         "💡",
-        "🌈",
     ];
+
+    // Initialize emoji-picker-element
+    onMount(() => {
+        if (browser) {
+            import("emoji-picker-element").then(() => {
+                emojiPickerReady = true;
+            });
+        }
+    });
+
+    // Handle emoji selection from picker
+    function handleEmojiSelect(event: CustomEvent) {
+        if (event.detail?.unicode) {
+            icon = event.detail.unicode;
+            showEmojiPicker = false;
+            showFullPicker = false;
+        }
+    }
+
+    // Handle quick emoji selection
+    function selectQuickEmoji(emoji: string) {
+        icon = emoji;
+        showEmojiPicker = false;
+        showFullPicker = false;
+    }
 
     // Days
     const dayOptions = [
@@ -283,9 +346,6 @@
         targetPerPeriod = false;
         activeTab = "details";
         showEmojiPicker = false;
-        historyFilter = "all";
-        taskFilter = "all";
-        taskSearch = "";
     }
 
     function handleSubmit() {
@@ -347,9 +407,7 @@
     }
 
     // Computed values for display
-    const currentStreak = $derived(
-        goal?.stats?.current_streak || goal?.current_streak || 0,
-    );
+    const currentStreak = $derived(goal?.stats?.current_streak || 0);
     const longestStreak = $derived(goal?.stats?.longest_streak || 0);
     const progressPercent = $derived(goal?.stats?.progress_percent || 0);
     const currentValue = $derived(goal?.stats?.current_value || 0);
@@ -357,40 +415,6 @@
 
     // Linked tasks
     const linkedTasks = $derived(goal?.linked_tasks || []);
-
-    // Filter and search tasks
-    const filteredTasks = $derived.by(() => {
-        let tasks = linkedTasks;
-
-        if (taskFilter !== "all") {
-            tasks = tasks.filter((t) => t.impact_type === taskFilter);
-        }
-
-        if (taskSearch.trim()) {
-            const search = taskSearch.toLowerCase();
-            tasks = tasks.filter((t) =>
-                t.task_title.toLowerCase().includes(search),
-            );
-        }
-
-        // Sort
-        if (taskSortBy === "impact") {
-            tasks = [...tasks].sort(
-                (a, b) => (b.impact_magnitude || 0) - (a.impact_magnitude || 0),
-            );
-        }
-
-        return tasks;
-    });
-
-    const taskCounts = $derived({
-        all: linkedTasks.length,
-        positive: linkedTasks.filter((t) => t.impact_type === "positive")
-            .length,
-        negative: linkedTasks.filter((t) => t.impact_type === "negative")
-            .length,
-        neutral: linkedTasks.filter((t) => t.impact_type === "neutral").length,
-    });
 
     function getPeriodLabel(p: string): string {
         const map: Record<string, string> = {
@@ -440,19 +464,15 @@
             queryClient.invalidateQueries({ queryKey: ["units"] });
             targetUnit = newUnit.id;
             showCreateUnit = false;
-            newUnitName = "";
-            newUnitSymbol = "";
-            newUnitType = "count";
         },
     });
 
-    async function handleCreateUnit() {
-        if (!newUnitName.trim()) return;
-        $createUnitMut.mutate({
-            name: newUnitName.trim(),
-            symbol: newUnitSymbol.trim() || newUnitName.trim().substring(0, 3),
-            type: newUnitType,
-        });
+    function handleCreateUnit(data: {
+        name: string;
+        symbol: string;
+        type: string;
+    }) {
+        $createUnitMut.mutate(data);
     }
 </script>
 
@@ -476,32 +496,101 @@
                 </button>
 
                 {#if showEmojiPicker}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
-                        class="absolute top-18 left-0 z-50 bg-base-100 border border-base-300 rounded-2xl shadow-2xl p-4 w-80"
+                        class="fixed inset-0 z-40"
+                        onclick={() => {
+                            showEmojiPicker = false;
+                            showFullPicker = false;
+                        }}
+                    ></div>
+                    <div
+                        bind:this={emojiPickerRef}
+                        class="absolute top-18 left-0 z-50 bg-base-100 border border-base-300 rounded-2xl shadow-2xl overflow-hidden"
                     >
-                        <p
-                            class="text-xs font-medium text-base-content/50 mb-3"
-                        >
-                            Choose an icon
-                        </p>
-                        <div class="grid grid-cols-8 gap-1.5">
-                            {#each popularEmojis as emoji}
+                        {#if showFullPicker && emojiPickerReady}
+                            <!-- Full emoji picker -->
+                            <div
+                                class="flex items-center justify-between px-3 pt-3 pb-1"
+                            >
                                 <button
                                     type="button"
-                                    class={cn(
-                                        "w-9 h-9 rounded-xl text-xl hover:bg-base-200 transition-all flex items-center justify-center hover:scale-110",
-                                        icon === emoji &&
-                                            "bg-primary/20 ring-2 ring-primary shadow-sm",
-                                    )}
-                                    onclick={() => {
-                                        icon = emoji;
-                                        showEmojiPicker = false;
-                                    }}
+                                    class="btn btn-xs btn-ghost gap-1"
+                                    onclick={() => (showFullPicker = false)}
                                 >
-                                    {emoji}
+                                    ← Back to Suggested
                                 </button>
-                            {/each}
-                        </div>
+                            </div>
+                            <emoji-picker
+                                class="light"
+                                onemoji-click={handleEmojiSelect}
+                            ></emoji-picker>
+                        {:else}
+                            <!-- Suggested emojis panel -->
+                            <div class="p-4 w-80 max-h-[400px] overflow-y-auto">
+                                <!-- Button to open full picker - at top -->
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-ghost w-full mb-4 gap-2 text-base-content/60 hover:text-primary border border-base-300 hover:border-primary/50"
+                                    onclick={() => (showFullPicker = true)}
+                                >
+                                    🔍 Search all emojis...
+                                </button>
+
+                                <!-- Quick access row -->
+                                <div class="mb-4">
+                                    <p
+                                        class="text-xs font-medium text-base-content/50 mb-2"
+                                    >
+                                        Quick Pick
+                                    </p>
+                                    <div class="flex flex-wrap gap-1">
+                                        {#each quickEmojis as emoji}
+                                            <button
+                                                type="button"
+                                                class={cn(
+                                                    "w-9 h-9 rounded-xl text-xl hover:bg-base-200 transition-all flex items-center justify-center hover:scale-110",
+                                                    icon === emoji &&
+                                                        "bg-primary/20 ring-2 ring-primary shadow-sm",
+                                                )}
+                                                onclick={() =>
+                                                    selectQuickEmoji(emoji)}
+                                            >
+                                                {emoji}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                </div>
+
+                                <!-- Categorized suggestions -->
+                                {#each Object.entries(suggestedEmojis) as [category, emojis]}
+                                    <div class="mb-3">
+                                        <p
+                                            class="text-[10px] font-semibold text-base-content/40 uppercase mb-1.5"
+                                        >
+                                            {category}
+                                        </p>
+                                        <div class="flex flex-wrap gap-1">
+                                            {#each emojis as emoji}
+                                                <button
+                                                    type="button"
+                                                    class={cn(
+                                                        "w-8 h-8 rounded-lg text-lg hover:bg-base-200 transition-all flex items-center justify-center hover:scale-110",
+                                                        icon === emoji &&
+                                                            "bg-primary/20 ring-2 ring-primary shadow-sm",
+                                                    )}
+                                                    onclick={() =>
+                                                        selectQuickEmoji(emoji)}
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
                     </div>
                 {/if}
             </div>
@@ -826,681 +915,57 @@
                             >
                         </div>
 
-                        <!-- Recurring Habit - Expandable -->
-                        <div
-                            class={cn(
-                                "rounded-xl border-2 transition-all",
-                                isHabit
-                                    ? "border-primary bg-primary/5"
-                                    : "border-base-300 bg-base-100 hover:border-primary/30",
-                            )}
-                        >
-                            <button
-                                type="button"
-                                class="w-full p-3 flex items-center gap-3 text-left"
-                                onclick={() => (isHabit = !isHabit)}
-                            >
-                                <div
-                                    class={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-                                        isHabit
-                                            ? "bg-primary text-primary-content"
-                                            : "bg-base-200 text-base-content/50",
-                                    )}
-                                >
-                                    <Repeat class="w-4 h-4" />
-                                </div>
-                                <div class="flex-1">
-                                    <span class="text-sm font-semibold"
-                                        >Recurring Habit</span
-                                    >
-                                    <p class="text-xs text-base-content/50">
-                                        Track daily, weekly, or monthly
-                                    </p>
-                                </div>
-                                <div
-                                    class={cn(
-                                        "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                                        isHabit
-                                            ? "bg-primary border-primary text-primary-content"
-                                            : "border-base-300",
-                                    )}
-                                >
-                                    {#if isHabit}
-                                        <Check class="w-3 h-3" />
-                                    {/if}
-                                </div>
-                            </button>
-                            {#if isHabit}
-                                <div
-                                    class="px-3 pb-3 pt-3 border-t border-primary/20 space-y-3"
-                                >
-                                    <!-- Recurrence Settings inline -->
-                                    <div class="flex items-center gap-3">
-                                        <span
-                                            class="text-xs font-medium opacity-70"
-                                            >Repeat every</span
-                                        >
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="365"
-                                            bind:value={frequency}
-                                            class="input input-sm input-bordered w-16 text-center"
-                                        />
-                                        <select
-                                            bind:value={period}
-                                            class="select select-sm select-bordered"
-                                        >
-                                            <option value="day">day(s)</option>
-                                            <option value="week">week(s)</option
-                                            >
-                                            <option value="month"
-                                                >month(s)</option
-                                            >
-                                        </select>
-                                    </div>
+                        <!-- Recurring Habit Settings -->
+                        <GoalRecurrenceSettings
+                            bind:isHabit
+                            bind:frequency
+                            bind:period
+                            bind:activeDays
+                            bind:activeMonthDay
+                            onIsHabitChange={(v) => (isHabit = v)}
+                            onFrequencyChange={(v) => (frequency = v)}
+                            onPeriodChange={(v) => (period = v)}
+                            onActiveDaysChange={(days) => (activeDays = days)}
+                            onActiveMonthDayChange={(d) => (activeMonthDay = d)}
+                        />
 
-                                    {#if period === "week"}
-                                        <div class="flex items-center gap-3">
-                                            <span
-                                                class="text-xs font-medium opacity-70"
-                                                >Active on</span
-                                            >
-                                            <div
-                                                class="flex gap-1.5 flex-wrap flex-1"
-                                            >
-                                                {#each [{ value: 0, label: "Sun" }, { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" }, { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" }] as day}
-                                                    <button
-                                                        type="button"
-                                                        class={cn(
-                                                            "btn btn-sm px-2.5",
-                                                            activeDays.includes(
-                                                                day.value,
-                                                            )
-                                                                ? "btn-primary"
-                                                                : "bg-base-200 hover:bg-base-300 border-base-300 text-base-content/70",
-                                                        )}
-                                                        onclick={() =>
-                                                            toggleDay(
-                                                                day.value,
-                                                            )}
-                                                    >
-                                                        {day.label}
-                                                    </button>
-                                                {/each}
-                                            </div>
-                                        </div>
-                                    {/if}
-
-                                    {#if period === "month"}
-                                        <div class="flex items-center gap-3">
-                                            <span
-                                                class="text-xs font-medium opacity-70"
-                                                >Day of month</span
-                                            >
-                                            <select
-                                                bind:value={activeMonthDay}
-                                                class="select select-sm select-bordered"
-                                            >
-                                                {#each Array.from({ length: 31 }, (_, i) => i + 1) as d}
-                                                    <option value={d}
-                                                        >{d}</option
-                                                    >
-                                                {/each}
-                                            </select>
-                                        </div>
-                                    {/if}
-
-                                    <!-- Habit Summary -->
-                                    <div
-                                        class="pt-3 mt-3 border-t border-primary/20 flex items-center gap-2"
-                                    >
-                                        <div
-                                            class="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center"
-                                        >
-                                            <Repeat
-                                                class="w-3 h-3 text-primary"
-                                            />
-                                        </div>
-                                        <p class="text-xs text-base-content/60">
-                                            Repeats every <span
-                                                class="font-semibold text-primary"
-                                                >{frequency > 1
-                                                    ? `${frequency} ${period}s`
-                                                    : period}</span
-                                            >
-                                            {#if period === "week" && activeDays.length > 0 && activeDays.length < 7}
-                                                on <span class="font-medium"
-                                                    >{activeDays
-                                                        .map(
-                                                            (d) =>
-                                                                [
-                                                                    "Sun",
-                                                                    "Mon",
-                                                                    "Tue",
-                                                                    "Wed",
-                                                                    "Thu",
-                                                                    "Fri",
-                                                                    "Sat",
-                                                                ][d],
-                                                        )
-                                                        .join(", ")}</span
-                                                >
-                                            {/if}
-                                        </p>
-                                    </div>
-                                </div>
-                            {/if}
-                        </div>
-
-                        <!-- Measurable Target - Expandable -->
-                        <div
-                            class={cn(
-                                "rounded-xl border-2 transition-all",
-                                isMeasurable
-                                    ? "border-secondary bg-secondary/5"
-                                    : "border-base-300 bg-base-100 hover:border-secondary/30",
-                            )}
-                        >
-                            <button
-                                type="button"
-                                class="w-full p-3 flex items-center gap-3 text-left"
-                                onclick={() => (isMeasurable = !isMeasurable)}
-                            >
-                                <div
-                                    class={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-                                        isMeasurable
-                                            ? "bg-secondary text-secondary-content"
-                                            : "bg-base-200 text-base-content/50",
-                                    )}
-                                >
-                                    <Target class="w-4 h-4" />
-                                </div>
-                                <div class="flex-1">
-                                    <span class="text-sm font-semibold"
-                                        >Measurable Target</span
-                                    >
-                                    <p class="text-xs text-base-content/50">
-                                        Set a specific numeric goal
-                                    </p>
-                                </div>
-                                <div
-                                    class={cn(
-                                        "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                                        isMeasurable
-                                            ? "bg-secondary border-secondary text-secondary-content"
-                                            : "border-base-300",
-                                    )}
-                                >
-                                    {#if isMeasurable}
-                                        <Check class="w-3 h-3" />
-                                    {/if}
-                                </div>
-                            </button>
-                            {#if isMeasurable}
-                                <div
-                                    class="px-3 pb-3 pt-3 border-t border-secondary/20 space-y-3"
-                                >
-                                    <!-- Target Settings inline -->
-                                    <div class="flex items-center gap-2">
-                                        <select
-                                            bind:value={targetOperator}
-                                            class="select select-sm select-bordered"
-                                        >
-                                            <option value="gte"
-                                                >At least (≥)</option
-                                            >
-                                            <option value="eq"
-                                                >Exactly (=)</option
-                                            >
-                                            <option value="lte"
-                                                >At most (≤)</option
-                                            >
-                                        </select>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="1"
-                                            bind:value={targetValue}
-                                            class="input input-sm input-bordered w-20 text-center"
-                                        />
-                                        <div class="flex-1">
-                                            {#if showCreateUnit}
-                                                <!-- Unit Creation Form (replaces dropdown like Category) -->
-                                                <div class="space-y-2">
-                                                    <input
-                                                        type="text"
-                                                        bind:value={newUnitName}
-                                                        placeholder="Unit name (e.g., hours)"
-                                                        class={cn(
-                                                            "input input-sm input-bordered w-full",
-                                                            newUnitName.length >
-                                                                30 &&
-                                                                "input-error",
-                                                        )}
-                                                        maxlength={30}
-                                                    />
-                                                    <div class="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            bind:value={
-                                                                newUnitSymbol
-                                                            }
-                                                            placeholder="Symbol (e.g., h)"
-                                                            class="input input-sm input-bordered w-20"
-                                                            maxlength={10}
-                                                        />
-                                                        <select
-                                                            bind:value={
-                                                                newUnitType
-                                                            }
-                                                            class="select select-sm select-bordered flex-1"
-                                                        >
-                                                            <option
-                                                                value="count"
-                                                                >Count</option
-                                                            >
-                                                            <option value="time"
-                                                                >Time</option
-                                                            >
-                                                            <option
-                                                                value="distance"
-                                                                >Distance</option
-                                                            >
-                                                            <option
-                                                                value="volume"
-                                                                >Volume</option
-                                                            >
-                                                            <option
-                                                                value="custom"
-                                                                >Custom</option
-                                                            >
-                                                        </select>
-                                                    </div>
-                                                    <div class="flex gap-2">
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-sm btn-primary flex-1 gap-1"
-                                                            onclick={handleCreateUnit}
-                                                            disabled={$createUnitMut.isPending ||
-                                                                !newUnitName.trim()}
-                                                        >
-                                                            {#if $createUnitMut.isPending}
-                                                                <span
-                                                                    class="loading loading-spinner loading-xs"
-                                                                ></span>
-                                                            {:else}
-                                                                <Check
-                                                                    class="w-3.5 h-3.5"
-                                                                />
-                                                            {/if}
-                                                            Create
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-sm btn-ghost"
-                                                            onclick={() =>
-                                                                (showCreateUnit = false)}
-                                                            >Cancel</button
-                                                        >
-                                                    </div>
-                                                </div>
-                                            {:else}
-                                                <UnitDropdown
-                                                    {units}
-                                                    bind:value={targetUnit}
-                                                    size="sm"
-                                                    showCreateButton={true}
-                                                    onCreate={() =>
-                                                        (showCreateUnit = true)}
-                                                />
-                                            {/if}
-                                        </div>
-                                    </div>
-
-                                    {#if isHabit}
-                                        <label
-                                            class="flex items-center gap-3 cursor-pointer"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                class="checkbox checkbox-sm checkbox-secondary"
-                                                bind:checked={targetPerPeriod}
-                                            />
-                                            <span class="text-sm"
-                                                >Reset per {period}</span
-                                            >
-                                        </label>
-                                    {/if}
-
-                                    <!-- Target Summary -->
-                                    <div
-                                        class="pt-3 mt-3 border-t border-secondary/20 flex items-center gap-2"
-                                    >
-                                        <div
-                                            class="w-5 h-5 rounded-md bg-secondary/10 flex items-center justify-center"
-                                        >
-                                            <Target
-                                                class="w-3 h-3 text-secondary"
-                                            />
-                                        </div>
-                                        <p class="text-xs text-base-content/60">
-                                            Target: <span
-                                                class="font-semibold text-secondary"
-                                                >{targetOperator === "gte"
-                                                    ? "at least"
-                                                    : targetOperator === "lte"
-                                                      ? "at most"
-                                                      : "exactly"}
-                                                {targetValue || 0}{selectedUnit
-                                                    ? ` ${selectedUnit.symbol}`
-                                                    : ""}</span
-                                            >
-                                            {#if isHabit && targetPerPeriod}
-                                                <span class="opacity-70"
-                                                    >per {period}</span
-                                                >
-                                            {/if}
-                                        </p>
-                                    </div>
-                                </div>
-                            {/if}
-                        </div>
+                        <!-- Measurable Target Settings -->
+                        <GoalTargetSettings
+                            bind:isMeasurable
+                            bind:targetOperator
+                            bind:targetValue
+                            bind:targetUnit
+                            bind:targetPerPeriod
+                            bind:showCreateUnit
+                            {isHabit}
+                            {period}
+                            {units}
+                            {selectedUnit}
+                            onIsMeasurableChange={(v) => (isMeasurable = v)}
+                            onTargetOperatorChange={(v) => (targetOperator = v)}
+                            onTargetValueChange={(v) => (targetValue = v)}
+                            onTargetUnitChange={(v) => (targetUnit = v)}
+                            onTargetPerPeriodChange={(v) =>
+                                (targetPerPeriod = v)}
+                            onShowCreateUnit={() => (showCreateUnit = true)}
+                            onCancelCreateUnit={() => (showCreateUnit = false)}
+                            onCreateUnit={handleCreateUnit}
+                            isCreatingUnit={$createUnitMut.isPending}
+                        />
                     </div>
                 </div>
             {:else if activeTab === "tasks"}
-                <!-- Tasks Tab -->
-                <div class="p-6">
-                    <!-- Stats Bar -->
-                    <div
-                        class="flex items-center gap-4 mb-4 p-3 bg-base-200/50 rounded-xl"
-                    >
-                        <div class="flex items-center gap-2 text-sm">
-                            <ListTodo class="w-4 h-4 text-primary" />
-                            <span class="font-medium">{linkedTasks.length}</span
-                            >
-                            <span class="text-base-content/60"
-                                >linked tasks</span
-                            >
-                        </div>
-                        {#if totalContributions > 0}
-                            <div class="flex items-center gap-2 text-sm">
-                                <TrendingUp class="w-4 h-4 text-success" />
-                                <span class="font-medium"
-                                    >{totalContributions}</span
-                                >
-                                <span class="text-base-content/60"
-                                    >contributions</span
-                                >
-                            </div>
-                        {/if}
-                    </div>
-
-                    {#if linkedTasks.length > 0}
-                        <!-- Filter Bar -->
-                        <div class="flex items-center gap-3 mb-4">
-                            <!-- Search -->
-                            <div class="relative flex-1">
-                                <Search
-                                    class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Search tasks..."
-                                    class="input input-sm input-bordered w-full pl-9 bg-base-200/50"
-                                    bind:value={taskSearch}
-                                />
-                            </div>
-
-                            <!-- Quick Filters -->
-                            <div class="flex gap-1">
-                                <button
-                                    class={cn(
-                                        "btn btn-sm gap-1",
-                                        taskFilter === "all"
-                                            ? "btn-primary"
-                                            : "btn-ghost",
-                                    )}
-                                    onclick={() => (taskFilter = "all")}
-                                >
-                                    All
-                                    <span class="badge badge-xs"
-                                        >{taskCounts.all}</span
-                                    >
-                                </button>
-                                {#if taskCounts.positive > 0}
-                                    <button
-                                        class={cn(
-                                            "btn btn-sm gap-1",
-                                            taskFilter === "positive"
-                                                ? "btn-success"
-                                                : "btn-ghost text-success",
-                                        )}
-                                        onclick={() =>
-                                            (taskFilter = "positive")}
-                                    >
-                                        <Check class="w-3 h-3" />
-                                        <span
-                                            class="badge badge-xs badge-success"
-                                            >{taskCounts.positive}</span
-                                        >
-                                    </button>
-                                {/if}
-                                {#if taskCounts.negative > 0}
-                                    <button
-                                        class={cn(
-                                            "btn btn-sm gap-1",
-                                            taskFilter === "negative"
-                                                ? "btn-error"
-                                                : "btn-ghost text-error",
-                                        )}
-                                        onclick={() =>
-                                            (taskFilter = "negative")}
-                                    >
-                                        <XIcon class="w-3 h-3" />
-                                        <span class="badge badge-xs badge-error"
-                                            >{taskCounts.negative}</span
-                                        >
-                                    </button>
-                                {/if}
-                            </div>
-                        </div>
-
-                        <!-- Task List -->
-                        <div
-                            class="space-y-2 max-h-[400px] overflow-y-auto pr-2"
-                        >
-                            {#each filteredTasks as task (task.task_id)}
-                                <div
-                                    class="flex items-center gap-3 p-4 rounded-xl bg-base-200/30 hover:bg-base-200/60 transition-all border border-transparent hover:border-base-300 group"
-                                >
-                                    <!-- Impact indicator -->
-                                    <div
-                                        class={cn(
-                                            "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110",
-                                            task.impact_type === "positive"
-                                                ? "bg-success/20 text-success"
-                                                : task.impact_type ===
-                                                    "negative"
-                                                  ? "bg-error/20 text-error"
-                                                  : "bg-base-300 text-base-content/50",
-                                        )}
-                                    >
-                                        {#if task.impact_type === "positive"}
-                                            <Check class="w-5 h-5" />
-                                        {:else if task.impact_type === "negative"}
-                                            <XIcon class="w-5 h-5" />
-                                        {:else}
-                                            <Minus class="w-5 h-5" />
-                                        {/if}
-                                    </div>
-
-                                    <!-- Task info -->
-                                    <div class="flex-1 min-w-0">
-                                        <p class="font-medium truncate">
-                                            {task.task_title}
-                                        </p>
-                                        <div
-                                            class="flex items-center gap-2 mt-1 flex-wrap"
-                                        >
-                                            {#if task.quantity_value}
-                                                <span
-                                                    class="badge badge-sm bg-base-300 gap-1"
-                                                >
-                                                    <ArrowUp
-                                                        class="w-3 h-3 text-success"
-                                                    />
-                                                    +{task.quantity_value}
-                                                    {task.unit_id?.replace(
-                                                        "units:",
-                                                        "",
-                                                    ) || ""}
-                                                </span>
-                                            {/if}
-                                            {#if task.impact_magnitude && task.impact_magnitude > 0}
-                                                <span
-                                                    class="text-xs text-base-content/50"
-                                                >
-                                                    Impact: {task.impact_magnitude}/5
-                                                </span>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                </div>
-                            {:else}
-                                <div
-                                    class="text-center py-8 text-base-content/50"
-                                >
-                                    <Search
-                                        class="w-8 h-8 mx-auto mb-2 opacity-30"
-                                    />
-                                    <p class="text-sm">
-                                        No tasks match your filters
-                                    </p>
-                                </div>
-                            {/each}
-                        </div>
-                    {:else}
-                        <div class="text-center py-16 text-base-content/50">
-                            <div
-                                class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-base-200 flex items-center justify-center"
-                            >
-                                <ListTodo class="w-8 h-8 opacity-30" />
-                            </div>
-                            <p class="font-medium text-lg">
-                                No linked tasks yet
-                            </p>
-                            <p class="text-sm mt-1 max-w-xs mx-auto">
-                                Tasks that contribute to this goal will appear
-                                here. Link tasks from the task details page.
-                            </p>
-                        </div>
-                    {/if}
-                </div>
+                <GoalTasksTab {linkedTasks} {totalContributions} />
             {:else if activeTab === "history"}
-                <!-- History Tab -->
-                <div class="p-6">
-                    {#if isEditing && goal}
-                        <!-- Stats Summary -->
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                            <div
-                                class="p-4 rounded-2xl bg-gradient-to-br from-orange-500/10 to-yellow-500/10 border border-orange-500/20"
-                            >
-                                <div class="flex items-center gap-2 mb-2">
-                                    <Flame class="w-5 h-5 text-orange-500" />
-                                </div>
-                                <p class="text-2xl font-bold text-orange-500">
-                                    {currentStreak}
-                                </p>
-                                <p class="text-xs text-base-content/60">
-                                    Current Streak
-                                </p>
-                            </div>
-                            <div
-                                class="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20"
-                            >
-                                <div class="flex items-center gap-2 mb-2">
-                                    <Award class="w-5 h-5 text-purple-500" />
-                                </div>
-                                <p class="text-2xl font-bold text-purple-500">
-                                    {longestStreak}
-                                </p>
-                                <p class="text-xs text-base-content/60">
-                                    Best Streak
-                                </p>
-                            </div>
-                            <div
-                                class="p-4 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20"
-                            >
-                                <div class="flex items-center gap-2 mb-2">
-                                    <TrendingUp
-                                        class="w-5 h-5 text-green-500"
-                                    />
-                                </div>
-                                <p class="text-2xl font-bold text-green-500">
-                                    {progressPercent}%
-                                </p>
-                                <p class="text-xs text-base-content/60">
-                                    Progress
-                                </p>
-                            </div>
-                            <div
-                                class="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20"
-                            >
-                                <div class="flex items-center gap-2 mb-2">
-                                    <BarChart3 class="w-5 h-5 text-blue-500" />
-                                </div>
-                                <p class="text-2xl font-bold text-blue-500">
-                                    {currentValue}
-                                </p>
-                                <p class="text-xs text-base-content/60">
-                                    Current Value
-                                </p>
-                            </div>
-                        </div>
-
-                        <!-- Activity Timeline -->
-                        <div
-                            class="border border-base-300 rounded-2xl p-4 bg-base-200/30 max-h-[350px] overflow-y-auto"
-                        >
-                            <h4 class="font-semibold mb-4 text-center">
-                                Activity Timeline
-                            </h4>
-                            <GoalTimeline
-                                {logs}
-                                isLoading={$logsQuery.isPending}
-                                filter={historyFilter === "with_tasks"
-                                    ? "with-tasks"
-                                    : historyFilter === "without_tasks"
-                                      ? "goal-only"
-                                      : "all"}
-                                onFilterChange={(f) =>
-                                    (historyFilter =
-                                        f === "with-tasks"
-                                            ? "with_tasks"
-                                            : f === "goal-only"
-                                              ? "without_tasks"
-                                              : "all")}
-                            />
-                        </div>
-                    {:else}
-                        <div class="text-center py-16 text-base-content/50">
-                            <div
-                                class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-base-200 flex items-center justify-center"
-                            >
-                                <History class="w-8 h-8 opacity-30" />
-                            </div>
-                            <p class="font-medium text-lg">
-                                Save your goal first
-                            </p>
-                            <p class="text-sm mt-1">
-                                History will appear after you create the goal
-                            </p>
-                        </div>
-                    {/if}
-                </div>
+                <GoalHistoryTab
+                    {goal}
+                    {logs}
+                    isLoading={$logsQuery.isPending}
+                    {currentStreak}
+                    {longestStreak}
+                    {progressPercent}
+                    {currentValue}
+                />
             {/if}
         </div>
 

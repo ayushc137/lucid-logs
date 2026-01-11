@@ -8,6 +8,16 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
+
+	// emoji-picker-element custom element
+	namespace svelteHTML {
+		interface IntrinsicElements {
+			'emoji-picker': {
+				class?: string;
+				'onemoji-click'?: (event: CustomEvent<{ unicode: string; emoji: { annotation: string } }>) => void;
+			};
+		}
+	}
 }
 
-export {};
+export { };

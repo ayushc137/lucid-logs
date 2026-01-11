@@ -177,7 +177,7 @@
         <!-- Dropdown Menu -->
         {#if isOpen}
             <div
-                class="absolute z-50 top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg overflow-hidden animate-dropdown min-w-[220px]"
+                class="absolute z-50 bottom-full left-0 right-0 mb-1 bg-base-100 border border-base-300 rounded-lg shadow-lg overflow-hidden animate-dropdown min-w-[220px]"
             >
                 <!-- Search -->
                 {#if showSearch && (units?.length || 0) > 5}

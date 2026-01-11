@@ -38,26 +38,23 @@
     } from "$lib/components/ui";
     import { EmotionModal } from "$lib/components/emotions";
     import { GoalSelector } from "$lib/components/goals";
+    import {
+        TaskPrioritySlider,
+        EmotionSection,
+        ScheduleSection,
+        ReflectionSection,
+    } from "$lib/components/tasks";
     import { cn } from "$lib/utils";
     import { goto } from "$app/navigation";
     import { browser } from "$app/environment";
 
     import {
-        Sparkles,
         Check,
         X,
-        Plus,
-        ThumbsUp,
-        ThumbsDown,
-        Clock,
-        CircleAlert,
         Save,
         Tag,
-        Calendar,
         CircleCheck,
         Circle,
-        Heart,
-        ChevronRight,
         Trash2,
         Edit3,
         FileText,
@@ -116,8 +113,6 @@
     let priority = $state(3);
     let positives = $state<TaskItem[]>([]);
     let negatives = $state<TaskItem[]>([]);
-    let newPositive = $state("");
-    let newNegative = $state("");
     let completed = $state(false);
 
     // Goal links state
@@ -650,57 +645,6 @@
         showUncompleteConfirm = false;
     }
 
-    // Reflection items
-    function addPositive() {
-        if (newPositive.trim()) {
-            const newItem = {
-                text: newPositive.trim(),
-                emotion_id: pendingPositiveEmotion?.id,
-            };
-            positives = [...positives, newItem];
-            console.log("[Add Positive]", {
-                newItem,
-                totalPositives: positives.length,
-                hasEmotion: !!newItem.emotion_id,
-            });
-            newPositive = "";
-            pendingPositiveEmotion = null;
-        }
-    }
-
-    function addNegative() {
-        if (newNegative.trim()) {
-            const newItem = {
-                text: newNegative.trim(),
-                emotion_id: pendingNegativeEmotion?.id,
-            };
-            negatives = [...negatives, newItem];
-            console.log("[Add Negative]", {
-                newItem,
-                totalNegatives: negatives.length,
-                hasEmotion: !!newItem.emotion_id,
-            });
-            newNegative = "";
-            pendingNegativeEmotion = null;
-        }
-    }
-
-    function clearPendingPositiveEmotion() {
-        pendingPositiveEmotion = null;
-    }
-
-    function clearPendingNegativeEmotion() {
-        pendingNegativeEmotion = null;
-    }
-
-    function removePositive(index: number) {
-        positives = positives.filter((_, i) => i !== index);
-    }
-
-    function removeNegative(index: number) {
-        negatives = negatives.filter((_, i) => i !== index);
-    }
-
     // Category
     function handleCreateCategory() {
         if (newCategoryName.trim()) {
@@ -775,23 +719,6 @@
         $deleteMut.mutate();
         showDeleteConfirm = false;
     }
-
-    const priorityLabels = [
-        "None",
-        "Low",
-        "Medium",
-        "High",
-        "Critical",
-        "Urgent",
-    ];
-    const priorityColors = [
-        "badge-ghost",
-        "badge-info",
-        "badge-success",
-        "badge-warning",
-        "badge-error",
-        "badge-error",
-    ];
 </script>
 
 <div class="flex flex-col min-h-[calc(100vh-6rem)] relative">
@@ -878,468 +805,23 @@
                     </div>
                 </Card>
 
-                <!-- Reflection Section - Redesigned -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-300 hover:shadow-lg"
-                >
-                    <div class="flex items-center gap-2 mb-4">
-                        <Sparkles class="w-4 h-4 opacity-50" />
-                        <span class="text-xs font-semibold uppercase opacity-50"
-                            >Reflection</span
-                        >
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Positives Section - Redesigned -->
-                        <div class="flex flex-col h-full">
-                            <div class="flex items-center gap-2 mb-3">
-                                <div
-                                    class="w-6 h-6 rounded-lg bg-success/20 flex items-center justify-center"
-                                >
-                                    <ThumbsUp
-                                        class="w-3.5 h-3.5 text-success"
-                                    />
-                                </div>
-                                <span class="text-sm font-semibold text-success"
-                                    >What went well?</span
-                                >
-                            </div>
-
-                            <!-- New item input with emotion selector -->
-                            <div
-                                class="rounded-xl border border-success/30 bg-success/5 p-3 space-y-2"
-                            >
-                                <!-- Emotion selector (optional, select BEFORE adding) -->
-                                <div class="flex items-center gap-2">
-                                    {#if pendingPositiveEmotion}
-                                        {@const colors =
-                                            QUADRANT_COLORS[
-                                                pendingPositiveEmotion.quadrant as Quadrant
-                                            ]}
-                                        <div
-                                            class="tooltip tooltip-bottom"
-                                            data-tip={pendingPositiveEmotion.description}
-                                        >
-                                            <button
-                                                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                                style="
-                                                background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                                color: {colors.secondary};
-                                                border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                            "
-                                                onclick={openEmotionForPendingPositive}
-                                            >
-                                                <span
-                                                    class="w-6 h-6 rounded-md flex items-center justify-center"
-                                                    style="background: {colors.gradient};"
-                                                >
-                                                    <OpenMoji
-                                                        emoji={pendingPositiveEmotion.emoji}
-                                                        alt={pendingPositiveEmotion.name}
-                                                        size="sm"
-                                                    />
-                                                </span>
-                                                <span
-                                                    class="truncate max-w-[80px]"
-                                                    >{pendingPositiveEmotion.name}</span
-                                                >
-                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                <span
-                                                    class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                                    onclick={(e) => {
-                                                        e.stopPropagation();
-                                                        clearPendingPositiveEmotion();
-                                                    }}
-                                                    role="button"
-                                                    tabindex="0"
-                                                >
-                                                    <X class="w-3 h-3" />
-                                                </span>
-                                            </button>
-                                        </div>
-                                    {:else}
-                                        <button
-                                            class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-success/10 text-success/70 hover:bg-success/20 hover:text-success transition-all duration-200"
-                                            onclick={openEmotionForPendingPositive}
-                                        >
-                                            <Heart class="w-3 h-3" />
-                                            <span>Add feeling</span>
-                                        </button>
-                                    {/if}
-                                </div>
-
-                                <!-- Text input -->
-                                <div class="flex items-start gap-2">
-                                    <textarea
-                                        bind:value={newPositive}
-                                        placeholder="What went well? What are you grateful for?"
-                                        class="textarea textarea-sm textarea-bordered flex-1 bg-transparent border-success/20 focus:border-success min-h-[60px] text-sm resize-none"
-                                        onkeydown={(e) => {
-                                            if (
-                                                e.key === "Enter" &&
-                                                !e.shiftKey
-                                            ) {
-                                                e.preventDefault();
-                                                addPositive();
-                                            }
-                                        }}
-                                    ></textarea>
-                                    <button
-                                        class="btn btn-sm btn-success btn-outline shrink-0 gap-1"
-                                        onclick={addPositive}
-                                        disabled={!newPositive.trim()}
-                                    >
-                                        <Plus class="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Existing positives list -->
-                            {#if positives.length > 0}
-                                <div class="flex flex-col gap-2 mt-3">
-                                    {#each positives as p, i (i)}
-                                        {@const hasEmotion = !!p.emotion_id}
-                                        <div
-                                            class="rounded-xl bg-gradient-to-r from-success/10 to-success/5 border border-success/20 p-3 group hover:shadow-md transition-all duration-300 animate-fade-in"
-                                        >
-                                            <div class="flex items-start gap-3">
-                                                <ThumbsUp
-                                                    class="w-4 h-4 text-success shrink-0 mt-0.5"
-                                                />
-                                                <div class="flex-1 min-w-0">
-                                                    <p
-                                                        class="text-sm leading-relaxed break-words"
-                                                    >
-                                                        {p.text}
-                                                    </p>
-                                                    <!-- Emotion display -->
-                                                    <div class="mt-2">
-                                                        {#if hasEmotion}
-                                                            {@const emotion =
-                                                                emotionStore.get(
-                                                                    p.emotion_id!,
-                                                                )}
-                                                            {#if emotion}
-                                                                {@const colors =
-                                                                    QUADRANT_COLORS[
-                                                                        emotion.quadrant as Quadrant
-                                                                    ]}
-                                                                <div
-                                                                    class="tooltip tooltip-bottom"
-                                                                    data-tip={emotion.description}
-                                                                >
-                                                                    <button
-                                                                        class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                                                        style="
-                                                                        background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                                                        color: {colors.secondary};
-                                                                        border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                                                    "
-                                                                        onclick={() =>
-                                                                            openEmotionForPositive(
-                                                                                i,
-                                                                            )}
-                                                                    >
-                                                                        <span
-                                                                            class="w-6 h-6 rounded-md flex items-center justify-center"
-                                                                            style="background: {colors.gradient};"
-                                                                        >
-                                                                            <OpenMoji
-                                                                                emoji={emotion.emoji}
-                                                                                alt={emotion.name}
-                                                                                size="sm"
-                                                                            />
-                                                                        </span>
-                                                                        <span
-                                                                            class="truncate max-w-[80px]"
-                                                                            >{emotion.name}</span
-                                                                        >
-                                                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                                        <span
-                                                                            class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                                                            onclick={(
-                                                                                e,
-                                                                            ) => {
-                                                                                e.stopPropagation();
-                                                                                clearPositiveEmotion(
-                                                                                    i,
-                                                                                );
-                                                                            }}
-                                                                            role="button"
-                                                                            tabindex="0"
-                                                                        >
-                                                                            <X
-                                                                                class="w-3 h-3"
-                                                                            />
-                                                                        </span>
-                                                                    </button>
-                                                                </div>
-                                                            {:else}
-                                                                <span
-                                                                    class="text-xs text-success/50"
-                                                                    >Loading...</span
-                                                                >
-                                                            {/if}
-                                                        {:else}
-                                                            <button
-                                                                class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-base-content/40 hover:text-success hover:bg-success/10 transition-all duration-200"
-                                                                onclick={() =>
-                                                                    openEmotionForPositive(
-                                                                        i,
-                                                                    )}
-                                                            >
-                                                                <Plus
-                                                                    class="w-3 h-3"
-                                                                />
-                                                                <span
-                                                                    >Add feeling</span
-                                                                >
-                                                            </button>
-                                                        {/if}
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onclick={() =>
-                                                        removePositive(i)}
-                                                    class="btn btn-ghost btn-xs text-base-content/30 hover:text-error hover:bg-error/10 transition-all duration-200 shrink-0 opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <X class="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
-
-                        <!-- Negatives Section - Redesigned -->
-                        <div class="flex flex-col h-full">
-                            <div class="flex items-center gap-2 mb-3">
-                                <div
-                                    class="w-6 h-6 rounded-lg bg-error/20 flex items-center justify-center"
-                                >
-                                    <ThumbsDown
-                                        class="w-3.5 h-3.5 text-error"
-                                    />
-                                </div>
-                                <span class="text-sm font-semibold text-error"
-                                    >What could improve?</span
-                                >
-                            </div>
-
-                            <!-- New item input with emotion selector -->
-                            <div
-                                class="rounded-xl border border-error/30 bg-error/5 p-3 space-y-2"
-                            >
-                                <!-- Emotion selector (optional, select BEFORE adding) -->
-                                <div class="flex items-center gap-2">
-                                    {#if pendingNegativeEmotion}
-                                        {@const colors =
-                                            QUADRANT_COLORS[
-                                                pendingNegativeEmotion.quadrant as Quadrant
-                                            ]}
-                                        <div
-                                            class="tooltip tooltip-bottom"
-                                            data-tip={pendingNegativeEmotion.description}
-                                        >
-                                            <button
-                                                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                                style="
-                                                background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                                color: {colors.secondary};
-                                                border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                            "
-                                                onclick={openEmotionForPendingNegative}
-                                            >
-                                                <span
-                                                    class="w-6 h-6 rounded-md flex items-center justify-center"
-                                                    style="background: {colors.gradient};"
-                                                >
-                                                    <OpenMoji
-                                                        emoji={pendingNegativeEmotion.emoji}
-                                                        alt={pendingNegativeEmotion.name}
-                                                        size="sm"
-                                                    />
-                                                </span>
-                                                <span
-                                                    class="truncate max-w-[80px]"
-                                                    >{pendingNegativeEmotion.name}</span
-                                                >
-                                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                <span
-                                                    class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                                    onclick={(e) => {
-                                                        e.stopPropagation();
-                                                        clearPendingNegativeEmotion();
-                                                    }}
-                                                    role="button"
-                                                    tabindex="0"
-                                                >
-                                                    <X class="w-3 h-3" />
-                                                </span>
-                                            </button>
-                                        </div>
-                                    {:else}
-                                        <button
-                                            class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-error/10 text-error/70 hover:bg-error/20 hover:text-error transition-all duration-200"
-                                            onclick={openEmotionForPendingNegative}
-                                        >
-                                            <Heart class="w-3 h-3" />
-                                            <span>Add feeling</span>
-                                        </button>
-                                    {/if}
-                                </div>
-
-                                <!-- Text input -->
-                                <div class="flex items-start gap-2">
-                                    <textarea
-                                        bind:value={newNegative}
-                                        placeholder="What could be better? What challenged you?"
-                                        class="textarea textarea-sm textarea-bordered flex-1 bg-transparent border-error/20 focus:border-error min-h-[60px] text-sm resize-none"
-                                        onkeydown={(e) => {
-                                            if (
-                                                e.key === "Enter" &&
-                                                !e.shiftKey
-                                            ) {
-                                                e.preventDefault();
-                                                addNegative();
-                                            }
-                                        }}
-                                    ></textarea>
-                                    <button
-                                        class="btn btn-sm btn-error btn-outline shrink-0 gap-1"
-                                        onclick={addNegative}
-                                        disabled={!newNegative.trim()}
-                                    >
-                                        <Plus class="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Existing negatives list -->
-                            {#if negatives.length > 0}
-                                <div class="flex flex-col gap-2 mt-3">
-                                    {#each negatives as n, i (i)}
-                                        {@const hasEmotion = !!n.emotion_id}
-                                        <div
-                                            class="rounded-xl bg-gradient-to-r from-error/10 to-error/5 border border-error/20 p-3 group hover:shadow-md transition-all duration-300 animate-fade-in"
-                                        >
-                                            <div class="flex items-start gap-3">
-                                                <ThumbsDown
-                                                    class="w-4 h-4 text-error shrink-0 mt-0.5"
-                                                />
-                                                <div class="flex-1 min-w-0">
-                                                    <p
-                                                        class="text-sm leading-relaxed break-words"
-                                                    >
-                                                        {n.text}
-                                                    </p>
-                                                    <!-- Emotion display -->
-                                                    <div class="mt-2">
-                                                        {#if hasEmotion}
-                                                            {@const emotion =
-                                                                emotionStore.get(
-                                                                    n.emotion_id!,
-                                                                )}
-                                                            {#if emotion}
-                                                                {@const colors =
-                                                                    QUADRANT_COLORS[
-                                                                        emotion.quadrant as Quadrant
-                                                                    ]}
-                                                                <div
-                                                                    class="tooltip tooltip-bottom"
-                                                                    data-tip={emotion.description}
-                                                                >
-                                                                    <button
-                                                                        class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105"
-                                                                        style="
-                                                                        background: linear-gradient(135deg, color-mix(in srgb, {colors.primary} 15%, transparent), color-mix(in srgb, {colors.secondary} 10%, transparent));
-                                                                        color: {colors.secondary};
-                                                                        border: 1px solid color-mix(in srgb, {colors.primary} 30%, transparent);
-                                                                    "
-                                                                        onclick={() =>
-                                                                            openEmotionForNegative(
-                                                                                i,
-                                                                            )}
-                                                                    >
-                                                                        <span
-                                                                            class="w-6 h-6 rounded-md flex items-center justify-center"
-                                                                            style="background: {colors.gradient};"
-                                                                        >
-                                                                            <OpenMoji
-                                                                                emoji={emotion.emoji}
-                                                                                alt={emotion.name}
-                                                                                size="sm"
-                                                                            />
-                                                                        </span>
-                                                                        <span
-                                                                            class="truncate max-w-[80px]"
-                                                                            >{emotion.name}</span
-                                                                        >
-                                                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                                                        <span
-                                                                            class="p-0.5 rounded-full hover:bg-base-content/10 transition-colors cursor-pointer"
-                                                                            onclick={(
-                                                                                e,
-                                                                            ) => {
-                                                                                e.stopPropagation();
-                                                                                clearNegativeEmotion(
-                                                                                    i,
-                                                                                );
-                                                                            }}
-                                                                            role="button"
-                                                                            tabindex="0"
-                                                                        >
-                                                                            <X
-                                                                                class="w-3 h-3"
-                                                                            />
-                                                                        </span>
-                                                                    </button>
-                                                                </div>
-                                                            {:else}
-                                                                <span
-                                                                    class="text-xs text-error/50"
-                                                                    >Loading...</span
-                                                                >
-                                                            {/if}
-                                                        {:else}
-                                                            <button
-                                                                class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-base-content/40 hover:text-error hover:bg-error/10 transition-all duration-200"
-                                                                onclick={() =>
-                                                                    openEmotionForNegative(
-                                                                        i,
-                                                                    )}
-                                                            >
-                                                                <Plus
-                                                                    class="w-3 h-3"
-                                                                />
-                                                                <span
-                                                                    >Add feeling</span
-                                                                >
-                                                            </button>
-                                                        {/if}
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onclick={() =>
-                                                        removeNegative(i)}
-                                                    class="btn btn-ghost btn-xs text-base-content/30 hover:text-error hover:bg-error/10 transition-all duration-200 shrink-0 opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <X class="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
-                    </div>
-                </Card>
+                <!-- Reflection Section -->
+                <ReflectionSection
+                    {positives}
+                    {negatives}
+                    {pendingPositiveEmotion}
+                    {pendingNegativeEmotion}
+                    onPositivesChange={(items) => (positives = items)}
+                    onNegativesChange={(items) => (negatives = items)}
+                    onOpenEmotionForPositive={openEmotionForPositive}
+                    onOpenEmotionForNegative={openEmotionForNegative}
+                    onOpenEmotionForPendingPositive={openEmotionForPendingPositive}
+                    onOpenEmotionForPendingNegative={openEmotionForPendingNegative}
+                    onClearPendingPositiveEmotion={() =>
+                        (pendingPositiveEmotion = null)}
+                    onClearPendingNegativeEmotion={() =>
+                        (pendingNegativeEmotion = null)}
+                />
             </div>
 
             <!-- Right Column: Meta Fields (1/3 width on desktop) -->
@@ -1422,435 +904,35 @@
                     {/if}
                 </Card>
 
-                <!-- Emotion Section - Redesigned -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-300 hover:shadow-lg overflow-visible"
-                >
-                    <div class="flex items-center gap-2 mb-4">
-                        <Heart class="w-4 h-4 opacity-50" />
-                        <span class="text-xs font-semibold uppercase opacity-50"
-                            >Feeling</span
-                        >
-                    </div>
-
-                    <!-- Two-column display: Selected | Inferred -->
-                    <div class="grid grid-cols-1 gap-3">
-                        <!-- User Selected Emotion -->
-                        <div class="relative">
-                            <div
-                                class="text-[10px] uppercase font-semibold text-base-content/40 mb-2 flex items-center gap-1.5"
-                            >
-                                <span>Your Selection</span>
-                            </div>
-
-                            {#if selectedEmotion}
-                                {@const colors =
-                                    QUADRANT_COLORS[
-                                        selectedEmotion.quadrant as Quadrant
-                                    ]}
-                                {@const meta =
-                                    QUADRANT_META[
-                                        selectedEmotion.quadrant as Quadrant
-                                    ]}
-
-                                <div
-                                    class="tooltip tooltip-bottom w-full"
-                                    data-tip={selectedEmotion.description}
-                                >
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div
-                                        class="w-full rounded-xl p-3 flex items-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer group/card relative overflow-hidden border"
-                                        style="
-                                                background: linear-gradient(135deg, 
-                                                    color-mix(in srgb, {colors.primary} 12%, var(--b1)) 0%, 
-                                                    color-mix(in srgb, {colors.secondary} 8%, var(--b1)) 100%);
-                                                border-color: color-mix(in srgb, {colors.primary} 25%, transparent);
-                                            "
-                                        onclick={openEmotionForTask}
-                                        onkeydown={(e) =>
-                                            e.key === "Enter" &&
-                                            openEmotionForTask()}
-                                        role="button"
-                                        tabindex="0"
-                                    >
-                                        <!-- Background glow on hover -->
-                                        <div
-                                            class="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
-                                            style="background: radial-gradient(circle at 30% 50%, {colors.glow}, transparent 60%);"
-                                        ></div>
-
-                                        <!-- Emoji -->
-                                        <div
-                                            class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md group-hover/card:scale-110 transition-transform duration-300 relative z-10"
-                                            style="background: {colors.gradient};"
-                                        >
-                                            <OpenMoji
-                                                emoji={selectedEmotion.emoji}
-                                                alt={selectedEmotion.name}
-                                                size="md"
-                                            />
-                                        </div>
-
-                                        <!-- Info -->
-                                        <div
-                                            class="flex-1 min-w-0 text-left relative z-10"
-                                        >
-                                            <div
-                                                class="flex items-center gap-2"
-                                            >
-                                                <span
-                                                    class="text-sm font-bold truncate"
-                                                    style="color: {colors.secondary};"
-                                                >
-                                                    {selectedEmotion.name}
-                                                </span>
-                                                <span
-                                                    class="badge badge-xs font-bold uppercase tracking-wider px-1.5 shrink-0"
-                                                    style="background: {colors.primary}; color: white; border: none;"
-                                                >
-                                                    ✓
-                                                </span>
-                                            </div>
-                                            <div
-                                                class="text-[10px] opacity-60 mt-0.5"
-                                            >
-                                                {meta?.energyLabel} Energy • {meta?.pleasantnessLabel}
-                                            </div>
-                                        </div>
-
-                                        <!-- Clear button -->
-                                        <button
-                                            class="p-1.5 rounded-full hover:bg-base-content/10 transition-colors relative z-10 opacity-0 group-hover/card:opacity-100"
-                                            onclick={(e) => {
-                                                e.stopPropagation();
-                                                clearTaskEmotion();
-                                            }}
-                                            title="Remove"
-                                        >
-                                            <X
-                                                class="w-4 h-4 opacity-60 hover:opacity-100"
-                                            />
-                                        </button>
-                                    </div>
-                                </div>
-                            {:else}
-                                <!-- Empty State -->
-                                <button
-                                    class="w-full rounded-xl border-2 border-dashed border-base-300 p-4 flex items-center justify-center gap-3 hover:border-primary hover:bg-primary/5 transition-all duration-300 text-base-content/50 hover:text-primary group/empty"
-                                    onclick={openEmotionForTask}
-                                >
-                                    <div
-                                        class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center group-hover/empty:bg-primary/20 transition-colors duration-300"
-                                    >
-                                        <Heart
-                                            class="w-5 h-5 group-hover/empty:scale-110 transition-transform duration-300"
-                                        />
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-sm font-semibold"
-                                            >Select Emotion</span
-                                        >
-                                        <p class="text-xs opacity-60">
-                                            How are you feeling?
-                                        </p>
-                                    </div>
-                                    <Plus
-                                        class="w-5 h-5 ml-auto opacity-40 group-hover/empty:opacity-100 transition-opacity"
-                                    />
-                                </button>
-                            {/if}
-                        </div>
-
-                        <!-- Inferred Emotion (side by side feel) -->
-                        {#if inferringEmotion || inferredEmotion || inferenceError}
-                            <div class="relative">
-                                <div
-                                    class="text-[10px] uppercase font-semibold text-primary/70 mb-2 flex items-center gap-1.5"
-                                >
-                                    <Sparkles
-                                        class="w-3 h-3 text-primary {inferringEmotion
-                                            ? 'animate-pulse'
-                                            : ''}"
-                                    />
-                                    <span>Suggested</span>
-                                    <div
-                                        class="tooltip tooltip-right cursor-help normal-case"
-                                        data-tip="Based on your reflections"
-                                    >
-                                        <Info class="w-3 h-3 text-primary/50" />
-                                    </div>
-                                    {#if inferringEmotion}
-                                        <span
-                                            class="loading loading-spinner loading-xs text-primary"
-                                        ></span>
-                                    {/if}
-                                </div>
-
-                                {#if inferenceError}
-                                    <!-- Error State -->
-                                    <div
-                                        class="w-full rounded-xl p-2.5 flex items-center gap-2 bg-error/10 border border-error/30"
-                                    >
-                                        <CircleAlert
-                                            class="w-4 h-4 text-error shrink-0"
-                                        />
-                                        <span class="text-xs text-error"
-                                            >{inferenceError}</span
-                                        >
-                                    </div>
-                                {:else if inferringEmotion}
-                                    <!-- Loading State -->
-                                    <div
-                                        class="w-full rounded-xl p-2.5 flex items-center gap-3 bg-base-200 border border-base-300 animate-pulse"
-                                    >
-                                        <div
-                                            class="w-9 h-9 rounded-lg bg-base-300"
-                                        ></div>
-                                        <div class="flex-1">
-                                            <div
-                                                class="h-3 bg-base-300 rounded w-24 mb-1"
-                                            ></div>
-                                            <div
-                                                class="h-2 bg-base-300 rounded w-32"
-                                            ></div>
-                                        </div>
-                                    </div>
-                                {:else if inferredEmotion}
-                                    {@const inferredQuadrant =
-                                        (inferredEmotionFull?.quadrant ||
-                                            inferredEmotion.quadrant ||
-                                            "green") as Quadrant}
-                                    {@const colors =
-                                        QUADRANT_COLORS[inferredQuadrant]}
-                                    {@const meta =
-                                        QUADRANT_META[inferredQuadrant]}
-                                    <!-- Emotion Display -->
-
-                                    <div
-                                        class="tooltip tooltip-bottom w-full"
-                                        data-tip={inferredEmotionFull?.description ||
-                                            "Calculated from your reflections"}
-                                    >
-                                        <button
-                                            class="w-full rounded-xl p-2.5 flex items-center gap-3 transition-all duration-300 hover:shadow-md cursor-pointer group/inferred relative overflow-hidden"
-                                            style="
-                                                background: linear-gradient(135deg,
-                                                    color-mix(in srgb, {colors.primary} 6%, var(--b2)) 0%,
-                                                    color-mix(in srgb, {colors.secondary} 4%, var(--b2)) 100%);
-                                                border: 1px dashed color-mix(in srgb, {colors.primary} 35%, transparent);
-                                            "
-                                            onclick={openEmotionForSuggested}
-                                        >
-                                            <!-- Emoji -->
-                                            <div
-                                                class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm group-hover/inferred:scale-105 transition-transform duration-300"
-                                                style="background: {colors.gradient}; opacity: 0.9;"
-                                            >
-                                                {#if inferredEmotionFull}
-                                                    <OpenMoji
-                                                        emoji={inferredEmotionFull.emoji}
-                                                        alt={inferredEmotionFull?.name ||
-                                                            "Inferred Emotion"}
-                                                        size="md"
-                                                    />
-                                                {:else}
-                                                    <Sparkles
-                                                        class="w-4 h-4 text-white/80"
-                                                    />
-                                                {/if}
-                                            </div>
-
-                                            <!-- Info -->
-                                            <div
-                                                class="flex-1 min-w-0 text-left"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-2"
-                                                >
-                                                    <span
-                                                        class="text-sm font-semibold opacity-80"
-                                                    >
-                                                        {inferredEmotionFull?.name ||
-                                                            "Suggesting..."}
-                                                    </span>
-                                                </div>
-                                                <div
-                                                    class="text-[10px] opacity-50 mt-0.5"
-                                                >
-                                                    {meta?.energyLabel} Energy •
-                                                    {meta?.pleasantnessLabel}
-                                                </div>
-                                            </div>
-
-                                            <ChevronRight
-                                                class="w-4 h-4 text-primary/40 group-hover/inferred:text-primary transition-colors"
-                                            />
-                                        </button>
-                                    </div>
-                                {/if}
-                            </div>
-                        {/if}
-                    </div>
-                </Card>
+                <!-- Emotion Section -->
+                <EmotionSection
+                    {selectedEmotion}
+                    inferredEmotion={liveInferredEmotion}
+                    {inferredEmotionFull}
+                    {inferringEmotion}
+                    {inferenceError}
+                    onOpenEmotionForTask={openEmotionForTask}
+                    onOpenEmotionForSuggested={openEmotionForSuggested}
+                    onClearTaskEmotion={clearTaskEmotion}
+                />
 
                 <!-- Schedule -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-200 hover:shadow-md"
-                >
-                    <div class="flex items-center gap-2 mb-3">
-                        <Calendar class="w-4 h-4 opacity-50" />
-                        <span class="text-xs font-semibold uppercase opacity-50"
-                            >Schedule</span
-                        >
-                    </div>
-
-                    <div
-                        class="bg-base-100 rounded-lg border border-base-300 p-3 space-y-3"
-                    >
-                        <!-- Quick toggles (only in create mode) -->
-                        {#if !isEditing}
-                            <div
-                                class="flex flex-wrap gap-2 pb-2 border-b border-base-200"
-                            >
-                                {#if lastTaskEndTime}
-                                    <label
-                                        class="flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            class="toggle toggle-xs toggle-primary"
-                                            bind:checked={useLastTaskStart}
-                                        />
-                                        <span
-                                            class="text-xs {useLastTaskStart
-                                                ? 'text-primary font-medium'
-                                                : 'opacity-60'}"
-                                        >
-                                            From last task
-                                        </span>
-                                    </label>
-                                {/if}
-                                <label
-                                    class="flex items-center gap-2 cursor-pointer ml-auto"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        class="toggle toggle-xs toggle-success"
-                                        bind:checked={liveEndTime}
-                                    />
-                                    <span
-                                        class="text-xs flex items-center gap-1 {liveEndTime
-                                            ? 'text-success font-medium'
-                                            : 'opacity-60'}"
-                                    >
-                                        {#if liveEndTime}
-                                            <span
-                                                class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
-                                            ></span>
-                                        {/if}
-                                        End at Now
-                                    </span>
-                                </label>
-                            </div>
-                        {/if}
-
-                        <div class="space-y-3">
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="start-date"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50"
-                                            >Start Date</span
-                                        >
-                                    </label>
-                                    <input
-                                        id="start-date"
-                                        type="date"
-                                        bind:value={startDate}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
-                                        disabled={useLastTaskStart}
-                                    />
-                                </div>
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="end-date"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50"
-                                            >End Date</span
-                                        >
-                                    </label>
-                                    <input
-                                        id="end-date"
-                                        type="date"
-                                        bind:value={endDate}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
-                                            ? 'input-success'
-                                            : ''}"
-                                        disabled={liveEndTime}
-                                    />
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="start-time"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50 flex items-center gap-1"
-                                        >
-                                            <Clock class="w-3 h-3" /> From
-                                        </span>
-                                    </label>
-                                    <input
-                                        id="start-time"
-                                        type="time"
-                                        step="1"
-                                        bind:value={startTime}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary"
-                                        disabled={useLastTaskStart}
-                                    />
-                                </div>
-                                <div class="form-control">
-                                    <label
-                                        class="label py-0 pb-1"
-                                        for="end-time"
-                                    >
-                                        <span
-                                            class="label-text text-xs opacity-50 flex items-center gap-1"
-                                        >
-                                            <Clock class="w-3 h-3" /> To
-                                            {#if liveEndTime}
-                                                <span
-                                                    class="badge badge-xs badge-success"
-                                                    >LIVE</span
-                                                >
-                                            {/if}
-                                        </span>
-                                    </label>
-                                    <input
-                                        id="end-time"
-                                        type="time"
-                                        step="1"
-                                        bind:value={endTime}
-                                        class="input input-sm input-bordered w-full transition-all duration-200 focus:border-primary {liveEndTime
-                                            ? 'input-success font-mono'
-                                            : ''}"
-                                        disabled={liveEndTime}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-
+                <ScheduleSection
+                    bind:startDate
+                    bind:endDate
+                    bind:startTime
+                    bind:endTime
+                    bind:liveEndTime
+                    bind:useLastTaskStart
+                    {isEditing}
+                    {lastTaskEndTime}
+                    onStartDateChange={(v) => (startDate = v)}
+                    onEndDateChange={(v) => (endDate = v)}
+                    onStartTimeChange={(v) => (startTime = v)}
+                    onEndTimeChange={(v) => (endTime = v)}
+                    onLiveEndTimeChange={(v) => (liveEndTime = v)}
+                    onUseLastTaskStartChange={(v) => (useLastTaskStart = v)}
+                />
                 <!-- Goals Section -->
                 <Card
                     variant="bordered"
@@ -1863,54 +945,7 @@
                 </Card>
 
                 <!-- Priority -->
-                <Card
-                    variant="bordered"
-                    class="transition-all duration-200 hover:shadow-md"
-                >
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                            <CircleAlert class="w-4 h-4 opacity-50" />
-                            <span
-                                class="text-xs font-semibold uppercase opacity-50"
-                                >Priority</span
-                            >
-                        </div>
-                        <span
-                            class={cn(
-                                "badge badge-sm",
-                                priorityColors[priority],
-                            )}>{priorityLabels[priority]}</span
-                        >
-                    </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="5"
-                        bind:value={priority}
-                        class="range range-sm range-primary w-full transition-all duration-200"
-                        step="1"
-                    />
-                    <div
-                        class="relative h-5 text-[10px] mt-1.5 opacity-50 mx-0.5"
-                    >
-                        {#each priorityLabels as label, i}
-                            <span
-                                class="absolute top-0 whitespace-nowrap"
-                                style="
-                                    left: {(i / (priorityLabels.length - 1)) *
-                                    100}%;
-                                    transform: translateX({i === 0
-                                    ? '0%'
-                                    : i === priorityLabels.length - 1
-                                      ? '-100%'
-                                      : '-50%'});
-                                "
-                            >
-                                {label}
-                            </span>
-                        {/each}
-                    </div>
-                </Card>
+                <TaskPrioritySlider bind:value={priority} />
             </div>
         </div>
     </div>

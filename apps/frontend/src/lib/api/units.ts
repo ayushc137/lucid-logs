@@ -1,7 +1,7 @@
 // Units API client
 // Provides CRUD operations for unit management
 
-import { api } from "./client";
+import { api, unwrap } from "./client";
 
 // =============================================================================
 // TYPES
@@ -46,28 +46,28 @@ export async function getUnits(systemOnly?: boolean): Promise<UnitListResponse> 
         params.set("system_only", String(systemOnly));
     }
     const query = params.toString();
-    return api.get(`units${query ? `?${query}` : ""}`).json();
+    return unwrap<UnitListResponse>(api.get(`units${query ? `?${query}` : ""}`));
 }
 
 /**
  * Get a single unit by ID
  */
 export async function getUnit(id: string): Promise<Unit> {
-    return api.get(`units/${id}`).json();
+    return unwrap<Unit>(api.get(`units/${id}`));
 }
 
 /**
  * Create a custom unit
  */
 export async function createUnit(data: CreateUnitRequest): Promise<Unit> {
-    return api.post("units", { json: data }).json();
+    return unwrap<Unit>(api.post("units", { json: data }));
 }
 
 /**
  * Update a custom unit
  */
 export async function updateUnit(id: string, data: UpdateUnitRequest): Promise<Unit> {
-    return api.put(`units/${id}`, { json: data }).json();
+    return unwrap<Unit>(api.put(`units/${id}`, { json: data }));
 }
 
 /**
