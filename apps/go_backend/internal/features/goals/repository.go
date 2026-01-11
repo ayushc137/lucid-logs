@@ -701,7 +701,7 @@ func (r *repository) FindRecurringForDate(ctx context.Context, userID string, da
 // =============================================================================
 
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Goal, error) {
-	now := time.Now().UTC()
+	now := time.Now()
 
 	createData := map[string]any{
 		"created_by":  userID,

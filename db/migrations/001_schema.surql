@@ -113,7 +113,7 @@ DEFINE INDEX IF NOT EXISTS idx_task_goals_impact ON TABLE task_goals COLUMNS out
 DEFINE INDEX IF NOT EXISTS idx_task_goals_milestone ON TABLE task_goals COLUMNS out, is_milestone;
 
 -- GOAL_LOGS (goals -> goal_snapshots) event history
-DEFINE TABLE goal_logs TYPE RELATION IN goals PERMISSIONS FULL;
+DEFINE TABLE goal_logs PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS event_type ON goal_logs TYPE string;
 DEFINE FIELD IF NOT EXISTS changes ON goal_logs TYPE option<object>;
 DEFINE FIELD IF NOT EXISTS triggered_by_task_id ON goal_logs TYPE option<string>;

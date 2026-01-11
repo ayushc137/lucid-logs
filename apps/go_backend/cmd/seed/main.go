@@ -277,7 +277,7 @@ func resetSeededData(ctx context.Context, db *database.DB, userID string) error 
 }
 
 func seedUnits(ctx context.Context, db *database.DB) error {
-	now := time.Now().UTC()
+	now := time.Now()
 	units := []struct {
 		id, name, symbol, unitType string
 	}{
@@ -1034,8 +1034,8 @@ func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, 
 	// Track streaks state in memory to simulate realistic progression
 	streaks := make(map[string]int)
 
-	// Seed past 20 days + today + 3 future days (focus on density per day, not length)
-	for dayOffset := -20; dayOffset <= 3; dayOffset++ {
+	// Seed past 20 days + today + 7 future days (focus on density per day, not length)
+	for dayOffset := -20; dayOffset <= 7; dayOffset++ {
 		day := now.AddDate(0, 0, dayOffset)
 		tasks, links := seedTasksForDay(ctx, db, day, dayOffset, categories, goals, templates, streaks, userID)
 		totalTasks += tasks
@@ -2457,7 +2457,13 @@ func createTaskWithDetails(day time.Time, hour, minute, durationMin int, title, 
 		return false
 	}
 
-	if completed {
+	// Determine completion based on time (mostly complete past, sparse incomplete)
+	shouldComplete := false
+	if startTime.Before(time.Now()) {
+		shouldComplete = rand.Float32() < 0.90
+	}
+
+	if shouldComplete {
 		if taskID, ok := resp["id"].(string); ok {
 			idPart := strings.TrimPrefix(taskID, "tasks:")
 			//nolint:errcheck // ignore PUT errors
@@ -2526,7 +2532,13 @@ func createTaskWithDetailsAndJournal(day time.Time, hour, minute, durationMin in
 		return false
 	}
 
-	if completed {
+	// Determine completion based on time (mostly complete past, sparse incomplete)
+	shouldComplete := false
+	if startTime.Before(time.Now()) {
+		shouldComplete = rand.Float32() < 0.90
+	}
+
+	if shouldComplete {
 		if taskID, ok := resp["id"].(string); ok {
 			idPart := strings.TrimPrefix(taskID, "tasks:")
 			//nolint:errcheck // ignore PUT errors
@@ -2589,7 +2601,13 @@ func createTaskWithEmotionAndReflections(day time.Time, hour, minute, durationMi
 		return false
 	}
 
-	if completed {
+	// Determine completion based on time (mostly complete past, sparse incomplete)
+	shouldComplete := false
+	if startTime.Before(time.Now()) {
+		shouldComplete = rand.Float32() < 0.90
+	}
+
+	if shouldComplete {
 		if taskID, ok := resp["id"].(string); ok {
 			idPart := strings.TrimPrefix(taskID, "tasks:")
 			//nolint:errcheck // ignore PUT errors

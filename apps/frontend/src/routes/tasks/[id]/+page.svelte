@@ -21,9 +21,9 @@
 
     // Fetch task data
     const taskOptions = writable({
-        queryKey: ["task", taskId],
-        queryFn: () => getTask(taskId!),
-        enabled: !!taskId,
+        queryKey: ["task", null as string | null | undefined],
+        queryFn: () => Promise.reject(new Error("No task ID")) as Promise<Task>,
+        enabled: false,
     });
 
     $effect(() => {

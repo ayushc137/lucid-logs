@@ -263,37 +263,4 @@ create cub components for all huge components where ever its sensable throughtou
 
 
 
-
-help me fix:
-
-vice=lucid-logs-api version=1.0.0
-2026-01-11T12:15:49+05:30 ERR SDK Query failed error="There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n" component=database query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:49+05:30 ERR Database operation failed error="DATABASE_ERROR: Database operation failed (There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n)" code=DATABASE_ERROR service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:49+05:30 ERR request bytes=123 duration=1.518046 method=GET path=/api/v1/goals/goals:9hlbnicdi1w5ipk82qz2/logs remote_addr=::1 service=lucid-logs-api status=500 trace_id=6c4c8a79-11c0-4255-b13d-731522e48c79 user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" user_id=users:fhqumoikacf055k0z8sf version=1.0.0
-2026-01-11T12:15:50+05:30 DBG SDK Query executed component=database duration=1.470408 query="SELECT count() as count FROM goal_logs WHERE in = $goal_id AND created_by = $user" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 DBG SDK Query executed component=database duration=0.637979 query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR SDK Query failed error="There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n" component=database query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR Database operation failed error="DATABASE_ERROR: Database operation failed (There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n)" code=DATABASE_ERROR service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR request bytes=123 duration=2.387482 method=GET path=/api/v1/goals/goals:9hlbnicdi1w5ipk82qz2/logs remote_addr=::1 service=lucid-logs-api status=500 trace_id=6789f8f2-2719-4702-8e0e-eacc6f4463d5 user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" user_id=users:fhqumoikacf055k0z8sf version=1.0.0
-2026-01-11T12:15:50+05:30 DBG SDK Query executed component=database duration=1.357215 query="SELECT count() as count FROM goal_logs WHERE in = $goal_id AND created_by = $user" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 DBG SDK Query executed component=database duration=0.634285 query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR SDK Query failed error="There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n" component=database query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR Database operation failed error="DATABASE_ERROR: Database operation failed (There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n)" code=DATABASE_ERROR service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR request bytes=123 duration=2.288179 method=GET path=/api/v1/goals/goals:9hlbnicdi1w5ipk82qz2/logs remote_addr=::1 service=lucid-logs-api status=500 trace_id=e35f6777-7ee2-4527-ad31-ca199c13f01d user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" user_id=users:fhqumoikacf055k0z8sf version=1.0.0
-2026-01-11T12:15:50+05:30 DBG SDK Query executed component=database duration=1.684002 query="SELECT count() as count FROM goal_logs WHERE in = $goal_id AND created_by = $user" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 DBG SDK Query executed component=database duration=0.36036 query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR SDK Query failed error="There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n" component=database query="SELECT * FROM goal_logs WHERE in = $goal_id AND created_by = $user ORDER BY created_at DESC LIMIT $limit OFFSET $offset" service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR Database operation failed error="DATABASE_ERROR: Database operation failed (There was a problem with the database: Parse error: Unexpected token `an identifier`, expected Eof\n --> [5:16]\n  |\n5 | LIMIT $limit OFFSET $offset\n  |              ^^^^^^ \n)" code=DATABASE_ERROR service=lucid-logs-api version=1.0.0
-2026-01-11T12:15:50+05:30 ERR request bytes=123 duration=2.352251 method=GET path=/api/v1/goals/goals:9hlbnicdi1w5ipk82qz2/logs remote_addr=::1 service=lucid-logs-api status=500 trace_id=03388723-fa36-4b98-897b-0bb9720a7643 user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" user_id=users:fhqumoikacf055k0z8sf version=1.0.0
-12:16:42 PM [vite] (client) hmr update
-
-
-
-
-
-
-
-
-
-
-fix seed errors :
+timezone settings throughtout --- > need to change 

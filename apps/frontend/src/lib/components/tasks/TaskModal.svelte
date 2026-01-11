@@ -74,7 +74,7 @@
     const lastTaskEndTimeOptions = writable({
         queryKey: ["tasks", "last-end-time"],
         queryFn: getLastTaskEndTime,
-        enabled: open && !task,
+        enabled: false,
     });
 
     $effect(() => {

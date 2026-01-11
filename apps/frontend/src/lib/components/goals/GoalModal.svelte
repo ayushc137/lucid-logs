@@ -101,12 +101,10 @@
     // Fetch goal logs when editing
     // Fetch goal logs when editing
     const logsOptions = writable({
-        queryKey: ["goal-logs", goalId],
+        queryKey: ["goal-logs", null as string | null | undefined],
         queryFn: () =>
-            goalId
-                ? getGoalLogs(goalId, { limit: 50 })
-                : Promise.resolve({ goal_id: "", logs: [], total: 0 }),
-        enabled: !!goalId && open,
+            Promise.resolve({ goal_id: "", logs: [] as any[], total: 0 }),
+        enabled: false,
     });
 
     $effect(() => {

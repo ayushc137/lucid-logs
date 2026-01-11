@@ -319,11 +319,13 @@
         <!-- Title & Icon Row -->
         <div class="flex gap-3">
             <div class="flex flex-col gap-1">
-                <label class="text-xs font-semibold uppercase opacity-50"
-                    >Icon</label
+                <label
+                    class="text-xs font-semibold uppercase opacity-50"
+                    for="template-icon-picker">Icon</label
                 >
                 <button
                     type="button"
+                    id="template-icon-picker"
                     class="w-12 h-12 rounded-xl border-2 border-dashed border-base-300 hover:border-secondary/50 flex items-center justify-center text-2xl transition-colors"
                     onclick={() => {
                         const emojis = [

@@ -101,7 +101,7 @@ func (s *goalSnapshotDB) toGoalSnapshot() *GoalSnapshot {
 // =============================================================================
 
 func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID string) (*GoalLog, error) {
-	now := time.Now().UTC()
+	now := time.Now()
 	goalID := database.MustRecordID(goals.Table, req.GoalID)
 
 	// First create a snapshot if stats are provided
