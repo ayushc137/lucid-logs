@@ -213,32 +213,6 @@ func NewRouter(cfg Config) *gin.Engine {
 // CORS CONFIGURATION
 // =============================================================================
 
-// corsHandler creates the CORS middleware based on configuration.
-func corsHandler(cfg *config.Config) gin.HandlerFunc {
-	// In development, be extremely permissive but respect AllowCredentials constraint
-	// We cannot use AllowAllOrigins: true with AllowCredentials: true
-	if cfg.IsDev() {
-		return cors.New(cors.Config{
-			AllowOriginFunc: func(origin string) bool {
-				return true
-			},
-			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept", "X-Requested-With"},
-			ExposeHeaders:    []string{"Content-Length", "Content-Type"},
-			AllowCredentials: true,
-			MaxAge:           12 * 3600,
-		})
-	}
-
-	return cors.New(cors.Config{
-		AllowOrigins:     cfg.CORS.AllowedOrigins,
-		AllowMethods:     cfg.CORS.AllowedMethods,
-		AllowHeaders:     cfg.CORS.AllowedHeaders,
-		AllowCredentials: true,
-		MaxAge:           300,
-	})
-}
-
 // =============================================================================
 // API DOCUMENTATION
 // =============================================================================

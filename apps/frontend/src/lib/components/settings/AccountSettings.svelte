@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { authStore } from "$lib/stores/auth.svelte";
-    import { User, Shield } from "lucide-svelte";
+import { authStore } from '$lib/stores/auth.svelte';
+import { Shield, User } from 'lucide-svelte';
 </script>
 
 <div class="space-y-6">

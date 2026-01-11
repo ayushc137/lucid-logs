@@ -19,13 +19,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
+
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 // =============================================================================
@@ -308,11 +309,12 @@ func (g *goalDB) toGoal() *Goal {
 				stats.TodayStatus = TodayStatusExceeded
 			}
 		case OperatorEQ:
-			if stats.CurrentValue == goal.Target.Value {
+			switch {
+			case stats.CurrentValue == goal.Target.Value:
 				stats.TodayStatus = TodayStatusMet
-			} else if stats.CurrentValue > goal.Target.Value {
+			case stats.CurrentValue > goal.Target.Value:
 				stats.TodayStatus = TodayStatusExceeded
-			} else {
+			default:
 				stats.TodayStatus = TodayStatusPending
 			}
 		}
@@ -361,17 +363,17 @@ func anyToInt(v any) int {
 	case float32:
 		return int(n)
 	case int64:
-		return int(n)
+		return int(n) //nolint:gosec // safe cast
 	case int32:
 		return int(n)
 	case int:
 		return n
 	case uint64:
-		return int(n)
+		return int(n) //nolint:gosec // safe cast
 	case uint32:
-		return int(n)
+		return int(n) //nolint:gosec // safe cast
 	case uint:
-		return int(n)
+		return int(n) //nolint:gosec // safe cast
 	default:
 		return 0
 	}
@@ -389,17 +391,17 @@ func mapToRecurrence(m map[string]any) *Recurrence {
 	case float32:
 		r.Frequency = int(v)
 	case int64:
-		r.Frequency = int(v)
+		r.Frequency = int(v) //nolint:gosec // configuration value
 	case int32:
 		r.Frequency = int(v)
 	case int:
 		r.Frequency = v
 	case uint64:
-		r.Frequency = int(v)
+		r.Frequency = int(v) //nolint:gosec // configuration value
 	case uint32:
-		r.Frequency = int(v)
+		r.Frequency = int(v) //nolint:gosec // configuration value
 	case uint:
-		r.Frequency = int(v)
+		r.Frequency = int(v) //nolint:gosec // configuration value
 	}
 	if v, ok := m["period"].(string); ok {
 		r.Period = v
@@ -424,17 +426,17 @@ func mapToRecurrence(m map[string]any) *Recurrence {
 	case float32:
 		r.GraceDays = int(v)
 	case int64:
-		r.GraceDays = int(v)
+		r.GraceDays = int(v) //nolint:gosec // configuration value
 	case int32:
 		r.GraceDays = int(v)
 	case int:
 		r.GraceDays = v
 	case uint64:
-		r.GraceDays = int(v)
+		r.GraceDays = int(v) //nolint:gosec // configuration value
 	case uint32:
-		r.GraceDays = int(v)
+		r.GraceDays = int(v) //nolint:gosec // configuration value
 	case uint:
-		r.GraceDays = int(v)
+		r.GraceDays = int(v) //nolint:gosec // configuration value
 	}
 	return r
 }
@@ -1104,11 +1106,12 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 				stats.TodayStatus = TodayStatusExceeded
 			}
 		case OperatorEQ:
-			if stats.CurrentValue == goal.Target.Value {
+			switch {
+			case stats.CurrentValue == goal.Target.Value:
 				stats.TodayStatus = TodayStatusMet
-			} else if stats.CurrentValue > goal.Target.Value {
+			case stats.CurrentValue > goal.Target.Value:
 				stats.TodayStatus = TodayStatusExceeded
-			} else {
+			default:
 				stats.TodayStatus = TodayStatusPending
 			}
 		}

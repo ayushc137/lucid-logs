@@ -1,31 +1,24 @@
 <script lang="ts">
-    import { Card } from "$lib/components/ui";
-    import { CircleAlert } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { Card } from '$lib/components/ui';
+import { cn } from '$lib/utils';
+import { CircleAlert } from 'lucide-svelte';
 
-    interface Props {
-        value: number;
-        onChange?: (value: number) => void;
-    }
+interface Props {
+	value: number;
+	onChange?: (value: number) => void;
+}
 
-    let { value = $bindable(3), onChange }: Props = $props();
+let { value = $bindable(3), onChange }: Props = $props();
 
-    const priorityLabels = [
-        "None",
-        "Low",
-        "Medium",
-        "High",
-        "Critical",
-        "Urgent",
-    ];
-    const priorityColors = [
-        "badge-ghost",
-        "badge-info",
-        "badge-success",
-        "badge-warning",
-        "badge-error",
-        "badge-error",
-    ];
+const priorityLabels = ['None', 'Low', 'Medium', 'High', 'Critical', 'Urgent'];
+const priorityColors = [
+	'badge-ghost',
+	'badge-info',
+	'badge-success',
+	'badge-warning',
+	'badge-error',
+	'badge-error',
+];
 </script>
 
 <Card variant="bordered" class="transition-all duration-200 hover:shadow-md">

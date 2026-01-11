@@ -1,268 +1,264 @@
 <script lang="ts">
-    import {
-        Calendar,
-        Sunrise,
-        Sun,
-        Sunset,
-        Moon,
-        Coffee,
-        Check,
-    } from "lucide-svelte";
-    import { fade, fly } from "svelte/transition";
-    import { cubicOut } from "svelte/easing";
-    import type { TimelineTask, TimelineProps } from "./types";
+import {
+	Calendar,
+	Check,
+	Coffee,
+	Moon,
+	Sun,
+	Sunrise,
+	Sunset,
+} from 'lucide-svelte';
+import { cubicOut } from 'svelte/easing';
+import { fade, fly } from 'svelte/transition';
+import type { TimelineProps, TimelineTask } from './types';
 
-    // Shared components
-    import DateNavigator from "./DateNavigator.svelte";
-    import CategoryFilter from "./CategoryFilter.svelte";
-    import AgendaTaskCard from "./AgendaTaskCard.svelte";
+import AgendaTaskCard from './AgendaTaskCard.svelte';
+import CategoryFilter from './CategoryFilter.svelte';
+// Shared components
+import DateNavigator from './DateNavigator.svelte';
 
-    let {
-        tasks = [],
-        selectedDate = new Date(),
-        onTaskClick,
-        onDateChange,
-    }: TimelineProps = $props();
+let {
+	tasks = [],
+	selectedDate = new Date(),
+	onTaskClick,
+	onDateChange,
+}: TimelineProps = $props();
 
-    let currentTime = $state(new Date());
+let currentTime = $state(new Date());
 
-    // Category filter state
-    let selectedCategoryFilter = $state<string | null>(null);
+// Category filter state
+let selectedCategoryFilter = $state<string | null>(null);
 
-    // Update current time for task status
-    $effect(() => {
-        const interval = setInterval(() => (currentTime = new Date()), 1000);
-        return () => clearInterval(interval);
-    });
+// Update current time for task status
+$effect(() => {
+	const interval = setInterval(() => (currentTime = new Date()), 1000);
+	return () => clearInterval(interval);
+});
 
-    const isToday = $derived(() => {
-        const t = new Date();
-        return (
-            selectedDate.getFullYear() === t.getFullYear() &&
-            selectedDate.getMonth() === t.getMonth() &&
-            selectedDate.getDate() === t.getDate()
-        );
-    });
+const isToday = $derived(() => {
+	const t = new Date();
+	return (
+		selectedDate.getFullYear() === t.getFullYear() &&
+		selectedDate.getMonth() === t.getMonth() &&
+		selectedDate.getDate() === t.getDate()
+	);
+});
 
-    const dateLabel = $derived(() => {
-        const t = new Date();
-        const y = new Date(t);
-        y.setDate(y.getDate() - 1);
-        const tm = new Date(t);
-        tm.setDate(tm.getDate() + 1);
-        if (isToday()) return "Today";
-        if (selectedDate.toDateString() === y.toDateString())
-            return "Yesterday";
-        if (selectedDate.toDateString() === tm.toDateString())
-            return "Tomorrow";
-        return selectedDate.toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-        });
-    });
+const dateLabel = $derived(() => {
+	const t = new Date();
+	const y = new Date(t);
+	y.setDate(y.getDate() - 1);
+	const tm = new Date(t);
+	tm.setDate(tm.getDate() + 1);
+	if (isToday()) return 'Today';
+	if (selectedDate.toDateString() === y.toDateString()) return 'Yesterday';
+	if (selectedDate.toDateString() === tm.toDateString()) return 'Tomorrow';
+	return selectedDate.toLocaleDateString('en-US', {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+	});
+});
 
-    function formatTime(d: Date): string {
-        if (!(d instanceof Date) || isNaN(d.getTime())) return "--:--";
-        return d.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        });
-    }
+function formatTime(d: Date): string {
+	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
+	return d.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	});
+}
 
-    function formatDuration(s: Date, e: Date): string {
-        if (!(s instanceof Date) || !(e instanceof Date)) return "";
-        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-        if (mins < 1) return `<1m`;
-        if (mins < 60) return `${mins}m`;
-        const h = Math.floor(mins / 60),
-            m = mins % 60;
-        return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    }
+function formatDuration(s: Date, e: Date): string {
+	if (!(s instanceof Date) || !(e instanceof Date)) return '';
+	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+	if (mins < 1) return '<1m';
+	if (mins < 60) return `${mins}m`;
+	const h = Math.floor(mins / 60);
+	const m = mins % 60;
+	return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
-    // --- Categories ---
-    const categories = $derived.by(() => {
-        const catMap = new Map<string, { color: string; count: number }>();
-        tasks.forEach((t) => {
-            if (t.categoryName && t.categoryColor) {
-                const existing = catMap.get(t.categoryName);
-                if (existing) {
-                    existing.count++;
-                } else {
-                    catMap.set(t.categoryName, {
-                        color: t.categoryColor,
-                        count: 1,
-                    });
-                }
-            }
-        });
-        return Array.from(catMap.entries())
-            .map(([name, data]) => ({ name, ...data }))
-            .sort((a, b) => b.count - a.count);
-    });
+// --- Categories ---
+const categories = $derived.by(() => {
+	const catMap = new Map<string, { color: string; count: number }>();
+	tasks.forEach((t) => {
+		if (t.categoryName && t.categoryColor) {
+			const existing = catMap.get(t.categoryName);
+			if (existing) {
+				existing.count++;
+			} else {
+				catMap.set(t.categoryName, {
+					color: t.categoryColor,
+					count: 1,
+				});
+			}
+		}
+	});
+	return Array.from(catMap.entries())
+		.map(([name, data]) => ({ name, ...data }))
+		.sort((a, b) => b.count - a.count);
+});
 
-    // Count uncategorized tasks
-    const uncategorizedCount = $derived(
-        tasks.filter((t) => !t.categoryName).length,
-    );
+// Count uncategorized tasks
+const uncategorizedCount = $derived(
+	tasks.filter((t) => !t.categoryName).length,
+);
 
-    // Filtered tasks - handle "__uncategorized__" special filter
-    const filteredTasks = $derived(
-        selectedCategoryFilter === "__uncategorized__"
-            ? tasks.filter((t) => !t.categoryName)
-            : selectedCategoryFilter
-              ? tasks.filter((t) => t.categoryName === selectedCategoryFilter)
-              : tasks,
-    );
+// Filtered tasks - handle "__uncategorized__" special filter
+const filteredTasks = $derived(
+	selectedCategoryFilter === '__uncategorized__'
+		? tasks.filter((t) => !t.categoryName)
+		: selectedCategoryFilter
+			? tasks.filter((t) => t.categoryName === selectedCategoryFilter)
+			: tasks,
+);
 
-    // --- Time Block Logic ---
-    function getHourFromDate(d: Date): number {
-        return d.getHours();
-    }
+// --- Time Block Logic ---
+function getHourFromDate(d: Date): number {
+	return d.getHours();
+}
 
-    type TimeBlock =
-        | "early-morning"
-        | "morning"
-        | "afternoon"
-        | "evening"
-        | "night";
+type TimeBlock =
+	| 'early-morning'
+	| 'morning'
+	| 'afternoon'
+	| 'evening'
+	| 'night';
 
-    function getTimeBlock(hour: number): TimeBlock {
-        if (hour >= 5 && hour < 9) return "early-morning";
-        if (hour >= 9 && hour < 12) return "morning";
-        if (hour >= 12 && hour < 17) return "afternoon";
-        if (hour >= 17 && hour < 21) return "evening";
-        return "night";
-    }
+function getTimeBlock(hour: number): TimeBlock {
+	if (hour >= 5 && hour < 9) return 'early-morning';
+	if (hour >= 9 && hour < 12) return 'morning';
+	if (hour >= 12 && hour < 17) return 'afternoon';
+	if (hour >= 17 && hour < 21) return 'evening';
+	return 'night';
+}
 
-    function getTimeBlockLabel(block: TimeBlock): string {
-        switch (block) {
-            case "early-morning":
-                return "Early Morning";
-            case "morning":
-                return "Morning";
-            case "afternoon":
-                return "Afternoon";
-            case "evening":
-                return "Evening";
-            case "night":
-                return "Night";
-        }
-    }
+function getTimeBlockLabel(block: TimeBlock): string {
+	switch (block) {
+		case 'early-morning':
+			return 'Early Morning';
+		case 'morning':
+			return 'Morning';
+		case 'afternoon':
+			return 'Afternoon';
+		case 'evening':
+			return 'Evening';
+		case 'night':
+			return 'Night';
+	}
+}
 
-    function getTimeBlockSubLabel(block: TimeBlock): string {
-        switch (block) {
-            case "early-morning":
-                return "5 AM – 9 AM";
-            case "morning":
-                return "9 AM – 12 PM";
-            case "afternoon":
-                return "12 PM – 5 PM";
-            case "evening":
-                return "5 PM – 9 PM";
-            case "night":
-                return "9 PM – 5 AM";
-        }
-    }
+function getTimeBlockSubLabel(block: TimeBlock): string {
+	switch (block) {
+		case 'early-morning':
+			return '5 AM – 9 AM';
+		case 'morning':
+			return '9 AM – 12 PM';
+		case 'afternoon':
+			return '12 PM – 5 PM';
+		case 'evening':
+			return '5 PM – 9 PM';
+		case 'night':
+			return '9 PM – 5 AM';
+	}
+}
 
-    function getTimeBlockIcon(block: TimeBlock) {
-        switch (block) {
-            case "early-morning":
-                return Sunrise;
-            case "morning":
-                return Coffee;
-            case "afternoon":
-                return Sun;
-            case "evening":
-                return Sunset;
-            case "night":
-                return Moon;
-        }
-    }
+function getTimeBlockIcon(block: TimeBlock) {
+	switch (block) {
+		case 'early-morning':
+			return Sunrise;
+		case 'morning':
+			return Coffee;
+		case 'afternoon':
+			return Sun;
+		case 'evening':
+			return Sunset;
+		case 'night':
+			return Moon;
+	}
+}
 
-    function getTimeBlockGradient(block: TimeBlock): string {
-        switch (block) {
-            case "early-morning":
-                return "from-amber-500/15 to-orange-500/5";
-            case "morning":
-                return "from-sky-500/15 to-blue-500/5";
-            case "afternoon":
-                return "from-yellow-500/15 to-amber-500/5";
-            case "evening":
-                return "from-orange-500/15 to-rose-500/5";
-            case "night":
-                return "from-indigo-500/15 to-purple-500/5";
-        }
-    }
+function getTimeBlockGradient(block: TimeBlock): string {
+	switch (block) {
+		case 'early-morning':
+			return 'from-amber-500/15 to-orange-500/5';
+		case 'morning':
+			return 'from-sky-500/15 to-blue-500/5';
+		case 'afternoon':
+			return 'from-yellow-500/15 to-amber-500/5';
+		case 'evening':
+			return 'from-orange-500/15 to-rose-500/5';
+		case 'night':
+			return 'from-indigo-500/15 to-purple-500/5';
+	}
+}
 
-    function getTimeBlockIconBg(block: TimeBlock): string {
-        switch (block) {
-            case "early-morning":
-                return "bg-gradient-to-br from-amber-400 to-orange-500";
-            case "morning":
-                return "bg-gradient-to-br from-sky-400 to-blue-500";
-            case "afternoon":
-                return "bg-gradient-to-br from-yellow-400 to-amber-500";
-            case "evening":
-                return "bg-gradient-to-br from-orange-400 to-rose-500";
-            case "night":
-                return "bg-gradient-to-br from-indigo-400 to-purple-500";
-        }
-    }
+function getTimeBlockIconBg(block: TimeBlock): string {
+	switch (block) {
+		case 'early-morning':
+			return 'bg-gradient-to-br from-amber-400 to-orange-500';
+		case 'morning':
+			return 'bg-gradient-to-br from-sky-400 to-blue-500';
+		case 'afternoon':
+			return 'bg-gradient-to-br from-yellow-400 to-amber-500';
+		case 'evening':
+			return 'bg-gradient-to-br from-orange-400 to-rose-500';
+		case 'night':
+			return 'bg-gradient-to-br from-indigo-400 to-purple-500';
+	}
+}
 
-    // Group tasks by time block (using filtered tasks)
-    const tasksByBlock = $derived.by(() => {
-        const blocks = new Map<TimeBlock, TimelineTask[]>();
-        const valid = filteredTasks.filter(
-            (t) => t.startTime instanceof Date && t.endTime instanceof Date,
-        );
-        const sorted = [...valid].sort(
-            (a, b) => a.startTime.getTime() - b.startTime.getTime(),
-        );
+// Group tasks by time block (using filtered tasks)
+const tasksByBlock = $derived.by(() => {
+	const blocks = new Map<TimeBlock, TimelineTask[]>();
+	const valid = filteredTasks.filter(
+		(t) => t.startTime instanceof Date && t.endTime instanceof Date,
+	);
+	const sorted = [...valid].sort(
+		(a, b) => a.startTime.getTime() - b.startTime.getTime(),
+	);
 
-        for (const task of sorted) {
-            const hour = getHourFromDate(task.startTime);
-            const block = getTimeBlock(hour);
-            if (!blocks.has(block)) {
-                blocks.set(block, []);
-            }
-            blocks.get(block)!.push(task);
-        }
+	for (const task of sorted) {
+		const hour = getHourFromDate(task.startTime);
+		const block = getTimeBlock(hour);
+		if (!blocks.has(block)) {
+			blocks.set(block, []);
+		}
+		blocks.get(block)!.push(task);
+	}
 
-        return blocks;
-    });
+	return blocks;
+});
 
-    // Get blocks in order
-    const blocksInOrder: TimeBlock[] = [
-        "early-morning",
-        "morning",
-        "afternoon",
-        "evening",
-        "night",
-    ];
-    const activeBlocks = $derived(
-        blocksInOrder.filter((b) => tasksByBlock.has(b)),
-    );
+// Get blocks in order
+const blocksInOrder: TimeBlock[] = [
+	'early-morning',
+	'morning',
+	'afternoon',
+	'evening',
+	'night',
+];
+const activeBlocks = $derived(blocksInOrder.filter((b) => tasksByBlock.has(b)));
 
-    // Stats (use filtered tasks)
-    const totalTasks = $derived(filteredTasks.length);
-    const completedTasks = $derived(
-        filteredTasks.filter((t) => t.completed).length,
-    );
+// Stats (use filtered tasks)
+const totalTasks = $derived(filteredTasks.length);
+const completedTasks = $derived(
+	filteredTasks.filter((t) => t.completed).length,
+);
 
-    const currentBlock = $derived(getTimeBlock(currentTime.getHours()));
+const currentBlock = $derived(getTimeBlock(currentTime.getHours()));
 
-    function getTaskStatus(task: TimelineTask): "past" | "current" | "future" {
-        if (!isToday()) return "future";
-        const now = currentTime.getTime();
-        const start = task.startTime.getTime();
-        const end = task.endTime.getTime();
+function getTaskStatus(task: TimelineTask): 'past' | 'current' | 'future' {
+	if (!isToday()) return 'future';
+	const now = currentTime.getTime();
+	const start = task.startTime.getTime();
+	const end = task.endTime.getTime();
 
-        if (now >= start && now <= end) return "current";
-        if (now > end) return "past";
-        return "future";
-    }
+	if (now >= start && now <= end) return 'current';
+	if (now > end) return 'past';
+	return 'future';
+}
 </script>
 
 <div

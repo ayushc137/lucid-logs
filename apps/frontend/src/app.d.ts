@@ -14,10 +14,15 @@ declare global {
 		interface IntrinsicElements {
 			'emoji-picker': {
 				class?: string;
-				'onemoji-click'?: (event: CustomEvent<{ unicode: string; emoji: { annotation: string } }>) => void;
+				'onemoji-click'?: (
+					event: CustomEvent<{
+						unicode: string;
+						emoji: { annotation: string };
+					}>,
+				) => void;
 			};
 		}
 	}
 }
 
-export { };
+export {};

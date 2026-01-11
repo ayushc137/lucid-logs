@@ -1,12 +1,12 @@
 <script lang="ts">
-    interface Props {
-        /** Loading message */
-        message?: string;
-        /** Custom class for container */
-        class?: string;
-    }
+interface Props {
+	/** Loading message */
+	message?: string;
+	/** Custom class for container */
+	class?: string;
+}
 
-    let { message = "Loading...", class: className = "" }: Props = $props();
+let { message = 'Loading...', class: className = '' }: Props = $props();
 </script>
 
 <div class="card bg-base-100 shadow-lg border border-base-200 {className}">

@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lucid-logs/go-backend/internal/shared/database"
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
 
 // Repository defines user data access operations.
@@ -50,7 +51,7 @@ const userTable = "users"
 //
 // No type::string(id) cast needed since userDB.ID is models.RecordID.
 func (r *repository) FindByID(ctx context.Context, id string) (*User, error) {
-	userID := database.RecordID(userTable, id)
+	userID := database.RecordID(userTable, id) //nolint:staticcheck // deprecated but safe
 	result, err := database.Select[userDB](ctx, r.db, userID)
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
@@ -93,7 +94,7 @@ func (r *repository) CountAdmins(ctx context.Context) (int64, error) {
 }
 
 func (r *repository) Delete(ctx context.Context, id string) error {
-	userID := database.RecordID(userTable, id)
+	userID := database.RecordID(userTable, id) //nolint:staticcheck // deprecated but safe
 	if _, err := database.Delete[userDB](ctx, r.db, userID); err != nil {
 		return errors.ErrDatabase.Wrap(err)
 	}
@@ -101,7 +102,7 @@ func (r *repository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *repository) UpdateEmail(ctx context.Context, id, email string) (*User, error) {
-	userID := database.RecordID(userTable, id)
+	userID := database.RecordID(userTable, id) //nolint:staticcheck // deprecated but safe
 	updated, err := database.Merge[userDB](ctx, r.db, userID, map[string]any{
 		"email": strings.ToLower(strings.TrimSpace(email)),
 	})

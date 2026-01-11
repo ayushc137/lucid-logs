@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/features/analytics"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -101,7 +102,10 @@ func (s *service) Generate(ctx context.Context, userID string, req *GenerateRequ
 	start, end := s.resolveDateRange(req)
 
 	// Check if already exists
-	existing, _ := s.repo.FindByDateRange(ctx, userID, req.RetroType, start, end)
+	existing, err := s.repo.FindByDateRange(ctx, userID, req.RetroType, start, end)
+	if err != nil && !errors.Is(err, errors.ErrNotFound) {
+		return nil, err
+	}
 	if existing != nil {
 		s.logger.Info().Str("retro_id", existing.ID).Msg("retrospective already exists")
 		return existing, nil
@@ -218,7 +222,7 @@ func (s *service) computeAutoSummary(ctx context.Context, userID string, start, 
 		summary.Tasks = TasksSummary{
 			Completed:          taskMetrics.CompletedTasks,
 			Postponed:          taskMetrics.PostponedTasks,
-			Cancelled:          taskMetrics.AbandonedTasks,
+			Canceled:           taskMetrics.AbandonedTasks,
 			TotalDurationHours: taskMetrics.TotalDurationHours,
 		}
 		// Add category breakdown
@@ -284,7 +288,7 @@ func (s *service) computeAutoSummary(ctx context.Context, userID string, start, 
 // HELPERS
 // =============================================================================
 
-func (s *service) resolveDateRange(req *GenerateRequest) (time.Time, time.Time) {
+func (s *service) resolveDateRange(req *GenerateRequest) (start, end time.Time) {
 	now := time.Now().UTC()
 
 	switch req.RetroType {

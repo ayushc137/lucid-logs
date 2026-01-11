@@ -1,33 +1,33 @@
 <script lang="ts">
-    import type { Component } from "svelte";
-    import { Plus } from "lucide-svelte";
+import { Plus } from 'lucide-svelte';
+import type { Component } from 'svelte';
 
-    interface Props {
-        /** Page title */
-        title: string;
-        /** Subtitle/description */
-        subtitle?: string;
-        /** Icon component from lucide-svelte */
-        icon?: Component<{ class?: string }>;
-        /** Show add button */
-        showAddButton?: boolean;
-        /** Add button label */
-        addButtonLabel?: string;
-        /** Add button click handler */
-        onAdd?: () => void;
-        /** Custom class for container */
-        class?: string;
-    }
+interface Props {
+	/** Page title */
+	title: string;
+	/** Subtitle/description */
+	subtitle?: string;
+	/** Icon component from lucide-svelte */
+	icon?: Component<{ class?: string }>;
+	/** Show add button */
+	showAddButton?: boolean;
+	/** Add button label */
+	addButtonLabel?: string;
+	/** Add button click handler */
+	onAdd?: () => void;
+	/** Custom class for container */
+	class?: string;
+}
 
-    let {
-        title,
-        subtitle = "",
-        icon: Icon,
-        showAddButton = false,
-        addButtonLabel = "Add",
-        onAdd,
-        class: className = "",
-    }: Props = $props();
+let {
+	title,
+	subtitle = '',
+	icon: Icon,
+	showAddButton = false,
+	addButtonLabel = 'Add',
+	onAdd,
+	class: className = '',
+}: Props = $props();
 </script>
 
 <div

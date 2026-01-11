@@ -5,13 +5,12 @@
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-
-    .emotion-cell,
-    .emotion-shape,
-    .emotion-blob {
-        animation: none !important;
-        transition-duration: 0.01ms !important;
-    }
+	.emotion-cell,
+	.emotion-shape,
+	.emotion-blob {
+		animation: none !important;
+		transition-duration: 0.01ms !important;
+	}
 }
 
 /* =============================================================================
@@ -20,150 +19,145 @@
 
 /* Gentle breathing animation for shapes */
 @keyframes emotion-breathe {
+	0%,
+	100% {
+		transform: scale(1);
+	}
 
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.03);
-    }
+	50% {
+		transform: scale(1.03);
+	}
 }
 
 /* Subtle wobble for blob morph */
 @keyframes emotion-wobble {
+	0%,
+	100% {
+		transform: rotate(0deg) scale(1);
+	}
 
-    0%,
-    100% {
-        transform: rotate(0deg) scale(1);
-    }
+	25% {
+		transform: rotate(1deg) scale(1.01);
+	}
 
-    25% {
-        transform: rotate(1deg) scale(1.01);
-    }
-
-    75% {
-        transform: rotate(-1deg) scale(0.99);
-    }
+	75% {
+		transform: rotate(-1deg) scale(0.99);
+	}
 }
 
 /* Wave distortion for blob */
 @keyframes emotion-wave {
+	0%,
+	100% {
+		border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+	}
 
-    0%,
-    100% {
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-    }
+	25% {
+		border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+	}
 
-    25% {
-        border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
-    }
+	50% {
+		border-radius: 50% 60% 30% 60% / 30% 40% 70% 60%;
+	}
 
-    50% {
-        border-radius: 50% 60% 30% 60% / 30% 40% 70% 60%;
-    }
-
-    75% {
-        border-radius: 60% 40% 50% 40% / 60% 50% 40% 60%;
-    }
+	75% {
+		border-radius: 60% 40% 50% 40% / 60% 50% 40% 60%;
+	}
 }
 
 /* Selection snap animation */
 @keyframes emotion-select-snap {
-    0% {
-        transform: scale(1);
-    }
+	0% {
+		transform: scale(1);
+	}
 
-    30% {
-        transform: scale(1.12);
-    }
+	30% {
+		transform: scale(1.12);
+	}
 
-    60% {
-        transform: scale(0.95);
-    }
+	60% {
+		transform: scale(0.95);
+	}
 
-    100% {
-        transform: scale(1);
-    }
+	100% {
+		transform: scale(1);
+	}
 }
 
 /* Glow pulse for selected state */
 @keyframes emotion-glow-pulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 3px currentColor, 0 0 20px currentColor;
+		opacity: 0.8;
+	}
 
-    0%,
-    100% {
-        box-shadow: 0 0 0 3px currentColor, 0 0 20px currentColor;
-        opacity: 0.8;
-    }
-
-    50% {
-        box-shadow: 0 0 0 4px currentColor, 0 0 30px currentColor;
-        opacity: 1;
-    }
+	50% {
+		box-shadow: 0 0 0 4px currentColor, 0 0 30px currentColor;
+		opacity: 1;
+	}
 }
 
 /* Entry animation for cells */
 @keyframes emotion-cell-enter {
-    0% {
-        opacity: 0;
-        transform: scale(0.8) translateY(10px);
-    }
+	0% {
+		opacity: 0;
+		transform: scale(0.8) translateY(10px);
+	}
 
-    100% {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
+	100% {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
 }
 
 /* Modal fade in */
 @keyframes emotion-modal-enter {
-    0% {
-        opacity: 0;
-        transform: scale(0.95);
-    }
+	0% {
+		opacity: 0;
+		transform: scale(0.95);
+	}
 
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
 }
 
 /* Modal fade out */
 @keyframes emotion-modal-exit {
-    0% {
-        opacity: 1;
-        transform: scale(1);
-    }
+	0% {
+		opacity: 1;
+		transform: scale(1);
+	}
 
-    100% {
-        opacity: 0;
-        transform: scale(0.95);
-    }
+	100% {
+		opacity: 0;
+		transform: scale(0.95);
+	}
 }
 
 /* Floating/hover elevation */
 @keyframes emotion-float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
 
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-3px);
-    }
+	50% {
+		transform: translateY(-3px);
+	}
 }
 
 /* Shimmer effect for glass cards */
 @keyframes emotion-shimmer {
-    0% {
-        background-position: -200% 0;
-    }
+	0% {
+		background-position: -200% 0;
+	}
 
-    100% {
-        background-position: 200% 0;
-    }
+	100% {
+		background-position: 200% 0;
+	}
 }
 
 /* =============================================================================
@@ -171,74 +165,72 @@
    ============================================================================= */
 
 .emotion-animate-breathe {
-    animation: emotion-breathe 3s ease-in-out infinite;
+	animation: emotion-breathe 3s ease-in-out infinite;
 }
 
 .emotion-animate-wobble {
-    animation: emotion-wobble 4s ease-in-out infinite;
+	animation: emotion-wobble 4s ease-in-out infinite;
 }
 
 .emotion-animate-wave {
-    animation: emotion-wave 6s ease-in-out infinite;
+	animation: emotion-wave 6s ease-in-out infinite;
 }
 
 .emotion-animate-float {
-    animation: emotion-float 3s ease-in-out infinite;
+	animation: emotion-float 3s ease-in-out infinite;
 }
 
 .emotion-snap-select {
-    animation: emotion-select-snap 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+	animation: emotion-select-snap 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .emotion-glow-selected {
-    animation: emotion-glow-pulse 2s ease-in-out infinite;
+	animation: emotion-glow-pulse 2s ease-in-out infinite;
 }
 
 .emotion-cell-animate {
-    animation: emotion-cell-enter 0.3s ease-out forwards;
+	animation: emotion-cell-enter 0.3s ease-out forwards;
 }
-
-
 
 /* =============================================================================
    SHARED LAYOUT UTILITIES
    ============================================================================= */
 
 .emotion-grid-container {
-    display: grid;
-    gap: 8px;
+	display: grid;
+	gap: 8px;
 }
 
 .emotion-grid-5x5 {
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(5, 1fr);
+	grid-template-columns: repeat(5, 1fr);
+	grid-template-rows: repeat(5, 1fr);
 }
 
 .emotion-grid-10x10 {
-    grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(10, 1fr);
+	grid-template-columns: repeat(10, 1fr);
+	grid-template-rows: repeat(10, 1fr);
 }
 
 /* Focus visible styles for accessibility */
 .emotion-cell:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
-    z-index: 10;
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+	z-index: 10;
 }
 
 /* Selection ring */
 .emotion-selected {
-    position: relative;
+	position: relative;
 }
 
 .emotion-selected::after {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: inherit;
-    border: 2px solid currentColor;
-    pointer-events: none;
-    animation: emotion-glow-pulse 2s ease-in-out infinite;
+	content: "";
+	position: absolute;
+	inset: -4px;
+	border-radius: inherit;
+	border: 2px solid currentColor;
+	pointer-events: none;
+	animation: emotion-glow-pulse 2s ease-in-out infinite;
 }
 
 /* =============================================================================
@@ -249,95 +241,91 @@
 /* Yellow: Energetic, expansive */
 /* Yellow: Energetic, expansive */
 @keyframes morph-yellow {
+	0%,
+	100% {
+		border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+	}
 
-    0%,
-    100% {
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-    }
+	25% {
+		border-radius: 45% 55% 50% 50% / 55% 45% 50% 50%;
+	}
 
-    25% {
-        border-radius: 45% 55% 50% 50% / 55% 45% 50% 50%;
-    }
+	50% {
+		border-radius: 50% 50% 60% 40% / 50% 50% 40% 60%;
+		transform: scale(1.05);
+	}
 
-    50% {
-        border-radius: 50% 50% 60% 40% / 50% 50% 40% 60%;
-        transform: scale(1.05);
-    }
-
-    75% {
-        border-radius: 55% 45% 50% 50% / 45% 55% 50% 50%;
-    }
+	75% {
+		border-radius: 55% 45% 50% 50% / 45% 55% 50% 50%;
+	}
 }
 
 /* Red: Tense, jagged, erratic */
 @keyframes morph-red {
+	0%,
+	100% {
+		border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
+	}
 
-    0%,
-    100% {
-        border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
-    }
+	20% {
+		border-radius: 20% 80% 30% 70% / 70% 30% 80% 20%;
+	}
 
-    20% {
-        border-radius: 20% 80% 30% 70% / 70% 30% 80% 20%;
-    }
+	40% {
+		border-radius: 80% 20% 70% 30% / 30% 70% 20% 80%;
+	}
 
-    40% {
-        border-radius: 80% 20% 70% 30% / 30% 70% 20% 80%;
-    }
+	60% {
+		border-radius: 30% 70% 20% 80% / 80% 20% 70% 30%;
+	}
 
-    60% {
-        border-radius: 30% 70% 20% 80% / 80% 20% 70% 30%;
-    }
-
-    80% {
-        border-radius: 70% 30% 80% 20% / 20% 80% 30% 70%;
-    }
+	80% {
+		border-radius: 70% 30% 80% 20% / 20% 80% 30% 70%;
+	}
 }
 
 /* Blue: Slow, liquid, heavy */
 @keyframes morph-blue {
+	0%,
+	100% {
+		border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+	}
 
-    0%,
-    100% {
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-    }
+	33% {
+		border-radius: 70% 30% 50% 50% / 30% 70% 50% 50%;
+	}
 
-    33% {
-        border-radius: 70% 30% 50% 50% / 30% 70% 50% 50%;
-    }
-
-    66% {
-        border-radius: 30% 70% 70% 30% / 70% 30% 30% 70%;
-    }
+	66% {
+		border-radius: 30% 70% 70% 30% / 70% 30% 30% 70%;
+	}
 }
 
 /* Green: Balanced, organic, breathing */
 @keyframes morph-green {
+	0%,
+	100% {
+		border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
+		transform: scale(1);
+	}
 
-    0%,
-    100% {
-        border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
-        transform: scale(1);
-    }
-
-    50% {
-        border-radius: 40% 60% 60% 40% / 40% 60% 60% 40%;
-        transform: scale(1.02);
-    }
+	50% {
+		border-radius: 40% 60% 60% 40% / 40% 60% 60% 40%;
+		transform: scale(1.02);
+	}
 }
 
 .morph-yellow-anim {
-    animation: morph-yellow 2s ease-in-out infinite;
+	animation: morph-yellow 2s ease-in-out infinite;
 }
 
 .morph-red-anim {
-    animation: morph-red 0.8s linear infinite;
+	animation: morph-red 0.8s linear infinite;
 }
 
 .morph-blue-anim {
-    animation: morph-blue 6s ease-in-out infinite;
+	animation: morph-blue 6s ease-in-out infinite;
 }
 
 .morph-green-anim {
-    animation: morph-green 4s ease-in-out infinite;
+	animation: morph-green 4s ease-in-out infinite;
 }

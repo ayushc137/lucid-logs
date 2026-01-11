@@ -1,50 +1,50 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
-  import {
-    Home,
-    ListTodo,
-    Target,
-    Zap,
-    Calendar,
-    BarChart3,
-    Settings,
-    ChevronLeft,
-    ChevronRight,
-    LogOut,
-    Palette,
-    Check,
-  } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import { authStore } from "$lib/stores/auth.svelte";
-  import { themeStore, THEMES } from "$lib/stores";
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+import { THEMES, themeStore } from '$lib/stores';
+import { authStore } from '$lib/stores/auth.svelte';
+import { cn } from '$lib/utils';
+import {
+	BarChart3,
+	Calendar,
+	Check,
+	ChevronLeft,
+	ChevronRight,
+	Home,
+	ListTodo,
+	LogOut,
+	Palette,
+	Settings,
+	Target,
+	Zap,
+} from 'lucide-svelte';
 
-  interface Props {
-    collapsed?: boolean;
-    onToggle?: () => void;
-  }
+interface Props {
+	collapsed?: boolean;
+	onToggle?: () => void;
+}
 
-  let { collapsed = $bindable(false), onToggle }: Props = $props();
+let { collapsed = $bindable(false), onToggle }: Props = $props();
 
-  const navItems = [
-    { href: "/", icon: Home, label: "Dashboard" },
-    { href: "/tasks", icon: ListTodo, label: "Tasks" },
-    { href: "/categories", icon: Palette, label: "Categories" },
-    { href: "/goals", icon: Target, label: "Goals" },
-    { href: "/templates", icon: Zap, label: "Templates" },
-    { href: "/retrospectives", icon: Calendar, label: "Retrospectives" },
-    { href: "/analytics", icon: BarChart3, label: "Analytics" },
-  ] as const;
+const navItems = [
+	{ href: '/', icon: Home, label: 'Dashboard' },
+	{ href: '/tasks', icon: ListTodo, label: 'Tasks' },
+	{ href: '/categories', icon: Palette, label: 'Categories' },
+	{ href: '/goals', icon: Target, label: 'Goals' },
+	{ href: '/templates', icon: Zap, label: 'Templates' },
+	{ href: '/retrospectives', icon: Calendar, label: 'Retrospectives' },
+	{ href: '/analytics', icon: BarChart3, label: 'Analytics' },
+] as const;
 
-  function isActive(href: string): boolean {
-    if (href === "/") return $page.url.pathname === "/";
-    return $page.url.pathname.startsWith(href);
-  }
+function isActive(href: string): boolean {
+	if (href === '/') return $page.url.pathname === '/';
+	return $page.url.pathname.startsWith(href);
+}
 
-  function handleLogout() {
-    authStore.logout();
-    goto("/login");
-  }
+function handleLogout() {
+	authStore.logout();
+	goto('/login');
+}
 </script>
 
 <aside

@@ -1,33 +1,33 @@
 <script lang="ts">
-    import { Plus } from "lucide-svelte";
-    import type { Snippet } from "svelte";
+import { Plus } from 'lucide-svelte';
+import type { Snippet } from 'svelte';
 
-    interface Props {
-        /** Main title */
-        title: string;
-        /** Description text */
-        description: string;
-        /** Show action button */
-        showButton?: boolean;
-        /** Button label */
-        buttonLabel?: string;
-        /** Button click handler */
-        onButtonClick?: () => void;
-        /** Custom class for container */
-        class?: string;
-        /** Icon slot */
-        icon?: Snippet;
-    }
+interface Props {
+	/** Main title */
+	title: string;
+	/** Description text */
+	description: string;
+	/** Show action button */
+	showButton?: boolean;
+	/** Button label */
+	buttonLabel?: string;
+	/** Button click handler */
+	onButtonClick?: () => void;
+	/** Custom class for container */
+	class?: string;
+	/** Icon slot */
+	icon?: Snippet;
+}
 
-    let {
-        title,
-        description,
-        showButton = true,
-        buttonLabel = "Get Started",
-        onButtonClick,
-        class: className = "",
-        icon,
-    }: Props = $props();
+let {
+	title,
+	description,
+	showButton = true,
+	buttonLabel = 'Get Started',
+	onButtonClick,
+	class: className = '',
+	icon,
+}: Props = $props();
 </script>
 
 <div class="card bg-base-100 shadow-lg border border-base-200 {className}">

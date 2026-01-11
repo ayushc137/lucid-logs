@@ -1,114 +1,112 @@
 <script lang="ts">
-    import { createQuery } from "@tanstack/svelte-query";
-    import { getGoals, type Goal } from "$lib/api";
-    import {
-        Target,
-        Plus,
-        X,
-        Search,
-        Check,
-        ChevronDown,
-        Flame,
-        TrendingUp,
-        TrendingDown,
-        Minus,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import { fly, fade } from "svelte/transition";
+import { type Goal, getGoals } from '$lib/api';
+import { cn } from '$lib/utils';
+import { createQuery } from '@tanstack/svelte-query';
+import {
+	Check,
+	ChevronDown,
+	Flame,
+	Minus,
+	Plus,
+	Search,
+	Target,
+	TrendingDown,
+	TrendingUp,
+	X,
+} from 'lucide-svelte';
+import { fade, fly } from 'svelte/transition';
 
-    interface GoalLink {
-        goal_id: string;
-        impact_type: "positive" | "negative" | "neutral";
-        impact_magnitude: number;
-        quantity_value?: number;
-        quantity_unit?: string;
-    }
+interface GoalLink {
+	goal_id: string;
+	impact_type: 'positive' | 'negative' | 'neutral';
+	impact_magnitude: number;
+	quantity_value?: number;
+	quantity_unit?: string;
+}
 
-    interface Props {
-        value: GoalLink[];
-        onChange: (links: GoalLink[]) => void;
-        disabled?: boolean;
-    }
+interface Props {
+	value: GoalLink[];
+	onChange: (links: GoalLink[]) => void;
+	disabled?: boolean;
+}
 
-    let { value = [], onChange, disabled = false }: Props = $props();
+let { value = [], onChange, disabled = false }: Props = $props();
 
-    let isOpen = $state(false);
-    let searchQuery = $state("");
-    let editingLink = $state<GoalLink | null>(null);
+let isOpen = $state(false);
+let searchQuery = $state('');
+let editingLink = $state<GoalLink | null>(null);
 
-    // Fetch goals
-    const goalsQuery = createQuery({
-        queryKey: ["goals", "active"],
-        queryFn: () => getGoals({ status: "active", limit: 100 }),
-    });
+// Fetch goals
+const goalsQuery = createQuery({
+	queryKey: ['goals', 'active'],
+	queryFn: () => getGoals({ status: 'active', limit: 100 }),
+});
 
-    const goals = $derived($goalsQuery.data?.items || []);
-    const filteredGoals = $derived(
-        goals.filter(
-            (g) =>
-                g.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-                !value.some((v) => v.goal_id === g.id),
-        ),
-    );
+const goals = $derived($goalsQuery.data?.items || []);
+const filteredGoals = $derived(
+	goals.filter(
+		(g) =>
+			g.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+			!value.some((v) => v.goal_id === g.id),
+	),
+);
 
-    // Get selected goals with full data
-    const selectedGoals = $derived(
-        value
-            .map((link) => ({
-                ...link,
-                goal: goals.find((g) => g.id === link.goal_id),
-            }))
-            .filter((l) => l.goal),
-    );
+// Get selected goals with full data
+const selectedGoals = $derived(
+	value
+		.map((link) => ({
+			...link,
+			goal: goals.find((g) => g.id === link.goal_id),
+		}))
+		.filter((l) => l.goal),
+);
 
-    function addGoal(goal: Goal) {
-        const newLink: GoalLink = {
-            goal_id: goal.id,
-            impact_type: "positive",
-            impact_magnitude: 3,
-            quantity_value: goal.target ? undefined : undefined,
-            quantity_unit: goal.target?.unit_id,
-        };
-        editingLink = newLink;
-    }
+function addGoal(goal: Goal) {
+	const newLink: GoalLink = {
+		goal_id: goal.id,
+		impact_type: 'positive',
+		impact_magnitude: 3,
+		quantity_value: goal.target ? undefined : undefined,
+		quantity_unit: goal.target?.unit_id,
+	};
+	editingLink = newLink;
+}
 
-    function confirmAddGoal() {
-        if (!editingLink) return;
-        onChange([...value, editingLink]);
-        editingLink = null;
-        searchQuery = "";
-    }
+function confirmAddGoal() {
+	if (!editingLink) return;
+	onChange([...value, editingLink]);
+	editingLink = null;
+	searchQuery = '';
+}
 
-    function removeGoal(goalId: string) {
-        onChange(value.filter((v) => v.goal_id !== goalId));
-    }
+function removeGoal(goalId: string) {
+	onChange(value.filter((v) => v.goal_id !== goalId));
+}
 
-    function updateLink(goalId: string, updates: Partial<GoalLink>) {
-        onChange(
-            value.map((v) => (v.goal_id === goalId ? { ...v, ...updates } : v)),
-        );
-    }
+function updateLink(goalId: string, updates: Partial<GoalLink>) {
+	onChange(value.map((v) => (v.goal_id === goalId ? { ...v, ...updates } : v)));
+}
 
-    const impactTypes = [
-        {
-            value: "positive",
-            label: "Positive",
-            icon: TrendingUp,
-            color: "text-success",
-        },
-        {
-            value: "negative",
-            label: "Negative",
-            icon: TrendingDown,
-            color: "text-error",
-        },
-        {
-            value: "neutral",
-            label: "Neutral",
-            icon: Minus,
-            color: "text-base-content/60",
-        },
-    ] as const;
+const impactTypes = [
+	{
+		value: 'positive',
+		label: 'Positive',
+		icon: TrendingUp,
+		color: 'text-success',
+	},
+	{
+		value: 'negative',
+		label: 'Negative',
+		icon: TrendingDown,
+		color: 'text-error',
+	},
+	{
+		value: 'neutral',
+		label: 'Neutral',
+		icon: Minus,
+		color: 'text-base-content/60',
+	},
+] as const;
 </script>
 
 <div class="space-y-3">

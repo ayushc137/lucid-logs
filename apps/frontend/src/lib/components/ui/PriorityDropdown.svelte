@@ -1,88 +1,85 @@
 <script lang="ts">
-    import { ChevronDown, Check } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { Check, ChevronDown } from 'lucide-svelte';
 
-    type PriorityValue = "all" | "high" | "medium" | "low";
+type PriorityValue = 'all' | 'high' | 'medium' | 'low';
 
-    interface PriorityOption {
-        value: PriorityValue;
-        label: string;
-        badgeClass: string;
-        range: string;
-    }
+interface PriorityOption {
+	value: PriorityValue;
+	label: string;
+	badgeClass: string;
+	range: string;
+}
 
-    interface Props {
-        value: PriorityValue;
-        onchange?: (value: PriorityValue) => void;
-        label?: string;
-        size?: "sm" | "md";
-        showAllOption?: boolean;
-        class?: string;
-    }
+interface Props {
+	value: PriorityValue;
+	onchange?: (value: PriorityValue) => void;
+	label?: string;
+	size?: 'sm' | 'md';
+	showAllOption?: boolean;
+	class?: string;
+}
 
-    let {
-        value = $bindable("all"),
-        onchange,
-        label,
-        size = "sm",
-        showAllOption = true,
-        class: className,
-    }: Props = $props();
+let {
+	value = $bindable('all'),
+	onchange,
+	label,
+	size = 'sm',
+	showAllOption = true,
+	class: className,
+}: Props = $props();
 
-    let isOpen = $state(false);
-    let dropdownRef = $state<HTMLDivElement | null>(null);
+let isOpen = $state(false);
+let dropdownRef = $state<HTMLDivElement | null>(null);
 
-    const allOptions: PriorityOption[] = [
-        {
-            value: "all",
-            label: "All Priorities",
-            badgeClass: "badge-ghost",
-            range: "",
-        },
-        {
-            value: "high",
-            label: "High",
-            badgeClass: "badge-error",
-            range: "7-10",
-        },
-        {
-            value: "medium",
-            label: "Medium",
-            badgeClass: "badge-warning",
-            range: "4-6",
-        },
-        { value: "low", label: "Low", badgeClass: "badge-info", range: "1-3" },
-    ];
+const allOptions: PriorityOption[] = [
+	{
+		value: 'all',
+		label: 'All Priorities',
+		badgeClass: 'badge-ghost',
+		range: '',
+	},
+	{
+		value: 'high',
+		label: 'High',
+		badgeClass: 'badge-error',
+		range: '7-10',
+	},
+	{
+		value: 'medium',
+		label: 'Medium',
+		badgeClass: 'badge-warning',
+		range: '4-6',
+	},
+	{ value: 'low', label: 'Low', badgeClass: 'badge-info', range: '1-3' },
+];
 
-    const priorityOptions = $derived(
-        showAllOption
-            ? allOptions
-            : allOptions.filter((o) => o.value !== "all"),
-    );
+const priorityOptions = $derived(
+	showAllOption ? allOptions : allOptions.filter((o) => o.value !== 'all'),
+);
 
-    const selectedOption = $derived(
-        priorityOptions.find((o) => o.value === value) ?? priorityOptions[0],
-    );
+const selectedOption = $derived(
+	priorityOptions.find((o) => o.value === value) ?? priorityOptions[0],
+);
 
-    function handleSelect(optionValue: PriorityValue) {
-        value = optionValue;
-        onchange?.(optionValue);
-        isOpen = false;
-    }
+function handleSelect(optionValue: PriorityValue) {
+	value = optionValue;
+	onchange?.(optionValue);
+	isOpen = false;
+}
 
-    function handleClickOutside(e: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
-            isOpen = false;
-        }
-    }
+function handleClickOutside(e: MouseEvent) {
+	if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+		isOpen = false;
+	}
+}
 
-    $effect(() => {
-        if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
-    });
+$effect(() => {
+	if (isOpen) {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}
+});
 </script>
 
 <div class={cn("form-control", className)}>

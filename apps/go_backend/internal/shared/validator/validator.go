@@ -15,10 +15,12 @@
 package validator
 
 import (
+	stderrors "errors"
 	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
@@ -50,8 +52,12 @@ func New() *Validator {
 	})
 
 	// Register custom validations
-	_ = v.RegisterValidation("datetime_flexible", validateDateTimeFlexible)
-	_ = v.RegisterValidation("emotion_id", validateEmotionID)
+	if err := v.RegisterValidation("datetime_flexible", validateDateTimeFlexible); err != nil {
+		panic(err)
+	}
+	if err := v.RegisterValidation("emotion_id", validateEmotionID); err != nil {
+		panic(err)
+	}
 
 	return &Validator{v: v}
 }
@@ -81,10 +87,20 @@ func (val *Validator) Validate(s any) []response.ValidationErrorDetail {
 	}
 
 	var errors []response.ValidationErrorDetail
-	for _, e := range err.(validator.ValidationErrors) {
+	var validationErrors validator.ValidationErrors
+	if stderrors.As(err, &validationErrors) {
+		errors = make([]response.ValidationErrorDetail, 0, len(validationErrors))
+		for _, e := range validationErrors {
+			errors = append(errors, response.ValidationErrorDetail{
+				Field:   e.Field(),
+				Message: formatValidationMessage(e),
+			})
+		}
+	} else {
+		// Should not happen, but handle gracefully
 		errors = append(errors, response.ValidationErrorDetail{
-			Field:   e.Field(),
-			Message: formatValidationMessage(e),
+			Field:   "global",
+			Message: err.Error(),
 		})
 	}
 	return errors

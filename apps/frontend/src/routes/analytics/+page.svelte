@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { BarChart3 } from "lucide-svelte";
-  import { PageHeader, EmptyState } from "$lib/components/ui";
+import { EmptyState, PageHeader } from '$lib/components/ui';
+import { BarChart3 } from 'lucide-svelte';
 </script>
 
 <svelte:head>

@@ -1,93 +1,92 @@
 <script lang="ts">
-    import { ChevronDown, Search, X, Plus, Check } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import type { Category } from "$lib/api/categories";
+import type { Category } from '$lib/api/categories';
+import { cn } from '$lib/utils';
+import { Check, ChevronDown, Plus, Search, X } from 'lucide-svelte';
 
-    interface Props {
-        categories: Category[];
-        value: string | undefined;
-        onchange?: (value: string | undefined) => void;
-        label?: string;
-        size?: "sm" | "md";
-        showSearch?: boolean;
-        showAllOption?: boolean;
-        allLabel?: string;
-        showNoCategoryOption?: boolean;
-        noCategoryLabel?: string;
-        placeholder?: string;
-        showCreateButton?: boolean;
-        onCreate?: () => void;
-        class?: string;
-    }
+interface Props {
+	categories: Category[];
+	value: string | undefined;
+	onchange?: (value: string | undefined) => void;
+	label?: string;
+	size?: 'sm' | 'md';
+	showSearch?: boolean;
+	showAllOption?: boolean;
+	allLabel?: string;
+	showNoCategoryOption?: boolean;
+	noCategoryLabel?: string;
+	placeholder?: string;
+	showCreateButton?: boolean;
+	onCreate?: () => void;
+	class?: string;
+}
 
-    let {
-        categories,
-        value = $bindable(),
-        onchange,
-        label,
-        size = "sm",
-        showSearch = true,
-        showAllOption = false,
-        allLabel = "All Categories",
-        showNoCategoryOption = false,
-        noCategoryLabel = "Uncategorized",
-        placeholder = "Select category...",
-        showCreateButton = false,
-        onCreate,
-        class: className,
-    }: Props = $props();
+let {
+	categories,
+	value = $bindable(),
+	onchange,
+	label,
+	size = 'sm',
+	showSearch = true,
+	showAllOption = false,
+	allLabel = 'All Categories',
+	showNoCategoryOption = false,
+	noCategoryLabel = 'Uncategorized',
+	placeholder = 'Select category...',
+	showCreateButton = false,
+	onCreate,
+	class: className,
+}: Props = $props();
 
-    let isOpen = $state(false);
-    let search = $state("");
-    let dropdownRef = $state<HTMLDivElement | null>(null);
-    let searchInputRef = $state<HTMLInputElement | null>(null);
+let isOpen = $state(false);
+let search = $state('');
+let dropdownRef = $state<HTMLDivElement | null>(null);
+let searchInputRef = $state<HTMLInputElement | null>(null);
 
-    const selectedCategory = $derived(categories.find((c) => c.id === value));
+const selectedCategory = $derived(categories.find((c) => c.id === value));
 
-    const filteredCategories = $derived(
-        search.trim()
-            ? categories.filter((c) =>
-                  c.name.toLowerCase().includes(search.toLowerCase()),
-              )
-            : categories,
-    );
+const filteredCategories = $derived(
+	search.trim()
+		? categories.filter((c) =>
+				c.name.toLowerCase().includes(search.toLowerCase()),
+			)
+		: categories,
+);
 
-    const displayLabel = $derived(() => {
-        if (showAllOption && value === "all") return allLabel;
-        if (showNoCategoryOption && value === "none") return noCategoryLabel;
-        if (selectedCategory) return selectedCategory.name;
-        if (!value) return placeholder;
-        return placeholder;
-    });
+const displayLabel = $derived(() => {
+	if (showAllOption && value === 'all') return allLabel;
+	if (showNoCategoryOption && value === 'none') return noCategoryLabel;
+	if (selectedCategory) return selectedCategory.name;
+	if (!value) return placeholder;
+	return placeholder;
+});
 
-    function handleSelect(categoryId: string | undefined) {
-        value = categoryId;
-        onchange?.(categoryId);
-        isOpen = false;
-        search = "";
-    }
+function handleSelect(categoryId: string | undefined) {
+	value = categoryId;
+	onchange?.(categoryId);
+	isOpen = false;
+	search = '';
+}
 
-    function handleClickOutside(e: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
-            isOpen = false;
-            search = "";
-        }
-    }
+function handleClickOutside(e: MouseEvent) {
+	if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+		isOpen = false;
+		search = '';
+	}
+}
 
-    function handleOpen() {
-        isOpen = !isOpen;
-        if (isOpen && showSearch) {
-            setTimeout(() => searchInputRef?.focus(), 50);
-        }
-    }
+function handleOpen() {
+	isOpen = !isOpen;
+	if (isOpen && showSearch) {
+		setTimeout(() => searchInputRef?.focus(), 50);
+	}
+}
 
-    $effect(() => {
-        if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
-    });
+$effect(() => {
+	if (isOpen) {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}
+});
 </script>
 
 <div class={cn("form-control", className)}>

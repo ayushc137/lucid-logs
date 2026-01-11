@@ -1,51 +1,51 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
-  import { Mail, Lock, CircleAlert, Sparkles, ArrowRight } from "lucide-svelte";
-  import { login } from "$lib/api";
-  import { authStore, isDevAuthBypassEnabled } from "$lib/stores/auth.svelte";
+import { goto } from '$app/navigation';
+import { login } from '$lib/api';
+import { authStore, isDevAuthBypassEnabled } from '$lib/stores/auth.svelte';
+import { ArrowRight, CircleAlert, Lock, Mail, Sparkles } from 'lucide-svelte';
+import { onMount } from 'svelte';
 
-  let email = $state("");
-  let password = $state("");
-  let loading = $state(false);
-  let error = $state("");
+let email = $state('');
+let password = $state('');
+let loading = $state(false);
+let error = $state('');
 
-  // Check for dev auth bypass on mount
-  onMount(async () => {
-    if (isDevAuthBypassEnabled()) {
-      loading = true;
-      const success = await authStore.devAutoLogin();
-      if (success) {
-        await goto("/", { replaceState: true });
-        return;
-      }
-      loading = false;
-      error = "Dev auto-login failed. Please check backend connection.";
-    }
-  });
+// Check for dev auth bypass on mount
+onMount(async () => {
+	if (isDevAuthBypassEnabled()) {
+		loading = true;
+		const success = await authStore.devAutoLogin();
+		if (success) {
+			await goto('/', { replaceState: true });
+			return;
+		}
+		loading = false;
+		error = 'Dev auto-login failed. Please check backend connection.';
+	}
+});
 
-  async function handleLogin() {
-    loading = true;
-    error = "";
-    try {
-      const response = await login({ username: email, password });
-      authStore.loginWithResponse(response, email);
-      await goto("/", { replaceState: true });
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "response" in err) {
-        const httpErr = err as { response?: { status?: number } };
-        if (httpErr.response?.status === 401) {
-          error = "Invalid email or password";
-        } else {
-          error = "Login failed. Please try again.";
-        }
-      } else {
-        error = "Network error. Please check your connection.";
-      }
-    } finally {
-      loading = false;
-    }
-  }
+async function handleLogin() {
+	loading = true;
+	error = '';
+	try {
+		const response = await login({ username: email, password });
+		authStore.loginWithResponse(response, email);
+		await goto('/', { replaceState: true });
+	} catch (err: unknown) {
+		if (err && typeof err === 'object' && 'response' in err) {
+			const httpErr = err as { response?: { status?: number } };
+			if (httpErr.response?.status === 401) {
+				error = 'Invalid email or password';
+			} else {
+				error = 'Login failed. Please try again.';
+			}
+		} else {
+			error = 'Network error. Please check your connection.';
+		}
+	} finally {
+		loading = false;
+	}
+}
 </script>
 
 <svelte:head>

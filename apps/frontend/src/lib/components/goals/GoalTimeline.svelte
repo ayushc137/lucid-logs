@@ -1,177 +1,178 @@
 <script lang="ts">
-    import {
-        Sparkles,
-        RotateCcw,
-        Trophy,
-        Archive,
-        Flame,
-        AlertCircle,
-        Target,
-        CalendarDays,
-        Link2,
-        Unlink,
-        ArrowDown,
-        ArrowUp,
-        Clock,
-        ChevronDown,
-        ChevronUp,
-    } from "lucide-svelte";
-    import type { GoalLog, GoalLogEvent } from "$lib/api/goals";
-    import { cn } from "$lib/utils";
+import type { GoalLog, GoalLogEvent } from '$lib/api/goals';
+import { cn } from '$lib/utils';
+import {
+	AlertCircle,
+	Archive,
+	ArrowDown,
+	ArrowUp,
+	CalendarDays,
+	ChevronDown,
+	ChevronUp,
+	Clock,
+	Flame,
+	Link2,
+	RotateCcw,
+	Sparkles,
+	Target,
+	Trophy,
+	Unlink,
+} from 'lucide-svelte';
 
-    interface Props {
-        logs: GoalLog[];
-        isLoading?: boolean;
-        filter?: "all" | "with-tasks" | "goal-only";
-        onFilterChange?: (filter: "all" | "with-tasks" | "goal-only") => void;
-    }
+interface Props {
+	logs: GoalLog[];
+	isLoading?: boolean;
+	filter?: 'all' | 'with-tasks' | 'goal-only';
+	onFilterChange?: (filter: 'all' | 'with-tasks' | 'goal-only') => void;
+}
 
-    let {
-        logs = [],
-        isLoading = false,
-        filter = "all",
-        onFilterChange,
-    }: Props = $props();
+let {
+	logs = [],
+	isLoading = false,
+	filter = 'all',
+	onFilterChange,
+}: Props = $props();
 
-    let showEventDetails = $state<string | null>(null);
+let showEventDetails = $state<string | null>(null);
 
-    // Event display config
-    const eventConfig: Record<
-        GoalLogEvent,
-        { icon: typeof Sparkles; color: string; label: string }
-    > = {
-        created: {
-            icon: Sparkles,
-            color: "text-success",
-            label: "Goal created",
-        },
-        updated: { icon: RotateCcw, color: "text-info", label: "Goal updated" },
-        completed: {
-            icon: Trophy,
-            color: "text-success",
-            label: "Goal completed",
-        },
-        archived: {
-            icon: Archive,
-            color: "text-warning",
-            label: "Goal archived",
-        },
-        reactivated: {
-            icon: Sparkles,
-            color: "text-success",
-            label: "Goal reactivated",
-        },
-        deleted: {
-            icon: AlertCircle,
-            color: "text-error",
-            label: "Goal deleted",
-        },
-        streak_updated: {
-            icon: Flame,
-            color: "text-warning",
-            label: "Streak updated",
-        },
-        streak_broken: {
-            icon: AlertCircle,
-            color: "text-error",
-            label: "Streak broken",
-        },
-        target_met: {
-            icon: Target,
-            color: "text-success",
-            label: "Target reached!",
-        },
-        target_exceeded: {
-            icon: AlertCircle,
-            color: "text-error",
-            label: "Target exceeded",
-        },
-        period_end: {
-            icon: CalendarDays,
-            color: "text-info",
-            label: "Period ended",
-        },
-        task_linked: {
-            icon: Link2,
-            color: "text-primary",
-            label: "Task linked",
-        },
-        task_unlinked: {
-            icon: Unlink,
-            color: "text-warning",
-            label: "Task unlinked",
-        },
-        child_added: {
-            icon: ArrowDown,
-            color: "text-success",
-            label: "Child added",
-        },
-        child_removed: {
-            icon: ArrowUp,
-            color: "text-error",
-            label: "Child removed",
-        },
-    };
+// Event display config
+const eventConfig: Record<
+	GoalLogEvent,
+	{ icon: typeof Sparkles; color: string; label: string }
+> = {
+	created: {
+		icon: Sparkles,
+		color: 'text-success',
+		label: 'Goal created',
+	},
+	updated: { icon: RotateCcw, color: 'text-info', label: 'Goal updated' },
+	completed: {
+		icon: Trophy,
+		color: 'text-success',
+		label: 'Goal completed',
+	},
+	archived: {
+		icon: Archive,
+		color: 'text-warning',
+		label: 'Goal archived',
+	},
+	reactivated: {
+		icon: Sparkles,
+		color: 'text-success',
+		label: 'Goal reactivated',
+	},
+	deleted: {
+		icon: AlertCircle,
+		color: 'text-error',
+		label: 'Goal deleted',
+	},
+	streak_updated: {
+		icon: Flame,
+		color: 'text-warning',
+		label: 'Streak updated',
+	},
+	streak_broken: {
+		icon: AlertCircle,
+		color: 'text-error',
+		label: 'Streak broken',
+	},
+	target_met: {
+		icon: Target,
+		color: 'text-success',
+		label: 'Target reached!',
+	},
+	target_exceeded: {
+		icon: AlertCircle,
+		color: 'text-error',
+		label: 'Target exceeded',
+	},
+	period_end: {
+		icon: CalendarDays,
+		color: 'text-info',
+		label: 'Period ended',
+	},
+	task_linked: {
+		icon: Link2,
+		color: 'text-primary',
+		label: 'Task linked',
+	},
+	task_unlinked: {
+		icon: Unlink,
+		color: 'text-warning',
+		label: 'Task unlinked',
+	},
+	child_added: {
+		icon: ArrowDown,
+		color: 'text-success',
+		label: 'Child added',
+	},
+	child_removed: {
+		icon: ArrowUp,
+		color: 'text-error',
+		label: 'Child removed',
+	},
+};
 
-    // Filter logs based on filter prop
-    const filteredLogs = $derived.by(() => {
-        if (filter === "all") return logs;
-        if (filter === "with-tasks") {
-            return logs.filter(
-                (l) =>
-                    l.event === "task_linked" ||
-                    l.event === "task_unlinked" ||
-                    l.triggered_by_task_id,
-            );
-        }
-        return logs.filter(
-            (l) =>
-                l.event !== "task_linked" &&
-                l.event !== "task_unlinked" &&
-                !l.triggered_by_task_id,
-        );
-    });
+// Filter logs based on filter prop
+const filteredLogs = $derived.by(() => {
+	if (filter === 'all') return logs;
+	if (filter === 'with-tasks') {
+		return logs.filter(
+			(l) =>
+				l.event === 'task_linked' ||
+				l.event === 'task_unlinked' ||
+				l.triggered_by_task_id,
+		);
+	}
+	return logs.filter(
+		(l) =>
+			l.event !== 'task_linked' &&
+			l.event !== 'task_unlinked' &&
+			!l.triggered_by_task_id,
+	);
+});
 
-    function formatEventDate(dateStr: string): string {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+function formatEventDate(dateStr: string): string {
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diff = now.getTime() - date.getTime();
+	const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-        if (days === 0) {
-            return date.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } else if (days === 1) {
-            return "Yesterday";
-        } else if (days < 7) {
-            return `${days} days ago`;
-        } else {
-            return date.toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-            });
-        }
-    }
+	if (days === 0) {
+		return date.toLocaleTimeString([], {
+			hour: '2-digit',
+			minute: '2-digit',
+		});
+	}
+	if (days === 1) {
+		return 'Yesterday';
+	}
+	if (days < 7) {
+		return `${days} days ago`;
+	}
+	return date.toLocaleDateString([], {
+		month: 'short',
+		day: 'numeric',
+	});
+}
 
-    function formatChanges(changes: Record<string, unknown>): string {
-        const entries = Object.entries(changes);
-        if (entries.length === 0) return "";
-        return entries
-            .map(([key, value]) => {
-                const formattedKey = key.replace(/_/g, " ");
-                if (typeof value === "object") {
-                    return `${formattedKey}: ${JSON.stringify(value)}`;
-                }
-                return `${formattedKey}: ${value}`;
-            })
-            .join(", ");
-    }
+function formatChanges(changes: Record<string, unknown>): string {
+	const entries = Object.entries(changes);
+	if (entries.length === 0) return '';
+	return entries
+		.map(([key, value]) => {
+			const formattedKey = key.replace(/_/g, ' ');
+			if (typeof value === 'object') {
+				return `${formattedKey}: ${JSON.stringify(value)}`;
+			}
+			return `${formattedKey}: ${value}`;
+		})
+		.join(', ');
+}
 
-    function toggleEventDetails(logId: string) {
-        showEventDetails = showEventDetails === logId ? null : logId;
-    }
+function toggleEventDetails(logId: string) {
+	showEventDetails = showEventDetails === logId ? null : logId;
+}
 </script>
 
 <div class="space-y-4">

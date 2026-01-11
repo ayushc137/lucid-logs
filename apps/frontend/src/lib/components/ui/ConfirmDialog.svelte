@@ -1,53 +1,53 @@
 <script lang="ts">
-    import { TriangleAlert, AlertCircle, X } from "lucide-svelte";
+import { AlertCircle, TriangleAlert, X } from 'lucide-svelte';
 
-    interface Props {
-        /** Control dialog visibility */
-        open?: boolean;
-        /** Dialog title */
-        title?: string;
-        /** Confirmation message */
-        message?: string;
-        /** Confirm button text */
-        confirmText?: string;
-        /** Cancel button text */
-        cancelText?: string;
-        /** Confirm button is destructive (red) vs warning (amber) */
-        destructive?: boolean;
-        /** Loading state */
-        loading?: boolean;
-        /** Confirm handler */
-        onConfirm?: () => void;
-        /** Cancel/close handler */
-        onCancel?: () => void;
-    }
+interface Props {
+	/** Control dialog visibility */
+	open?: boolean;
+	/** Dialog title */
+	title?: string;
+	/** Confirmation message */
+	message?: string;
+	/** Confirm button text */
+	confirmText?: string;
+	/** Cancel button text */
+	cancelText?: string;
+	/** Confirm button is destructive (red) vs warning (amber) */
+	destructive?: boolean;
+	/** Loading state */
+	loading?: boolean;
+	/** Confirm handler */
+	onConfirm?: () => void;
+	/** Cancel/close handler */
+	onCancel?: () => void;
+}
 
-    let {
-        open = $bindable(false),
-        title = "Are you sure?",
-        message = "This action cannot be undone.",
-        confirmText = "Confirm",
-        cancelText = "Cancel",
-        destructive = true,
-        loading = false,
-        onConfirm,
-        onCancel,
-    }: Props = $props();
+let {
+	open = $bindable(false),
+	title = 'Are you sure?',
+	message = 'This action cannot be undone.',
+	confirmText = 'Confirm',
+	cancelText = 'Cancel',
+	destructive = true,
+	loading = false,
+	onConfirm,
+	onCancel,
+}: Props = $props();
 
-    function handleCancel() {
-        open = false;
-        onCancel?.();
-    }
+function handleCancel() {
+	open = false;
+	onCancel?.();
+}
 
-    function handleConfirm() {
-        onConfirm?.();
-    }
+function handleConfirm() {
+	onConfirm?.();
+}
 
-    // Color schemes based on destructive prop
-    const iconBg = $derived(destructive ? "bg-error/10" : "bg-warning/10");
-    const iconColor = $derived(destructive ? "text-error" : "text-warning");
-    const titleColor = $derived(destructive ? "text-error" : "text-warning");
-    const buttonClass = $derived(destructive ? "btn-error" : "btn-warning");
+// Color schemes based on destructive prop
+const iconBg = $derived(destructive ? 'bg-error/10' : 'bg-warning/10');
+const iconColor = $derived(destructive ? 'text-error' : 'text-warning');
+const titleColor = $derived(destructive ? 'text-error' : 'text-warning');
+const buttonClass = $derived(destructive ? 'btn-error' : 'btn-warning');
 </script>
 
 <dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>

@@ -1,68 +1,67 @@
 <script lang="ts">
-    import { ChevronDown, X } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { ChevronDown, X } from 'lucide-svelte';
 
-    interface Option {
-        value: string;
-        label: string;
-        color?: string;
-        badge?: string;
-        badgeClass?: string;
-        icon?: typeof ChevronDown;
-    }
+interface Option {
+	value: string;
+	label: string;
+	color?: string;
+	badge?: string;
+	badgeClass?: string;
+	icon?: typeof ChevronDown;
+}
 
-    interface Props {
-        options: Option[];
-        value: string;
-        onchange?: (value: string) => void;
-        placeholder?: string;
-        label?: string;
-        size?: "sm" | "md";
-        showColorDot?: boolean;
-        allLabel?: string;
-        class?: string;
-    }
+interface Props {
+	options: Option[];
+	value: string;
+	onchange?: (value: string) => void;
+	placeholder?: string;
+	label?: string;
+	size?: 'sm' | 'md';
+	showColorDot?: boolean;
+	allLabel?: string;
+	class?: string;
+}
 
-    let {
-        options,
-        value = $bindable(),
-        onchange,
-        placeholder = "Select...",
-        label,
-        size = "sm",
-        showColorDot = false,
-        allLabel = "All",
-        class: className,
-    }: Props = $props();
+let {
+	options,
+	value = $bindable(),
+	onchange,
+	placeholder = 'Select...',
+	label,
+	size = 'sm',
+	showColorDot = false,
+	allLabel = 'All',
+	class: className,
+}: Props = $props();
 
-    let isOpen = $state(false);
-    let dropdownRef = $state<HTMLDivElement | null>(null);
+let isOpen = $state(false);
+let dropdownRef = $state<HTMLDivElement | null>(null);
 
-    const selectedOption = $derived(options.find((o) => o.value === value));
+const selectedOption = $derived(options.find((o) => o.value === value));
 
-    const displayLabel = $derived(
-        value === "all" ? allLabel : (selectedOption?.label ?? placeholder),
-    );
+const displayLabel = $derived(
+	value === 'all' ? allLabel : (selectedOption?.label ?? placeholder),
+);
 
-    function handleSelect(optionValue: string) {
-        value = optionValue;
-        onchange?.(optionValue);
-        isOpen = false;
-    }
+function handleSelect(optionValue: string) {
+	value = optionValue;
+	onchange?.(optionValue);
+	isOpen = false;
+}
 
-    function handleClickOutside(e: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
-            isOpen = false;
-        }
-    }
+function handleClickOutside(e: MouseEvent) {
+	if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+		isOpen = false;
+	}
+}
 
-    $effect(() => {
-        if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
-    });
+$effect(() => {
+	if (isOpen) {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}
+});
 </script>
 
 <div class={cn("form-control", className)}>

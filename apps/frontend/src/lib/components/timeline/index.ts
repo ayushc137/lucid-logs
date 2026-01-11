@@ -1,5 +1,8 @@
 // Multi-view timeline (recommended)
-export { default as TimelineMultiView, type TimelineView } from './TimelineMultiView.svelte';
+export {
+	default as TimelineMultiView,
+	type TimelineView,
+} from './TimelineMultiView.svelte';
 
 // Individual view components
 export { default as TimelineGantt } from './TimelineGantt.svelte';

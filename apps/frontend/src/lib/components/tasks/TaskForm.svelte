@@ -1,736 +1,702 @@
 <script lang="ts">
-    import {
-        createMutation,
-        useQueryClient,
-        createQuery,
-    } from "@tanstack/svelte-query";
-    import {
-        createTask,
-        updateTask,
-        deleteTask,
-        type Task,
-        type CreateTaskRequest,
-        type UpdateTaskRequest,
-        type TaskItem,
-        getLastTaskEndTime,
-        type TaskTemplate,
-    } from "$lib/api";
-    import { getCategories, createCategory } from "$lib/api/categories";
-    import {
-        inferEmotion,
-        type InferredEmotion,
-        type Emotion,
-    } from "$lib/api/emotions";
-    import { emotionStore } from "$lib/stores/emotions.svelte";
-    import {
-        QUADRANT_COLORS,
-        QUADRANT_META,
-        type Quadrant,
-    } from "$lib/components/emotions/emotionData";
-    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import { RichEditor } from "$lib/components/rich-editor";
-    import {
-        CategoryDropdown,
-        ColorPicker,
-        ConfirmDialog,
-        Card,
-        SectionHeader,
-    } from "$lib/components/ui";
-    import { EmotionModal } from "$lib/components/emotions";
-    import { GoalSelector } from "$lib/components/goals";
-    import {
-        TaskPrioritySlider,
-        EmotionSection,
-        ScheduleSection,
-        ReflectionSection,
-    } from "$lib/components/tasks";
-    import { cn } from "$lib/utils";
-    import { goto } from "$app/navigation";
-    import { browser } from "$app/environment";
-
-    import {
-        Check,
-        X,
-        Save,
-        Tag,
-        CircleCheck,
-        Circle,
-        Trash2,
-        Edit3,
-        FileText,
-        Info,
-        Target,
-    } from "lucide-svelte";
-
-    import { onDestroy } from "svelte";
-    import { writable } from "svelte/store";
-
-    // Context for emotion selection
-    type EmotionSelectionContext = {
-        type: "task" | "positive" | "negative";
-        index?: number;
-    };
-
-    interface Props {
-        /** Task to edit (null for create mode) */
-        task?: Task | null;
-        /** Initial category ID for new tasks */
-        initialCategoryId?: string;
-        /** Referrer URL to navigate back to */
-        referrer?: string;
-        /** Called after successful save */
-        onSuccess?: () => void;
-    }
-
-    let {
-        task = null,
-        initialCategoryId,
-        referrer,
-        onSuccess,
-    }: Props = $props();
-
-    const queryClient = useQueryClient();
-    const isEditing = $derived(!!task);
-
-    // Fetch last task end time only in create mode
-    // Fetch last task end time only in create mode
-    const lastTaskEndTimeOptions = writable({
-        queryKey: ["tasks", "last-end-time"],
-        queryFn: getLastTaskEndTime,
-        enabled: false,
-    });
-
-    $effect(() => {
-        lastTaskEndTimeOptions.set({
-            queryKey: ["tasks", "last-end-time"],
-            queryFn: getLastTaskEndTime,
-            enabled: !isEditing,
-        });
-    });
-
-    const lastTaskEndTimeQuery = createQuery<{ end_time: string | null }>(
-        lastTaskEndTimeOptions,
-    );
-
-    const lastTaskEndTime = $derived(
-        $lastTaskEndTimeQuery.data?.end_time
-            ? new Date($lastTaskEndTimeQuery.data.end_time)
-            : null,
-    );
-
-    // Form state
-    let title = $state("");
-    let journal = $state("");
-    let categoryId = $state<string | undefined>(undefined);
-    let priority = $state(3);
-    let positives = $state<TaskItem[]>([]);
-    let negatives = $state<TaskItem[]>([]);
-    let completed = $state(false);
-
-    // Goal links state
-    interface GoalLink {
-        goal_id: string;
-        impact_type: "positive" | "negative" | "neutral";
-        impact_magnitude: number;
-        quantity_value?: number;
-        quantity_unit?: string;
-    }
-    let goalLinks = $state<GoalLink[]>([]);
-
-    // Emotion state
-    let selectedEmotion = $state<Emotion | null>(null);
-    let emotionContext = $state<EmotionSelectionContext | null>(null);
-    let emotionModalOpen = $state(false);
-    let liveInferredEmotion = $state<InferredEmotion | null>(null);
-    let inferredEmotionFull = $state<Emotion | null>(null);
-    let inferringEmotion = $state(false);
-    let inferenceError = $state<string | null>(null);
-    /** Initial emotion to pre-select when modal opens (e.g. suggested emotion) */
-    let initialEmotionForModal = $state<Emotion | null>(null);
-    /** Allowed quadrants for emotion selection (null = all allowed) */
-    let allowedQuadrantsForModal = $state<Quadrant[] | null>(null);
-
-    // Pending emotion for new reflection item (select emotion FIRST)
-    let pendingPositiveEmotion = $state<Emotion | null>(null);
-    let pendingNegativeEmotion = $state<Emotion | null>(null);
-    let pendingEmotionType = $state<"positive" | "negative" | null>(null);
-
-    // Date/time state
-    let startDate = $state("");
-    let endDate = $state("");
-    let startTime = $state("09:00:00");
-    let endTime = $state("10:00:00");
-
-    // Category creation
-    let newCategoryName = $state("");
-    let newCategoryColor = $state("#6366f1");
-    let showNewCategory = $state(false);
-    let useCustomCategoryColor = $state(false);
-
-    // Confirmation dialogs
-    let showUncompleteConfirm = $state(false);
-    let showDeleteConfirm = $state(false);
-
-    // Live time tracking (only for create mode)
-    let liveEndTime = $state(false);
-    let useLastTaskStart = $state(false);
-    let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
-
-    // Track if form is initialized
-    let formInitialized = $state(false);
-
-    function getTodayString() {
-        return new Date().toISOString().split("T")[0];
-    }
-
-    // Hash of reflections to check if they have changed
-    function getReflectionsHash(p: TaskItem[], n: TaskItem[]) {
-        return JSON.stringify({
-            p: p.map((x) => ({ t: x.text, e: x.emotion_id })),
-            n: n.map((x) => ({ t: x.text, e: x.emotion_id })),
-        });
-    }
-
-    // Logic to prevent initial inference call
-    let lastInferredHash = $state("");
-
-    function updateEndTimeToNow() {
-        const now = new Date();
-        endDate = now.toISOString().split("T")[0];
-        endTime = now.toTimeString().slice(0, 8);
-    }
-
-    // Initialize form based on mode
-    $effect(() => {
-        if (formInitialized) return;
-
-        if (task) {
-            // Edit mode - populate from task
-            title = task.title;
-            journal = task.journal || "";
-            categoryId = task.category?.id;
-            priority = task.priority || 3;
-            positives = task.positives || [];
-            negatives = task.negatives || [];
-            completed = task.completed || false;
-            goalLinks = (task.linked_goals || []).map((l) => ({
-                goal_id: l.goal_id,
-                impact_type:
-                    (l.impact_type as "positive" | "negative" | "neutral") ||
-                    "positive",
-                impact_magnitude: l.impact_magnitude,
-                quantity_value: l.quantity_value,
-                quantity_unit: l.quantity_unit,
-            }));
-
-            const startDateObj = new Date(task.start_date);
-            const endDateObj = new Date(task.end_date);
-
-            startDate = startDateObj.toISOString().split("T")[0];
-            endDate = endDateObj.toISOString().split("T")[0];
-            startTime = startDateObj.toTimeString().slice(0, 8);
-            endTime = endDateObj.toTimeString().slice(0, 8);
-
-            if (task.emotion_id) {
-                // Try to load immediately from store
-                const e = emotionStore.get(task.emotion_id);
-                if (e) {
-                    selectedEmotion = e;
-                }
-            }
-
-            // Set initial hash to prevent immediate inference
-            lastInferredHash = getReflectionsHash(positives, negatives);
-        } else {
-            // Create mode - set defaults
-            const today = getTodayString();
-            startDate = today;
-            endDate = today;
-            if (initialCategoryId) {
-                categoryId = initialCategoryId;
-            }
-
-            // Check for template
-            if (browser) {
-                const templateJson = sessionStorage.getItem("task-template");
-                if (templateJson) {
-                    try {
-                        const tmpl = JSON.parse(templateJson) as TaskTemplate;
-                        title = tmpl.title;
-                        if (tmpl.description) journal = tmpl.description;
-                        if (tmpl.icon) title = `${tmpl.icon} ${title}`; // Optional: prepend icon?
-
-                        if (tmpl.category) categoryId = tmpl.category.id;
-
-                        // Calculate end time based on default duration
-                        if (tmpl.default_duration) {
-                            const start = new Date(); // Or whatever start time is set to (now by default)
-                            // Actually start time is set to 'now' implicitly by user interaction or default state?
-                            // Default state for startTime/endTime is set to 09:00/10:00 in declarations...
-                            // If we want "Now" + duration:
-                            const now = new Date();
-                            const end = new Date(
-                                now.getTime() + tmpl.default_duration * 1000,
-                            );
-
-                            // Update start/end strings
-                            startDate = now.toISOString().split("T")[0];
-                            startTime = now.toTimeString().slice(0, 8);
-                            endDate = end.toISOString().split("T")[0];
-                            endTime = end.toTimeString().slice(0, 8);
-                        }
-
-                        if (tmpl.default_emotion_id) {
-                            const e = emotionStore.get(tmpl.default_emotion_id);
-                            if (e) selectedEmotion = e;
-                        }
-
-                        if (tmpl.goals) {
-                            goalLinks = tmpl.goals.map((g) => ({
-                                goal_id: g.id,
-                                impact_type: "positive",
-                                impact_magnitude: 3,
-                                quantity_value: tmpl.quantity_enabled
-                                    ? tmpl.quantity_default
-                                    : undefined,
-                                quantity_unit: g.target?.unit_id,
-                            }));
-                        }
-
-                        sessionStorage.removeItem("task-template");
-                    } catch (e) {
-                        console.error("Failed to parse task template", e);
-                    }
-                }
-            }
-
-            // Initialize hash for empty arrays in create mode
-            lastInferredHash = getReflectionsHash([], []);
-        }
-        formInitialized = true;
-        console.log("[TaskForm Init] Initialized:", {
-            isEditing,
-            lastInferredHash,
-            formInitialized,
-        });
-    });
-
-    // Live time interval for create mode
-    $effect(() => {
-        if (!isEditing && liveEndTime) {
-            updateEndTimeToNow();
-            timeUpdateInterval = setInterval(updateEndTimeToNow, 1000);
-        } else if (timeUpdateInterval) {
-            clearInterval(timeUpdateInterval);
-            timeUpdateInterval = null;
-        }
-    });
-
-    // Effect to set start from last task
-    $effect(() => {
-        if (!isEditing && useLastTaskStart && lastTaskEndTime) {
-            const lastEnd = new Date(lastTaskEndTime);
-            startDate = lastEnd.toISOString().split("T")[0];
-            startTime = lastEnd.toTimeString().slice(0, 8);
-        }
-    });
-
-    // Effect to calculate live inferred emotion
-    $effect(() => {
-        const currentHash = getReflectionsHash(positives, negatives);
-        const hasEmotions =
-            positives.some((p) => p.emotion_id) ||
-            negatives.some((n) => n.emotion_id);
-
-        console.log("[Emotion Inference] Effect triggered:", {
-            hasEmotions,
-            currentHash,
-            lastInferredHash,
-            positivesCount: positives.length,
-            negativesCount: negatives.length,
-            positivesWithEmotions: positives.filter((p) => p.emotion_id).length,
-            negativesWithEmotions: negatives.filter((n) => n.emotion_id).length,
-        });
-
-        if (!hasEmotions) {
-            console.log("[Emotion Inference] No emotions, clearing inference");
-            liveInferredEmotion = null;
-            inferredEmotionFull = null;
-            inferringEmotion = false;
-            inferenceError = null;
-            return;
-        }
-
-        if (currentHash !== lastInferredHash) {
-            console.log("[Emotion Inference] Starting inference...");
-            inferringEmotion = true;
-            inferenceError = null;
-
-            inferEmotion({ positives, negatives })
-                .then((response) => {
-                    console.log("[Emotion Inference] Success:", response);
-                    lastInferredHash = currentHash;
-                    liveInferredEmotion = response.inferred_emotion;
-                    inferringEmotion = false;
-
-                    // Get full emotion data from store
-                    if (response.inferred_emotion?.closest_emotion_id) {
-                        const e = emotionStore.get(
-                            response.inferred_emotion.closest_emotion_id,
-                        );
-                        console.log(
-                            "[Emotion Inference] Found emotion in store:",
-                            e?.name,
-                        );
-                        inferredEmotionFull = e || null;
-                    } else {
-                        console.log(
-                            "[Emotion Inference] No closest emotion ID in response",
-                        );
-                        inferredEmotionFull = null;
-                    }
-                })
-                .catch((error) => {
-                    console.error("[Emotion Inference] Error:", error);
-                    inferringEmotion = false;
-                    inferenceError = error.message || "Failed to infer emotion";
-                    liveInferredEmotion = null;
-                    inferredEmotionFull = null;
-                });
-        } else {
-            console.log(
-                "[Emotion Inference] Hash unchanged, skipping inference",
-            );
-        }
-    });
-
-    // Reactively update selectedEmotion and inferredEmotionFull when store initializes
-    $effect(() => {
-        if (emotionStore.isInitialized) {
-            if (task?.emotion_id && !selectedEmotion) {
-                const e = emotionStore.get(task.emotion_id);
-                if (e) selectedEmotion = e;
-                // Note: this might override if user cleared it?
-                // Actually formInitialized prevents re-running the main init block.
-                // This block is specifically for when store loads AFTER task load.
-                // But simply checking !selectedEmotion checks if it's empty.
-                // If user actively cleared it, it is null.
-                // Ideally we track if we have "attempted" to load the initial emotion.
-            }
-            // Update inferred emotion full if needed (e.g. store loaded late)
-            if (
-                liveInferredEmotion?.closest_emotion_id &&
-                !inferredEmotionFull
-            ) {
-                const e = emotionStore.get(
-                    liveInferredEmotion.closest_emotion_id,
-                );
-                if (e) inferredEmotionFull = e;
-            }
-            // Also need to handle task.inferred_emotion if not editing live
-            if (
-                task?.inferred_emotion?.closest_emotion_id &&
-                !inferredEmotionFull &&
-                !liveInferredEmotion
-            ) {
-                const e = emotionStore.get(
-                    task.inferred_emotion.closest_emotion_id,
-                );
-                if (e) inferredEmotionFull = e;
-            }
-        }
-    });
-
-    onDestroy(() => {
-        if (timeUpdateInterval) clearInterval(timeUpdateInterval);
-    });
-
-    // Queries
-    const categoriesQuery = createQuery({
-        queryKey: ["categories"],
-        queryFn: () => getCategories({ limit: 100 }),
-        retry: false,
-    });
-
-    const categories = $derived($categoriesQuery.data?.items || []);
-    const selectedCategory = $derived(
-        categories.find((c) => c.id === categoryId),
-    );
-
-    // Mutations
-    const createMut = createMutation({
-        mutationFn: (data: CreateTaskRequest) => createTask(data),
-        onSuccess: handleSuccess,
-    });
-
-    const updateMut = createMutation({
-        mutationFn: (data: UpdateTaskRequest) => updateTask(task!.id, data),
-        onSuccess: handleSuccess,
-    });
-
-    const deleteMut = createMutation({
-        mutationFn: () => deleteTask(task!.id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["tasks"] });
-            navigateBack();
-        },
-    });
-
-    const createCategoryMut = createMutation({
-        mutationFn: (data: { name: string; color: string }) =>
-            createCategory(data),
-        onSuccess: (newCat) => {
-            queryClient.invalidateQueries({ queryKey: ["categories"] });
-            categoryId = newCat.id;
-            newCategoryName = "";
-            newCategoryColor = "#6366f1";
-            useCustomCategoryColor = false;
-            showNewCategory = false;
-        },
-    });
-
-    const isPending = $derived($createMut.isPending || $updateMut.isPending);
-    const inferredEmotion = $derived(
-        liveInferredEmotion || task?.inferred_emotion,
-    );
-
-    function handleSuccess() {
-        queryClient.invalidateQueries({ queryKey: ["tasks"] });
-        onSuccess?.();
-        navigateBack();
-    }
-
-    function navigateBack() {
-        if (referrer) {
-            goto(referrer);
-        } else {
-            goto("/tasks");
-        }
-    }
-
-    // loadTaskEmotion removed as it's handled in effects/init
-
-    // Emotion handlers
-    function handleEmotionSelect(emotion: Emotion) {
-        console.log("[Emotion Select]", {
-            emotion: emotion.name,
-            context: emotionContext,
-        });
-
-        if (emotionContext?.type === "task") {
-            selectedEmotion = emotion;
-        } else if (
-            emotionContext?.type === "positive" &&
-            emotionContext.index !== undefined
-        ) {
-            if (emotionContext.index === -1) {
-                // Pending new positive item
-                pendingPositiveEmotion = emotion;
-                console.log(
-                    "[Emotion Select] Set pending positive emotion:",
-                    emotion.name,
-                );
-            } else {
-                positives = positives.map((p, i) =>
-                    i === emotionContext!.index
-                        ? { ...p, emotion_id: emotion.id }
-                        : p,
-                );
-                console.log(
-                    "[Emotion Select] Updated positive item at index",
-                    emotionContext.index,
-                );
-            }
-        } else if (
-            emotionContext?.type === "negative" &&
-            emotionContext.index !== undefined
-        ) {
-            if (emotionContext.index === -1) {
-                // Pending new negative item
-                pendingNegativeEmotion = emotion;
-                console.log(
-                    "[Emotion Select] Set pending negative emotion:",
-                    emotion.name,
-                );
-            } else {
-                negatives = negatives.map((n, i) =>
-                    i === emotionContext!.index
-                        ? { ...n, emotion_id: emotion.id }
-                        : n,
-                );
-                console.log(
-                    "[Emotion Select] Updated negative item at index",
-                    emotionContext.index,
-                );
-            }
-        }
-        emotionContext = null;
-        emotionModalOpen = false;
-        pendingEmotionType = null;
-    }
-
-    function openEmotionForTask() {
-        emotionContext = { type: "task" };
-        initialEmotionForModal = null;
-        allowedQuadrantsForModal = null; // All quadrants allowed for task emotion
-        emotionModalOpen = true;
-    }
-
-    /** Open emotion modal with the suggested emotion pre-selected and panned to */
-    function openEmotionForSuggested() {
-        emotionContext = { type: "task" };
-        initialEmotionForModal = inferredEmotionFull;
-        allowedQuadrantsForModal = null; // All quadrants allowed for task emotion
-        emotionModalOpen = true;
-    }
-
-    function openEmotionForPositive(index: number) {
-        emotionContext = { type: "positive", index };
-
-        // Find current emotion if it exists
-        const p = positives[index];
-        initialEmotionForModal = p.emotion_id
-            ? emotionStore.get(p.emotion_id) || null
-            : null;
-
-        allowedQuadrantsForModal = ["yellow", "green"]; // Only pleasant emotions for positives
-        emotionModalOpen = true;
-    }
-
-    function openEmotionForNegative(index: number) {
-        emotionContext = { type: "negative", index };
-
-        // Find current emotion if it exists
-        const n = negatives[index];
-        initialEmotionForModal = n.emotion_id
-            ? emotionStore.get(n.emotion_id) || null
-            : null;
-
-        allowedQuadrantsForModal = ["red", "blue"]; // Only unpleasant emotions for negatives
-        emotionModalOpen = true;
-    }
-
-    // Open emotion picker for pending new item
-    function openEmotionForPendingPositive() {
-        pendingEmotionType = "positive";
-        emotionContext = { type: "positive", index: -1 };
-        initialEmotionForModal = pendingPositiveEmotion;
-        allowedQuadrantsForModal = ["yellow", "green"]; // Only pleasant emotions for positives
-        emotionModalOpen = true;
-    }
-
-    function openEmotionForPendingNegative() {
-        pendingEmotionType = "negative";
-        emotionContext = { type: "negative", index: -1 };
-        initialEmotionForModal = pendingNegativeEmotion;
-        allowedQuadrantsForModal = ["red", "blue"]; // Only unpleasant emotions for negatives
-        emotionModalOpen = true;
-    }
-
-    function clearTaskEmotion() {
-        selectedEmotion = null;
-    }
-
-    function clearPositiveEmotion(index: number) {
-        positives = positives.map((p, i) =>
-            i === index ? { ...p, emotion_id: undefined } : p,
-        );
-    }
-
-    function clearNegativeEmotion(index: number) {
-        negatives = negatives.map((n, i) =>
-            i === index ? { ...n, emotion_id: undefined } : n,
-        );
-    }
-
-    // Completion toggle
-    function handleCompletionToggle() {
-        if (completed && isEditing) {
-            showUncompleteConfirm = true;
-        } else {
-            completed = !completed;
-        }
-    }
-
-    function confirmUncomplete() {
-        completed = false;
-        showUncompleteConfirm = false;
-    }
-
-    // Category
-    function handleCreateCategory() {
-        if (newCategoryName.trim()) {
-            $createCategoryMut.mutate({
-                name: newCategoryName.trim(),
-                color: newCategoryColor,
-            });
-        }
-    }
-
-    // Submit
-    function handleSubmit() {
-        if (!title.trim() || !startDate || !endDate) return;
-
-        const [startYear, startMonth, startDay] = startDate
-            .split("-")
-            .map(Number);
-        const [startHour, startMinute, startSecond] = startTime
-            .split(":")
-            .map(Number);
-        const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
-        const [endHour, endMinute, endSecond] = endTime.split(":").map(Number);
-
-        const startDateObj = new Date(
-            startYear,
-            startMonth - 1,
-            startDay,
-            startHour || 0,
-            startMinute || 0,
-            startSecond || 0,
-        );
-        const endDateObj = new Date(
-            endYear,
-            endMonth - 1,
-            endDay,
-            endHour || 0,
-            endMinute || 0,
-            endSecond || 0,
-        );
-
-        const data = {
-            title: title.trim(),
-            journal: journal || undefined,
-            start_date: startDateObj.toISOString(),
-            end_date: endDateObj.toISOString(),
-            category_id: categoryId || undefined,
-            priority: priority || undefined,
-            positives: positives.length > 0 ? positives : undefined,
-            negatives: negatives.length > 0 ? negatives : undefined,
-            completed: completed,
-            emotion_id: selectedEmotion?.id || undefined,
-            linked_goals:
-                goalLinks.length > 0
-                    ? goalLinks.map((l) => ({
-                          goal_id: l.goal_id,
-                          impact_type: l.impact_type,
-                          impact_magnitude: l.impact_magnitude,
-                          quantity_value: l.quantity_value,
-                          quantity_unit: l.quantity_unit,
-                      }))
-                    : undefined,
-        };
-
-        if (isEditing) {
-            $updateMut.mutate(data);
-        } else {
-            $createMut.mutate(data);
-        }
-    }
-
-    function handleDelete() {
-        $deleteMut.mutate();
-        showDeleteConfirm = false;
-    }
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import {
+	type CreateTaskRequest,
+	type Task,
+	type TaskItem,
+	type TaskTemplate,
+	type UpdateTaskRequest,
+	createTask,
+	deleteTask,
+	getLastTaskEndTime,
+	updateTask,
+} from '$lib/api';
+import { createCategory, getCategories } from '$lib/api/categories';
+import {
+	type Emotion,
+	type InferredEmotion,
+	inferEmotion,
+} from '$lib/api/emotions';
+import { EmotionModal } from '$lib/components/emotions';
+import {
+	QUADRANT_COLORS,
+	QUADRANT_META,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { GoalSelector } from '$lib/components/goals';
+import { RichEditor } from '$lib/components/rich-editor';
+import {
+	EmotionSection,
+	ReflectionSection,
+	ScheduleSection,
+	TaskPrioritySlider,
+} from '$lib/components/tasks';
+import {
+	Card,
+	CategoryDropdown,
+	ColorPicker,
+	ConfirmDialog,
+	SectionHeader,
+} from '$lib/components/ui';
+import OpenMoji from '$lib/components/ui/OpenMoji.svelte';
+import { emotionStore } from '$lib/stores/emotions.svelte';
+import { cn } from '$lib/utils';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+
+import {
+	Check,
+	Circle,
+	CircleCheck,
+	Edit3,
+	FileText,
+	Info,
+	Save,
+	Tag,
+	Target,
+	Trash2,
+	X,
+} from 'lucide-svelte';
+
+import { onDestroy } from 'svelte';
+import { writable } from 'svelte/store';
+
+// Context for emotion selection
+type EmotionSelectionContext = {
+	type: 'task' | 'positive' | 'negative';
+	index?: number;
+};
+
+interface Props {
+	/** Task to edit (null for create mode) */
+	task?: Task | null;
+	/** Initial category ID for new tasks */
+	initialCategoryId?: string;
+	/** Referrer URL to navigate back to */
+	referrer?: string;
+	/** Called after successful save */
+	onSuccess?: () => void;
+}
+
+let { task = null, initialCategoryId, referrer, onSuccess }: Props = $props();
+
+const queryClient = useQueryClient();
+const isEditing = $derived(!!task);
+
+// Fetch last task end time only in create mode
+// Fetch last task end time only in create mode
+const lastTaskEndTimeOptions = writable({
+	queryKey: ['tasks', 'last-end-time'],
+	queryFn: getLastTaskEndTime,
+	enabled: false,
+});
+
+$effect(() => {
+	lastTaskEndTimeOptions.set({
+		queryKey: ['tasks', 'last-end-time'],
+		queryFn: getLastTaskEndTime,
+		enabled: !isEditing,
+	});
+});
+
+const lastTaskEndTimeQuery = createQuery<{ end_time: string | null }>(
+	lastTaskEndTimeOptions,
+);
+
+const lastTaskEndTime = $derived(
+	$lastTaskEndTimeQuery.data?.end_time
+		? new Date($lastTaskEndTimeQuery.data.end_time)
+		: null,
+);
+
+// Form state
+let title = $state('');
+let journal = $state('');
+let categoryId = $state<string | undefined>(undefined);
+let priority = $state(3);
+let positives = $state<TaskItem[]>([]);
+let negatives = $state<TaskItem[]>([]);
+let completed = $state(false);
+
+// Goal links state
+interface GoalLink {
+	goal_id: string;
+	impact_type: 'positive' | 'negative' | 'neutral';
+	impact_magnitude: number;
+	quantity_value?: number;
+	quantity_unit?: string;
+}
+let goalLinks = $state<GoalLink[]>([]);
+
+// Emotion state
+let selectedEmotion = $state<Emotion | null>(null);
+let emotionContext = $state<EmotionSelectionContext | null>(null);
+let emotionModalOpen = $state(false);
+let liveInferredEmotion = $state<InferredEmotion | null>(null);
+let inferredEmotionFull = $state<Emotion | null>(null);
+let inferringEmotion = $state(false);
+let inferenceError = $state<string | null>(null);
+/** Initial emotion to pre-select when modal opens (e.g. suggested emotion) */
+let initialEmotionForModal = $state<Emotion | null>(null);
+/** Allowed quadrants for emotion selection (null = all allowed) */
+let allowedQuadrantsForModal = $state<Quadrant[] | null>(null);
+
+// Pending emotion for new reflection item (select emotion FIRST)
+let pendingPositiveEmotion = $state<Emotion | null>(null);
+let pendingNegativeEmotion = $state<Emotion | null>(null);
+let pendingEmotionType = $state<'positive' | 'negative' | null>(null);
+
+// Date/time state
+let startDate = $state('');
+let endDate = $state('');
+let startTime = $state('09:00:00');
+let endTime = $state('10:00:00');
+
+// Category creation
+let newCategoryName = $state('');
+let newCategoryColor = $state('#6366f1');
+let showNewCategory = $state(false);
+let useCustomCategoryColor = $state(false);
+
+// Confirmation dialogs
+let showUncompleteConfirm = $state(false);
+let showDeleteConfirm = $state(false);
+
+// Live time tracking (only for create mode)
+let liveEndTime = $state(false);
+let useLastTaskStart = $state(false);
+let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
+
+// Track if form is initialized
+let formInitialized = $state(false);
+
+function getTodayString() {
+	return new Date().toISOString().split('T')[0];
+}
+
+// Hash of reflections to check if they have changed
+function getReflectionsHash(p: TaskItem[], n: TaskItem[]) {
+	return JSON.stringify({
+		p: p.map((x) => ({ t: x.text, e: x.emotion_id })),
+		n: n.map((x) => ({ t: x.text, e: x.emotion_id })),
+	});
+}
+
+// Logic to prevent initial inference call
+let lastInferredHash = $state('');
+
+function updateEndTimeToNow() {
+	const now = new Date();
+	endDate = now.toISOString().split('T')[0];
+	endTime = now.toTimeString().slice(0, 8);
+}
+
+// Initialize form based on mode
+$effect(() => {
+	if (formInitialized) return;
+
+	if (task) {
+		// Edit mode - populate from task
+		title = task.title;
+		journal = task.journal || '';
+		categoryId = task.category?.id;
+		priority = task.priority || 3;
+		positives = task.positives || [];
+		negatives = task.negatives || [];
+		completed = task.completed || false;
+		goalLinks = (task.linked_goals || []).map((l) => ({
+			goal_id: l.goal_id,
+			impact_type:
+				(l.impact_type as 'positive' | 'negative' | 'neutral') || 'positive',
+			impact_magnitude: l.impact_magnitude,
+			quantity_value: l.quantity_value,
+			quantity_unit: l.quantity_unit,
+		}));
+
+		const startDateObj = new Date(task.start_date);
+		const endDateObj = new Date(task.end_date);
+
+		startDate = startDateObj.toISOString().split('T')[0];
+		endDate = endDateObj.toISOString().split('T')[0];
+		startTime = startDateObj.toTimeString().slice(0, 8);
+		endTime = endDateObj.toTimeString().slice(0, 8);
+
+		if (task.emotion_id) {
+			// Try to load immediately from store
+			const e = emotionStore.get(task.emotion_id);
+			if (e) {
+				selectedEmotion = e;
+			}
+		}
+
+		// Set initial hash to prevent immediate inference
+		lastInferredHash = getReflectionsHash(positives, negatives);
+	} else {
+		// Create mode - set defaults
+		const today = getTodayString();
+		startDate = today;
+		endDate = today;
+		if (initialCategoryId) {
+			categoryId = initialCategoryId;
+		}
+
+		// Check for template
+		if (browser) {
+			const templateJson = sessionStorage.getItem('task-template');
+			if (templateJson) {
+				try {
+					const tmpl = JSON.parse(templateJson) as TaskTemplate;
+					title = tmpl.title;
+					if (tmpl.description) journal = tmpl.description;
+					if (tmpl.icon) title = `${tmpl.icon} ${title}`; // Optional: prepend icon?
+
+					if (tmpl.category) categoryId = tmpl.category.id;
+
+					// Calculate end time based on default duration
+					if (tmpl.default_duration) {
+						const start = new Date(); // Or whatever start time is set to (now by default)
+						// Actually start time is set to 'now' implicitly by user interaction or default state?
+						// Default state for startTime/endTime is set to 09:00/10:00 in declarations...
+						// If we want "Now" + duration:
+						const now = new Date();
+						const end = new Date(now.getTime() + tmpl.default_duration * 1000);
+
+						// Update start/end strings
+						startDate = now.toISOString().split('T')[0];
+						startTime = now.toTimeString().slice(0, 8);
+						endDate = end.toISOString().split('T')[0];
+						endTime = end.toTimeString().slice(0, 8);
+					}
+
+					if (tmpl.default_emotion_id) {
+						const e = emotionStore.get(tmpl.default_emotion_id);
+						if (e) selectedEmotion = e;
+					}
+
+					if (tmpl.goals) {
+						goalLinks = tmpl.goals.map((g) => ({
+							goal_id: g.id,
+							impact_type: 'positive',
+							impact_magnitude: 3,
+							quantity_value: tmpl.quantity_enabled
+								? tmpl.quantity_default
+								: undefined,
+							quantity_unit: g.target?.unit_id,
+						}));
+					}
+
+					sessionStorage.removeItem('task-template');
+				} catch (e) {
+					console.error('Failed to parse task template', e);
+				}
+			}
+		}
+
+		// Initialize hash for empty arrays in create mode
+		lastInferredHash = getReflectionsHash([], []);
+	}
+	formInitialized = true;
+	console.log('[TaskForm Init] Initialized:', {
+		isEditing,
+		lastInferredHash,
+		formInitialized,
+	});
+});
+
+// Live time interval for create mode
+$effect(() => {
+	if (!isEditing && liveEndTime) {
+		updateEndTimeToNow();
+		timeUpdateInterval = setInterval(updateEndTimeToNow, 1000);
+	} else if (timeUpdateInterval) {
+		clearInterval(timeUpdateInterval);
+		timeUpdateInterval = null;
+	}
+});
+
+// Effect to set start from last task
+$effect(() => {
+	if (!isEditing && useLastTaskStart && lastTaskEndTime) {
+		const lastEnd = new Date(lastTaskEndTime);
+		startDate = lastEnd.toISOString().split('T')[0];
+		startTime = lastEnd.toTimeString().slice(0, 8);
+	}
+});
+
+// Effect to calculate live inferred emotion
+$effect(() => {
+	const currentHash = getReflectionsHash(positives, negatives);
+	const hasEmotions =
+		positives.some((p) => p.emotion_id) || negatives.some((n) => n.emotion_id);
+
+	console.log('[Emotion Inference] Effect triggered:', {
+		hasEmotions,
+		currentHash,
+		lastInferredHash,
+		positivesCount: positives.length,
+		negativesCount: negatives.length,
+		positivesWithEmotions: positives.filter((p) => p.emotion_id).length,
+		negativesWithEmotions: negatives.filter((n) => n.emotion_id).length,
+	});
+
+	if (!hasEmotions) {
+		console.log('[Emotion Inference] No emotions, clearing inference');
+		liveInferredEmotion = null;
+		inferredEmotionFull = null;
+		inferringEmotion = false;
+		inferenceError = null;
+		return;
+	}
+
+	if (currentHash !== lastInferredHash) {
+		console.log('[Emotion Inference] Starting inference...');
+		inferringEmotion = true;
+		inferenceError = null;
+
+		inferEmotion({ positives, negatives })
+			.then((response) => {
+				console.log('[Emotion Inference] Success:', response);
+				lastInferredHash = currentHash;
+				liveInferredEmotion = response.inferred_emotion;
+				inferringEmotion = false;
+
+				// Get full emotion data from store
+				if (response.inferred_emotion?.closest_emotion_id) {
+					const e = emotionStore.get(
+						response.inferred_emotion.closest_emotion_id,
+					);
+					console.log('[Emotion Inference] Found emotion in store:', e?.name);
+					inferredEmotionFull = e || null;
+				} else {
+					console.log('[Emotion Inference] No closest emotion ID in response');
+					inferredEmotionFull = null;
+				}
+			})
+			.catch((error) => {
+				console.error('[Emotion Inference] Error:', error);
+				inferringEmotion = false;
+				inferenceError = error.message || 'Failed to infer emotion';
+				liveInferredEmotion = null;
+				inferredEmotionFull = null;
+			});
+	} else {
+		console.log('[Emotion Inference] Hash unchanged, skipping inference');
+	}
+});
+
+// Reactively update selectedEmotion and inferredEmotionFull when store initializes
+$effect(() => {
+	if (emotionStore.isInitialized) {
+		if (task?.emotion_id && !selectedEmotion) {
+			const e = emotionStore.get(task.emotion_id);
+			if (e) selectedEmotion = e;
+			// Note: this might override if user cleared it?
+			// Actually formInitialized prevents re-running the main init block.
+			// This block is specifically for when store loads AFTER task load.
+			// But simply checking !selectedEmotion checks if it's empty.
+			// If user actively cleared it, it is null.
+			// Ideally we track if we have "attempted" to load the initial emotion.
+		}
+		// Update inferred emotion full if needed (e.g. store loaded late)
+		if (liveInferredEmotion?.closest_emotion_id && !inferredEmotionFull) {
+			const e = emotionStore.get(liveInferredEmotion.closest_emotion_id);
+			if (e) inferredEmotionFull = e;
+		}
+		// Also need to handle task.inferred_emotion if not editing live
+		if (
+			task?.inferred_emotion?.closest_emotion_id &&
+			!inferredEmotionFull &&
+			!liveInferredEmotion
+		) {
+			const e = emotionStore.get(task.inferred_emotion.closest_emotion_id);
+			if (e) inferredEmotionFull = e;
+		}
+	}
+});
+
+onDestroy(() => {
+	if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+});
+
+// Queries
+const categoriesQuery = createQuery({
+	queryKey: ['categories'],
+	queryFn: () => getCategories({ limit: 100 }),
+	retry: false,
+});
+
+const categories = $derived($categoriesQuery.data?.items || []);
+const selectedCategory = $derived(categories.find((c) => c.id === categoryId));
+
+// Mutations
+const createMut = createMutation({
+	mutationFn: (data: CreateTaskRequest) => createTask(data),
+	onSuccess: handleSuccess,
+});
+
+const updateMut = createMutation({
+	mutationFn: (data: UpdateTaskRequest) => updateTask(task!.id, data),
+	onSuccess: handleSuccess,
+});
+
+const deleteMut = createMutation({
+	mutationFn: () => deleteTask(task!.id),
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ['tasks'] });
+		navigateBack();
+	},
+});
+
+const createCategoryMut = createMutation({
+	mutationFn: (data: { name: string; color: string }) => createCategory(data),
+	onSuccess: (newCat) => {
+		queryClient.invalidateQueries({ queryKey: ['categories'] });
+		categoryId = newCat.id;
+		newCategoryName = '';
+		newCategoryColor = '#6366f1';
+		useCustomCategoryColor = false;
+		showNewCategory = false;
+	},
+});
+
+const isPending = $derived($createMut.isPending || $updateMut.isPending);
+const inferredEmotion = $derived(liveInferredEmotion || task?.inferred_emotion);
+
+function handleSuccess() {
+	queryClient.invalidateQueries({ queryKey: ['tasks'] });
+	onSuccess?.();
+	navigateBack();
+}
+
+function navigateBack() {
+	if (referrer) {
+		goto(referrer);
+	} else {
+		goto('/tasks');
+	}
+}
+
+// loadTaskEmotion removed as it's handled in effects/init
+
+// Emotion handlers
+function handleEmotionSelect(emotion: Emotion) {
+	console.log('[Emotion Select]', {
+		emotion: emotion.name,
+		context: emotionContext,
+	});
+
+	if (emotionContext?.type === 'task') {
+		selectedEmotion = emotion;
+	} else if (
+		emotionContext?.type === 'positive' &&
+		emotionContext.index !== undefined
+	) {
+		if (emotionContext.index === -1) {
+			// Pending new positive item
+			pendingPositiveEmotion = emotion;
+			console.log(
+				'[Emotion Select] Set pending positive emotion:',
+				emotion.name,
+			);
+		} else {
+			positives = positives.map((p, i) =>
+				i === emotionContext!.index ? { ...p, emotion_id: emotion.id } : p,
+			);
+			console.log(
+				'[Emotion Select] Updated positive item at index',
+				emotionContext.index,
+			);
+		}
+	} else if (
+		emotionContext?.type === 'negative' &&
+		emotionContext.index !== undefined
+	) {
+		if (emotionContext.index === -1) {
+			// Pending new negative item
+			pendingNegativeEmotion = emotion;
+			console.log(
+				'[Emotion Select] Set pending negative emotion:',
+				emotion.name,
+			);
+		} else {
+			negatives = negatives.map((n, i) =>
+				i === emotionContext!.index ? { ...n, emotion_id: emotion.id } : n,
+			);
+			console.log(
+				'[Emotion Select] Updated negative item at index',
+				emotionContext.index,
+			);
+		}
+	}
+	emotionContext = null;
+	emotionModalOpen = false;
+	pendingEmotionType = null;
+}
+
+function openEmotionForTask() {
+	emotionContext = { type: 'task' };
+	initialEmotionForModal = null;
+	allowedQuadrantsForModal = null; // All quadrants allowed for task emotion
+	emotionModalOpen = true;
+}
+
+/** Open emotion modal with the suggested emotion pre-selected and panned to */
+function openEmotionForSuggested() {
+	emotionContext = { type: 'task' };
+	initialEmotionForModal = inferredEmotionFull;
+	allowedQuadrantsForModal = null; // All quadrants allowed for task emotion
+	emotionModalOpen = true;
+}
+
+function openEmotionForPositive(index: number) {
+	emotionContext = { type: 'positive', index };
+
+	// Find current emotion if it exists
+	const p = positives[index];
+	initialEmotionForModal = p.emotion_id
+		? emotionStore.get(p.emotion_id) || null
+		: null;
+
+	allowedQuadrantsForModal = ['yellow', 'green']; // Only pleasant emotions for positives
+	emotionModalOpen = true;
+}
+
+function openEmotionForNegative(index: number) {
+	emotionContext = { type: 'negative', index };
+
+	// Find current emotion if it exists
+	const n = negatives[index];
+	initialEmotionForModal = n.emotion_id
+		? emotionStore.get(n.emotion_id) || null
+		: null;
+
+	allowedQuadrantsForModal = ['red', 'blue']; // Only unpleasant emotions for negatives
+	emotionModalOpen = true;
+}
+
+// Open emotion picker for pending new item
+function openEmotionForPendingPositive() {
+	pendingEmotionType = 'positive';
+	emotionContext = { type: 'positive', index: -1 };
+	initialEmotionForModal = pendingPositiveEmotion;
+	allowedQuadrantsForModal = ['yellow', 'green']; // Only pleasant emotions for positives
+	emotionModalOpen = true;
+}
+
+function openEmotionForPendingNegative() {
+	pendingEmotionType = 'negative';
+	emotionContext = { type: 'negative', index: -1 };
+	initialEmotionForModal = pendingNegativeEmotion;
+	allowedQuadrantsForModal = ['red', 'blue']; // Only unpleasant emotions for negatives
+	emotionModalOpen = true;
+}
+
+function clearTaskEmotion() {
+	selectedEmotion = null;
+}
+
+function clearPositiveEmotion(index: number) {
+	positives = positives.map((p, i) =>
+		i === index ? { ...p, emotion_id: undefined } : p,
+	);
+}
+
+function clearNegativeEmotion(index: number) {
+	negatives = negatives.map((n, i) =>
+		i === index ? { ...n, emotion_id: undefined } : n,
+	);
+}
+
+// Completion toggle
+function handleCompletionToggle() {
+	if (completed && isEditing) {
+		showUncompleteConfirm = true;
+	} else {
+		completed = !completed;
+	}
+}
+
+function confirmUncomplete() {
+	completed = false;
+	showUncompleteConfirm = false;
+}
+
+// Category
+function handleCreateCategory() {
+	if (newCategoryName.trim()) {
+		$createCategoryMut.mutate({
+			name: newCategoryName.trim(),
+			color: newCategoryColor,
+		});
+	}
+}
+
+// Submit
+function handleSubmit() {
+	if (!title.trim() || !startDate || !endDate) return;
+
+	const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+	const [startHour, startMinute, startSecond] = startTime
+		.split(':')
+		.map(Number);
+	const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+	const [endHour, endMinute, endSecond] = endTime.split(':').map(Number);
+
+	const startDateObj = new Date(
+		startYear,
+		startMonth - 1,
+		startDay,
+		startHour || 0,
+		startMinute || 0,
+		startSecond || 0,
+	);
+	const endDateObj = new Date(
+		endYear,
+		endMonth - 1,
+		endDay,
+		endHour || 0,
+		endMinute || 0,
+		endSecond || 0,
+	);
+
+	const data = {
+		title: title.trim(),
+		journal: journal || undefined,
+		start_date: startDateObj.toISOString(),
+		end_date: endDateObj.toISOString(),
+		category_id: categoryId || undefined,
+		priority: priority || undefined,
+		positives: positives.length > 0 ? positives : undefined,
+		negatives: negatives.length > 0 ? negatives : undefined,
+		completed: completed,
+		emotion_id: selectedEmotion?.id || undefined,
+		linked_goals:
+			goalLinks.length > 0
+				? goalLinks.map((l) => ({
+						goal_id: l.goal_id,
+						impact_type: l.impact_type,
+						impact_magnitude: l.impact_magnitude,
+						quantity_value: l.quantity_value,
+						quantity_unit: l.quantity_unit,
+					}))
+				: undefined,
+	};
+
+	if (isEditing) {
+		$updateMut.mutate(data);
+	} else {
+		$createMut.mutate(data);
+	}
+}
+
+function handleDelete() {
+	$deleteMut.mutate();
+	showDeleteConfirm = false;
+}
 </script>
 
 <div class="flex flex-col min-h-[calc(100vh-6rem)] relative">

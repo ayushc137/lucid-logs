@@ -16,8 +16,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog/log"
+
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
 
 // =============================================================================

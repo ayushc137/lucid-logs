@@ -1,44 +1,44 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
-    import { fade } from "svelte/transition";
+import { onDestroy, onMount } from 'svelte';
+import { fade } from 'svelte/transition';
 
-    let {
-        showOnlyToday = true,
-        selectedDate = new Date(),
-    }: {
-        showOnlyToday?: boolean;
-        selectedDate?: Date;
-    } = $props();
+let {
+	showOnlyToday = true,
+	selectedDate = new Date(),
+}: {
+	showOnlyToday?: boolean;
+	selectedDate?: Date;
+} = $props();
 
-    let currentTime = $state(new Date());
-    let timeInterval: ReturnType<typeof setInterval>;
+let currentTime = $state(new Date());
+let timeInterval: ReturnType<typeof setInterval>;
 
-    onMount(() => {
-        timeInterval = setInterval(() => (currentTime = new Date()), 1000);
-    });
+onMount(() => {
+	timeInterval = setInterval(() => (currentTime = new Date()), 1000);
+});
 
-    onDestroy(() => {
-        if (timeInterval) clearInterval(timeInterval);
-    });
+onDestroy(() => {
+	if (timeInterval) clearInterval(timeInterval);
+});
 
-    const isToday = $derived(() => {
-        const t = new Date();
-        return (
-            selectedDate.getFullYear() === t.getFullYear() &&
-            selectedDate.getMonth() === t.getMonth() &&
-            selectedDate.getDate() === t.getDate()
-        );
-    });
+const isToday = $derived(() => {
+	const t = new Date();
+	return (
+		selectedDate.getFullYear() === t.getFullYear() &&
+		selectedDate.getMonth() === t.getMonth() &&
+		selectedDate.getDate() === t.getDate()
+	);
+});
 
-    const nowFormatted = $derived(
-        currentTime.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        }),
-    );
+const nowFormatted = $derived(
+	currentTime.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	}),
+);
 
-    const shouldShow = $derived(!showOnlyToday || isToday());
+const shouldShow = $derived(!showOnlyToday || isToday());
 </script>
 
 {#if shouldShow}

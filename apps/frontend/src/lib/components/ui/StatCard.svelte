@@ -1,37 +1,37 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    import IconBox from "./IconBox.svelte";
+import type { Snippet } from 'svelte';
+import IconBox from './IconBox.svelte';
 
-    interface Props {
-        /** Main value to display */
-        value: string | number;
-        /** Label text */
-        label: string;
-        /** Optional unit/suffix */
-        unit?: string;
-        /** Semantic color */
-        color?:
-            | "primary"
-            | "secondary"
-            | "accent"
-            | "info"
-            | "success"
-            | "warning"
-            | "error";
-        /** Icon slot */
-        icon?: Snippet;
-        /** Custom class */
-        class?: string;
-    }
+interface Props {
+	/** Main value to display */
+	value: string | number;
+	/** Label text */
+	label: string;
+	/** Optional unit/suffix */
+	unit?: string;
+	/** Semantic color */
+	color?:
+		| 'primary'
+		| 'secondary'
+		| 'accent'
+		| 'info'
+		| 'success'
+		| 'warning'
+		| 'error';
+	/** Icon slot */
+	icon?: Snippet;
+	/** Custom class */
+	class?: string;
+}
 
-    let {
-        value,
-        label,
-        unit = "",
-        color = "primary",
-        icon,
-        class: className = "",
-    }: Props = $props();
+let {
+	value,
+	label,
+	unit = '',
+	color = 'primary',
+	icon,
+	class: className = '',
+}: Props = $props();
 </script>
 
 <div class="flex items-center gap-3 {className}">

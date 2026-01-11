@@ -1,123 +1,117 @@
 <script lang="ts">
-    import {
-        createMutation,
-        createQuery,
-        useQueryClient,
-    } from "@tanstack/svelte-query";
-    import { getUnits, createUnit, type Unit } from "$lib/api";
-    import { ChevronDown, Plus, Check } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { type Unit, createUnit, getUnits } from '$lib/api';
+import { cn } from '$lib/utils';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import { Check, ChevronDown, Plus } from 'lucide-svelte';
 
-    interface Props {
-        value: string;
-        label?: string;
-        size?: "xs" | "sm" | "md";
-        class?: string;
-    }
+interface Props {
+	value: string;
+	label?: string;
+	size?: 'xs' | 'sm' | 'md';
+	class?: string;
+}
 
-    let {
-        value = $bindable(""),
-        label,
-        size = "sm",
-        class: className,
-    }: Props = $props();
+let {
+	value = $bindable(''),
+	label,
+	size = 'sm',
+	class: className,
+}: Props = $props();
 
-    const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
-    // Fetch units from API
-    const unitsQuery = createQuery({
-        queryKey: ["units"],
-        queryFn: () => getUnits(),
-        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    });
+// Fetch units from API
+const unitsQuery = createQuery({
+	queryKey: ['units'],
+	queryFn: () => getUnits(),
+	staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+});
 
-    const units = $derived($unitsQuery.data?.items || []);
-    const selectedUnit = $derived(units.find((u) => u.id === value));
+const units = $derived($unitsQuery.data?.items || []);
+const selectedUnit = $derived(units.find((u) => u.id === value));
 
-    // Create unit mutation
-    const createUnitMut = createMutation({
-        mutationFn: (data: { name: string; symbol: string; type: string }) =>
-            createUnit({
-                name: data.name,
-                symbol: data.symbol,
-                type: data.type as
-                    | "count"
-                    | "time"
-                    | "distance"
-                    | "volume"
-                    | "custom",
-            }),
-        onSuccess: (newUnit) => {
-            queryClient.invalidateQueries({ queryKey: ["units"] });
-            value = newUnit.id;
-            showCreate = false;
-            newName = "";
-            newSymbol = "";
-            newType = "count";
-        },
-    });
+// Create unit mutation
+const createUnitMut = createMutation({
+	mutationFn: (data: { name: string; symbol: string; type: string }) =>
+		createUnit({
+			name: data.name,
+			symbol: data.symbol,
+			type: data.type as 'count' | 'time' | 'distance' | 'volume' | 'custom',
+		}),
+	onSuccess: (newUnit) => {
+		queryClient.invalidateQueries({ queryKey: ['units'] });
+		value = newUnit.id;
+		showCreate = false;
+		newName = '';
+		newSymbol = '';
+		newType = 'count';
+	},
+});
 
-    let isOpen = $state(false);
-    let showCreate = $state(false);
-    let newName = $state("");
-    let newSymbol = $state("");
-    let newType = $state<"count" | "time" | "distance" | "volume" | "custom">(
-        "count",
-    );
-    let dropdownRef = $state<HTMLDivElement | null>(null);
+let isOpen = $state(false);
+let showCreate = $state(false);
+let newName = $state('');
+let newSymbol = $state('');
+let newType = $state<'count' | 'time' | 'distance' | 'volume' | 'custom'>(
+	'count',
+);
+let dropdownRef = $state<HTMLDivElement | null>(null);
 
-    // Group units by type
-    const groupedUnits = $derived.by(() => {
-        const groups: Record<string, Unit[]> = {
-            time: [],
-            distance: [],
-            volume: [],
-            count: [],
-            custom: [],
-        };
-        for (const unit of units) {
-            if (groups[unit.type]) {
-                groups[unit.type].push(unit);
-            } else {
-                groups.custom.push(unit);
-            }
-        }
-        return groups;
-    });
+// Group units by type
+const groupedUnits = $derived.by(() => {
+	const groups: Record<string, Unit[]> = {
+		time: [],
+		distance: [],
+		volume: [],
+		count: [],
+		custom: [],
+	};
+	for (const unit of units) {
+		if (groups[unit.type]) {
+			groups[unit.type].push(unit);
+		} else {
+			groups.custom.push(unit);
+		}
+	}
+	return groups;
+});
 
-    function handleSelect(unitId: string) {
-        value = unitId;
-        isOpen = false;
-    }
+function handleSelect(unitId: string) {
+	value = unitId;
+	isOpen = false;
+}
 
-    function handleCreate() {
-        if (!newName.trim()) return;
-        $createUnitMut.mutate({
-            name: newName.trim(),
-            symbol: newSymbol.trim() || newName.trim().substring(0, 3),
-            type: newType,
-        });
-    }
+function handleCreate() {
+	if (!newName.trim()) return;
+	$createUnitMut.mutate({
+		name: newName.trim(),
+		symbol: newSymbol.trim() || newName.trim().substring(0, 3),
+		type: newType,
+	});
+}
 
-    function handleClickOutside(e: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
-            isOpen = false;
-        }
-    }
+function handleClickOutside(e: MouseEvent) {
+	if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+		isOpen = false;
+	}
+}
 
-    $effect(() => {
-        if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
-    });
+$effect(() => {
+	if (isOpen) {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}
+});
 
-    const sizeClasses = {
-        xs: "h-6 text-xs px-2",
-        sm: "h-8 text-sm px-3",
-        md: "h-10 px-3",
-    };
+const sizeClasses = {
+	xs: 'h-6 text-xs px-2',
+	sm: 'h-8 text-sm px-3',
+	md: 'h-10 px-3',
+};
 </script>
 
 <div class={cn("form-control", className)}>

@@ -6,11 +6,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -161,14 +162,14 @@ func (h *Handler) Unlink(c *gin.Context) {
 // =============================================================================
 
 func handleLinkError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, errors.ErrNotFound):
+	if errors.Is(err, errors.ErrNotFound) {
 		response.NotFound(c)
-	case errors.Is(err, errors.ErrConflict):
-		response.Error(c, err.(*errors.AppError))
-	case errors.Is(err, errors.ErrBadRequest):
-		response.Error(c, err.(*errors.AppError))
-	default:
+		return
+	}
+
+	if appErr := errors.AsAppError(err); appErr != nil {
+		response.Error(c, appErr)
+	} else {
 		response.ErrorFromErr(c, err)
 	}
 }

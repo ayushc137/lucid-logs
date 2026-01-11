@@ -1,50 +1,50 @@
 <script lang="ts">
-    import { Filter } from "lucide-svelte";
-    import { scale } from "svelte/transition";
+import { Filter } from 'lucide-svelte';
+import { scale } from 'svelte/transition';
 
-    type Category = {
-        name: string;
-        color: string;
-        count: number;
-    };
+type Category = {
+	name: string;
+	color: string;
+	count: number;
+};
 
-    let {
-        categories = [],
-        totalTaskCount = 0,
-        filteredTaskCount = 0,
-        uncategorizedCount = 0,
-        selectedCategory = null,
-        onCategoryChange,
-    }: {
-        categories: Category[];
-        totalTaskCount: number;
-        filteredTaskCount: number;
-        uncategorizedCount: number;
-        selectedCategory: string | null;
-        onCategoryChange?: (category: string | null) => void;
-    } = $props();
+let {
+	categories = [],
+	totalTaskCount = 0,
+	filteredTaskCount = 0,
+	uncategorizedCount = 0,
+	selectedCategory = null,
+	onCategoryChange,
+}: {
+	categories: Category[];
+	totalTaskCount: number;
+	filteredTaskCount: number;
+	uncategorizedCount: number;
+	selectedCategory: string | null;
+	onCategoryChange?: (category: string | null) => void;
+} = $props();
 
-    let showDropdown = $state(false);
-    let containerRef: HTMLDivElement = null!;
+let showDropdown = $state(false);
+let containerRef: HTMLDivElement = null!;
 
-    $effect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (containerRef && !containerRef.contains(e.target as Node)) {
-                showDropdown = false;
-            }
-        };
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    });
+$effect(() => {
+	const handleClickOutside = (e: MouseEvent) => {
+		if (containerRef && !containerRef.contains(e.target as Node)) {
+			showDropdown = false;
+		}
+	};
+	document.addEventListener('click', handleClickOutside);
+	return () => document.removeEventListener('click', handleClickOutside);
+});
 
-    function selectCategory(category: string | null) {
-        onCategoryChange?.(category);
-        showDropdown = false;
-    }
+function selectCategory(category: string | null) {
+	onCategoryChange?.(category);
+	showDropdown = false;
+}
 
-    const selectedCat = $derived(
-        categories.find((c) => c.name === selectedCategory),
-    );
+const selectedCat = $derived(
+	categories.find((c) => c.name === selectedCategory),
+);
 </script>
 
 <div class="relative" bind:this={containerRef}>

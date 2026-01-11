@@ -1,226 +1,214 @@
 <script lang="ts">
-    import {
-        Palette,
-        Plus,
-        Trash2,
-        SquarePen,
-        Check,
-        X,
-        Search,
-        LoaderCircle,
-        Pipette,
-        CircleAlert,
-    } from "lucide-svelte";
-    import { ErrorAlert, ConfirmDialog, ColorPicker } from "$lib/components/ui";
-    import {
-        createQuery,
-        createMutation,
-        useQueryClient,
-    } from "@tanstack/svelte-query";
-    import {
-        getCategories,
-        createCategory,
-        updateCategory,
-        deleteCategory,
-        type Category,
-    } from "$lib/api/categories";
-    import { cn } from "$lib/utils";
-    import {
-        COLOR_PRESETS,
-        DEFAULT_COLOR,
-        getContrastColor,
-    } from "$lib/constants";
-    import {
-        getUrlParams,
-        updateUrlParams,
-        parsers,
-    } from "$lib/utils/navigation";
-    import { browser } from "$app/environment";
+import { browser } from '$app/environment';
+import {
+	type Category,
+	createCategory,
+	deleteCategory,
+	getCategories,
+	updateCategory,
+} from '$lib/api/categories';
+import { ColorPicker, ConfirmDialog, ErrorAlert } from '$lib/components/ui';
+import { COLOR_PRESETS, DEFAULT_COLOR, getContrastColor } from '$lib/constants';
+import { cn } from '$lib/utils';
+import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import {
+	Check,
+	CircleAlert,
+	LoaderCircle,
+	Palette,
+	Pipette,
+	Plus,
+	Search,
+	SquarePen,
+	Trash2,
+	X,
+} from 'lucide-svelte';
 
-    const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
-    // Initialize state from URL
-    const initialParams = getUrlParams<{ q: string }>({
-        q: parsers.string(""),
-    });
+// Initialize state from URL
+const initialParams = getUrlParams<{ q: string }>({
+	q: parsers.string(''),
+});
 
-    // Search state
-    let searchQuery = $state(initialParams.q);
-    let debouncedSearch = $state(initialParams.q);
-    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+// Search state
+let searchQuery = $state(initialParams.q);
+let debouncedSearch = $state(initialParams.q);
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    function handleSearchInput(value: string) {
-        searchQuery = value;
-        if (searchTimeout) clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            debouncedSearch = value;
-        }, 300);
-    }
+function handleSearchInput(value: string) {
+	searchQuery = value;
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchTimeout = setTimeout(() => {
+		debouncedSearch = value;
+	}, 300);
+}
 
-    // Sync state to URL
-    $effect(() => {
-        updateUrlParams(
-            { q: debouncedSearch },
-            { replace: true, keepFocus: true },
-        );
-    });
+// Sync state to URL
+$effect(() => {
+	updateUrlParams({ q: debouncedSearch }, { replace: true, keepFocus: true });
+});
 
-    // Query params
-    const queryParams = $derived({
-        limit: 100,
-        search: debouncedSearch || undefined,
-    });
+// Query params
+const queryParams = $derived({
+	limit: 100,
+	search: debouncedSearch || undefined,
+});
 
-    // Mutable ref for tracking param changes
-    let currentParamsJson = "";
+// Mutable ref for tracking param changes
+let currentParamsJson = '';
 
-    // Category query
-    const query = createQuery({
-        queryKey: ["categories-list"],
-        queryFn: () => getCategories(queryParams),
-        retry: false,
-    });
+// Category query
+const query = createQuery({
+	queryKey: ['categories-list'],
+	queryFn: () => getCategories(queryParams),
+	retry: false,
+});
 
-    // Refetch when params change
-    $effect(() => {
-        const newParamsJson = JSON.stringify(queryParams);
-        if (currentParamsJson === "") {
-            currentParamsJson = newParamsJson;
-            return;
-        }
-        if (newParamsJson !== currentParamsJson) {
-            currentParamsJson = newParamsJson;
-            $query.refetch();
-        }
-    });
+// Refetch when params change
+$effect(() => {
+	const newParamsJson = JSON.stringify(queryParams);
+	if (currentParamsJson === '') {
+		currentParamsJson = newParamsJson;
+		return;
+	}
+	if (newParamsJson !== currentParamsJson) {
+		currentParamsJson = newParamsJson;
+		$query.refetch();
+	}
+});
 
-    const categories = $derived($query.data?.items || []);
-    const totalCategories = $derived($query.data?.total || 0);
+const categories = $derived($query.data?.items || []);
+const totalCategories = $derived($query.data?.total || 0);
 
-    // Modal states
-    let isCreating = $state(false);
-    let editingId = $state<string | null>(null);
-    let deleteConfirmOpen = $state(false);
-    let deleteTargetId = $state<string | null>(null);
+// Modal states
+let isCreating = $state(false);
+let editingId = $state<string | null>(null);
+let deleteConfirmOpen = $state(false);
+let deleteTargetId = $state<string | null>(null);
 
-    // Create form state
-    let newName = $state("");
-    let newColor = $state(DEFAULT_COLOR);
-    let useCustomColor = $state(false);
-    let createError = $state("");
+// Create form state
+let newName = $state('');
+let newColor = $state(DEFAULT_COLOR);
+let useCustomColor = $state(false);
+let createError = $state('');
 
-    // Edit form state
-    let editName = $state("");
-    let editColor = $state("");
-    let editUseCustomColor = $state(false);
+// Edit form state
+let editName = $state('');
+let editColor = $state('');
+let editUseCustomColor = $state(false);
 
-    // Mutations
-    const createMut = createMutation({
-        mutationFn: (data: { name: string; color: string }) =>
-            createCategory(data),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({
-                queryKey: ["categories-list"],
-            });
-            await queryClient.invalidateQueries({ queryKey: ["categories"] });
-            resetCreateForm();
-        },
-        onError: (error: Error) => {
-            // Use the error message directly from the API
-            createError = error.message || "Failed to create category";
-        },
-    });
+// Mutations
+const createMut = createMutation({
+	mutationFn: (data: { name: string; color: string }) => createCategory(data),
+	onSuccess: async () => {
+		await queryClient.invalidateQueries({
+			queryKey: ['categories-list'],
+		});
+		await queryClient.invalidateQueries({ queryKey: ['categories'] });
+		resetCreateForm();
+	},
+	onError: (error: Error) => {
+		// Use the error message directly from the API
+		createError = error.message || 'Failed to create category';
+	},
+});
 
-    const updateMut = createMutation({
-        mutationFn: ({
-            id,
-            data,
-        }: {
-            id: string;
-            data: { name?: string; color?: string };
-        }) => updateCategory(id, data),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({
-                queryKey: ["categories-list"],
-            });
-            await queryClient.invalidateQueries({ queryKey: ["categories"] });
-            editingId = null;
-        },
-    });
+const updateMut = createMutation({
+	mutationFn: ({
+		id,
+		data,
+	}: {
+		id: string;
+		data: { name?: string; color?: string };
+	}) => updateCategory(id, data),
+	onSuccess: async () => {
+		await queryClient.invalidateQueries({
+			queryKey: ['categories-list'],
+		});
+		await queryClient.invalidateQueries({ queryKey: ['categories'] });
+		editingId = null;
+	},
+});
 
-    const deleteMut = createMutation({
-        mutationFn: (id: string) => deleteCategory(id),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({
-                queryKey: ["categories-list"],
-            });
-            await queryClient.invalidateQueries({ queryKey: ["categories"] });
-            deleteConfirmOpen = false;
-            deleteTargetId = null;
-        },
-    });
+const deleteMut = createMutation({
+	mutationFn: (id: string) => deleteCategory(id),
+	onSuccess: async () => {
+		await queryClient.invalidateQueries({
+			queryKey: ['categories-list'],
+		});
+		await queryClient.invalidateQueries({ queryKey: ['categories'] });
+		deleteConfirmOpen = false;
+		deleteTargetId = null;
+	},
+});
 
-    function resetCreateForm() {
-        newName = "";
-        newColor = DEFAULT_COLOR;
-        useCustomColor = false;
-        createError = "";
-        isCreating = false;
-    }
+function resetCreateForm() {
+	newName = '';
+	newColor = DEFAULT_COLOR;
+	useCustomColor = false;
+	createError = '';
+	isCreating = false;
+}
 
-    function startEdit(cat: Category) {
-        editingId = cat.id;
-        editName = cat.name;
-        editColor = cat.color;
-        editUseCustomColor = !COLOR_PRESETS.includes(
-            cat.color as (typeof COLOR_PRESETS)[number],
-        );
-    }
+function startEdit(cat: Category) {
+	editingId = cat.id;
+	editName = cat.name;
+	editColor = cat.color;
+	editUseCustomColor = !COLOR_PRESETS.includes(
+		cat.color as (typeof COLOR_PRESETS)[number],
+	);
+}
 
-    function saveEdit() {
-        if (editingId && editName.trim()) {
-            $updateMut.mutate({
-                id: editingId,
-                data: { name: editName.trim(), color: editColor },
-            });
-        }
-    }
+function saveEdit() {
+	if (editingId && editName.trim()) {
+		$updateMut.mutate({
+			id: editingId,
+			data: { name: editName.trim(), color: editColor },
+		});
+	}
+}
 
-    function handleCreate() {
-        createError = "";
-        if (newName.trim().length > 40) {
-            createError = "Category name must be 40 characters or less";
-            return;
-        }
-        if (newName.trim()) {
-            $createMut.mutate({ name: newName.trim(), color: newColor });
-        }
-    }
+function handleCreate() {
+	createError = '';
+	if (newName.trim().length > 40) {
+		createError = 'Category name must be 40 characters or less';
+		return;
+	}
+	if (newName.trim()) {
+		$createMut.mutate({ name: newName.trim(), color: newColor });
+	}
+}
 
-    function confirmDelete(id: string, e: Event) {
-        e.stopPropagation();
-        deleteTargetId = id;
-        deleteConfirmOpen = true;
-    }
+function confirmDelete(id: string, e: Event) {
+	e.stopPropagation();
+	deleteTargetId = id;
+	deleteConfirmOpen = true;
+}
 
-    function handleDelete() {
-        if (deleteTargetId) {
-            $deleteMut.mutate(deleteTargetId);
-        }
-    }
+function handleDelete() {
+	if (deleteTargetId) {
+		$deleteMut.mutate(deleteTargetId);
+	}
+}
 
-    const isSearching = $derived(searchQuery !== debouncedSearch);
+const isSearching = $derived(searchQuery !== debouncedSearch);
 
-    // Highlight search matches
-    function highlightText(text: string, query: string): string {
-        if (!query || !text) return text;
-        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`(${escapedQuery})`, "gi");
-        return text.replace(
-            regex,
-            '<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
-        );
-    }
+// Highlight search matches
+function highlightText(text: string, query: string): string {
+	if (!query || !text) return text;
+	const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const regex = new RegExp(`(${escapedQuery})`, 'gi');
+	return text.replace(
+		regex,
+		'<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
+	);
+}
 </script>
 
 <svelte:head>

@@ -1,304 +1,298 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
-    import { Editor } from "@tiptap/core";
-    import StarterKit from "@tiptap/starter-kit";
-    import Placeholder from "@tiptap/extension-placeholder";
-    import Link from "@tiptap/extension-link";
-    import TaskList from "@tiptap/extension-task-list";
-    import TaskItem from "@tiptap/extension-task-item";
-    import {
-        Bold,
-        Italic,
-        Strikethrough,
-        Code,
-        List,
-        ListOrdered,
-        Quote,
-        Minus,
-        Link as LinkIcon,
-        ListTodo,
-        Undo,
-        Redo,
-        Heading1,
-        Heading2,
-        Heading3,
-        RemoveFormatting,
-        ChevronDown,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { Editor } from '@tiptap/core';
+import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
+import TaskItem from '@tiptap/extension-task-item';
+import TaskList from '@tiptap/extension-task-list';
+import StarterKit from '@tiptap/starter-kit';
+import {
+	Bold,
+	ChevronDown,
+	Code,
+	Heading1,
+	Heading2,
+	Heading3,
+	Italic,
+	Link as LinkIcon,
+	List,
+	ListOrdered,
+	ListTodo,
+	Minus,
+	Quote,
+	Redo,
+	RemoveFormatting,
+	Strikethrough,
+	Undo,
+} from 'lucide-svelte';
+import { onDestroy, onMount } from 'svelte';
 
-    interface Props {
-        value?: string;
-        placeholder?: string;
-        class?: string;
-        minHeight?: string;
-        showToolbar?: boolean;
-        showFooter?: boolean;
-        onchange?: (value: string) => void;
-    }
+interface Props {
+	value?: string;
+	placeholder?: string;
+	class?: string;
+	minHeight?: string;
+	showToolbar?: boolean;
+	showFooter?: boolean;
+	onchange?: (value: string) => void;
+}
 
-    let {
-        value = $bindable(""),
-        placeholder = "Write something...",
-        class: className = "",
-        minHeight = "150px",
-        showToolbar = true,
-        showFooter = false,
-        onchange,
-    }: Props = $props();
+let {
+	value = $bindable(''),
+	placeholder = 'Write something...',
+	class: className = '',
+	minHeight = '150px',
+	showToolbar = true,
+	showFooter = false,
+	onchange,
+}: Props = $props();
 
-    let element: HTMLElement;
-    let editor = $state<Editor | null>(null);
-    let isFocused = $state(false);
-    let showHeadingMenu = $state(false);
-    // Used to trigger reactivity when editor selection/content changes
-    let editorStateVersion = $state(0);
-    // Link popover state
-    let showLinkPopover = $state(false);
-    let linkUrl = $state("");
-    let linkInputRef: HTMLInputElement | null = $state(null);
-    let linkPopoverRef: HTMLDivElement | null = $state(null);
+let element: HTMLElement;
+let editor = $state<Editor | null>(null);
+let isFocused = $state(false);
+let showHeadingMenu = $state(false);
+// Used to trigger reactivity when editor selection/content changes
+let editorStateVersion = $state(0);
+// Link popover state
+let showLinkPopover = $state(false);
+let linkUrl = $state('');
+let linkInputRef: HTMLInputElement | null = $state(null);
+let linkPopoverRef: HTMLDivElement | null = $state(null);
 
-    onMount(() => {
-        editor = new Editor({
-            element,
-            extensions: [
-                StarterKit.configure({
-                    heading: { levels: [1, 2, 3] },
-                    // Disable link from StarterKit since we add it separately with custom config
-                    link: false,
-                }),
-                Placeholder.configure({
-                    placeholder,
-                }),
-                Link.configure({
-                    openOnClick: false,
-                    HTMLAttributes: {
-                        class: "text-primary underline cursor-pointer",
-                    },
-                }),
-                TaskList,
-                TaskItem.configure({
-                    nested: true,
-                }),
-            ],
-            content: value,
-            editorProps: {
-                attributes: {
-                    class: "prose prose-sm max-w-none focus:outline-none",
-                },
-            },
-            onUpdate: ({ editor }) => {
-                const html = editor.getHTML();
-                value = html;
-                onchange?.(html);
-                editorStateVersion++;
-            },
-            onSelectionUpdate: () => {
-                editorStateVersion++;
-            },
-            onFocus: () => {
-                isFocused = true;
-            },
-            onBlur: () => {
-                isFocused = false;
-            },
-        });
-    });
+onMount(() => {
+	editor = new Editor({
+		element,
+		extensions: [
+			StarterKit.configure({
+				heading: { levels: [1, 2, 3] },
+				// Disable link from StarterKit since we add it separately with custom config
+				link: false,
+			}),
+			Placeholder.configure({
+				placeholder,
+			}),
+			Link.configure({
+				openOnClick: false,
+				HTMLAttributes: {
+					class: 'text-primary underline cursor-pointer',
+				},
+			}),
+			TaskList,
+			TaskItem.configure({
+				nested: true,
+			}),
+		],
+		content: value,
+		editorProps: {
+			attributes: {
+				class: 'prose prose-sm max-w-none focus:outline-none',
+			},
+		},
+		onUpdate: ({ editor }) => {
+			const html = editor.getHTML();
+			value = html;
+			onchange?.(html);
+			editorStateVersion++;
+		},
+		onSelectionUpdate: () => {
+			editorStateVersion++;
+		},
+		onFocus: () => {
+			isFocused = true;
+		},
+		onBlur: () => {
+			isFocused = false;
+		},
+	});
+});
 
-    onDestroy(() => {
-        editor?.destroy();
-    });
+onDestroy(() => {
+	editor?.destroy();
+});
 
-    // Update content when value changes externally
-    $effect(() => {
-        if (editor && value !== editor.getHTML()) {
-            editor.commands.setContent(value);
-        }
-    });
+// Update content when value changes externally
+$effect(() => {
+	if (editor && value !== editor.getHTML()) {
+		editor.commands.setContent(value);
+	}
+});
 
-    function toggleLinkPopover() {
-        if (showLinkPopover) {
-            cancelLink();
-        } else {
-            openLinkPopover();
-        }
-    }
+function toggleLinkPopover() {
+	if (showLinkPopover) {
+		cancelLink();
+	} else {
+		openLinkPopover();
+	}
+}
 
-    function openLinkPopover() {
-        if (!editor) return;
-        const previousUrl = editor.getAttributes("link").href || "";
-        linkUrl = previousUrl;
-        showLinkPopover = true;
-        // Auto-focus the input after it renders
-        requestAnimationFrame(() => {
-            linkInputRef?.focus();
-            linkInputRef?.select();
-        });
-    }
+function openLinkPopover() {
+	if (!editor) return;
+	const previousUrl = editor.getAttributes('link').href || '';
+	linkUrl = previousUrl;
+	showLinkPopover = true;
+	// Auto-focus the input after it renders
+	requestAnimationFrame(() => {
+		linkInputRef?.focus();
+		linkInputRef?.select();
+	});
+}
 
-    function applyLink() {
-        if (!editor) return;
-        if (linkUrl === "") {
-            editor.chain().focus().extendMarkRange("link").unsetLink().run();
-        } else {
-            // Add https:// if no protocol specified
-            let url = linkUrl;
-            if (url && !url.match(/^https?:\/\//i)) {
-                url = "https://" + url;
-            }
-            editor
-                .chain()
-                .focus()
-                .extendMarkRange("link")
-                .setLink({ href: url })
-                .run();
-        }
-        showLinkPopover = false;
-        linkUrl = "";
-    }
+function applyLink() {
+	if (!editor) return;
+	if (linkUrl === '') {
+		editor.chain().focus().extendMarkRange('link').unsetLink().run();
+	} else {
+		// Add https:// if no protocol specified
+		let url = linkUrl;
+		if (url && !url.match(/^https?:\/\//i)) {
+			url = `https://${url}`;
+		}
+		editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+	}
+	showLinkPopover = false;
+	linkUrl = '';
+}
 
-    function removeLink() {
-        if (!editor) return;
-        editor.chain().focus().extendMarkRange("link").unsetLink().run();
-        showLinkPopover = false;
-        linkUrl = "";
-    }
+function removeLink() {
+	if (!editor) return;
+	editor.chain().focus().extendMarkRange('link').unsetLink().run();
+	showLinkPopover = false;
+	linkUrl = '';
+}
 
-    function cancelLink() {
-        showLinkPopover = false;
-        linkUrl = "";
-        editor?.chain().focus().run();
-    }
+function cancelLink() {
+	showLinkPopover = false;
+	linkUrl = '';
+	editor?.chain().focus().run();
+}
 
-    // Handle click outside to close link popover
-    function handleClickOutside(event: MouseEvent) {
-        if (
-            showLinkPopover &&
-            linkPopoverRef &&
-            !linkPopoverRef.contains(event.target as Node)
-        ) {
-            // Check if click was on the link button itself
-            const target = event.target as HTMLElement;
-            if (!target.closest("[data-link-button]")) {
-                cancelLink();
-            }
-        }
-    }
+// Handle click outside to close link popover
+function handleClickOutside(event: MouseEvent) {
+	if (
+		showLinkPopover &&
+		linkPopoverRef &&
+		!linkPopoverRef.contains(event.target as Node)
+	) {
+		// Check if click was on the link button itself
+		const target = event.target as HTMLElement;
+		if (!target.closest('[data-link-button]')) {
+			cancelLink();
+		}
+	}
+}
 
-    // Set up click outside listener
-    $effect(() => {
-        if (showLinkPopover) {
-            document.addEventListener("mousedown", handleClickOutside);
-            return () =>
-                document.removeEventListener("mousedown", handleClickOutside);
-        }
-    });
+// Set up click outside listener
+$effect(() => {
+	if (showLinkPopover) {
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}
+});
 
-    function setHeading(level: 1 | 2 | 3) {
-        if (!editor) return;
-        editor.chain().focus().toggleHeading({ level }).run();
-        showHeadingMenu = false;
-    }
+function setHeading(level: 1 | 2 | 3) {
+	if (!editor) return;
+	editor.chain().focus().toggleHeading({ level }).run();
+	showHeadingMenu = false;
+}
 
-    function setParagraph() {
-        if (!editor) return;
-        editor.chain().focus().setParagraph().run();
-        showHeadingMenu = false;
-    }
+function setParagraph() {
+	if (!editor) return;
+	editor.chain().focus().setParagraph().run();
+	showHeadingMenu = false;
+}
 
-    function clearFormatting() {
-        if (!editor) return;
-        editor.chain().focus().unsetAllMarks().clearNodes().run();
-    }
+function clearFormatting() {
+	if (!editor) return;
+	editor.chain().focus().unsetAllMarks().clearNodes().run();
+}
 
-    type ToolbarButton = {
-        icon: typeof Bold;
-        action: () => void;
-        isActive: () => boolean;
-        title: string;
-    };
+type ToolbarButton = {
+	icon: typeof Bold;
+	action: () => void;
+	isActive: () => boolean;
+	title: string;
+};
 
-    const toolbarButtons: ToolbarButton[] = [
-        {
-            icon: Bold,
-            action: () => editor?.chain().focus().toggleBold().run(),
-            isActive: () => editor?.isActive("bold") ?? false,
-            title: "Bold (Ctrl+B)",
-        },
-        {
-            icon: Italic,
-            action: () => editor?.chain().focus().toggleItalic().run(),
-            isActive: () => editor?.isActive("italic") ?? false,
-            title: "Italic (Ctrl+I)",
-        },
-        {
-            icon: Strikethrough,
-            action: () => editor?.chain().focus().toggleStrike().run(),
-            isActive: () => editor?.isActive("strike") ?? false,
-            title: "Strikethrough",
-        },
-        {
-            icon: Code,
-            action: () => editor?.chain().focus().toggleCode().run(),
-            isActive: () => editor?.isActive("code") ?? false,
-            title: "Inline Code",
-        },
-    ];
+const toolbarButtons: ToolbarButton[] = [
+	{
+		icon: Bold,
+		action: () => editor?.chain().focus().toggleBold().run(),
+		isActive: () => editor?.isActive('bold') ?? false,
+		title: 'Bold (Ctrl+B)',
+	},
+	{
+		icon: Italic,
+		action: () => editor?.chain().focus().toggleItalic().run(),
+		isActive: () => editor?.isActive('italic') ?? false,
+		title: 'Italic (Ctrl+I)',
+	},
+	{
+		icon: Strikethrough,
+		action: () => editor?.chain().focus().toggleStrike().run(),
+		isActive: () => editor?.isActive('strike') ?? false,
+		title: 'Strikethrough',
+	},
+	{
+		icon: Code,
+		action: () => editor?.chain().focus().toggleCode().run(),
+		isActive: () => editor?.isActive('code') ?? false,
+		title: 'Inline Code',
+	},
+];
 
-    const listButtons: ToolbarButton[] = [
-        {
-            icon: List,
-            action: () => editor?.chain().focus().toggleBulletList().run(),
-            isActive: () => editor?.isActive("bulletList") ?? false,
-            title: "Bullet List",
-        },
-        {
-            icon: ListOrdered,
-            action: () => editor?.chain().focus().toggleOrderedList().run(),
-            isActive: () => editor?.isActive("orderedList") ?? false,
-            title: "Ordered List",
-        },
-        {
-            icon: ListTodo,
-            action: () => editor?.chain().focus().toggleTaskList().run(),
-            isActive: () => editor?.isActive("taskList") ?? false,
-            title: "Task List",
-        },
-    ];
+const listButtons: ToolbarButton[] = [
+	{
+		icon: List,
+		action: () => editor?.chain().focus().toggleBulletList().run(),
+		isActive: () => editor?.isActive('bulletList') ?? false,
+		title: 'Bullet List',
+	},
+	{
+		icon: ListOrdered,
+		action: () => editor?.chain().focus().toggleOrderedList().run(),
+		isActive: () => editor?.isActive('orderedList') ?? false,
+		title: 'Ordered List',
+	},
+	{
+		icon: ListTodo,
+		action: () => editor?.chain().focus().toggleTaskList().run(),
+		isActive: () => editor?.isActive('taskList') ?? false,
+		title: 'Task List',
+	},
+];
 
-    const blockButtons: ToolbarButton[] = [
-        {
-            icon: Quote,
-            action: () => editor?.chain().focus().toggleBlockquote().run(),
-            isActive: () => editor?.isActive("blockquote") ?? false,
-            title: "Quote",
-        },
-        {
-            icon: Minus,
-            action: () => editor?.chain().focus().setHorizontalRule().run(),
-            isActive: () => false,
-            title: "Divider",
-        },
-        {
-            icon: LinkIcon,
-            action: toggleLinkPopover,
-            isActive: () => editor?.isActive("link") ?? false,
-            title: "Link",
-        },
-    ];
+const blockButtons: ToolbarButton[] = [
+	{
+		icon: Quote,
+		action: () => editor?.chain().focus().toggleBlockquote().run(),
+		isActive: () => editor?.isActive('blockquote') ?? false,
+		title: 'Quote',
+	},
+	{
+		icon: Minus,
+		action: () => editor?.chain().focus().setHorizontalRule().run(),
+		isActive: () => false,
+		title: 'Divider',
+	},
+	{
+		icon: LinkIcon,
+		action: toggleLinkPopover,
+		isActive: () => editor?.isActive('link') ?? false,
+		title: 'Link',
+	},
+];
 
-    // Get current heading level for display
-    // Using editorStateVersion to trigger reactivity on selection changes
-    const currentHeadingLabel = $derived.by(() => {
-        // This dependency ensures we re-evaluate when editor state changes
-        const _ = editorStateVersion;
-        if (!editor) return "Paragraph";
-        if (editor.isActive("heading", { level: 1 })) return "Heading 1";
-        if (editor.isActive("heading", { level: 2 })) return "Heading 2";
-        if (editor.isActive("heading", { level: 3 })) return "Heading 3";
-        return "Paragraph";
-    });
+// Get current heading level for display
+// Using editorStateVersion to trigger reactivity on selection changes
+const currentHeadingLabel = $derived.by(() => {
+	// This dependency ensures we re-evaluate when editor state changes
+	const _ = editorStateVersion;
+	if (!editor) return 'Paragraph';
+	if (editor.isActive('heading', { level: 1 })) return 'Heading 1';
+	if (editor.isActive('heading', { level: 2 })) return 'Heading 2';
+	if (editor.isActive('heading', { level: 3 })) return 'Heading 3';
+	return 'Paragraph';
+});
 </script>
 
 <div

@@ -1,71 +1,68 @@
 <script lang="ts">
-    import { ChevronDown, Check } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { Check, ChevronDown } from 'lucide-svelte';
 
-    type StatusValue = "all" | "completed" | "pending";
+type StatusValue = 'all' | 'completed' | 'pending';
 
-    interface StatusOption {
-        value: StatusValue;
-        label: string;
-        badgeClass: string;
-    }
+interface StatusOption {
+	value: StatusValue;
+	label: string;
+	badgeClass: string;
+}
 
-    interface Props {
-        value: StatusValue;
-        onchange?: (value: StatusValue) => void;
-        label?: string;
-        size?: "sm" | "md";
-        showAllOption?: boolean;
-        class?: string;
-    }
+interface Props {
+	value: StatusValue;
+	onchange?: (value: StatusValue) => void;
+	label?: string;
+	size?: 'sm' | 'md';
+	showAllOption?: boolean;
+	class?: string;
+}
 
-    let {
-        value = $bindable("all"),
-        onchange,
-        label,
-        size = "sm",
-        showAllOption = true,
-        class: className,
-    }: Props = $props();
+let {
+	value = $bindable('all'),
+	onchange,
+	label,
+	size = 'sm',
+	showAllOption = true,
+	class: className,
+}: Props = $props();
 
-    let isOpen = $state(false);
-    let dropdownRef = $state<HTMLDivElement | null>(null);
+let isOpen = $state(false);
+let dropdownRef = $state<HTMLDivElement | null>(null);
 
-    const allOptions: StatusOption[] = [
-        { value: "all", label: "All Status", badgeClass: "badge-ghost" },
-        { value: "pending", label: "Pending", badgeClass: "badge-warning" },
-        { value: "completed", label: "Completed", badgeClass: "badge-success" },
-    ];
+const allOptions: StatusOption[] = [
+	{ value: 'all', label: 'All Status', badgeClass: 'badge-ghost' },
+	{ value: 'pending', label: 'Pending', badgeClass: 'badge-warning' },
+	{ value: 'completed', label: 'Completed', badgeClass: 'badge-success' },
+];
 
-    const statusOptions = $derived(
-        showAllOption
-            ? allOptions
-            : allOptions.filter((o) => o.value !== "all"),
-    );
+const statusOptions = $derived(
+	showAllOption ? allOptions : allOptions.filter((o) => o.value !== 'all'),
+);
 
-    const selectedOption = $derived(
-        statusOptions.find((o) => o.value === value) ?? statusOptions[0],
-    );
+const selectedOption = $derived(
+	statusOptions.find((o) => o.value === value) ?? statusOptions[0],
+);
 
-    function handleSelect(optionValue: StatusValue) {
-        value = optionValue;
-        onchange?.(optionValue);
-        isOpen = false;
-    }
+function handleSelect(optionValue: StatusValue) {
+	value = optionValue;
+	onchange?.(optionValue);
+	isOpen = false;
+}
 
-    function handleClickOutside(e: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
-            isOpen = false;
-        }
-    }
+function handleClickOutside(e: MouseEvent) {
+	if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+		isOpen = false;
+	}
+}
 
-    $effect(() => {
-        if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
-    });
+$effect(() => {
+	if (isOpen) {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}
+});
 </script>
 
 <div class={cn("form-control", className)}>

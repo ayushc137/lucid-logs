@@ -1316,7 +1316,7 @@ definitions:
         items:
           $ref: '#/definitions/retrospectives.CategoryCount'
         type: array
-      cancelled:
+      canceled:
         type: integer
       completed:
         type: integer

@@ -45,7 +45,3 @@ func TraceID(ctx context.Context) string {
 	}
 	return ""
 }
-
-
-
-

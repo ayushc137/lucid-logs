@@ -40,14 +40,11 @@ linters:
     - noctx          # Check context propagation
     - gosec          # Security checks
     - prealloc       # Suggest slice preallocation
-    - exportloopref  # Check loop variable captures
     - gocritic       # Comprehensive Go linter
     - errorlint      # Find code that will cause problems with errors
 
   disable:
-    - deadcode       # Deprecated
-    - structcheck    # Deprecated
-    - varcheck       # Deprecated
+    - depguard       # Unused
 
 # =============================================================================
 # LINTER SETTINGS

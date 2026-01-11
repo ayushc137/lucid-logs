@@ -1,107 +1,105 @@
 <script lang="ts">
-    /**
-     * Emotion Selector Modal
-     * - Clean header with description
-     * - OpenMojiColor font
-     * - Tailwind CSS styling
-     * - Supports initial emotion pre-selection with panning
-     * - Supports quadrant filtering for positive/negative contexts
-     */
-    import EmotionGrid from "./EmotionGrid.svelte";
-    import { QUADRANT_COLORS, type Quadrant } from "./emotionData";
-    import { getIndicatorDots } from "./emotionUtils";
-    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import type { Emotion } from "$lib/api/emotions";
-    import { X, Heart, Lock } from "lucide-svelte";
+import type { Emotion } from '$lib/api/emotions';
+import OpenMoji from '$lib/components/ui/OpenMoji.svelte';
+import { Heart, Lock, X } from 'lucide-svelte';
+/**
+ * Emotion Selector Modal
+ * - Clean header with description
+ * - OpenMojiColor font
+ * - Tailwind CSS styling
+ * - Supports initial emotion pre-selection with panning
+ * - Supports quadrant filtering for positive/negative contexts
+ */
+import EmotionGrid from './EmotionGrid.svelte';
+import { QUADRANT_COLORS, type Quadrant } from './emotionData';
+import { getIndicatorDots } from './emotionUtils';
 
-    interface Props {
-        open?: boolean;
-        selectedEmotion?: Emotion | null;
-        /** Emotion to pre-select and pan to when modal opens */
-        initialEmotion?: Emotion | null;
-        /** Restrict selection to specific quadrants (e.g., for positive/negative reflections) */
-        allowedQuadrants?: Quadrant[] | null;
-        onSelect?: (emotion: Emotion) => void;
-        onClose?: () => void;
-    }
+interface Props {
+	open?: boolean;
+	selectedEmotion?: Emotion | null;
+	/** Emotion to pre-select and pan to when modal opens */
+	initialEmotion?: Emotion | null;
+	/** Restrict selection to specific quadrants (e.g., for positive/negative reflections) */
+	allowedQuadrants?: Quadrant[] | null;
+	onSelect?: (emotion: Emotion) => void;
+	onClose?: () => void;
+}
 
-    let {
-        open = $bindable(false),
-        selectedEmotion = $bindable(null),
-        initialEmotion = null,
-        allowedQuadrants = null,
-        onSelect,
-        onClose,
-    }: Props = $props();
+let {
+	open = $bindable(false),
+	selectedEmotion = $bindable(null),
+	initialEmotion = null,
+	allowedQuadrants = null,
+	onSelect,
+	onClose,
+}: Props = $props();
 
-    // Track if we've applied the initial emotion for this modal open
-    let appliedInitialEmotion = $state(false);
+// Track if we've applied the initial emotion for this modal open
+let appliedInitialEmotion = $state(false);
 
-    // Apply initial emotion when modal opens
-    $effect(() => {
-        if (open && initialEmotion && !appliedInitialEmotion) {
-            selectedEmotion = initialEmotion;
-            appliedInitialEmotion = true;
-        }
-        // Reset when modal closes
-        if (!open) {
-            appliedInitialEmotion = false;
-        }
-    });
+// Apply initial emotion when modal opens
+$effect(() => {
+	if (open && initialEmotion && !appliedInitialEmotion) {
+		selectedEmotion = initialEmotion;
+		appliedInitialEmotion = true;
+	}
+	// Reset when modal closes
+	if (!open) {
+		appliedInitialEmotion = false;
+	}
+});
 
-    let showIndicators = $state(false);
-    let hoveredEmotion = $state<Emotion | null>(null);
+let showIndicators = $state(false);
+let hoveredEmotion = $state<Emotion | null>(null);
 
-    const displayEmotion = $derived(hoveredEmotion || selectedEmotion);
+const displayEmotion = $derived(hoveredEmotion || selectedEmotion);
 
-    function handleSelect(emotion: Emotion) {
-        selectedEmotion = emotion;
-    }
+function handleSelect(emotion: Emotion) {
+	selectedEmotion = emotion;
+}
 
-    function handleHoveredChange(emotion: Emotion | null) {
-        hoveredEmotion = emotion;
-    }
+function handleHoveredChange(emotion: Emotion | null) {
+	hoveredEmotion = emotion;
+}
 
-    function handleClose() {
-        open = false;
-        selectedEmotion = null;
-        onClose?.();
-    }
+function handleClose() {
+	open = false;
+	selectedEmotion = null;
+	onClose?.();
+}
 
-    function handleConfirm() {
-        if (selectedEmotion) {
-            onSelect?.(selectedEmotion);
-        }
-        open = false;
-        selectedEmotion = null;
-        onClose?.();
-    }
+function handleConfirm() {
+	if (selectedEmotion) {
+		onSelect?.(selectedEmotion);
+	}
+	open = false;
+	selectedEmotion = null;
+	onClose?.();
+}
 
-    function clearSelection() {
-        selectedEmotion = null;
-    }
+function clearSelection() {
+	selectedEmotion = null;
+}
 
-    function handleDoubleClickConfirm(emotion: Emotion) {
-        // Double-click directly selects and confirms
-        selectedEmotion = emotion;
-        onSelect?.(emotion);
-        open = false;
-        selectedEmotion = null;
-    }
+function handleDoubleClickConfirm(emotion: Emotion) {
+	// Double-click directly selects and confirms
+	selectedEmotion = emotion;
+	onSelect?.(emotion);
+	open = false;
+	selectedEmotion = null;
+}
 
-    // Get quadrant restriction label for display
-    const quadrantRestrictionLabel = $derived.by(() => {
-        if (!allowedQuadrants || allowedQuadrants.length === 4) return null;
-        const isPositive =
-            allowedQuadrants.includes("yellow") &&
-            allowedQuadrants.includes("green");
-        const isNegative =
-            allowedQuadrants.includes("red") &&
-            allowedQuadrants.includes("blue");
-        if (isPositive) return "Pleasant emotions only";
-        if (isNegative) return "Unpleasant emotions only";
-        return null;
-    });
+// Get quadrant restriction label for display
+const quadrantRestrictionLabel = $derived.by(() => {
+	if (!allowedQuadrants || allowedQuadrants.length === 4) return null;
+	const isPositive =
+		allowedQuadrants.includes('yellow') && allowedQuadrants.includes('green');
+	const isNegative =
+		allowedQuadrants.includes('red') && allowedQuadrants.includes('blue');
+	if (isPositive) return 'Pleasant emotions only';
+	if (isNegative) return 'Unpleasant emotions only';
+	return null;
+});
 </script>
 
 {#if open}

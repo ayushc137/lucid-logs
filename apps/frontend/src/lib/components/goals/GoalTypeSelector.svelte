@@ -1,30 +1,30 @@
 <script lang="ts">
-    import { Repeat, Target, Check, X } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { Check, Repeat, Target, X } from 'lucide-svelte';
 
-    interface Props {
-        isHabit: boolean;
-        isMeasurable: boolean;
-        onToggleHabit?: (value: boolean) => void;
-        onToggleMeasurable?: (value: boolean) => void;
-    }
+interface Props {
+	isHabit: boolean;
+	isMeasurable: boolean;
+	onToggleHabit?: (value: boolean) => void;
+	onToggleMeasurable?: (value: boolean) => void;
+}
 
-    let {
-        isHabit = $bindable(),
-        isMeasurable = $bindable(),
-        onToggleHabit,
-        onToggleMeasurable,
-    }: Props = $props();
+let {
+	isHabit = $bindable(),
+	isMeasurable = $bindable(),
+	onToggleHabit,
+	onToggleMeasurable,
+}: Props = $props();
 
-    function toggleHabit() {
-        isHabit = !isHabit;
-        onToggleHabit?.(isHabit);
-    }
+function toggleHabit() {
+	isHabit = !isHabit;
+	onToggleHabit?.(isHabit);
+}
 
-    function toggleMeasurable() {
-        isMeasurable = !isMeasurable;
-        onToggleMeasurable?.(isMeasurable);
-    }
+function toggleMeasurable() {
+	isMeasurable = !isMeasurable;
+	onToggleMeasurable?.(isMeasurable);
+}
 </script>
 
 <div class="grid grid-cols-2 gap-3">

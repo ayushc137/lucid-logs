@@ -4,10 +4,11 @@ package auth
 import (
 	"github.com/gin-gonic/gin"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================

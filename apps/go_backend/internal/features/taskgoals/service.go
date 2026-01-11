@@ -3,11 +3,12 @@ package taskgoals
 import (
 	"context"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/features/goals"
 	"github.com/lucid-logs/go-backend/internal/features/tasks"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -75,8 +76,11 @@ func (s *service) Link(ctx context.Context, taskID string, req *LinkRequest, use
 		return nil, errors.ErrNotFound.WithMessage("Goal not found")
 	}
 
-	// Check for duplicate link
-	existing, _ := s.repo.FindByTaskAndGoal(ctx, taskID, req.GoalID)
+	// Check if already linked
+	existing, err := s.repo.FindByTaskAndGoal(ctx, taskID, req.GoalID)
+	if err != nil && !errors.Is(err, errors.ErrNotFound) {
+		return nil, err
+	}
 	if existing != nil {
 		s.logger.Debug().
 			Str("task_id", taskID).

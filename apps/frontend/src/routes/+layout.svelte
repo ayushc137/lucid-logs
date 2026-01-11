@@ -1,32 +1,32 @@
 <script lang="ts">
-  import { QueryClient, QueryClientProvider } from "@tanstack/svelte-query";
-  import { page } from "$app/stores";
-  import { AppShell } from "$lib/components/layout";
-  import { AuthGuard } from "$lib/components/auth";
+import { page } from '$app/stores';
+import { AuthGuard } from '$lib/components/auth';
+import { AppShell } from '$lib/components/layout';
+import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
 
-  // App styles (Tailwind via PostCSS)
-  import "../app.css";
+// App styles (Tailwind via PostCSS)
+import '../app.css';
 
-  let { children } = $props();
+let { children } = $props();
 
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 1000 * 60 * 5,
-        gcTime: 1000 * 60 * 30,
-        refetchOnWindowFocus: true,
-        retry: 1,
-      },
-    },
-  });
+const queryClient = new QueryClient({
+	defaultOptions: {
+		queries: {
+			staleTime: 1000 * 60 * 5,
+			gcTime: 1000 * 60 * 30,
+			refetchOnWindowFocus: true,
+			retry: 1,
+		},
+	},
+});
 
-  const isAuthPage = $derived(
-    $page.url.pathname.startsWith("/login") ||
-      $page.url.pathname.startsWith("/register"),
-  );
+const isAuthPage = $derived(
+	$page.url.pathname.startsWith('/login') ||
+		$page.url.pathname.startsWith('/register'),
+);
 
-  // Show search ONLY on dashboard
-  const showSearch = $derived($page.url.pathname === "/");
+// Show search ONLY on dashboard
+const showSearch = $derived($page.url.pathname === '/');
 </script>
 
 <QueryClientProvider client={queryClient}>

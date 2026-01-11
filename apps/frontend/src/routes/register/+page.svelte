@@ -1,52 +1,52 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Mail, Lock, CircleAlert, UserPlus, ArrowRight } from "lucide-svelte";
-  import { register } from "$lib/api";
-  import { authStore } from "$lib/stores/auth.svelte";
-  import { cn } from "$lib/utils";
+import { goto } from '$app/navigation';
+import { register } from '$lib/api';
+import { authStore } from '$lib/stores/auth.svelte';
+import { cn } from '$lib/utils';
+import { ArrowRight, CircleAlert, Lock, Mail, UserPlus } from 'lucide-svelte';
 
-  let email = $state("");
-  let password = $state("");
-  let confirmPassword = $state("");
-  let loading = $state(false);
-  let error = $state("");
+let email = $state('');
+let password = $state('');
+let confirmPassword = $state('');
+let loading = $state(false);
+let error = $state('');
 
-  const passwordsMatch = $derived(
-    confirmPassword === "" || password === confirmPassword,
-  );
+const passwordsMatch = $derived(
+	confirmPassword === '' || password === confirmPassword,
+);
 
-  async function handleRegister() {
-    loading = true;
-    error = "";
-    if (password !== confirmPassword) {
-      error = "Passwords do not match";
-      loading = false;
-      return;
-    }
-    if (password.length < 6) {
-      error = "Password must be at least 6 characters";
-      loading = false;
-      return;
-    }
-    try {
-      const response = await register({ username: email, password });
-      authStore.loginWithResponse(response);
-      await goto("/", { replaceState: true });
-    } catch (err: unknown) {
-      if (err && typeof err === "object" && "response" in err) {
-        const httpErr = err as { response?: { status?: number } };
-        if (httpErr.response?.status === 409) {
-          error = "An account with this email already exists";
-        } else {
-          error = "Registration failed. Please try again.";
-        }
-      } else {
-        error = "Network error. Please check your connection.";
-      }
-    } finally {
-      loading = false;
-    }
-  }
+async function handleRegister() {
+	loading = true;
+	error = '';
+	if (password !== confirmPassword) {
+		error = 'Passwords do not match';
+		loading = false;
+		return;
+	}
+	if (password.length < 6) {
+		error = 'Password must be at least 6 characters';
+		loading = false;
+		return;
+	}
+	try {
+		const response = await register({ username: email, password });
+		authStore.loginWithResponse(response);
+		await goto('/', { replaceState: true });
+	} catch (err: unknown) {
+		if (err && typeof err === 'object' && 'response' in err) {
+			const httpErr = err as { response?: { status?: number } };
+			if (httpErr.response?.status === 409) {
+				error = 'An account with this email already exists';
+			} else {
+				error = 'Registration failed. Please try again.';
+			}
+		} else {
+			error = 'Network error. Please check your connection.';
+		}
+	} finally {
+		loading = false;
+	}
+}
 </script>
 
 <svelte:head>

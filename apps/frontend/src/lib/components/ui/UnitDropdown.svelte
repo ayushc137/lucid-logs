@@ -1,134 +1,133 @@
 <script lang="ts">
-    import {
-        ChevronDown,
-        Search,
-        X,
-        Plus,
-        Check,
-        Clock,
-        Ruler,
-        Droplet,
-        Hash,
-        Shapes,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import type { Unit } from "$lib/api/units";
+import type { Unit } from '$lib/api/units';
+import { cn } from '$lib/utils';
+import {
+	Check,
+	ChevronDown,
+	Clock,
+	Droplet,
+	Hash,
+	Plus,
+	Ruler,
+	Search,
+	Shapes,
+	X,
+} from 'lucide-svelte';
 
-    interface Props {
-        units: Unit[];
-        value: string | undefined;
-        onchange?: (value: string | undefined) => void;
-        label?: string;
-        size?: "xs" | "sm" | "md";
-        showSearch?: boolean;
-        showNoUnitOption?: boolean;
-        noUnitLabel?: string;
-        placeholder?: string;
-        showCreateButton?: boolean;
-        onCreate?: () => void;
-        class?: string;
-    }
+interface Props {
+	units: Unit[];
+	value: string | undefined;
+	onchange?: (value: string | undefined) => void;
+	label?: string;
+	size?: 'xs' | 'sm' | 'md';
+	showSearch?: boolean;
+	showNoUnitOption?: boolean;
+	noUnitLabel?: string;
+	placeholder?: string;
+	showCreateButton?: boolean;
+	onCreate?: () => void;
+	class?: string;
+}
 
-    let {
-        units = [],
-        value = $bindable(),
-        onchange,
-        label,
-        size = "sm",
-        showSearch = true,
-        showNoUnitOption = false,
-        noUnitLabel = "No unit",
-        placeholder = "Select unit...",
-        showCreateButton = false,
-        onCreate,
-        class: className,
-    }: Props = $props();
+let {
+	units = [],
+	value = $bindable(),
+	onchange,
+	label,
+	size = 'sm',
+	showSearch = true,
+	showNoUnitOption = false,
+	noUnitLabel = 'No unit',
+	placeholder = 'Select unit...',
+	showCreateButton = false,
+	onCreate,
+	class: className,
+}: Props = $props();
 
-    let isOpen = $state(false);
-    let search = $state("");
-    let dropdownRef = $state<HTMLDivElement | null>(null);
-    let searchInputRef = $state<HTMLInputElement | null>(null);
+let isOpen = $state(false);
+let search = $state('');
+let dropdownRef = $state<HTMLDivElement | null>(null);
+let searchInputRef = $state<HTMLInputElement | null>(null);
 
-    const selectedUnit = $derived(units?.find((u) => u.id === value));
+const selectedUnit = $derived(units?.find((u) => u.id === value));
 
-    const filteredUnits = $derived(
-        search.trim()
-            ? (units || []).filter(
-                  (u) =>
-                      u.name.toLowerCase().includes(search.toLowerCase()) ||
-                      u.symbol.toLowerCase().includes(search.toLowerCase()),
-              )
-            : units || [],
-    );
+const filteredUnits = $derived(
+	search.trim()
+		? (units || []).filter(
+				(u) =>
+					u.name.toLowerCase().includes(search.toLowerCase()) ||
+					u.symbol.toLowerCase().includes(search.toLowerCase()),
+			)
+		: units || [],
+);
 
-    // Group units by type
-    const groupedUnits = $derived.by(() => {
-        const groups: Record<string, Unit[]> = {
-            time: [],
-            distance: [],
-            volume: [],
-            count: [],
-            custom: [],
-        };
-        for (const unit of filteredUnits) {
-            if (groups[unit.type]) {
-                groups[unit.type].push(unit);
-            } else {
-                groups.custom.push(unit);
-            }
-        }
-        return groups;
-    });
+// Group units by type
+const groupedUnits = $derived.by(() => {
+	const groups: Record<string, Unit[]> = {
+		time: [],
+		distance: [],
+		volume: [],
+		count: [],
+		custom: [],
+	};
+	for (const unit of filteredUnits) {
+		if (groups[unit.type]) {
+			groups[unit.type].push(unit);
+		} else {
+			groups.custom.push(unit);
+		}
+	}
+	return groups;
+});
 
-    // Check if there are any units to display
-    const hasUnits = $derived(filteredUnits.length > 0);
+// Check if there are any units to display
+const hasUnits = $derived(filteredUnits.length > 0);
 
-    // Type icons and colors
-    const typeConfig: Record<
-        string,
-        { icon: typeof Clock; color: string; label: string }
-    > = {
-        time: { icon: Clock, color: "text-blue-500", label: "Time" },
-        distance: { icon: Ruler, color: "text-green-500", label: "Distance" },
-        volume: { icon: Droplet, color: "text-cyan-500", label: "Volume" },
-        count: { icon: Hash, color: "text-orange-500", label: "Count" },
-        custom: { icon: Shapes, color: "text-purple-500", label: "Custom" },
-    };
+// Type icons and colors
+const typeConfig: Record<
+	string,
+	{ icon: typeof Clock; color: string; label: string }
+> = {
+	time: { icon: Clock, color: 'text-blue-500', label: 'Time' },
+	distance: { icon: Ruler, color: 'text-green-500', label: 'Distance' },
+	volume: { icon: Droplet, color: 'text-cyan-500', label: 'Volume' },
+	count: { icon: Hash, color: 'text-orange-500', label: 'Count' },
+	custom: { icon: Shapes, color: 'text-purple-500', label: 'Custom' },
+};
 
-    function handleSelect(unitId: string | undefined) {
-        value = unitId;
-        onchange?.(unitId);
-        isOpen = false;
-        search = "";
-    }
+function handleSelect(unitId: string | undefined) {
+	value = unitId;
+	onchange?.(unitId);
+	isOpen = false;
+	search = '';
+}
 
-    function handleClickOutside(e: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
-            isOpen = false;
-            search = "";
-        }
-    }
+function handleClickOutside(e: MouseEvent) {
+	if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+		isOpen = false;
+		search = '';
+	}
+}
 
-    function handleOpen() {
-        isOpen = !isOpen;
-        if (isOpen && showSearch) {
-            setTimeout(() => searchInputRef?.focus(), 50);
-        }
-    }
+function handleOpen() {
+	isOpen = !isOpen;
+	if (isOpen && showSearch) {
+		setTimeout(() => searchInputRef?.focus(), 50);
+	}
+}
 
-    $effect(() => {
-        if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
-    });
+$effect(() => {
+	if (isOpen) {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}
+});
 
-    const sizeClasses = {
-        xs: "h-6 text-xs px-2",
-        sm: "h-8 text-sm px-3",
-        md: "h-10 px-3",
-    };
+const sizeClasses = {
+	xs: 'h-6 text-xs px-2',
+	sm: 'h-8 text-sm px-3',
+	md: 'h-10 px-3',
+};
 </script>
 
 <div class={cn("form-control", className)}>

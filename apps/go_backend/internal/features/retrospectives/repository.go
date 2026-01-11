@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/lucid-logs/go-backend/internal/shared/database"
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
+
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
 
 // =============================================================================
@@ -136,7 +137,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Retrospe
 	return result.toRetrospective(), nil
 }
 
-func (r *repository) FindByDateRange(ctx context.Context, userID string, retroType string, start, end time.Time) (*Retrospective, error) {
+func (r *repository) FindByDateRange(ctx context.Context, userID, retroType string, start, end time.Time) (*Retrospective, error) {
 	result, err := database.QueryFirst[retroDB](ctx, r.db, `
 		SELECT * FROM retrospectives
 		WHERE created_by = $user
@@ -321,7 +322,9 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 
 func generateRecordID() models.RecordID {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		panic(err)
+	}
 	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }
 

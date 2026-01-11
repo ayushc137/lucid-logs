@@ -1,33 +1,33 @@
 <script lang="ts">
-    import { createQuery } from "@tanstack/svelte-query";
-    import { getQuickLogTemplates, type TaskTemplate } from "$lib/api";
-    import { Zap, Plus, ChevronRight } from "lucide-svelte";
-    import { fly, fade } from "svelte/transition";
-    import { flip } from "svelte/animate";
+import { type TaskTemplate, getQuickLogTemplates } from '$lib/api';
+import { createQuery } from '@tanstack/svelte-query';
+import { ChevronRight, Plus, Zap } from 'lucide-svelte';
+import { flip } from 'svelte/animate';
+import { fade, fly } from 'svelte/transition';
 
-    interface Props {
-        onUseTemplate?: (template: TaskTemplate) => void;
-        onCreateTask?: () => void;
-    }
+interface Props {
+	onUseTemplate?: (template: TaskTemplate) => void;
+	onCreateTask?: () => void;
+}
 
-    let { onUseTemplate, onCreateTask }: Props = $props();
+let { onUseTemplate, onCreateTask }: Props = $props();
 
-    const templatesQuery = createQuery({
-        queryKey: ["templates", "quick-log"],
-        queryFn: getQuickLogTemplates,
-    });
+const templatesQuery = createQuery({
+	queryKey: ['templates', 'quick-log'],
+	queryFn: getQuickLogTemplates,
+});
 
-    const templates = $derived($templatesQuery.data || []);
-    const sortedTemplates = $derived(
-        [...templates].sort(
-            (a, b) => (a.quick_log_order || 0) - (b.quick_log_order || 0),
-        ),
-    );
+const templates = $derived($templatesQuery.data || []);
+const sortedTemplates = $derived(
+	[...templates].sort(
+		(a, b) => (a.quick_log_order || 0) - (b.quick_log_order || 0),
+	),
+);
 
-    let showAll = $state(false);
-    const displayedTemplates = $derived(
-        showAll ? sortedTemplates : sortedTemplates.slice(0, 8),
-    );
+let showAll = $state(false);
+const displayedTemplates = $derived(
+	showAll ? sortedTemplates : sortedTemplates.slice(0, 8),
+);
 </script>
 
 <div class="space-y-2">

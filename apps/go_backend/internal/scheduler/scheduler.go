@@ -13,10 +13,11 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
-	"github.com/lucid-logs/go-backend/internal/features/retrospectives"
-	"github.com/lucid-logs/go-backend/internal/features/users"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/lucid-logs/go-backend/internal/features/retrospectives"
+	"github.com/lucid-logs/go-backend/internal/features/users"
 )
 
 // =============================================================================

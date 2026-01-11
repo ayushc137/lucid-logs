@@ -1,517 +1,505 @@
 <script lang="ts">
-  import {
-    Calendar,
-    Target,
-    ListTodo,
-    Plus,
-    Zap,
-    Smile,
-    Flame,
-    X,
-    ClipboardList,
-  } from "lucide-svelte";
-  import {
-    TimelineMultiView,
-    type TimelineView,
-  } from "$lib/components/timeline";
-  import { AlignHorizontalJustifyStart, List } from "lucide-svelte";
-  import {
-    TaskModal,
-    type EmotionSelectionContext,
-  } from "$lib/components/tasks";
-  import { EmotionModal } from "$lib/components/emotions";
-  import {
-    Card,
-    IconBox,
-    SectionHeader,
-    ConfirmDialog,
-  } from "$lib/components/ui";
-  import {
-    createQuery,
-    createMutation,
-    useQueryClient,
-  } from "@tanstack/svelte-query";
-  import { getTasks, updateTask, type Task } from "$lib/api";
-  import { getCategories, type Category } from "$lib/api/categories";
-  import { type Emotion } from "$lib/api/emotions";
-  import { emotionStore } from "$lib/stores/emotions.svelte";
-  import { cn } from "$lib/utils";
-  import { goto } from "$app/navigation";
-  import { browser } from "$app/environment";
-  import { page } from "$app/stores";
-  import {
-    getUrlParams,
-    updateUrlParams,
-    parsers,
-  } from "$lib/utils/navigation";
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+import { type Task, getTasks, updateTask } from '$lib/api';
+import { type Category, getCategories } from '$lib/api/categories';
+import type { Emotion } from '$lib/api/emotions';
+import { EmotionModal } from '$lib/components/emotions';
+import { type EmotionSelectionContext, TaskModal } from '$lib/components/tasks';
+import { TimelineMultiView, type TimelineView } from '$lib/components/timeline';
+import {
+	Card,
+	ConfirmDialog,
+	IconBox,
+	SectionHeader,
+} from '$lib/components/ui';
+import { emotionStore } from '$lib/stores/emotions.svelte';
+import { cn } from '$lib/utils';
+import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import {
+	Calendar,
+	ClipboardList,
+	Flame,
+	ListTodo,
+	Plus,
+	Smile,
+	Target,
+	X,
+	Zap,
+} from 'lucide-svelte';
+import { AlignHorizontalJustifyStart, List } from 'lucide-svelte';
 
-  // Selected date state initialized from URL
-  const initialParams = getUrlParams<{ date: Date; view: string }>({
-    date: parsers.dateOnly(new Date()),
-    view: parsers.string("timeline"),
-  });
+// Selected date state initialized from URL
+const initialParams = getUrlParams<{ date: Date; view: string }>({
+	date: parsers.dateOnly(new Date()),
+	view: parsers.string('timeline'),
+});
 
-  let selectedDate = $state<Date>(initialParams.date);
-  let currentTimelineView = $state<TimelineView>(
-    (initialParams.view as TimelineView) || "timeline",
-  );
+let selectedDate = $state<Date>(initialParams.date);
+let currentTimelineView = $state<TimelineView>(
+	(initialParams.view as TimelineView) || 'timeline',
+);
 
-  function handleViewChange(view: TimelineView) {
-    currentTimelineView = view;
-  }
+function handleViewChange(view: TimelineView) {
+	currentTimelineView = view;
+}
 
-  // Sync state to URL
-  $effect(() => {
-    // Format as YYYY-MM-DD local time
-    const year = selectedDate.getFullYear();
-    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const day = String(selectedDate.getDate()).padStart(2, "0");
+// Sync state to URL
+$effect(() => {
+	// Format as YYYY-MM-DD local time
+	const year = selectedDate.getFullYear();
+	const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+	const day = String(selectedDate.getDate()).padStart(2, '0');
 
-    updateUrlParams({
-      date: `${year}-${month}-${day}`,
-      view: currentTimelineView,
-    });
-  });
+	updateUrlParams({
+		date: `${year}-${month}-${day}`,
+		view: currentTimelineView,
+	});
+});
 
-  // Helper to format date for API (Correctly handles local timezone to UTC)
-  function formatDateForApi(date: Date): {
-    startOfDay: string;
-    endOfDay: string;
-  } {
-    // Create date at start of local day (00:00:00)
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
+// Helper to format date for API (Correctly handles local timezone to UTC)
+function formatDateForApi(date: Date): {
+	startOfDay: string;
+	endOfDay: string;
+} {
+	// Create date at start of local day (00:00:00)
+	const start = new Date(date);
+	start.setHours(0, 0, 0, 0);
 
-    // Create date at end of local day (23:59:59.999)
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+	// Create date at end of local day (23:59:59.999)
+	const end = new Date(date);
+	end.setHours(23, 59, 59, 999);
 
-    return {
-      startOfDay: start.toISOString(),
-      endOfDay: end.toISOString(),
-    };
-  }
+	return {
+		startOfDay: start.toISOString(),
+		endOfDay: end.toISOString(),
+	};
+}
 
-  // Helper to get previous day for sleep task query
-  function getPreviousDayRange(date: Date): {
-    startOfDay: string;
-    endOfDay: string;
-  } {
-    const prevDay = new Date(date);
-    prevDay.setDate(prevDay.getDate() - 1);
-    return formatDateForApi(prevDay);
-  }
+// Helper to get previous day for sleep task query
+function getPreviousDayRange(date: Date): {
+	startOfDay: string;
+	endOfDay: string;
+} {
+	const prevDay = new Date(date);
+	prevDay.setDate(prevDay.getDate() - 1);
+	return formatDateForApi(prevDay);
+}
 
-  // Query key based on selected date
-  const dateKey = $derived(
-    `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`,
-  );
+// Query key based on selected date
+const dateKey = $derived(
+	`${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`,
+);
 
-  // Track dateKey changes to refetch
-  let currentDateKey = "";
+// Track dateKey changes to refetch
+let currentDateKey = '';
 
-  // Current and previous day query params (computed from selectedDate)
-  let queryParams = $derived.by(() => {
-    const { startOfDay, endOfDay } = formatDateForApi(selectedDate);
-    return { startOfDay, endOfDay };
-  });
+// Current and previous day query params (computed from selectedDate)
+let queryParams = $derived.by(() => {
+	const { startOfDay, endOfDay } = formatDateForApi(selectedDate);
+	return { startOfDay, endOfDay };
+});
 
-  let prevQueryParams = $derived.by(() => {
-    const prevDay = new Date(selectedDate);
-    prevDay.setDate(prevDay.getDate() - 1);
-    return formatDateForApi(prevDay);
-  });
+let prevQueryParams = $derived.by(() => {
+	const prevDay = new Date(selectedDate);
+	prevDay.setDate(prevDay.getDate() - 1);
+	return formatDateForApi(prevDay);
+});
 
-  // Fetch tasks for the selected date
-  const tasksQuery = createQuery({
-    queryKey: ["tasks", "timeline"],
-    queryFn: () => {
-      const { startOfDay, endOfDay } = formatDateForApi(selectedDate);
-      return getTasks({
-        limit: 100,
-        start_date_from: startOfDay,
-        start_date_to: endOfDay,
-        sort_field: "start_date",
-        sort_order: "asc",
-      });
-    },
-  });
+// Fetch tasks for the selected date
+const tasksQuery = createQuery({
+	queryKey: ['tasks', 'timeline'],
+	queryFn: () => {
+		const { startOfDay, endOfDay } = formatDateForApi(selectedDate);
+		return getTasks({
+			limit: 100,
+			start_date_from: startOfDay,
+			start_date_to: endOfDay,
+			sort_field: 'start_date',
+			sort_order: 'asc',
+		});
+	},
+});
 
-  // Also fetch tasks from previous day that might extend into current day (sleep tasks)
-  const prevDayTasksQuery = createQuery({
-    queryKey: ["tasks", "timeline-prev"],
-    queryFn: () => {
-      const prevDay = new Date(selectedDate);
-      prevDay.setDate(prevDay.getDate() - 1);
-      const { startOfDay, endOfDay } = formatDateForApi(prevDay);
-      return getTasks({
-        limit: 50,
-        start_date_from: startOfDay,
-        start_date_to: endOfDay,
-        sort_field: "start_date",
-        sort_order: "asc",
-      });
-    },
-  });
+// Also fetch tasks from previous day that might extend into current day (sleep tasks)
+const prevDayTasksQuery = createQuery({
+	queryKey: ['tasks', 'timeline-prev'],
+	queryFn: () => {
+		const prevDay = new Date(selectedDate);
+		prevDay.setDate(prevDay.getDate() - 1);
+		const { startOfDay, endOfDay } = formatDateForApi(prevDay);
+		return getTasks({
+			limit: 50,
+			start_date_from: startOfDay,
+			start_date_to: endOfDay,
+			sort_field: 'start_date',
+			sort_order: 'asc',
+		});
+	},
+});
 
-  // Refetch when date changes
-  $effect(() => {
-    if (currentDateKey !== "" && currentDateKey !== dateKey) {
-      $tasksQuery.refetch();
-      $prevDayTasksQuery.refetch();
-    }
-    currentDateKey = dateKey;
-  });
+// Refetch when date changes
+$effect(() => {
+	if (currentDateKey !== '' && currentDateKey !== dateKey) {
+		$tasksQuery.refetch();
+		$prevDayTasksQuery.refetch();
+	}
+	currentDateKey = dateKey;
+});
 
-  const categoriesQuery = createQuery({
-    queryKey: ["categories"],
-    queryFn: () => getCategories({ limit: 100 }),
-  });
+const categoriesQuery = createQuery({
+	queryKey: ['categories'],
+	queryFn: () => getCategories({ limit: 100 }),
+});
 
-  // Filter state
-  let selectedCategoryId = $state<string | null>(null);
+// Filter state
+let selectedCategoryId = $state<string | null>(null);
 
-  // FAB menu state
-  let fabOpen = $state(false);
+// FAB menu state
+let fabOpen = $state(false);
 
-  // Transform API tasks to timeline format
-  type TimelineTask = {
-    id: string;
-    title: string;
-    description?: string;
-    startTime: Date;
-    endTime: Date;
-    categoryColor?: string;
-    categoryName?: string;
-    completed?: boolean;
-    emoji?: string;
-    categoryId?: string;
-    // Emotion fields (user-selected)
-    emotionId?: string;
-    emotionName?: string;
-    emotionEmoji?: string;
-    emotionQuadrant?: "yellow" | "green" | "red" | "blue";
-    emotionDescription?: string;
-    // Inferred emotion
-    inferredEmotionId?: string;
-    inferredEmotionName?: string;
-    inferredEmotionEmoji?: string;
-    inferredEmotionQuadrant?: "yellow" | "green" | "red" | "blue";
-    inferredEmotionDescription?: string;
-  };
+// Transform API tasks to timeline format
+type TimelineTask = {
+	id: string;
+	title: string;
+	description?: string;
+	startTime: Date;
+	endTime: Date;
+	categoryColor?: string;
+	categoryName?: string;
+	completed?: boolean;
+	emoji?: string;
+	categoryId?: string;
+	// Emotion fields (user-selected)
+	emotionId?: string;
+	emotionName?: string;
+	emotionEmoji?: string;
+	emotionQuadrant?: 'yellow' | 'green' | 'red' | 'blue';
+	emotionDescription?: string;
+	// Inferred emotion
+	inferredEmotionId?: string;
+	inferredEmotionName?: string;
+	inferredEmotionEmoji?: string;
+	inferredEmotionQuadrant?: 'yellow' | 'green' | 'red' | 'blue';
+	inferredEmotionDescription?: string;
+};
 
-  function transformTasks(apiTasks: Task[]): TimelineTask[] {
-    return apiTasks.map((task) => {
-      const startTime = task.start_date
-        ? new Date(task.start_date)
-        : new Date();
-      const endTime = task.end_date
-        ? new Date(task.end_date)
-        : new Date(startTime.getTime() + 30 * 60000);
+function transformTasks(apiTasks: Task[]): TimelineTask[] {
+	return apiTasks.map((task) => {
+		const startTime = task.start_date ? new Date(task.start_date) : new Date();
+		const endTime = task.end_date
+			? new Date(task.end_date)
+			: new Date(startTime.getTime() + 30 * 60000);
 
-      return {
-        id: task.id,
-        title: task.title,
-        description: task.journal,
-        startTime,
-        endTime,
-        categoryColor: task.category?.color,
-        categoryName: task.category?.name,
-        completed: task.completed,
-        emoji: task.completed ? "✓" : undefined,
-        categoryId: task.category?.id,
-        emotionId: task.emotion_id,
-        inferredEmotionId: task.inferred_emotion?.closest_emotion_id,
-      };
-    });
-  }
+		return {
+			id: task.id,
+			title: task.title,
+			description: task.journal,
+			startTime,
+			endTime,
+			categoryColor: task.category?.color,
+			categoryName: task.category?.name,
+			completed: task.completed,
+			emoji: task.completed ? '✓' : undefined,
+			categoryId: task.category?.id,
+			emotionId: task.emotion_id,
+			inferredEmotionId: task.inferred_emotion?.closest_emotion_id,
+		};
+	});
+}
 
-  // Enrich tasks with emotion data (both selected and inferred) using the store
-  function enrichWithEmotions(tasks: TimelineTask[]): TimelineTask[] {
-    if (!emotionStore.isInitialized) return tasks;
+// Enrich tasks with emotion data (both selected and inferred) using the store
+function enrichWithEmotions(tasks: TimelineTask[]): TimelineTask[] {
+	if (!emotionStore.isInitialized) return tasks;
 
-    return tasks.map((task) => {
-      let enrichedTask = { ...task };
+	return tasks.map((task) => {
+		let enrichedTask = { ...task };
 
-      // Selected emotion data
-      if (task.emotionId) {
-        const emotion = emotionStore.get(task.emotionId);
-        if (emotion) {
-          enrichedTask = {
-            ...enrichedTask,
-            emotionName: emotion.name,
-            emotionEmoji: emotion.emoji,
-            emotionQuadrant: emotion.quadrant,
-            emotionDescription: emotion.description,
-          };
-        }
-      }
+		// Selected emotion data
+		if (task.emotionId) {
+			const emotion = emotionStore.get(task.emotionId);
+			if (emotion) {
+				enrichedTask = {
+					...enrichedTask,
+					emotionName: emotion.name,
+					emotionEmoji: emotion.emoji,
+					emotionQuadrant: emotion.quadrant,
+					emotionDescription: emotion.description,
+				};
+			}
+		}
 
-      // Inferred emotion data
-      if (task.inferredEmotionId) {
-        const inferredEmotion = emotionStore.get(task.inferredEmotionId);
-        if (inferredEmotion) {
-          enrichedTask = {
-            ...enrichedTask,
-            inferredEmotionName: inferredEmotion.name,
-            inferredEmotionEmoji: inferredEmotion.emoji,
-            inferredEmotionQuadrant: inferredEmotion.quadrant,
-            inferredEmotionDescription: inferredEmotion.description,
-          };
-        }
-      }
+		// Inferred emotion data
+		if (task.inferredEmotionId) {
+			const inferredEmotion = emotionStore.get(task.inferredEmotionId);
+			if (inferredEmotion) {
+				enrichedTask = {
+					...enrichedTask,
+					inferredEmotionName: inferredEmotion.name,
+					inferredEmotionEmoji: inferredEmotion.emoji,
+					inferredEmotionQuadrant: inferredEmotion.quadrant,
+					inferredEmotionDescription: inferredEmotion.description,
+				};
+			}
+		}
 
-      return enrichedTask;
-    });
-  }
+		return enrichedTask;
+	});
+}
 
-  // Check if a task is relevant for the selected date view
-  function isTaskVisibleOnDate(task: TimelineTask, date: Date): boolean {
-    const viewStart = new Date(date);
-    viewStart.setHours(0, 0, 0, 0);
-    const viewEnd = new Date(date);
-    viewEnd.setHours(23, 59, 59, 999);
+// Check if a task is relevant for the selected date view
+function isTaskVisibleOnDate(task: TimelineTask, date: Date): boolean {
+	const viewStart = new Date(date);
+	viewStart.setHours(0, 0, 0, 0);
+	const viewEnd = new Date(date);
+	viewEnd.setHours(23, 59, 59, 999);
 
-    // Task is visible if it overlaps with the view window
-    return task.startTime <= viewEnd && task.endTime >= viewStart;
-  }
+	// Task is visible if it overlaps with the view window
+	return task.startTime <= viewEnd && task.endTime >= viewStart;
+}
 
-  // Combine current day tasks with overnight tasks from previous day
-  const allTasksRaw = $derived.by(() => {
-    const currentDayTasks = transformTasks($tasksQuery.data?.items || []);
-    const prevDayTasks = transformTasks($prevDayTasksQuery.data?.items || []);
+// Combine current day tasks with overnight tasks from previous day
+const allTasksRaw = $derived.by(() => {
+	const currentDayTasks = transformTasks($tasksQuery.data?.items || []);
+	const prevDayTasks = transformTasks($prevDayTasksQuery.data?.items || []);
 
-    // Filter previous day tasks to only include those that extend into current day
-    const overnightTasks = prevDayTasks.filter((task) => {
-      const viewStart = new Date(selectedDate);
-      viewStart.setHours(0, 0, 0, 0);
-      // Task ends after midnight of selected date
-      return task.endTime > viewStart;
-    });
+	// Filter previous day tasks to only include those that extend into current day
+	const overnightTasks = prevDayTasks.filter((task) => {
+		const viewStart = new Date(selectedDate);
+		viewStart.setHours(0, 0, 0, 0);
+		// Task ends after midnight of selected date
+		return task.endTime > viewStart;
+	});
 
-    // Combine and deduplicate by ID
-    const taskMap = new Map<string, TimelineTask>();
-    [...overnightTasks, ...currentDayTasks].forEach((task) => {
-      taskMap.set(task.id, task);
-    });
+	// Combine and deduplicate by ID
+	const taskMap = new Map<string, TimelineTask>();
+	[...overnightTasks, ...currentDayTasks].forEach((task) => {
+		taskMap.set(task.id, task);
+	});
 
-    return Array.from(taskMap.values());
-  });
+	return Array.from(taskMap.values());
+});
 
-  // Enrich tasks with emotions when raw tasks change
-  // Enrich tasks with emotions reactively
-  const emotionEnrichedTasks = $derived(enrichWithEmotions(allTasksRaw));
+// Enrich tasks with emotions when raw tasks change
+// Enrich tasks with emotions reactively
+const emotionEnrichedTasks = $derived(enrichWithEmotions(allTasksRaw));
 
-  // Use enriched tasks for display
-  const allTasks = $derived(() =>
-    emotionEnrichedTasks.length > 0 ? emotionEnrichedTasks : allTasksRaw,
-  );
+// Use enriched tasks for display
+const allTasks = $derived(() =>
+	emotionEnrichedTasks.length > 0 ? emotionEnrichedTasks : allTasksRaw,
+);
 
-  const timelineTasks = $derived(
-    selectedCategoryId
-      ? allTasks().filter((t) => t.categoryId === selectedCategoryId)
-      : allTasks(),
-  );
+const timelineTasks = $derived(
+	selectedCategoryId
+		? allTasks().filter((t) => t.categoryId === selectedCategoryId)
+		: allTasks(),
+);
 
-  const categories = $derived($categoriesQuery.data?.items || []);
-  const completedCount = $derived(allTasks().filter((t) => t.completed).length);
-  const totalCount = $derived(allTasks().length);
-  const completionRate = $derived(
-    totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
-  );
+const categories = $derived($categoriesQuery.data?.items || []);
+const completedCount = $derived(allTasks().filter((t) => t.completed).length);
+const totalCount = $derived(allTasks().length);
+const completionRate = $derived(
+	totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+);
 
-  // Check if selected date is today
-  const isSelectedDateToday = $derived(() => {
-    const today = new Date();
-    return (
-      selectedDate.getFullYear() === today.getFullYear() &&
-      selectedDate.getMonth() === today.getMonth() &&
-      selectedDate.getDate() === today.getDate()
-    );
-  });
+// Check if selected date is today
+const isSelectedDateToday = $derived(() => {
+	const today = new Date();
+	return (
+		selectedDate.getFullYear() === today.getFullYear() &&
+		selectedDate.getMonth() === today.getMonth() &&
+		selectedDate.getDate() === today.getDate()
+	);
+});
 
-  // Task modal state
-  let modalOpen = $state(false);
-  let editingTask = $state<Task | null>(null);
-  let initialCategoryId = $state<string | undefined>(undefined);
+// Task modal state
+let modalOpen = $state(false);
+let editingTask = $state<Task | null>(null);
+let initialCategoryId = $state<string | undefined>(undefined);
 
-  // Uncomplete confirmation state
-  let showUncompleteConfirm = $state(false);
-  let pendingUncompleteTaskId = $state<string | null>(null);
+// Uncomplete confirmation state
+let showUncompleteConfirm = $state(false);
+let pendingUncompleteTaskId = $state<string | null>(null);
 
-  // Emotion modal state (for modal switching)
-  let emotionModalOpen = $state(false);
-  let pendingEmotion = $state<Emotion | null>(null);
-  let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
+// Emotion modal state (for modal switching)
+let emotionModalOpen = $state(false);
+let pendingEmotion = $state<Emotion | null>(null);
+let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
 
-  // Toggle complete mutation
-  const queryClient = useQueryClient();
-  const toggleCompleteMut = createMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      updateTask(id, { completed }),
-    onSuccess: () => {
-      // Invalidate both queries
-      queryClient.invalidateQueries({ queryKey: ["tasks", "timeline"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks", "timeline-prev"] });
-    },
-  });
+// Toggle complete mutation
+const queryClient = useQueryClient();
+const toggleCompleteMut = createMutation({
+	mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
+		updateTask(id, { completed }),
+	onSuccess: () => {
+		// Invalidate both queries
+		queryClient.invalidateQueries({ queryKey: ['tasks', 'timeline'] });
+		queryClient.invalidateQueries({ queryKey: ['tasks', 'timeline-prev'] });
+	},
+});
 
-  // Handle date change from Timeline
-  function handleDateChange(newDate: Date) {
-    selectedDate = newDate;
-    selectedCategoryId = null; // Reset filter on date change
-  }
+// Handle date change from Timeline
+function handleDateChange(newDate: Date) {
+	selectedDate = newDate;
+	selectedCategoryId = null; // Reset filter on date change
+}
 
-  // Handle task click from timeline - navigate to edit page
-  function handleTaskClick(taskId: string) {
-    if (browser) {
-      sessionStorage.setItem(
-        "task-form-referrer",
-        $page.url.pathname + $page.url.search,
-      );
-    }
-    goto(`/tasks/${taskId}`);
-  }
+// Handle task click from timeline - navigate to edit page
+function handleTaskClick(taskId: string) {
+	if (browser) {
+		sessionStorage.setItem(
+			'task-form-referrer',
+			$page.url.pathname + $page.url.search,
+		);
+	}
+	goto(`/tasks/${taskId}`);
+}
 
-  // Handle category label click from timeline - navigate to create page with category
-  function handleCategoryClick(categoryId: string) {
-    if (browser) {
-      sessionStorage.setItem(
-        "task-form-referrer",
-        $page.url.pathname + $page.url.search,
-      );
-    }
-    goto(`/tasks/create?category=${categoryId}`);
-  }
+// Handle category label click from timeline - navigate to create page with category
+function handleCategoryClick(categoryId: string) {
+	if (browser) {
+		sessionStorage.setItem(
+			'task-form-referrer',
+			$page.url.pathname + $page.url.search,
+		);
+	}
+	goto(`/tasks/create?category=${categoryId}`);
+}
 
-  // Handle modal close
-  function handleModalClose() {
-    modalOpen = false;
-    editingTask = null;
-    initialCategoryId = undefined;
-    pendingEmotion = null; // Clear pending emotion
-    queryClient.invalidateQueries({ queryKey: ["tasks", "timeline"] });
-    queryClient.invalidateQueries({ queryKey: ["tasks", "timeline-prev"] });
-  }
+// Handle modal close
+function handleModalClose() {
+	modalOpen = false;
+	editingTask = null;
+	initialCategoryId = undefined;
+	pendingEmotion = null; // Clear pending emotion
+	queryClient.invalidateQueries({ queryKey: ['tasks', 'timeline'] });
+	queryClient.invalidateQueries({ queryKey: ['tasks', 'timeline-prev'] });
+}
 
-  // Handle opening emotion modal from TaskModal
-  function handleOpenEmotionModal(context: EmotionSelectionContext) {
-    emotionSelectionContext = context;
-    emotionModalOpen = true;
-  }
+// Handle opening emotion modal from TaskModal
+function handleOpenEmotionModal(context: EmotionSelectionContext) {
+	emotionSelectionContext = context;
+	emotionModalOpen = true;
+}
 
-  // Handle emotion selection from EmotionModal
-  function handleEmotionSelect(emotion: Emotion) {
-    pendingEmotion = emotion;
-    emotionModalOpen = false;
-    modalOpen = true; // Reopen task modal
-  }
+// Handle emotion selection from EmotionModal
+function handleEmotionSelect(emotion: Emotion) {
+	pendingEmotion = emotion;
+	emotionModalOpen = false;
+	modalOpen = true; // Reopen task modal
+}
 
-  // Handle emotion modal close (cancelled)
-  function handleEmotionModalClose() {
-    emotionModalOpen = false;
-    modalOpen = true; // Reopen task modal without selection
-    emotionSelectionContext = null;
-  }
+// Handle emotion modal close (cancelled)
+function handleEmotionModalClose() {
+	emotionModalOpen = false;
+	modalOpen = true; // Reopen task modal without selection
+	emotionSelectionContext = null;
+}
 
-  // Handle toggle complete from timeline
-  function handleToggleComplete(taskId: string, newCompleted: boolean) {
-    if (!newCompleted) {
-      pendingUncompleteTaskId = taskId;
-      showUncompleteConfirm = true;
-    } else {
-      $toggleCompleteMut.mutate({ id: taskId, completed: true });
-    }
-  }
+// Handle toggle complete from timeline
+function handleToggleComplete(taskId: string, newCompleted: boolean) {
+	if (!newCompleted) {
+		pendingUncompleteTaskId = taskId;
+		showUncompleteConfirm = true;
+	} else {
+		$toggleCompleteMut.mutate({ id: taskId, completed: true });
+	}
+}
 
-  function confirmUncomplete() {
-    if (pendingUncompleteTaskId) {
-      $toggleCompleteMut.mutate({
-        id: pendingUncompleteTaskId,
-        completed: false,
-      });
-      pendingUncompleteTaskId = null;
-      showUncompleteConfirm = false;
-    }
-  }
+function confirmUncomplete() {
+	if (pendingUncompleteTaskId) {
+		$toggleCompleteMut.mutate({
+			id: pendingUncompleteTaskId,
+			completed: false,
+		});
+		pendingUncompleteTaskId = null;
+		showUncompleteConfirm = false;
+	}
+}
 
-  // Quick logs data
-  const quickLogs = [
-    { emoji: "☕", label: "Morning", color: "#f97316" },
-    { emoji: "💪", label: "Workout", color: "#ef4444" },
-    { emoji: "📚", label: "Reading", color: "#3b82f6" },
-    { emoji: "🧘", label: "Meditation", color: "#8b5cf6" },
-    { emoji: "🍽️", label: "Meal", color: "#22c55e" },
-    { emoji: "💤", label: "Sleep", color: "#6366f1" },
-    { emoji: "💧", label: "Water", color: "#06b6d4" },
-    { emoji: "🚶", label: "Walk", color: "#10b981" },
-  ];
+// Quick logs data
+const quickLogs = [
+	{ emoji: '☕', label: 'Morning', color: '#f97316' },
+	{ emoji: '💪', label: 'Workout', color: '#ef4444' },
+	{ emoji: '📚', label: 'Reading', color: '#3b82f6' },
+	{ emoji: '🧘', label: 'Meditation', color: '#8b5cf6' },
+	{ emoji: '🍽️', label: 'Meal', color: '#22c55e' },
+	{ emoji: '💤', label: 'Sleep', color: '#6366f1' },
+	{ emoji: '💧', label: 'Water', color: '#06b6d4' },
+	{ emoji: '🚶', label: 'Walk', color: '#10b981' },
+];
 
-  // Get greeting based on time
-  function getGreeting(): string {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  }
+// Get greeting based on time
+function getGreeting(): string {
+	const hour = new Date().getHours();
+	if (hour < 12) return 'Good Morning';
+	if (hour < 17) return 'Good Afternoon';
+	return 'Good Evening';
+}
 
-  function formatDate(): string {
-    return new Date().toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    });
-  }
+function formatDate(): string {
+	return new Date().toLocaleDateString('en-US', {
+		weekday: 'long',
+		month: 'long',
+		day: 'numeric',
+	});
+}
 
-  function handleQuickLog(log: { emoji: string; label: string }) {
-    // TODO: Implement quick log creation
-    console.log("Quick log:", log);
-    fabOpen = false;
-  }
+function handleQuickLog(log: { emoji: string; label: string }) {
+	// TODO: Implement quick log creation
+	console.log('Quick log:', log);
+	fabOpen = false;
+}
 
-  function openTaskModal() {
-    fabOpen = false;
-    if (browser) {
-      sessionStorage.setItem(
-        "task-form-referrer",
-        $page.url.pathname + $page.url.search,
-      );
-    }
-    goto("/tasks/create");
-  }
+function openTaskModal() {
+	fabOpen = false;
+	if (browser) {
+		sessionStorage.setItem(
+			'task-form-referrer',
+			$page.url.pathname + $page.url.search,
+		);
+	}
+	goto('/tasks/create');
+}
 
-  // Update task time mutation
-  const updateTaskTimeMut = createMutation({
-    mutationFn: ({
-      id,
-      start_date,
-      end_date,
-    }: {
-      id: string;
-      start_date: string;
-      end_date: string;
-    }) => updateTask(id, { start_date, end_date }),
-    onSuccess: () => {
-      // Invalidate both queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["tasks", "timeline"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks", "timeline-prev"] });
-    },
-  });
+// Update task time mutation
+const updateTaskTimeMut = createMutation({
+	mutationFn: ({
+		id,
+		start_date,
+		end_date,
+	}: {
+		id: string;
+		start_date: string;
+		end_date: string;
+	}) => updateTask(id, { start_date, end_date }),
+	onSuccess: () => {
+		// Invalidate both queries to refresh data
+		queryClient.invalidateQueries({ queryKey: ['tasks', 'timeline'] });
+		queryClient.invalidateQueries({ queryKey: ['tasks', 'timeline-prev'] });
+	},
+});
 
-  function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
-    // Optimistically update is handled in the component
-    // Here we just fire the API request
-    const { startOfDay: startDateStr } = formatDateForApi(start);
-    // Be careful with timezones. The API expects ISO strings.
-    // The previous transform used new Date(task.start_date), so we should send back ISO.
+function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
+	// Optimistically update is handled in the component
+	// Here we just fire the API request
+	const { startOfDay: startDateStr } = formatDateForApi(start);
+	// Be careful with timezones. The API expects ISO strings.
+	// The previous transform used new Date(task.start_date), so we should send back ISO.
 
-    // We need to preserve the full timestamp
-    $updateTaskTimeMut.mutate({
-      id: taskId,
-      start_date: start.toISOString(),
-      end_date: end.toISOString(),
-    });
-  }
+	// We need to preserve the full timestamp
+	$updateTaskTimeMut.mutate({
+		id: taskId,
+		start_date: start.toISOString(),
+		end_date: end.toISOString(),
+	});
+}
 </script>
 
 <svelte:head>

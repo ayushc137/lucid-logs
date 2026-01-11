@@ -1,54 +1,54 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    import { X } from "lucide-svelte";
+import { X } from 'lucide-svelte';
+import type { Snippet } from 'svelte';
 
-    type Size = "sm" | "md" | "lg" | "xl" | "full";
+type Size = 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
-    interface Props {
-        /** Control modal visibility */
-        open?: boolean;
-        /** Modal size */
-        size?: Size;
-        /** Modal title */
-        title?: string;
-        /** Subtitle/description */
-        subtitle?: string;
-        /** Show close button in header */
-        showClose?: boolean;
-        /** Close handler */
-        onClose?: () => void;
-        /** Header icon slot */
-        icon?: Snippet;
-        /** Main content slot */
-        children: Snippet;
-        /** Footer actions slot */
-        actions?: Snippet;
-    }
+interface Props {
+	/** Control modal visibility */
+	open?: boolean;
+	/** Modal size */
+	size?: Size;
+	/** Modal title */
+	title?: string;
+	/** Subtitle/description */
+	subtitle?: string;
+	/** Show close button in header */
+	showClose?: boolean;
+	/** Close handler */
+	onClose?: () => void;
+	/** Header icon slot */
+	icon?: Snippet;
+	/** Main content slot */
+	children: Snippet;
+	/** Footer actions slot */
+	actions?: Snippet;
+}
 
-    let {
-        open = $bindable(false),
-        size = "md",
-        title = "",
-        subtitle = "",
-        showClose = true,
-        onClose,
-        icon,
-        children,
-        actions,
-    }: Props = $props();
+let {
+	open = $bindable(false),
+	size = 'md',
+	title = '',
+	subtitle = '',
+	showClose = true,
+	onClose,
+	icon,
+	children,
+	actions,
+}: Props = $props();
 
-    const sizeClasses: Record<Size, string> = {
-        sm: "max-w-sm",
-        md: "max-w-lg",
-        lg: "max-w-3xl",
-        xl: "max-w-5xl",
-        full: "max-w-5xl h-[85vh] max-h-[800px]",
-    };
+const sizeClasses: Record<Size, string> = {
+	sm: 'max-w-sm',
+	md: 'max-w-lg',
+	lg: 'max-w-3xl',
+	xl: 'max-w-5xl',
+	full: 'max-w-5xl h-[85vh] max-h-[800px]',
+};
 
-    function handleClose() {
-        open = false;
-        onClose?.();
-    }
+function handleClose() {
+	open = false;
+	onClose?.();
+}
 </script>
 
 <dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>

@@ -1,433 +1,426 @@
 <script lang="ts">
-  import {
-    ListTodo,
-    Plus,
-    Trash2,
-    SquarePen,
-    Check,
-    Search,
-    Funnel,
-    X,
-    Clock,
-    LoaderCircle,
-    CalendarDays,
-  } from "lucide-svelte";
-  import {
-    getUrlParams,
-    updateUrlParams,
-    parsers,
-  } from "$lib/utils/navigation";
-  import {
-    createQuery,
-    createMutation,
-    useQueryClient,
-  } from "@tanstack/svelte-query";
-  import {
-    getTasks,
-    deleteTask,
-    updateTask,
-    getCategories,
-    getLastTaskEndTime,
-    type Task,
-    type TaskFilterParams,
-  } from "$lib/api";
-  import {
-    TaskModal,
-    type EmotionSelectionContext,
-  } from "$lib/components/tasks";
-  import { EmotionModal } from "$lib/components/emotions";
-  import { emotionStore } from "$lib/stores/emotions.svelte";
-  import {
-    CategoryDropdown,
-    StatusDropdown,
-    PriorityDropdown,
-    ErrorAlert,
-    ConfirmDialog,
-    DataTable,
-    SortableHeader,
-    OpenMoji,
-  } from "$lib/components/ui";
-  import {
-    QUADRANT_COLORS,
-    QUADRANT_META,
-    type Quadrant,
-  } from "$lib/components/emotions/emotionData";
-  import type { Emotion } from "$lib/api/emotions";
-  import { cn } from "$lib/utils";
-  import { goto } from "$app/navigation";
-  import { browser } from "$app/environment";
-  import { page } from "$app/stores";
-  import { onMount } from "svelte";
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+import {
+	type Task,
+	type TaskFilterParams,
+	deleteTask,
+	getCategories,
+	getLastTaskEndTime,
+	getTasks,
+	updateTask,
+} from '$lib/api';
+import type { Emotion } from '$lib/api/emotions';
+import { EmotionModal } from '$lib/components/emotions';
+import {
+	QUADRANT_COLORS,
+	QUADRANT_META,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { type EmotionSelectionContext, TaskModal } from '$lib/components/tasks';
+import {
+	CategoryDropdown,
+	ConfirmDialog,
+	DataTable,
+	ErrorAlert,
+	OpenMoji,
+	PriorityDropdown,
+	SortableHeader,
+	StatusDropdown,
+} from '$lib/components/ui';
+import { emotionStore } from '$lib/stores/emotions.svelte';
+import { cn } from '$lib/utils';
+import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import {
+	CalendarDays,
+	Check,
+	Clock,
+	Funnel,
+	ListTodo,
+	LoaderCircle,
+	Plus,
+	Search,
+	SquarePen,
+	Trash2,
+	X,
+} from 'lucide-svelte';
+import { onMount } from 'svelte';
 
-  // Session storage keys removed favor of URL params
+// Session storage keys removed favor of URL params
 
-  const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
-  // Today's date for filtering (Local -> ISO)
-  const today = new Date();
-  const startOfDay = new Date(today);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(today);
-  endOfDay.setHours(23, 59, 59, 999);
+// Today's date for filtering (Local -> ISO)
+const today = new Date();
+const startOfDay = new Date(today);
+startOfDay.setHours(0, 0, 0, 0);
+const endOfDay = new Date(today);
+endOfDay.setHours(23, 59, 59, 999);
 
-  const todayStart = startOfDay.toISOString();
-  const todayEnd = endOfDay.toISOString();
+const todayStart = startOfDay.toISOString();
+const todayEnd = endOfDay.toISOString();
 
-  // Initialize state from URL params
-  const initialParams = getUrlParams({
-    q: parsers.string(""),
-    cat: parsers.string("all"),
-    status: parsers.string("all"),
-    prio: parsers.string("all"),
-    show: parsers.boolean(false),
-    today: parsers.boolean(true),
-    from: parsers.string(""),
-    to: parsers.string(""),
-    sort: parsers.string("start_date"),
-    dir: parsers.string("desc"),
-  });
+// Initialize state from URL params
+const initialParams = getUrlParams({
+	q: parsers.string(''),
+	cat: parsers.string('all'),
+	status: parsers.string('all'),
+	prio: parsers.string('all'),
+	show: parsers.boolean(false),
+	today: parsers.boolean(true),
+	from: parsers.string(''),
+	to: parsers.string(''),
+	sort: parsers.string('start_date'),
+	dir: parsers.string('desc'),
+});
 
-  // Search and filter states
-  let searchQuery = $state(initialParams.q as string);
-  let debouncedSearch = $state(initialParams.q as string); // Initialize with same valid
-  let filterCategory = $state<string>(initialParams.cat as string);
-  let filterStatus = $state<"all" | "completed" | "pending">(
-    initialParams.status as "all" | "completed" | "pending",
-  );
-  let filterPriority = $state<"all" | "high" | "medium" | "low">(
-    initialParams.prio as "all" | "high" | "medium" | "low",
-  );
-  let showFilters = $state(initialParams.show as boolean);
+// Search and filter states
+let searchQuery = $state(initialParams.q as string);
+let debouncedSearch = $state(initialParams.q as string); // Initialize with same valid
+let filterCategory = $state<string>(initialParams.cat as string);
+let filterStatus = $state<'all' | 'completed' | 'pending'>(
+	initialParams.status as 'all' | 'completed' | 'pending',
+);
+let filterPriority = $state<'all' | 'high' | 'medium' | 'low'>(
+	initialParams.prio as 'all' | 'high' | 'medium' | 'low',
+);
+let showFilters = $state(initialParams.show as boolean);
 
-  // Today only toggle
-  let todayOnly = $state<boolean>(initialParams.today as boolean);
+// Today only toggle
+let todayOnly = $state<boolean>(initialParams.today as boolean);
 
-  // Date range filter
-  let dateFrom = $state(initialParams.from as string);
-  let dateTo = $state(initialParams.to as string);
+// Date range filter
+let dateFrom = $state(initialParams.from as string);
+let dateTo = $state(initialParams.to as string);
 
-  // Sort states
-  type SortField = "title" | "start_date" | "priority" | "created_at";
-  type SortDirection = "asc" | "desc";
-  let sortField = $state<SortField>(initialParams.sort as SortField);
-  let sortDirection = $state<SortDirection>(initialParams.dir as SortDirection);
+// Sort states
+type SortField = 'title' | 'start_date' | 'priority' | 'created_at';
+type SortDirection = 'asc' | 'desc';
+let sortField = $state<SortField>(initialParams.sort as SortField);
+let sortDirection = $state<SortDirection>(initialParams.dir as SortDirection);
 
-  // Sync state to URL params
-  $effect(() => {
-    updateUrlParams(
-      {
-        q: debouncedSearch,
-        cat: filterCategory,
-        status: filterStatus,
-        prio: filterPriority,
-        show: showFilters,
-        today: todayOnly,
-        from: dateFrom,
-        to: dateTo,
-        sort: sortField,
-        dir: sortDirection,
-      },
-      { replace: true, keepFocus: true },
-    );
-  });
+// Sync state to URL params
+$effect(() => {
+	updateUrlParams(
+		{
+			q: debouncedSearch,
+			cat: filterCategory,
+			status: filterStatus,
+			prio: filterPriority,
+			show: showFilters,
+			today: todayOnly,
+			from: dateFrom,
+			to: dateTo,
+			sort: sortField,
+			dir: sortDirection,
+		},
+		{ replace: true, keepFocus: true },
+	);
+});
 
-  // Debounce search input
-  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-  function handleSearchInput(value: string) {
-    searchQuery = value;
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      debouncedSearch = value;
-      // No need to manually trigger - $effect watching queryParams handles it
-    }, 300);
-  }
+// Debounce search input
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+function handleSearchInput(value: string) {
+	searchQuery = value;
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchTimeout = setTimeout(() => {
+		debouncedSearch = value;
+		// No need to manually trigger - $effect watching queryParams handles it
+	}, 300);
+}
 
-  // Compute query params reactively with $derived
-  // This ensures all filter/search state is properly tracked
-  const queryParams = $derived.by(() => {
-    const params: TaskFilterParams = {
-      limit: 100,
-      sort_field: sortField,
-      sort_order: sortDirection,
-    };
+// Compute query params reactively with $derived
+// This ensures all filter/search state is properly tracked
+const queryParams = $derived.by(() => {
+	const params: TaskFilterParams = {
+		limit: 100,
+		sort_field: sortField,
+		sort_order: sortDirection,
+	};
 
-    if (todayOnly) {
-      params.start_date_from = todayStart;
-      params.start_date_to = todayEnd;
-    } else {
-      if (dateFrom) params.start_date_from = `${dateFrom}T00:00:00Z`;
-      if (dateTo) params.start_date_to = `${dateTo}T23:59:59Z`;
-    }
+	if (todayOnly) {
+		params.start_date_from = todayStart;
+		params.start_date_to = todayEnd;
+	} else {
+		if (dateFrom) params.start_date_from = `${dateFrom}T00:00:00Z`;
+		if (dateTo) params.start_date_to = `${dateTo}T23:59:59Z`;
+	}
 
-    if (debouncedSearch) params.search = debouncedSearch;
-    if (filterCategory === "none") {
-      params.no_category = true;
-    } else if (filterCategory !== "all") {
-      params.category_id = filterCategory;
-    }
-    if (filterStatus !== "all") params.status = filterStatus;
+	if (debouncedSearch) params.search = debouncedSearch;
+	if (filterCategory === 'none') {
+		params.no_category = true;
+	} else if (filterCategory !== 'all') {
+		params.category_id = filterCategory;
+	}
+	if (filterStatus !== 'all') params.status = filterStatus;
 
-    if (filterPriority === "high") {
-      params.priority_min = 7;
-      params.priority_max = 10;
-    } else if (filterPriority === "medium") {
-      params.priority_min = 4;
-      params.priority_max = 6;
-    } else if (filterPriority === "low") {
-      params.priority_min = 1;
-      params.priority_max = 3;
-    }
+	if (filterPriority === 'high') {
+		params.priority_min = 7;
+		params.priority_max = 10;
+	} else if (filterPriority === 'medium') {
+		params.priority_min = 4;
+		params.priority_max = 6;
+	} else if (filterPriority === 'low') {
+		params.priority_min = 1;
+		params.priority_max = 3;
+	}
 
-    return params;
-  });
+	return params;
+});
 
-  // Mutable refs for tracking param changes - initialized lazily
-  let currentParams: TaskFilterParams | null = null;
-  let currentParamsJson = "";
+// Mutable refs for tracking param changes - initialized lazily
+let currentParams: TaskFilterParams | null = null;
+let currentParamsJson = '';
 
-  // Fetch tasks - queryFn reads currentParams which is updated by $effect
-  const tasksQuery = createQuery({
-    queryKey: ["tasks-list"],
-    queryFn: async () => {
-      // Use currentParams if set, otherwise use queryParams directly
-      const params = currentParams ?? queryParams;
-      console.log("[Tasks] Fetching with params:", params);
-      return getTasks(params);
-    },
-    staleTime: 0,
-  });
+// Fetch tasks - queryFn reads currentParams which is updated by $effect
+const tasksQuery = createQuery({
+	queryKey: ['tasks-list'],
+	queryFn: async () => {
+		// Use currentParams if set, otherwise use queryParams directly
+		const params = currentParams ?? queryParams;
+		console.log('[Tasks] Fetching with params:', params);
+		return getTasks(params);
+	},
+	staleTime: 0,
+});
 
-  // Use $effect to trigger refetch when queryParams change
-  // Update currentParams before calling refetch so queryFn sees fresh values
-  $effect(() => {
-    const newParamsJson = JSON.stringify(queryParams);
-    // Skip initial run (first time currentParamsJson is empty)
-    if (currentParamsJson === "") {
-      currentParamsJson = newParamsJson;
-      currentParams = queryParams;
-      return;
-    }
-    if (newParamsJson !== currentParamsJson) {
-      currentParams = queryParams;
-      currentParamsJson = newParamsJson;
-      console.log("[Tasks] Params changed, refetching...", queryParams);
-      $tasksQuery.refetch();
-    }
-  });
+// Use $effect to trigger refetch when queryParams change
+// Update currentParams before calling refetch so queryFn sees fresh values
+$effect(() => {
+	const newParamsJson = JSON.stringify(queryParams);
+	// Skip initial run (first time currentParamsJson is empty)
+	if (currentParamsJson === '') {
+		currentParamsJson = newParamsJson;
+		currentParams = queryParams;
+		return;
+	}
+	if (newParamsJson !== currentParamsJson) {
+		currentParams = queryParams;
+		currentParamsJson = newParamsJson;
+		console.log('[Tasks] Params changed, refetching...', queryParams);
+		$tasksQuery.refetch();
+	}
+});
 
-  // Fetch last task end time (for quick start)
-  const lastTaskEndTimeQuery = createQuery({
-    queryKey: ["tasks", "last-end-time"],
-    queryFn: getLastTaskEndTime,
-  });
+// Fetch last task end time (for quick start)
+const lastTaskEndTimeQuery = createQuery({
+	queryKey: ['tasks', 'last-end-time'],
+	queryFn: getLastTaskEndTime,
+});
 
-  const lastTaskEndTime = $derived(
-    $lastTaskEndTimeQuery.data?.end_time
-      ? new Date($lastTaskEndTimeQuery.data.end_time)
-      : null,
-  );
+const lastTaskEndTime = $derived(
+	$lastTaskEndTimeQuery.data?.end_time
+		? new Date($lastTaskEndTimeQuery.data.end_time)
+		: null,
+);
 
-  // Fetch categories
-  const categoriesQuery = createQuery({
-    queryKey: ["categories"],
-    queryFn: () => getCategories({ limit: 50 }),
-  });
+// Fetch categories
+const categoriesQuery = createQuery({
+	queryKey: ['categories'],
+	queryFn: () => getCategories({ limit: 50 }),
+});
 
-  // Delete mutation
-  const deleteMut = createMutation({
-    mutationFn: (id: string) => deleteTask(id),
-    onSuccess: () => {
-      $tasksQuery.refetch();
-    },
-  });
+// Delete mutation
+const deleteMut = createMutation({
+	mutationFn: (id: string) => deleteTask(id),
+	onSuccess: () => {
+		$tasksQuery.refetch();
+	},
+});
 
-  // Toggle complete mutation
-  const toggleCompleteMut = createMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      updateTask(id, { completed }),
-    onSuccess: () => {
-      $tasksQuery.refetch();
-    },
-  });
+// Toggle complete mutation
+const toggleCompleteMut = createMutation({
+	mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
+		updateTask(id, { completed }),
+	onSuccess: () => {
+		$tasksQuery.refetch();
+	},
+});
 
-  // Modal states
-  let modalOpen = $state(false);
-  let editingTask = $state<Task | null>(null);
-  let deleteConfirmOpen = $state(false);
-  let deleteTaskId = $state<string | null>(null);
+// Modal states
+let modalOpen = $state(false);
+let editingTask = $state<Task | null>(null);
+let deleteConfirmOpen = $state(false);
+let deleteTaskId = $state<string | null>(null);
 
-  // Uncomplete confirmation state
-  let uncompleteConfirmOpen = $state(false);
-  let pendingUncompleteTask = $state<Task | null>(null);
+// Uncomplete confirmation state
+let uncompleteConfirmOpen = $state(false);
+let pendingUncompleteTask = $state<Task | null>(null);
 
-  function openCreateModal() {
-    // Set referrer before navigating (include search params)
-    if (browser) {
-      sessionStorage.setItem(
-        "task-form-referrer",
-        $page.url.pathname + $page.url.search,
-      );
-    }
-    goto("/tasks/create");
-  }
+function openCreateModal() {
+	// Set referrer before navigating (include search params)
+	if (browser) {
+		sessionStorage.setItem(
+			'task-form-referrer',
+			$page.url.pathname + $page.url.search,
+		);
+	}
+	goto('/tasks/create');
+}
 
-  function openEditModal(task: Task) {
-    // Set referrer before navigating (include search params)
-    if (browser) {
-      sessionStorage.setItem(
-        "task-form-referrer",
-        $page.url.pathname + $page.url.search,
-      );
-    }
-    goto(`/tasks/${task.id}`);
-  }
+function openEditModal(task: Task) {
+	// Set referrer before navigating (include search params)
+	if (browser) {
+		sessionStorage.setItem(
+			'task-form-referrer',
+			$page.url.pathname + $page.url.search,
+		);
+	}
+	goto(`/tasks/${task.id}`);
+}
 
-  function handleModalClose() {
-    modalOpen = false;
-    editingTask = null;
-    pendingEmotion = null;
-    $tasksQuery.refetch(); // Refresh after modal closes
-  }
+function handleModalClose() {
+	modalOpen = false;
+	editingTask = null;
+	pendingEmotion = null;
+	$tasksQuery.refetch(); // Refresh after modal closes
+}
 
-  // Emotion modal state (for modal switching)
-  let emotionModalOpen = $state(false);
-  let pendingEmotion = $state<Emotion | null>(null);
-  let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
+// Emotion modal state (for modal switching)
+let emotionModalOpen = $state(false);
+let pendingEmotion = $state<Emotion | null>(null);
+let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
 
-  // Handle opening emotion modal from TaskModal
-  function handleOpenEmotionModal(context: EmotionSelectionContext) {
-    emotionSelectionContext = context;
-    emotionModalOpen = true;
-  }
+// Handle opening emotion modal from TaskModal
+function handleOpenEmotionModal(context: EmotionSelectionContext) {
+	emotionSelectionContext = context;
+	emotionModalOpen = true;
+}
 
-  // Handle emotion selection from EmotionModal
-  function handleEmotionSelect(emotion: Emotion) {
-    pendingEmotion = emotion;
-    emotionModalOpen = false;
-    modalOpen = true; // Reopen task modal
-  }
+// Handle emotion selection from EmotionModal
+function handleEmotionSelect(emotion: Emotion) {
+	pendingEmotion = emotion;
+	emotionModalOpen = false;
+	modalOpen = true; // Reopen task modal
+}
 
-  // Handle emotion modal close (cancelled)
-  function handleEmotionModalClose() {
-    emotionModalOpen = false;
-    modalOpen = true; // Reopen task modal without selection
-    emotionSelectionContext = null;
-  }
+// Handle emotion modal close (cancelled)
+function handleEmotionModalClose() {
+	emotionModalOpen = false;
+	modalOpen = true; // Reopen task modal without selection
+	emotionSelectionContext = null;
+}
 
-  function confirmDelete(id: string, e: Event) {
-    e.stopPropagation();
-    deleteTaskId = id;
-    deleteConfirmOpen = true;
-  }
+function confirmDelete(id: string, e: Event) {
+	e.stopPropagation();
+	deleteTaskId = id;
+	deleteConfirmOpen = true;
+}
 
-  function handleDelete() {
-    if (deleteTaskId) {
-      $deleteMut.mutate(deleteTaskId);
-      deleteConfirmOpen = false;
-      deleteTaskId = null;
-    }
-  }
+function handleDelete() {
+	if (deleteTaskId) {
+		$deleteMut.mutate(deleteTaskId);
+		deleteConfirmOpen = false;
+		deleteTaskId = null;
+	}
+}
 
-  function toggleComplete(task: Task, e: Event) {
-    e.stopPropagation();
-    if (task.completed) {
-      // Uncompleting - show confirmation
-      pendingUncompleteTask = task;
-      uncompleteConfirmOpen = true;
-    } else {
-      // Completing - just do it
-      $toggleCompleteMut.mutate({ id: task.id, completed: true });
-    }
-  }
+function toggleComplete(task: Task, e: Event) {
+	e.stopPropagation();
+	if (task.completed) {
+		// Uncompleting - show confirmation
+		pendingUncompleteTask = task;
+		uncompleteConfirmOpen = true;
+	} else {
+		// Completing - just do it
+		$toggleCompleteMut.mutate({ id: task.id, completed: true });
+	}
+}
 
-  function confirmUncomplete() {
-    if (pendingUncompleteTask) {
-      $toggleCompleteMut.mutate({
-        id: pendingUncompleteTask.id,
-        completed: false,
-      });
-      uncompleteConfirmOpen = false;
-      pendingUncompleteTask = null;
-    }
-  }
+function confirmUncomplete() {
+	if (pendingUncompleteTask) {
+		$toggleCompleteMut.mutate({
+			id: pendingUncompleteTask.id,
+			completed: false,
+		});
+		uncompleteConfirmOpen = false;
+		pendingUncompleteTask = null;
+	}
+}
 
-  function formatTime(dateStr: string): string {
-    return new Date(dateStr).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
+function formatTime(dateStr: string): string {
+	return new Date(dateStr).toLocaleTimeString([], {
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+}
 
-  function formatShortDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-    });
-  }
+function formatShortDate(dateStr: string): string {
+	return new Date(dateStr).toLocaleDateString([], {
+		month: 'short',
+		day: 'numeric',
+	});
+}
 
-  // Toggle sort on column header click
-  function toggleSort(field: SortField) {
-    if (sortField === field) {
-      sortDirection = sortDirection === "asc" ? "desc" : "asc";
-    } else {
-      sortField = field;
-      sortDirection = field === "title" ? "asc" : "desc";
-    }
-    // No manual refetch needed - $effect watches queryParams which includes sort state
-  }
+// Toggle sort on column header click
+function toggleSort(field: SortField) {
+	if (sortField === field) {
+		sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortField = field;
+		sortDirection = field === 'title' ? 'asc' : 'desc';
+	}
+	// No manual refetch needed - $effect watches queryParams which includes sort state
+}
 
-  function getPriorityLabel(priority: number): string {
-    if (priority >= 7) return "High";
-    if (priority >= 4) return "Medium";
-    return "Low";
-  }
+function getPriorityLabel(priority: number): string {
+	if (priority >= 7) return 'High';
+	if (priority >= 4) return 'Medium';
+	return 'Low';
+}
 
-  function getPriorityColor(priority: number): string {
-    if (priority >= 7) return "badge-error";
-    if (priority >= 4) return "badge-warning";
-    return "badge-info";
-  }
+function getPriorityColor(priority: number): string {
+	if (priority >= 7) return 'badge-error';
+	if (priority >= 4) return 'badge-warning';
+	return 'badge-info';
+}
 
-  function clearFilters() {
-    searchQuery = "";
-    debouncedSearch = "";
-    filterCategory = "all";
-    filterStatus = "all";
-    filterPriority = "all";
-    dateFrom = "";
-    dateTo = "";
-    // No manual refetch needed - $effect watches queryParams
-  }
+function clearFilters() {
+	searchQuery = '';
+	debouncedSearch = '';
+	filterCategory = 'all';
+	filterStatus = 'all';
+	filterPriority = 'all';
+	dateFrom = '';
+	dateTo = '';
+	// No manual refetch needed - $effect watches queryParams
+}
 
-  // Handle filter changes - no longer needed since $effect watches queryParams
-  function onFilterChange() {
-    // State changes automatically trigger refetch via $effect
-  }
+// Handle filter changes - no longer needed since $effect watches queryParams
+function onFilterChange() {
+	// State changes automatically trigger refetch via $effect
+}
 
-  // Highlight search matches
-  function highlightText(text: string, query: string): string {
-    if (!query || !text) return text;
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escapedQuery})`, "gi");
-    return text.replace(
-      regex,
-      '<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
-    );
-  }
+// Highlight search matches
+function highlightText(text: string, query: string): string {
+	if (!query || !text) return text;
+	const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const regex = new RegExp(`(${escapedQuery})`, 'gi');
+	return text.replace(
+		regex,
+		'<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
+	);
+}
 
-  const hasActiveFilters = $derived(
-    debouncedSearch !== "" ||
-      filterCategory !== "all" ||
-      filterStatus !== "all" ||
-      filterPriority !== "all" ||
-      dateFrom !== "" ||
-      dateTo !== "",
-  );
+const hasActiveFilters = $derived(
+	debouncedSearch !== '' ||
+		filterCategory !== 'all' ||
+		filterStatus !== 'all' ||
+		filterPriority !== 'all' ||
+		dateFrom !== '' ||
+		dateTo !== '',
+);
 
-  const tasks = $derived($tasksQuery.data?.items || []);
-  const categories = $derived($categoriesQuery.data?.items || []);
-  const totalTasks = $derived($tasksQuery.data?.total || 0);
-  const isSearching = $derived(searchQuery !== debouncedSearch);
+const tasks = $derived($tasksQuery.data?.items || []);
+const categories = $derived($categoriesQuery.data?.items || []);
+const totalTasks = $derived($tasksQuery.data?.total || 0);
+const isSearching = $derived(searchQuery !== debouncedSearch);
 </script>
 
 <svelte:head>

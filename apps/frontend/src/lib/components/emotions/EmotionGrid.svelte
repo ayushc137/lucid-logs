@@ -1,508 +1,501 @@
 <script lang="ts">
-    /**
-     * EMOTION GRID
-     * - Fetches all emotion data from backend API
-     * - OpenMoji font
-     * - Tooltip portaled to body (outside modal) via action
-     * - panzoom for smooth pan/zoom with wheel support
-     * - Tailwind CSS styling
-     * - Client-side search (filters loaded emotions)
-     */
-    import { onMount, onDestroy, tick, untrack } from "svelte";
-    import panzoom, { type PanZoom } from "panzoom";
-    import {
-        QUADRANT_COLORS,
-        QUADRANT_META,
-        seededRandom,
-        type Quadrant,
-    } from "./emotionData";
-    import {
-        generateLayers,
-        getAnimSpeed,
-        getEmotionColors,
-        getIndicatorDots,
-        type BlobLayer,
-        BLOB_SIZE,
-    } from "./emotionUtils";
-    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import { type Emotion } from "$lib/api/emotions";
-    import { emotionStore } from "$lib/stores/emotions.svelte";
-    import {
-        ZoomIn,
-        ZoomOut,
-        RotateCcw,
-        ArrowUp,
-        ArrowDown,
-        ArrowLeft,
-        ArrowRight,
-        Search,
-        X,
-        Loader2,
-        Target,
-    } from "lucide-svelte";
-
-    interface Props {
-        selectedEmotion?: Emotion | null;
-        onSelect?: (emotion: Emotion) => void;
-        onConfirm?: (emotion: Emotion) => void;
-        showIndicators?: boolean;
-        onHoveredChange?: (emotion: Emotion | null) => void;
-        /** Restrict selection to specific quadrants (e.g., for positive/negative reflections) */
-        allowedQuadrants?: Quadrant[] | null;
-    }
-
-    let {
-        selectedEmotion = $bindable(null),
-        onSelect,
-        onConfirm,
-        showIndicators = $bindable(false),
-        onHoveredChange,
-        allowedQuadrants = null,
-    }: Props = $props();
-
-    // Check if an emotion is allowed based on quadrant filtering
-    function isEmotionAllowed(emotion: Emotion): boolean {
-        if (!allowedQuadrants || allowedQuadrants.length === 0) return true;
-        return allowedQuadrants.includes(emotion.quadrant as Quadrant);
-    }
-
-    // API data state - from store
-    const allEmotions = $derived(emotionStore.all);
-    const isLoading = $derived(
-        emotionStore.isLoading && !emotionStore.isInitialized,
-    );
-    const loadError = $derived(emotionStore.error);
-
-    // Hover state
-    let hoveredEmotion = $state<Emotion | null>(null);
-    let tooltipPosition = $state<{ x: number; y: number } | null>(null);
-    let isMouseHovering = $state(false);
-    let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    // Panzoom
-    let viewportElement = $state<HTMLDivElement | null>(null);
-    let gridElement = $state<HTMLDivElement | null>(null);
-    let pzInstance: PanZoom | null = null;
-    let zoomLevel = $state(1);
-    let isPzReady = $state(false);
-
-    // Double-click detection (custom implementation to work around panzoom)
-    // Using $state to ensure variables persist through re-renders
-    let lastClickTime = $state(0);
-    let lastClickedEmotionId = $state<string | null>(null);
-    const DOUBLE_CLICK_THRESHOLD = 400; // ms
-
-    // Search state - client-side filtering
-    let searchQuery = $state("");
-    let showSearchDropdown = $state(false);
-    let searchInputElement = $state<HTMLInputElement | null>(null);
-
-    // Computed search results - filters allEmotions client-side
-    const searchResults = $derived.by(() => {
-        if (!searchQuery.trim()) return [];
-        const query = searchQuery.toLowerCase();
-        return allEmotions
-            .filter(
-                (e) =>
-                    e.name.toLowerCase().includes(query) ||
-                    e.description.toLowerCase().includes(query),
-            )
-            .slice(0, 20); // Limit to 20 results
-    });
-
-    // Center detection for auto-hover
-    let centerEmotion = $state<Emotion | null>(null);
-
-    // Computed grid from API data
-    const grid = $derived.by(() => {
-        const gridArray: (Emotion | null)[][] = Array(10)
-            .fill(null)
-            .map(() => Array(10).fill(null));
-
-        for (const emotion of allEmotions) {
-            const col = emotion.x < 0 ? emotion.x + 5 : emotion.x + 4;
-            const row = emotion.y > 0 ? 5 - emotion.y : Math.abs(emotion.y) + 4;
-            if (row >= 0 && row < 10 && col >= 0 && col < 10) {
-                gridArray[row][col] = emotion;
-            }
-        }
-        return gridArray;
-    });
-
-    // Pre-compute blob layers for all emotions
-    const emotionLayers = $derived.by(() => {
-        const layers = new Map<string, BlobLayer[]>();
-        for (const e of allEmotions) {
-            layers.set(e.id, generateLayers(e));
-        }
-        return layers;
-    });
-
-    function findCenterEmotion() {
-        if (!viewportElement || !gridElement || allEmotions.length === 0)
-            return;
-
-        const viewportRect = viewportElement.getBoundingClientRect();
-        const centerX = viewportRect.left + viewportRect.width / 2;
-        const centerY = viewportRect.top + viewportRect.height / 2;
-
-        const buttons = Array.from(
-            gridElement.querySelectorAll(".emotion-btn"),
-        );
-        let closestEmotion: Emotion | null = null;
-        let closestDistance = Infinity;
-
-        for (const btn of buttons) {
-            const rect = btn.getBoundingClientRect();
-            const btnCenterX = rect.left + rect.width / 2;
-            const btnCenterY = rect.top + rect.height / 2;
-            const distance = Math.sqrt(
-                Math.pow(centerX - btnCenterX, 2) +
-                    Math.pow(centerY - btnCenterY, 2),
-            );
-
-            const emotionId = btn.getAttribute("data-emotion-id");
-            const emotion = allEmotions.find((e) => e.id === emotionId);
-
-            if (emotion && distance < closestDistance) {
-                closestEmotion = emotion;
-                closestDistance = distance;
-            }
-        }
-
-        if (closestEmotion && closestDistance < 100) {
-            centerEmotion = closestEmotion;
-            if (!isMouseHovering) {
-                hoveredEmotion = closestEmotion;
-                onHoveredChange?.(closestEmotion);
-            }
-        }
-    }
-
-    /**
-     * Pan to a specific emotion in the grid.
-     */
-    function panToEmotion(emotion: Emotion) {
-        if (!pzInstance || !viewportElement || !gridElement) return;
-
-        const viewportRect = viewportElement.getBoundingClientRect();
-        const gridRect = gridElement.getBoundingClientRect();
-        const transform = pzInstance.getTransform();
-
-        // Find the emotion button
-        const btn = gridElement.querySelector(
-            `[data-emotion-id="${emotion.id}"]`,
-        );
-        if (!btn) return;
-
-        const btnRect = btn.getBoundingClientRect();
-
-        // Calculate the position relative to the grid (before transform)
-        const btnCenterX =
-            (btnRect.left + btnRect.width / 2 - gridRect.left) /
-            transform.scale;
-        const btnCenterY =
-            (btnRect.top + btnRect.height / 2 - gridRect.top) / transform.scale;
-
-        // Calculate the viewport center
-        const viewportCenterX = viewportRect.width / 2;
-        const viewportCenterY = viewportRect.height / 2;
-
-        // Calculate the new pan position to center the emotion
-        const newX = viewportCenterX - btnCenterX * transform.scale;
-        const newY = viewportCenterY - btnCenterY * transform.scale;
-        pzInstance.smoothMoveTo(newX, newY);
-    }
-
-    /**
-     * Pan to a specific quadrant center.
-     */
-    function panToQuadrant(quadrant: Quadrant) {
-        if (!pzInstance || !viewportElement || !gridElement) return;
-
-        const viewportRect = viewportElement.getBoundingClientRect();
-        const gridRect = gridElement.getBoundingClientRect();
-        const transform = pzInstance.getTransform();
-
-        // Calculate unscaled grid dimensions
-        const gridWidth = gridRect.width / transform.scale;
-        const gridHeight = gridRect.height / transform.scale;
-
-        let targetXRatio = 0.5;
-        let targetYRatio = 0.5;
-
-        switch (quadrant) {
-            case "red": // Top Left
-                targetXRatio = 0.25;
-                targetYRatio = 0.25;
-                break;
-            case "yellow": // Top Right
-                targetXRatio = 0.75;
-                targetYRatio = 0.25;
-                break;
-            case "blue": // Bottom Left
-                targetXRatio = 0.25;
-                targetYRatio = 0.75;
-                break;
-            case "green": // Bottom Right
-                targetXRatio = 0.75;
-                targetYRatio = 0.75;
-                break;
-        }
-
-        const targetX = gridWidth * targetXRatio;
-        const targetY = gridHeight * targetYRatio;
-
-        const viewportCenterX = viewportRect.width / 2;
-        const viewportCenterY = viewportRect.height / 2;
-
-        const newX = viewportCenterX - targetX * transform.scale;
-        const newY = viewportCenterY - targetY * transform.scale;
-
-        pzInstance.smoothMoveTo(newX, newY);
-    }
-
-    /**
-     * Pan to the center of the grid.
-     */
-    function panToCenter() {
-        if (!pzInstance || !viewportElement || !gridElement) return;
-
-        const viewportRect = viewportElement.getBoundingClientRect();
-        const gridRect = gridElement.getBoundingClientRect();
-        const transform = pzInstance.getTransform();
-
-        // Calculate grid center before transform
-        const gridCenterX = gridRect.width / transform.scale / 2;
-        const gridCenterY = gridRect.height / transform.scale / 2;
-
-        // Calculate viewport center
-        const viewportCenterX = viewportRect.width / 2;
-        const viewportCenterY = viewportRect.height / 2;
-
-        // Calculate new pan position
-        const newX = viewportCenterX - gridCenterX * transform.scale;
-        const newY = viewportCenterY - gridCenterY * transform.scale;
-
-        pzInstance.smoothMoveTo(newX, newY);
-    }
-
-    /**
-     * Initialize panzoom and pan to selected emotion or center.
-     */
-    function initializePanPosition() {
-        if (!isPzReady) return;
-
-        if (selectedEmotion) {
-            panToEmotion(selectedEmotion);
-        } else {
-            panToCenter();
-        }
-        setTimeout(findCenterEmotion, 300);
-    }
-
-    // Search functions - now client-side, no API calls needed
-    function handleSearchInput(e: Event) {
-        const value = (e.target as HTMLInputElement).value;
-        searchQuery = value;
-        showSearchDropdown = value.length > 0;
-    }
-
-    function handleSearchResultClick(emotion: Emotion) {
-        handleSelect(emotion);
-        panToEmotion(emotion);
-        searchQuery = "";
-        showSearchDropdown = false;
-    }
-
-    function clearSearch() {
-        searchQuery = "";
-        showSearchDropdown = false;
-    }
-
-    function handleSearchFocus() {
-        if (searchQuery.length > 0 && searchResults.length > 0) {
-            showSearchDropdown = true;
-        }
-    }
-
-    function handleSearchBlur() {
-        // Delay to allow click on results
-        setTimeout(() => {
-            showSearchDropdown = false;
-        }, 200);
-    }
-
-    function handleSearchKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") {
-            clearSearch();
-            searchInputElement?.blur();
-        }
-    }
-
-    onMount(async () => {
-        // Ensure emotions are loaded
-        if (!emotionStore.isInitialized) {
-            await emotionStore.init();
-        }
-
-        // Initialize panzoom after emotions are loaded
-        await tick();
-
-        if (gridElement) {
-            pzInstance = panzoom(gridElement, {
-                maxZoom: 2.5,
-                minZoom: 0.6,
-                bounds: true,
-                boundsPadding: 0.2,
-                smoothScroll: true, // Enable smooth scrolling for trackpad/wheel
-            });
-
-            pzInstance.on("zoom", () => {
-                zoomLevel = pzInstance?.getTransform().scale ?? 1;
-                findCenterEmotion();
-            });
-
-            pzInstance.on("pan", () => {
-                findCenterEmotion();
-            });
-
-            // Mark as ready after a brief delay to allow rendering
-            await tick();
-            isPzReady = true;
-            initializePanPosition();
-        }
-    });
-
-    onDestroy(() => {
-        pzInstance?.dispose();
-        if (hoverTimeout) clearTimeout(hoverTimeout);
-    });
-
-    // Watch for selectedEmotion changes to pan to selected item
-    // Note: Panning is now handled in handleSelect with timeout to support double-click
-    // This effect is only for initial load or external changes
-    $effect(() => {
-        if (isPzReady && selectedEmotion) {
-            // Only auto-pan if not from a click (lastClickedEmotionId would be set)
-            const clickedId = untrack(() => lastClickedEmotionId);
-            if (!clickedId) {
-                // External selection change (not from click), pan immediately
-                setTimeout(() => panToEmotion(selectedEmotion), 50);
-            }
-        }
-    });
-
-    function zoomIn() {
-        pzInstance?.smoothZoom(0, 0, 1.3);
-    }
-
-    function zoomOut() {
-        pzInstance?.smoothZoom(0, 0, 0.7);
-    }
-
-    function resetView() {
-        pzInstance?.moveTo(0, 0);
-        pzInstance?.zoomAbs(0, 0, 1);
-        zoomLevel = 1;
-        setTimeout(() => {
-            if (selectedEmotion) {
-                panToEmotion(selectedEmotion);
-            } else {
-                panToCenter();
-            }
-            findCenterEmotion();
-        }, 100);
-    }
-
-    function handleSelect(emotion: Emotion) {
-        // Skip if emotion is not in allowed quadrants
-        if (!isEmotionAllowed(emotion)) return;
-
-        const now = Date.now();
-        const isDoubleClick =
-            lastClickedEmotionId === emotion.id &&
-            now - lastClickTime < DOUBLE_CLICK_THRESHOLD;
-
-        if (isDoubleClick) {
-            // Double-click detected - select and confirm (modal closes, pan is irrelevant)
-            onSelect?.(emotion);
-            onConfirm?.(emotion);
-            // Reset tracking
-            lastClickTime = 0;
-            lastClickedEmotionId = null;
-        } else {
-            // Single click - select and pan immediately for instant feedback
-            onSelect?.(emotion);
-            lastClickTime = now;
-            lastClickedEmotionId = emotion.id;
-
-            // Pan immediately - if user double-clicks, modal closes anyway
-            panToEmotion(emotion);
-        }
-    }
-
-    // Mouse handlers - update tooltip in DOM portal
-    function onMouseEnter(e: MouseEvent, emotion: Emotion) {
-        if (!isEmotionAllowed(emotion)) return;
-
-        if (hoverTimeout) clearTimeout(hoverTimeout);
-
-        isMouseHovering = true;
-        hoveredEmotion = emotion;
-        onHoveredChange?.(emotion);
-        updateTooltipPosition(e);
-    }
-
-    function updateTooltipPosition(e: MouseEvent) {
-        // Position to the right of cursor, clamped to viewport
-        let x = e.clientX + 16;
-        let y = e.clientY;
-
-        // Clamp to viewport edges
-        const tooltipWidth = 260;
-        const tooltipHeight = 120;
-
-        if (x + tooltipWidth > window.innerWidth - 20) {
-            x = e.clientX - tooltipWidth - 16;
-        }
-        if (y + tooltipHeight > window.innerHeight - 20) {
-            y = window.innerHeight - tooltipHeight - 20;
-        }
-        if (y < 20) y = 20;
-
-        tooltipPosition = { x, y };
-    }
-
-    function onMouseMove(e: MouseEvent) {
-        if (isMouseHovering && hoveredEmotion) {
-            updateTooltipPosition(e);
-        }
-    }
-
-    function onMouseLeave() {
-        if (hoverTimeout) clearTimeout(hoverTimeout);
-
-        hoverTimeout = setTimeout(() => {
-            isMouseHovering = false;
-            tooltipPosition = null;
-            if (centerEmotion) {
-                hoveredEmotion = centerEmotion;
-                onHoveredChange?.(centerEmotion);
-            }
-        }, 50);
-    }
-
-    function portal(node: HTMLElement) {
-        document.body.appendChild(node);
-        return {
-            destroy() {
-                if (node.parentNode) {
-                    node.parentNode.removeChild(node);
-                }
-            },
-        };
-    }
+import type { Emotion } from '$lib/api/emotions';
+import OpenMoji from '$lib/components/ui/OpenMoji.svelte';
+import { emotionStore } from '$lib/stores/emotions.svelte';
+import {
+	ArrowDown,
+	ArrowLeft,
+	ArrowRight,
+	ArrowUp,
+	Loader2,
+	RotateCcw,
+	Search,
+	Target,
+	X,
+	ZoomIn,
+	ZoomOut,
+} from 'lucide-svelte';
+import panzoom, { type PanZoom } from 'panzoom';
+/**
+ * EMOTION GRID
+ * - Fetches all emotion data from backend API
+ * - OpenMoji font
+ * - Tooltip portaled to body (outside modal) via action
+ * - panzoom for smooth pan/zoom with wheel support
+ * - Tailwind CSS styling
+ * - Client-side search (filters loaded emotions)
+ */
+import { onDestroy, onMount, tick, untrack } from 'svelte';
+import {
+	QUADRANT_COLORS,
+	QUADRANT_META,
+	type Quadrant,
+	seededRandom,
+} from './emotionData';
+import {
+	BLOB_SIZE,
+	type BlobLayer,
+	generateLayers,
+	getAnimSpeed,
+	getEmotionColors,
+	getIndicatorDots,
+} from './emotionUtils';
+
+interface Props {
+	selectedEmotion?: Emotion | null;
+	onSelect?: (emotion: Emotion) => void;
+	onConfirm?: (emotion: Emotion) => void;
+	showIndicators?: boolean;
+	onHoveredChange?: (emotion: Emotion | null) => void;
+	/** Restrict selection to specific quadrants (e.g., for positive/negative reflections) */
+	allowedQuadrants?: Quadrant[] | null;
+}
+
+let {
+	selectedEmotion = $bindable(null),
+	onSelect,
+	onConfirm,
+	showIndicators = $bindable(false),
+	onHoveredChange,
+	allowedQuadrants = null,
+}: Props = $props();
+
+// Check if an emotion is allowed based on quadrant filtering
+function isEmotionAllowed(emotion: Emotion): boolean {
+	if (!allowedQuadrants || allowedQuadrants.length === 0) return true;
+	return allowedQuadrants.includes(emotion.quadrant as Quadrant);
+}
+
+// API data state - from store
+const allEmotions = $derived(emotionStore.all);
+const isLoading = $derived(
+	emotionStore.isLoading && !emotionStore.isInitialized,
+);
+const loadError = $derived(emotionStore.error);
+
+// Hover state
+let hoveredEmotion = $state<Emotion | null>(null);
+let tooltipPosition = $state<{ x: number; y: number } | null>(null);
+let isMouseHovering = $state(false);
+let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
+
+// Panzoom
+let viewportElement = $state<HTMLDivElement | null>(null);
+let gridElement = $state<HTMLDivElement | null>(null);
+let pzInstance: PanZoom | null = null;
+let zoomLevel = $state(1);
+let isPzReady = $state(false);
+
+// Double-click detection (custom implementation to work around panzoom)
+// Using $state to ensure variables persist through re-renders
+let lastClickTime = $state(0);
+let lastClickedEmotionId = $state<string | null>(null);
+const DOUBLE_CLICK_THRESHOLD = 400; // ms
+
+// Search state - client-side filtering
+let searchQuery = $state('');
+let showSearchDropdown = $state(false);
+let searchInputElement = $state<HTMLInputElement | null>(null);
+
+// Computed search results - filters allEmotions client-side
+const searchResults = $derived.by(() => {
+	if (!searchQuery.trim()) return [];
+	const query = searchQuery.toLowerCase();
+	return allEmotions
+		.filter(
+			(e) =>
+				e.name.toLowerCase().includes(query) ||
+				e.description.toLowerCase().includes(query),
+		)
+		.slice(0, 20); // Limit to 20 results
+});
+
+// Center detection for auto-hover
+let centerEmotion = $state<Emotion | null>(null);
+
+// Computed grid from API data
+const grid = $derived.by(() => {
+	const gridArray: (Emotion | null)[][] = Array(10)
+		.fill(null)
+		.map(() => Array(10).fill(null));
+
+	for (const emotion of allEmotions) {
+		const col = emotion.x < 0 ? emotion.x + 5 : emotion.x + 4;
+		const row = emotion.y > 0 ? 5 - emotion.y : Math.abs(emotion.y) + 4;
+		if (row >= 0 && row < 10 && col >= 0 && col < 10) {
+			gridArray[row][col] = emotion;
+		}
+	}
+	return gridArray;
+});
+
+// Pre-compute blob layers for all emotions
+const emotionLayers = $derived.by(() => {
+	const layers = new Map<string, BlobLayer[]>();
+	for (const e of allEmotions) {
+		layers.set(e.id, generateLayers(e));
+	}
+	return layers;
+});
+
+function findCenterEmotion() {
+	if (!viewportElement || !gridElement || allEmotions.length === 0) return;
+
+	const viewportRect = viewportElement.getBoundingClientRect();
+	const centerX = viewportRect.left + viewportRect.width / 2;
+	const centerY = viewportRect.top + viewportRect.height / 2;
+
+	const buttons = Array.from(gridElement.querySelectorAll('.emotion-btn'));
+	let closestEmotion: Emotion | null = null;
+	let closestDistance = Number.POSITIVE_INFINITY;
+
+	for (const btn of buttons) {
+		const rect = btn.getBoundingClientRect();
+		const btnCenterX = rect.left + rect.width / 2;
+		const btnCenterY = rect.top + rect.height / 2;
+		const distance = Math.sqrt(
+			(centerX - btnCenterX) ** 2 + (centerY - btnCenterY) ** 2,
+		);
+
+		const emotionId = btn.getAttribute('data-emotion-id');
+		const emotion = allEmotions.find((e) => e.id === emotionId);
+
+		if (emotion && distance < closestDistance) {
+			closestEmotion = emotion;
+			closestDistance = distance;
+		}
+	}
+
+	if (closestEmotion && closestDistance < 100) {
+		centerEmotion = closestEmotion;
+		if (!isMouseHovering) {
+			hoveredEmotion = closestEmotion;
+			onHoveredChange?.(closestEmotion);
+		}
+	}
+}
+
+/**
+ * Pan to a specific emotion in the grid.
+ */
+function panToEmotion(emotion: Emotion) {
+	if (!pzInstance || !viewportElement || !gridElement) return;
+
+	const viewportRect = viewportElement.getBoundingClientRect();
+	const gridRect = gridElement.getBoundingClientRect();
+	const transform = pzInstance.getTransform();
+
+	// Find the emotion button
+	const btn = gridElement.querySelector(`[data-emotion-id="${emotion.id}"]`);
+	if (!btn) return;
+
+	const btnRect = btn.getBoundingClientRect();
+
+	// Calculate the position relative to the grid (before transform)
+	const btnCenterX =
+		(btnRect.left + btnRect.width / 2 - gridRect.left) / transform.scale;
+	const btnCenterY =
+		(btnRect.top + btnRect.height / 2 - gridRect.top) / transform.scale;
+
+	// Calculate the viewport center
+	const viewportCenterX = viewportRect.width / 2;
+	const viewportCenterY = viewportRect.height / 2;
+
+	// Calculate the new pan position to center the emotion
+	const newX = viewportCenterX - btnCenterX * transform.scale;
+	const newY = viewportCenterY - btnCenterY * transform.scale;
+	pzInstance.smoothMoveTo(newX, newY);
+}
+
+/**
+ * Pan to a specific quadrant center.
+ */
+function panToQuadrant(quadrant: Quadrant) {
+	if (!pzInstance || !viewportElement || !gridElement) return;
+
+	const viewportRect = viewportElement.getBoundingClientRect();
+	const gridRect = gridElement.getBoundingClientRect();
+	const transform = pzInstance.getTransform();
+
+	// Calculate unscaled grid dimensions
+	const gridWidth = gridRect.width / transform.scale;
+	const gridHeight = gridRect.height / transform.scale;
+
+	let targetXRatio = 0.5;
+	let targetYRatio = 0.5;
+
+	switch (quadrant) {
+		case 'red': // Top Left
+			targetXRatio = 0.25;
+			targetYRatio = 0.25;
+			break;
+		case 'yellow': // Top Right
+			targetXRatio = 0.75;
+			targetYRatio = 0.25;
+			break;
+		case 'blue': // Bottom Left
+			targetXRatio = 0.25;
+			targetYRatio = 0.75;
+			break;
+		case 'green': // Bottom Right
+			targetXRatio = 0.75;
+			targetYRatio = 0.75;
+			break;
+	}
+
+	const targetX = gridWidth * targetXRatio;
+	const targetY = gridHeight * targetYRatio;
+
+	const viewportCenterX = viewportRect.width / 2;
+	const viewportCenterY = viewportRect.height / 2;
+
+	const newX = viewportCenterX - targetX * transform.scale;
+	const newY = viewportCenterY - targetY * transform.scale;
+
+	pzInstance.smoothMoveTo(newX, newY);
+}
+
+/**
+ * Pan to the center of the grid.
+ */
+function panToCenter() {
+	if (!pzInstance || !viewportElement || !gridElement) return;
+
+	const viewportRect = viewportElement.getBoundingClientRect();
+	const gridRect = gridElement.getBoundingClientRect();
+	const transform = pzInstance.getTransform();
+
+	// Calculate grid center before transform
+	const gridCenterX = gridRect.width / transform.scale / 2;
+	const gridCenterY = gridRect.height / transform.scale / 2;
+
+	// Calculate viewport center
+	const viewportCenterX = viewportRect.width / 2;
+	const viewportCenterY = viewportRect.height / 2;
+
+	// Calculate new pan position
+	const newX = viewportCenterX - gridCenterX * transform.scale;
+	const newY = viewportCenterY - gridCenterY * transform.scale;
+
+	pzInstance.smoothMoveTo(newX, newY);
+}
+
+/**
+ * Initialize panzoom and pan to selected emotion or center.
+ */
+function initializePanPosition() {
+	if (!isPzReady) return;
+
+	if (selectedEmotion) {
+		panToEmotion(selectedEmotion);
+	} else {
+		panToCenter();
+	}
+	setTimeout(findCenterEmotion, 300);
+}
+
+// Search functions - now client-side, no API calls needed
+function handleSearchInput(e: Event) {
+	const value = (e.target as HTMLInputElement).value;
+	searchQuery = value;
+	showSearchDropdown = value.length > 0;
+}
+
+function handleSearchResultClick(emotion: Emotion) {
+	handleSelect(emotion);
+	panToEmotion(emotion);
+	searchQuery = '';
+	showSearchDropdown = false;
+}
+
+function clearSearch() {
+	searchQuery = '';
+	showSearchDropdown = false;
+}
+
+function handleSearchFocus() {
+	if (searchQuery.length > 0 && searchResults.length > 0) {
+		showSearchDropdown = true;
+	}
+}
+
+function handleSearchBlur() {
+	// Delay to allow click on results
+	setTimeout(() => {
+		showSearchDropdown = false;
+	}, 200);
+}
+
+function handleSearchKeydown(e: KeyboardEvent) {
+	if (e.key === 'Escape') {
+		clearSearch();
+		searchInputElement?.blur();
+	}
+}
+
+onMount(async () => {
+	// Ensure emotions are loaded
+	if (!emotionStore.isInitialized) {
+		await emotionStore.init();
+	}
+
+	// Initialize panzoom after emotions are loaded
+	await tick();
+
+	if (gridElement) {
+		pzInstance = panzoom(gridElement, {
+			maxZoom: 2.5,
+			minZoom: 0.6,
+			bounds: true,
+			boundsPadding: 0.2,
+			smoothScroll: true, // Enable smooth scrolling for trackpad/wheel
+		});
+
+		pzInstance.on('zoom', () => {
+			zoomLevel = pzInstance?.getTransform().scale ?? 1;
+			findCenterEmotion();
+		});
+
+		pzInstance.on('pan', () => {
+			findCenterEmotion();
+		});
+
+		// Mark as ready after a brief delay to allow rendering
+		await tick();
+		isPzReady = true;
+		initializePanPosition();
+	}
+});
+
+onDestroy(() => {
+	pzInstance?.dispose();
+	if (hoverTimeout) clearTimeout(hoverTimeout);
+});
+
+// Watch for selectedEmotion changes to pan to selected item
+// Note: Panning is now handled in handleSelect with timeout to support double-click
+// This effect is only for initial load or external changes
+$effect(() => {
+	if (isPzReady && selectedEmotion) {
+		// Only auto-pan if not from a click (lastClickedEmotionId would be set)
+		const clickedId = untrack(() => lastClickedEmotionId);
+		if (!clickedId) {
+			// External selection change (not from click), pan immediately
+			setTimeout(() => panToEmotion(selectedEmotion), 50);
+		}
+	}
+});
+
+function zoomIn() {
+	pzInstance?.smoothZoom(0, 0, 1.3);
+}
+
+function zoomOut() {
+	pzInstance?.smoothZoom(0, 0, 0.7);
+}
+
+function resetView() {
+	pzInstance?.moveTo(0, 0);
+	pzInstance?.zoomAbs(0, 0, 1);
+	zoomLevel = 1;
+	setTimeout(() => {
+		if (selectedEmotion) {
+			panToEmotion(selectedEmotion);
+		} else {
+			panToCenter();
+		}
+		findCenterEmotion();
+	}, 100);
+}
+
+function handleSelect(emotion: Emotion) {
+	// Skip if emotion is not in allowed quadrants
+	if (!isEmotionAllowed(emotion)) return;
+
+	const now = Date.now();
+	const isDoubleClick =
+		lastClickedEmotionId === emotion.id &&
+		now - lastClickTime < DOUBLE_CLICK_THRESHOLD;
+
+	if (isDoubleClick) {
+		// Double-click detected - select and confirm (modal closes, pan is irrelevant)
+		onSelect?.(emotion);
+		onConfirm?.(emotion);
+		// Reset tracking
+		lastClickTime = 0;
+		lastClickedEmotionId = null;
+	} else {
+		// Single click - select and pan immediately for instant feedback
+		onSelect?.(emotion);
+		lastClickTime = now;
+		lastClickedEmotionId = emotion.id;
+
+		// Pan immediately - if user double-clicks, modal closes anyway
+		panToEmotion(emotion);
+	}
+}
+
+// Mouse handlers - update tooltip in DOM portal
+function onMouseEnter(e: MouseEvent, emotion: Emotion) {
+	if (!isEmotionAllowed(emotion)) return;
+
+	if (hoverTimeout) clearTimeout(hoverTimeout);
+
+	isMouseHovering = true;
+	hoveredEmotion = emotion;
+	onHoveredChange?.(emotion);
+	updateTooltipPosition(e);
+}
+
+function updateTooltipPosition(e: MouseEvent) {
+	// Position to the right of cursor, clamped to viewport
+	let x = e.clientX + 16;
+	let y = e.clientY;
+
+	// Clamp to viewport edges
+	const tooltipWidth = 260;
+	const tooltipHeight = 120;
+
+	if (x + tooltipWidth > window.innerWidth - 20) {
+		x = e.clientX - tooltipWidth - 16;
+	}
+	if (y + tooltipHeight > window.innerHeight - 20) {
+		y = window.innerHeight - tooltipHeight - 20;
+	}
+	if (y < 20) y = 20;
+
+	tooltipPosition = { x, y };
+}
+
+function onMouseMove(e: MouseEvent) {
+	if (isMouseHovering && hoveredEmotion) {
+		updateTooltipPosition(e);
+	}
+}
+
+function onMouseLeave() {
+	if (hoverTimeout) clearTimeout(hoverTimeout);
+
+	hoverTimeout = setTimeout(() => {
+		isMouseHovering = false;
+		tooltipPosition = null;
+		if (centerEmotion) {
+			hoveredEmotion = centerEmotion;
+			onHoveredChange?.(centerEmotion);
+		}
+	}, 50);
+}
+
+function portal(node: HTMLElement) {
+	document.body.appendChild(node);
+	return {
+		destroy() {
+			if (node.parentNode) {
+				node.parentNode.removeChild(node);
+			}
+		},
+	};
+}
 </script>
 
 <div class="flex flex-col gap-2 h-full">

@@ -1,102 +1,95 @@
 <script lang="ts">
-    import { type TaskItem } from "$lib/api";
-    import { emotionStore } from "$lib/stores/emotions.svelte";
-    import {
-        QUADRANT_COLORS,
-        type Quadrant,
-    } from "$lib/components/emotions/emotionData";
-    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import { Card } from "$lib/components/ui";
-    import {
-        Sparkles,
-        ThumbsUp,
-        ThumbsDown,
-        Plus,
-        X,
-        Heart,
-    } from "lucide-svelte";
-    import type { Emotion } from "$lib/api/emotions";
+import type { TaskItem } from '$lib/api';
+import type { Emotion } from '$lib/api/emotions';
+import {
+	QUADRANT_COLORS,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { Card } from '$lib/components/ui';
+import OpenMoji from '$lib/components/ui/OpenMoji.svelte';
+import { emotionStore } from '$lib/stores/emotions.svelte';
+import { Heart, Plus, Sparkles, ThumbsDown, ThumbsUp, X } from 'lucide-svelte';
 
-    interface Props {
-        positives: TaskItem[];
-        negatives: TaskItem[];
-        pendingPositiveEmotion: Emotion | null;
-        pendingNegativeEmotion: Emotion | null;
-        onPositivesChange: (items: TaskItem[]) => void;
-        onNegativesChange: (items: TaskItem[]) => void;
-        onOpenEmotionForPositive: (index: number) => void;
-        onOpenEmotionForNegative: (index: number) => void;
-        onOpenEmotionForPendingPositive: () => void;
-        onOpenEmotionForPendingNegative: () => void;
-        onClearPendingPositiveEmotion: () => void;
-        onClearPendingNegativeEmotion: () => void;
-    }
+interface Props {
+	positives: TaskItem[];
+	negatives: TaskItem[];
+	pendingPositiveEmotion: Emotion | null;
+	pendingNegativeEmotion: Emotion | null;
+	onPositivesChange: (items: TaskItem[]) => void;
+	onNegativesChange: (items: TaskItem[]) => void;
+	onOpenEmotionForPositive: (index: number) => void;
+	onOpenEmotionForNegative: (index: number) => void;
+	onOpenEmotionForPendingPositive: () => void;
+	onOpenEmotionForPendingNegative: () => void;
+	onClearPendingPositiveEmotion: () => void;
+	onClearPendingNegativeEmotion: () => void;
+}
 
-    let {
-        positives = [],
-        negatives = [],
-        pendingPositiveEmotion = null,
-        pendingNegativeEmotion = null,
-        onPositivesChange,
-        onNegativesChange,
-        onOpenEmotionForPositive,
-        onOpenEmotionForNegative,
-        onOpenEmotionForPendingPositive,
-        onOpenEmotionForPendingNegative,
-        onClearPendingPositiveEmotion,
-        onClearPendingNegativeEmotion,
-    }: Props = $props();
+let {
+	positives = [],
+	negatives = [],
+	pendingPositiveEmotion = null,
+	pendingNegativeEmotion = null,
+	onPositivesChange,
+	onNegativesChange,
+	onOpenEmotionForPositive,
+	onOpenEmotionForNegative,
+	onOpenEmotionForPendingPositive,
+	onOpenEmotionForPendingNegative,
+	onClearPendingPositiveEmotion,
+	onClearPendingNegativeEmotion,
+}: Props = $props();
 
-    let newPositive = $state("");
-    let newNegative = $state("");
+let newPositive = $state('');
+let newNegative = $state('');
 
-    function addPositive() {
-        if (newPositive.trim()) {
-            const newItem = {
-                text: newPositive.trim(),
-                emotion_id: pendingPositiveEmotion?.id,
-            };
-            onPositivesChange([...positives, newItem]);
-            newPositive = "";
-            onClearPendingPositiveEmotion();
-        }
-    }
+function addPositive() {
+	if (newPositive.trim()) {
+		const newItem = {
+			text: newPositive.trim(),
+			emotion_id: pendingPositiveEmotion?.id,
+		};
+		onPositivesChange([...positives, newItem]);
+		newPositive = '';
+		onClearPendingPositiveEmotion();
+	}
+}
 
-    function addNegative() {
-        if (newNegative.trim()) {
-            const newItem = {
-                text: newNegative.trim(),
-                emotion_id: pendingNegativeEmotion?.id,
-            };
-            onNegativesChange([...negatives, newItem]);
-            newNegative = "";
-            onClearPendingNegativeEmotion();
-        }
-    }
+function addNegative() {
+	if (newNegative.trim()) {
+		const newItem = {
+			text: newNegative.trim(),
+			emotion_id: pendingNegativeEmotion?.id,
+		};
+		onNegativesChange([...negatives, newItem]);
+		newNegative = '';
+		onClearPendingNegativeEmotion();
+	}
+}
 
-    function removePositive(index: number) {
-        onPositivesChange(positives.filter((_, i) => i !== index));
-    }
+function removePositive(index: number) {
+	onPositivesChange(positives.filter((_, i) => i !== index));
+}
 
-    function removeNegative(index: number) {
-        onNegativesChange(negatives.filter((_, i) => i !== index));
-    }
+function removeNegative(index: number) {
+	onNegativesChange(negatives.filter((_, i) => i !== index));
+}
 
-    function clearPositiveEmotion(index: number) {
-        onPositivesChange(
-            positives.map((p, i) =>
-                i === index ? { ...p, emotion_id: undefined } : p,
-            ),
-        );
-    }
+function clearPositiveEmotion(index: number) {
+	onPositivesChange(
+		positives.map((p, i) =>
+			i === index ? { ...p, emotion_id: undefined } : p,
+		),
+	);
+}
 
-    function clearNegativeEmotion(index: number) {
-        onNegativesChange(
-            negatives.map((n, i) =>
-                i === index ? { ...n, emotion_id: undefined } : n,
-            ),
-        );
-    }
+function clearNegativeEmotion(index: number) {
+	onNegativesChange(
+		negatives.map((n, i) =>
+			i === index ? { ...n, emotion_id: undefined } : n,
+		),
+	);
+}
 </script>
 
 <Card variant="bordered" class="transition-all duration-300 hover:shadow-lg">

@@ -1,28 +1,28 @@
 <script lang="ts">
-  import { Sidebar, Header } from "$lib/components/layout";
-  import type { Snippet } from "svelte";
+import { Header, Sidebar } from '$lib/components/layout';
+import type { Snippet } from 'svelte';
 
-  interface Props {
-    children: Snippet;
-    showSearch?: boolean;
-    headerContent?: Snippet;
-  }
+interface Props {
+	children: Snippet;
+	showSearch?: boolean;
+	headerContent?: Snippet;
+}
 
-  let { children, showSearch = true, headerContent }: Props = $props();
-  let sidebarCollapsed = $state(false);
-  let mobileMenuOpen = $state(false);
+let { children, showSearch = true, headerContent }: Props = $props();
+let sidebarCollapsed = $state(false);
+let mobileMenuOpen = $state(false);
 
-  // Apply saved theme on mount
-  $effect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else if (savedTheme === "light") {
-      document.documentElement.classList.remove("dark");
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      document.documentElement.classList.add("dark");
-    }
-  });
+// Apply saved theme on mount
+$effect(() => {
+	const savedTheme = localStorage.getItem('theme');
+	if (savedTheme === 'dark') {
+		document.documentElement.classList.add('dark');
+	} else if (savedTheme === 'light') {
+		document.documentElement.classList.remove('dark');
+	} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+		document.documentElement.classList.add('dark');
+	}
+});
 </script>
 
 <div class="flex h-screen overflow-hidden bg-background">

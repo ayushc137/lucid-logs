@@ -1,43 +1,43 @@
 <script lang="ts">
-    import type { Emotion, InferredEmotion } from "$lib/api/emotions";
-    import {
-        QUADRANT_COLORS,
-        QUADRANT_META,
-        type Quadrant,
-    } from "$lib/components/emotions/emotionData";
-    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import { Card } from "$lib/components/ui";
-    import {
-        Heart,
-        Plus,
-        X,
-        Sparkles,
-        CircleAlert,
-        ChevronRight,
-        Info,
-    } from "lucide-svelte";
+import type { Emotion, InferredEmotion } from '$lib/api/emotions';
+import {
+	QUADRANT_COLORS,
+	QUADRANT_META,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { Card } from '$lib/components/ui';
+import OpenMoji from '$lib/components/ui/OpenMoji.svelte';
+import {
+	ChevronRight,
+	CircleAlert,
+	Heart,
+	Info,
+	Plus,
+	Sparkles,
+	X,
+} from 'lucide-svelte';
 
-    interface Props {
-        selectedEmotion: Emotion | null;
-        inferredEmotion: InferredEmotion | null;
-        inferredEmotionFull: Emotion | null;
-        inferringEmotion: boolean;
-        inferenceError: string | null;
-        onOpenEmotionForTask: () => void;
-        onOpenEmotionForSuggested: () => void;
-        onClearTaskEmotion: () => void;
-    }
+interface Props {
+	selectedEmotion: Emotion | null;
+	inferredEmotion: InferredEmotion | null;
+	inferredEmotionFull: Emotion | null;
+	inferringEmotion: boolean;
+	inferenceError: string | null;
+	onOpenEmotionForTask: () => void;
+	onOpenEmotionForSuggested: () => void;
+	onClearTaskEmotion: () => void;
+}
 
-    let {
-        selectedEmotion = null,
-        inferredEmotion = null,
-        inferredEmotionFull = null,
-        inferringEmotion = false,
-        inferenceError = null,
-        onOpenEmotionForTask,
-        onOpenEmotionForSuggested,
-        onClearTaskEmotion,
-    }: Props = $props();
+let {
+	selectedEmotion = null,
+	inferredEmotion = null,
+	inferredEmotionFull = null,
+	inferringEmotion = false,
+	inferenceError = null,
+	onOpenEmotionForTask,
+	onOpenEmotionForSuggested,
+	onClearTaskEmotion,
+}: Props = $props();
 </script>
 
 <Card

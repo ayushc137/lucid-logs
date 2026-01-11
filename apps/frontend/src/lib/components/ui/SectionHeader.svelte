@@ -1,37 +1,37 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    import IconBox from "./IconBox.svelte";
+import type { Snippet } from 'svelte';
+import IconBox from './IconBox.svelte';
 
-    interface Props {
-        /** Section title */
-        title: string;
-        /** Optional subtitle */
-        subtitle?: string;
-        /** Semantic color for icon box */
-        color?:
-            | "primary"
-            | "secondary"
-            | "accent"
-            | "info"
-            | "success"
-            | "warning"
-            | "error";
-        /** Icon slot */
-        icon?: Snippet;
-        /** Actions slot (right side) */
-        actions?: Snippet;
-        /** Custom class */
-        class?: string;
-    }
+interface Props {
+	/** Section title */
+	title: string;
+	/** Optional subtitle */
+	subtitle?: string;
+	/** Semantic color for icon box */
+	color?:
+		| 'primary'
+		| 'secondary'
+		| 'accent'
+		| 'info'
+		| 'success'
+		| 'warning'
+		| 'error';
+	/** Icon slot */
+	icon?: Snippet;
+	/** Actions slot (right side) */
+	actions?: Snippet;
+	/** Custom class */
+	class?: string;
+}
 
-    let {
-        title,
-        subtitle = "",
-        color = "primary",
-        icon,
-        actions,
-        class: className = "",
-    }: Props = $props();
+let {
+	title,
+	subtitle = '',
+	color = 'primary',
+	icon,
+	actions,
+	class: className = '',
+}: Props = $props();
 </script>
 
 <div class="flex items-center justify-between {className}">

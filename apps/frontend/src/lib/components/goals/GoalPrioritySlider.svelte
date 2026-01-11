@@ -1,25 +1,25 @@
 <script lang="ts">
-    import { BarChart3 } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { BarChart3 } from 'lucide-svelte';
 
-    interface Props {
-        value: number;
-        class?: string;
-    }
+interface Props {
+	value: number;
+	class?: string;
+}
 
-    let { value = $bindable(5), class: className }: Props = $props();
+let { value = $bindable(5), class: className }: Props = $props();
 
-    const priorityLabels = [
-        { value: 1, label: "Lowest" },
-        { value: 2, label: "Low" },
-        { value: 3, label: "Medium" },
-        { value: 4, label: "High" },
-        { value: 5, label: "Highest" },
-    ];
+const priorityLabels = [
+	{ value: 1, label: 'Lowest' },
+	{ value: 2, label: 'Low' },
+	{ value: 3, label: 'Medium' },
+	{ value: 4, label: 'High' },
+	{ value: 5, label: 'Highest' },
+];
 
-    const currentLabel = $derived(
-        priorityLabels.find((p) => p.value === value)?.label || "Medium",
-    );
+const currentLabel = $derived(
+	priorityLabels.find((p) => p.value === value)?.label || 'Medium',
+);
 </script>
 
 <div class={cn("space-y-2", className)}>

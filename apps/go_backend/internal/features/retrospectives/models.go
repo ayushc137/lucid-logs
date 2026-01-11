@@ -120,7 +120,7 @@ type StreakUpdate struct {
 type TasksSummary struct {
 	Completed          int             `json:"completed"`
 	Postponed          int             `json:"postponed"`
-	Cancelled          int             `json:"cancelled"`
+	Canceled           int             `json:"canceled"`
 	NotStarted         int             `json:"not_started"`
 	TotalDurationHours float64         `json:"total_duration_hours"`
 	ByCategory         []CategoryCount `json:"by_category,omitempty"`

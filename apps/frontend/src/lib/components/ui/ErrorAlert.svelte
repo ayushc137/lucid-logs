@@ -1,23 +1,23 @@
 <script lang="ts">
-    import { CircleAlert } from "lucide-svelte";
+import { CircleAlert } from 'lucide-svelte';
 
-    interface Props {
-        /** Error message to display */
-        message?: string;
-        /** Show retry button */
-        showRetry?: boolean;
-        /** Retry button click handler */
-        onRetry?: () => void;
-        /** Custom class for container */
-        class?: string;
-    }
+interface Props {
+	/** Error message to display */
+	message?: string;
+	/** Show retry button */
+	showRetry?: boolean;
+	/** Retry button click handler */
+	onRetry?: () => void;
+	/** Custom class for container */
+	class?: string;
+}
 
-    let {
-        message = "Something went wrong. Please try again.",
-        showRetry = true,
-        onRetry,
-        class: className = "",
-    }: Props = $props();
+let {
+	message = 'Something went wrong. Please try again.',
+	showRetry = true,
+	onRetry,
+	class: className = '',
+}: Props = $props();
 </script>
 
 <div class="alert alert-error shadow-lg {className}">

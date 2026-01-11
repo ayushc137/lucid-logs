@@ -23,12 +23,13 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/lucid-logs/go-backend/internal/config"
-	"github.com/lucid-logs/go-backend/internal/shared/database"
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
+
+	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
 
 // =============================================================================

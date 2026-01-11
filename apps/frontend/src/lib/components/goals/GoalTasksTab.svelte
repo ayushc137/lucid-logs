@@ -1,67 +1,63 @@
 <script lang="ts">
-    import { cn } from "$lib/utils";
-    import {
-        ListTodo,
-        TrendingUp,
-        Search,
-        Check,
-        X as XIcon,
-        Minus,
-        ArrowUp,
-    } from "lucide-svelte";
-    import type { Goal } from "$lib/api";
+import type { Goal } from '$lib/api';
+import { cn } from '$lib/utils';
+import {
+	ArrowUp,
+	Check,
+	ListTodo,
+	Minus,
+	Search,
+	TrendingUp,
+	X as XIcon,
+} from 'lucide-svelte';
 
-    interface LinkedTask {
-        task_id: string;
-        task_title: string;
-        impact_type: "positive" | "negative" | "neutral";
-        impact_magnitude?: number;
-        quantity_value?: number;
-        unit_id?: string;
-    }
+interface LinkedTask {
+	task_id: string;
+	task_title: string;
+	impact_type: 'positive' | 'negative' | 'neutral';
+	impact_magnitude?: number;
+	quantity_value?: number;
+	unit_id?: string;
+}
 
-    interface Props {
-        linkedTasks: LinkedTask[];
-        totalContributions: number;
-    }
+interface Props {
+	linkedTasks: LinkedTask[];
+	totalContributions: number;
+}
 
-    let { linkedTasks = [], totalContributions = 0 }: Props = $props();
+let { linkedTasks = [], totalContributions = 0 }: Props = $props();
 
-    let taskFilter = $state<"all" | "positive" | "negative" | "neutral">("all");
-    let taskSearch = $state("");
-    let taskSortBy = $state<"date" | "impact">("date");
+let taskFilter = $state<'all' | 'positive' | 'negative' | 'neutral'>('all');
+let taskSearch = $state('');
+let taskSortBy = $state<'date' | 'impact'>('date');
 
-    const filteredTasks = $derived.by(() => {
-        let tasks = linkedTasks;
+const filteredTasks = $derived.by(() => {
+	let tasks = linkedTasks;
 
-        if (taskFilter !== "all") {
-            tasks = tasks.filter((t) => t.impact_type === taskFilter);
-        }
+	if (taskFilter !== 'all') {
+		tasks = tasks.filter((t) => t.impact_type === taskFilter);
+	}
 
-        if (taskSearch.trim()) {
-            const search = taskSearch.toLowerCase();
-            tasks = tasks.filter((t) =>
-                t.task_title.toLowerCase().includes(search),
-            );
-        }
+	if (taskSearch.trim()) {
+		const search = taskSearch.toLowerCase();
+		tasks = tasks.filter((t) => t.task_title.toLowerCase().includes(search));
+	}
 
-        if (taskSortBy === "impact") {
-            tasks = [...tasks].sort(
-                (a, b) => (b.impact_magnitude || 0) - (a.impact_magnitude || 0),
-            );
-        }
+	if (taskSortBy === 'impact') {
+		tasks = [...tasks].sort(
+			(a, b) => (b.impact_magnitude || 0) - (a.impact_magnitude || 0),
+		);
+	}
 
-        return tasks;
-    });
+	return tasks;
+});
 
-    const taskCounts = $derived({
-        all: linkedTasks.length,
-        positive: linkedTasks.filter((t) => t.impact_type === "positive")
-            .length,
-        negative: linkedTasks.filter((t) => t.impact_type === "negative")
-            .length,
-        neutral: linkedTasks.filter((t) => t.impact_type === "neutral").length,
-    });
+const taskCounts = $derived({
+	all: linkedTasks.length,
+	positive: linkedTasks.filter((t) => t.impact_type === 'positive').length,
+	negative: linkedTasks.filter((t) => t.impact_type === 'negative').length,
+	neutral: linkedTasks.filter((t) => t.impact_type === 'neutral').length,
+});
 </script>
 
 <div class="p-6">

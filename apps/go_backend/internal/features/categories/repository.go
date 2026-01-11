@@ -25,12 +25,13 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/lucid-logs/go-backend/internal/shared/database"
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
-	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
+
+	"github.com/lucid-logs/go-backend/internal/shared/database"
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 )
 
 // =============================================================================

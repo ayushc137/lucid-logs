@@ -6,12 +6,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/lucid-logs/go-backend/internal/shared/response"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -293,11 +294,11 @@ func (h *Handler) Delete(c *gin.Context) {
 			response.NotFound(c)
 			return
 		}
-		if errors.Is(err, errors.ErrBadRequest) {
-			response.Error(c, err.(*errors.AppError))
-			return
+		if appErr := errors.AsAppError(err); appErr != nil {
+			response.Error(c, appErr)
+		} else {
+			response.ErrorFromErr(c, err)
 		}
-		response.ErrorFromErr(c, err)
 		return
 	}
 
@@ -313,7 +314,11 @@ func handleTemplateError(c *gin.Context, err error) {
 	case errors.Is(err, errors.ErrNotFound):
 		response.NotFound(c)
 	case errors.Is(err, errors.ErrBadRequest):
-		response.Error(c, err.(*errors.AppError))
+		if appErr := errors.AsAppError(err); appErr != nil {
+			response.Error(c, appErr)
+		} else {
+			response.ErrorFromErr(c, err)
+		}
 	default:
 		response.ErrorFromErr(c, err)
 	}

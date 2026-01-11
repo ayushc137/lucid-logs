@@ -35,15 +35,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/surrealdb/surrealdb.go/pkg/models"
+
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/surrealdb/surrealdb.go/pkg/models"
 )
 
 // =============================================================================
@@ -208,17 +209,7 @@ func (t *taskDB) toTask() *Task {
 	if len(t.LinkedGoals) > 0 {
 		linkedGoals = make([]TaskGoalLink, len(t.LinkedGoals))
 		for i, lg := range t.LinkedGoals {
-			linkedGoals[i] = TaskGoalLink{
-				GoalID:          lg.GoalID,
-				GoalTitle:       lg.GoalTitle,
-				GoalIcon:        lg.GoalIcon,
-				ImpactType:      lg.ImpactType,
-				ImpactMagnitude: lg.ImpactMagnitude,
-				QuantityValue:   lg.QuantityValue,
-				UnitID:          lg.UnitID,
-				IsMilestone:     lg.IsMilestone,
-				MilestoneLabel:  lg.MilestoneLabel,
-			}
+			linkedGoals[i] = TaskGoalLink(lg)
 		}
 	}
 
@@ -595,9 +586,9 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		categoryLink = &catID
 	}
 
-	// Parse dates
-	startDate, _ := timeutil.ParseDateTime(req.StartDate)
-	endDate, _ := timeutil.ParseDateTime(req.EndDate)
+	// Parse dates (validated in service)
+	startDate, _ := timeutil.ParseDateTime(req.StartDate) //nolint:errcheck // validated in service
+	endDate, _ := timeutil.ParseDateTime(req.EndDate)     //nolint:errcheck // validated in service
 
 	// Prepare default values
 	positives := req.Positives
@@ -723,8 +714,8 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		if startStr == "" {
 			return nil, errors.ErrBadRequest.WithMessage("start_date cannot be empty")
 		}
-		t, err := timeutil.ParseDateTime(startStr)
-		if err != nil {
+		t, parseErr := timeutil.ParseDateTime(startStr)
+		if parseErr != nil {
 			return nil, errors.ErrBadRequest.WithMessage("Invalid start_date format")
 		}
 		newStart = &t
@@ -735,8 +726,8 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		if endStr == "" {
 			return nil, errors.ErrBadRequest.WithMessage("end_date cannot be empty")
 		}
-		t, err := timeutil.ParseDateTime(endStr)
-		if err != nil {
+		t, parseErr := timeutil.ParseDateTime(endStr)
+		if parseErr != nil {
 			return nil, errors.ErrBadRequest.WithMessage("Invalid end_date format")
 		}
 		newEnd = &t
@@ -908,11 +899,6 @@ func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID m
 	return true, nil
 }
 
-// formatTaskID ensures the ID has the table prefix (string version).
-func formatTaskID(id string) string {
-	return database.RecordID(Table, id)
-}
-
 // GetLastTaskEndTime retrieves the end time of the most recently finished task.
 func (r *repository) GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error) {
 	// Query to find the most recent task that has already finished
@@ -948,7 +934,9 @@ func (r *repository) GetLastTaskEndTime(ctx context.Context, userID string) (*ti
 // generateTaskRecordID generates a unique task ID as models.RecordID.
 func generateTaskRecordID() models.RecordID {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		panic(err)
+	}
 	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }
 

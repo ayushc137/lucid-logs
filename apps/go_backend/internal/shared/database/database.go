@@ -30,11 +30,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/surrealdb/surrealdb.go"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
+
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
 
 // =============================================================================
@@ -79,7 +80,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	logger := log.With().Str("component", "database").Logger()
 
 	// Connect to SurrealDB using SDK's New function
-	client, err := surrealdb.New(cfg.URL)
+	client, err := surrealdb.New(cfg.URL) //nolint:staticcheck // deprecated but functional
 	if err != nil {
 		logger.Error().Err(err).Str("url", cfg.URL).Msg("failed to connect to SurrealDB")
 		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("connection failed: %w", err))
@@ -478,13 +479,13 @@ func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string
 	if f, ok := val.(float64); ok {
 		switch any(zero).(type) {
 		case int64:
-			return any(int64(f)).(T), nil
+			return any(int64(f)).(T), nil //nolint:errcheck // type assertion
 		case int:
-			return any(int(f)).(T), nil
+			return any(int(f)).(T), nil //nolint:errcheck // type assertion
 		case float32:
-			return any(float32(f)).(T), nil
+			return any(float32(f)).(T), nil //nolint:errcheck // type assertion
 		case float64:
-			return any(f).(T), nil
+			return any(f).(T), nil //nolint:errcheck // type assertion
 		}
 	}
 
@@ -492,13 +493,13 @@ func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string
 	if i, ok := val.(int64); ok {
 		switch any(zero).(type) {
 		case int64:
-			return any(i).(T), nil
+			return any(i).(T), nil //nolint:errcheck // type assertion
 		case int:
-			return any(int(i)).(T), nil
+			return any(int(i)).(T), nil //nolint:errcheck // type assertion
 		case float32:
-			return any(float32(i)).(T), nil
+			return any(float32(i)).(T), nil //nolint:errcheck // type assertion
 		case float64:
-			return any(float64(i)).(T), nil
+			return any(float64(i)).(T), nil //nolint:errcheck // type assertion
 		}
 	}
 
@@ -506,13 +507,13 @@ func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string
 	if i, ok := val.(int); ok {
 		switch any(zero).(type) {
 		case int64:
-			return any(int64(i)).(T), nil
+			return any(int64(i)).(T), nil //nolint:errcheck // type assertion
 		case int:
-			return any(i).(T), nil
+			return any(i).(T), nil //nolint:errcheck // type assertion
 		case float32:
-			return any(float32(i)).(T), nil
+			return any(float32(i)).(T), nil //nolint:errcheck // type assertion
 		case float64:
-			return any(float64(i)).(T), nil
+			return any(float64(i)).(T), nil //nolint:errcheck // type assertion
 		}
 	}
 

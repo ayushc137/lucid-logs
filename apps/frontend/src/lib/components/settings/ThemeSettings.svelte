@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { themeStore, THEMES } from "$lib/stores";
-    import { Palette, Check, Moon, Sun } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { THEMES, themeStore } from '$lib/stores';
+import { cn } from '$lib/utils';
+import { Check, Moon, Palette, Sun } from 'lucide-svelte';
 </script>
 
 <div class="card bg-base-100 shadow">

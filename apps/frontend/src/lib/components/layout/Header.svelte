@@ -1,60 +1,60 @@
 <script lang="ts">
-  import {
-    Bell,
-    Search,
-    Plus,
-    Menu,
-    Settings,
-    LogOut,
-    ArrowLeft,
-    Home,
-    ChevronRight,
-    ClipboardList,
-    Edit3,
-  } from "lucide-svelte";
-  import { authStore } from "$lib/stores/auth.svelte";
-  import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { browser } from "$app/environment";
-  import type { Snippet } from "svelte";
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+import { authStore } from '$lib/stores/auth.svelte';
+import {
+	ArrowLeft,
+	Bell,
+	ChevronRight,
+	ClipboardList,
+	Edit3,
+	Home,
+	LogOut,
+	Menu,
+	Plus,
+	Search,
+	Settings,
+} from 'lucide-svelte';
+import type { Snippet } from 'svelte';
 
-  interface Props {
-    onMenuClick?: () => void;
-    showSearch?: boolean;
-    headerContent?: Snippet;
-  }
+interface Props {
+	onMenuClick?: () => void;
+	showSearch?: boolean;
+	headerContent?: Snippet;
+}
 
-  let { onMenuClick, showSearch = true, headerContent }: Props = $props();
+let { onMenuClick, showSearch = true, headerContent }: Props = $props();
 
-  // Get first letter of email for avatar
-  const avatarLetter = $derived(
-    authStore.userEmail?.charAt(0).toUpperCase() || "U",
-  );
+// Get first letter of email for avatar
+const avatarLetter = $derived(
+	authStore.userEmail?.charAt(0).toUpperCase() || 'U',
+);
 
-  // Task Page Detection
-  const isTaskCreatePage = $derived($page.url.pathname === "/tasks/create");
-  const isTaskEditPage = $derived(
-    $page.url.pathname.startsWith("/tasks/") &&
-      $page.url.pathname !== "/tasks" &&
-      $page.url.pathname !== "/tasks/create",
-  );
-  const isTaskPage = $derived(isTaskCreatePage || isTaskEditPage);
+// Task Page Detection
+const isTaskCreatePage = $derived($page.url.pathname === '/tasks/create');
+const isTaskEditPage = $derived(
+	$page.url.pathname.startsWith('/tasks/') &&
+		$page.url.pathname !== '/tasks' &&
+		$page.url.pathname !== '/tasks/create',
+);
+const isTaskPage = $derived(isTaskCreatePage || isTaskEditPage);
 
-  // Back Navigation Logic
-  let referrer = $state<string>("/tasks");
+// Back Navigation Logic
+let referrer = $state<string>('/tasks');
 
-  $effect(() => {
-    if (browser && isTaskPage) {
-      const storedReferrer = sessionStorage.getItem("task-form-referrer");
-      if (storedReferrer) {
-        referrer = storedReferrer;
-      }
-    }
-  });
+$effect(() => {
+	if (browser && isTaskPage) {
+		const storedReferrer = sessionStorage.getItem('task-form-referrer');
+		if (storedReferrer) {
+			referrer = storedReferrer;
+		}
+	}
+});
 
-  function handleBack() {
-    goto(referrer);
-  }
+function handleBack() {
+	goto(referrer);
+}
 </script>
 
 <header

@@ -1,301 +1,297 @@
 <script lang="ts">
-  import {
-    createQuery,
-    createMutation,
-    useQueryClient,
-  } from "@tanstack/svelte-query";
-  import { getGoals, deleteGoal, updateGoal, type Goal } from "$lib/api";
-  import { ErrorAlert, ConfirmDialog } from "$lib/components/ui";
-  import { GoalModal } from "$lib/components/goals";
-  import {
-    Target,
-    Plus,
-    Trash2,
-    SquarePen,
-    Search,
-    LoaderCircle,
-    Flame,
-    ChevronUp,
-    ChevronDown,
-    ArrowUpDown,
-    Repeat,
-    Crosshair,
-    BarChart3,
-    Layers,
-    Shield,
-    X,
-    CalendarDays,
-    Funnel,
-  } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import {
-    getUrlParams,
-    updateUrlParams,
-    parsers,
-  } from "$lib/utils/navigation";
+import { type Goal, deleteGoal, getGoals, updateGoal } from '$lib/api';
+import { GoalModal } from '$lib/components/goals';
+import { ConfirmDialog, ErrorAlert } from '$lib/components/ui';
+import { cn } from '$lib/utils';
+import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import {
+	ArrowUpDown,
+	BarChart3,
+	CalendarDays,
+	ChevronDown,
+	ChevronUp,
+	Crosshair,
+	Flame,
+	Funnel,
+	Layers,
+	LoaderCircle,
+	Plus,
+	Repeat,
+	Search,
+	Shield,
+	SquarePen,
+	Target,
+	Trash2,
+	X,
+} from 'lucide-svelte';
 
-  const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
-  // Initialize state from URL
-  const initialParams = getUrlParams<{
-    q: string;
-    status: string;
-    type: string;
-    sort: string;
-    today: boolean;
-    from: string;
-    to: string;
-  }>({
-    q: parsers.string(""),
-    status: parsers.string("all"),
-    type: parsers.string("all"),
-    sort: parsers.string("created_at-desc"),
-    today: parsers.boolean(true),
-    from: parsers.string(""),
-    to: parsers.string(""),
-  });
+// Initialize state from URL
+const initialParams = getUrlParams<{
+	q: string;
+	status: string;
+	type: string;
+	sort: string;
+	today: boolean;
+	from: string;
+	to: string;
+}>({
+	q: parsers.string(''),
+	status: parsers.string('all'),
+	type: parsers.string('all'),
+	sort: parsers.string('created_at-desc'),
+	today: parsers.boolean(true),
+	from: parsers.string(''),
+	to: parsers.string(''),
+});
 
-  const today = new Date();
-  const startOfDay = new Date(today);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(today);
-  endOfDay.setHours(23, 59, 59, 999);
+const today = new Date();
+const startOfDay = new Date(today);
+startOfDay.setHours(0, 0, 0, 0);
+const endOfDay = new Date(today);
+endOfDay.setHours(23, 59, 59, 999);
 
-  const todayStart = startOfDay.toISOString();
-  const todayEnd = endOfDay.toISOString();
+const todayStart = startOfDay.toISOString();
+const todayEnd = endOfDay.toISOString();
 
-  // Search state
-  let searchQuery = $state(initialParams.q);
-  let debouncedSearch = $state(initialParams.q);
-  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-  let showFilters = $state(false);
+// Search state
+let searchQuery = $state(initialParams.q);
+let debouncedSearch = $state(initialParams.q);
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+let showFilters = $state(false);
 
-  // Filter state
-  let statusFilter = $state(initialParams.status || "all");
-  let typeFilter = $state(initialParams.type || "all");
-  let sortBy = $state(initialParams.sort);
+// Filter state
+let statusFilter = $state(initialParams.status || 'all');
+let typeFilter = $state(initialParams.type || 'all');
+let sortBy = $state(initialParams.sort);
 
-  // Date range filter
-  let todayOnly = $state(initialParams.today);
-  let dateFrom = $state(initialParams.from);
-  let dateTo = $state(initialParams.to);
+// Date range filter
+let todayOnly = $state(initialParams.today);
+let dateFrom = $state(initialParams.from);
+let dateTo = $state(initialParams.to);
 
-  function handleSearchInput(value: string) {
-    searchQuery = value;
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      debouncedSearch = value;
-    }, 300);
-  }
+function handleSearchInput(value: string) {
+	searchQuery = value;
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchTimeout = setTimeout(() => {
+		debouncedSearch = value;
+	}, 300);
+}
 
-  // Sync state to URL
-  $effect(() => {
-    updateUrlParams(
-      {
-        q: debouncedSearch,
-        status: statusFilter,
-        type: typeFilter,
-        sort: sortBy,
-        today: todayOnly,
-        from: dateFrom,
-        to: dateTo,
-      },
-      { replace: true, keepFocus: true },
-    );
-  });
+// Sync state to URL
+$effect(() => {
+	updateUrlParams(
+		{
+			q: debouncedSearch,
+			status: statusFilter,
+			type: typeFilter,
+			sort: sortBy,
+			today: todayOnly,
+			from: dateFrom,
+			to: dateTo,
+		},
+		{ replace: true, keepFocus: true },
+	);
+});
 
-  // Query params
-  const queryParams = $derived.by(() => {
-    const params: Record<string, any> = {
-      limit: 100,
-      search: debouncedSearch || undefined,
-      status: statusFilter !== "all" ? statusFilter : undefined,
-      sort_by: sortBy || undefined,
-    };
+// Query params
+const queryParams = $derived.by(() => {
+	const params: Record<string, any> = {
+		limit: 100,
+		search: debouncedSearch || undefined,
+		status: statusFilter !== 'all' ? statusFilter : undefined,
+		sort_by: sortBy || undefined,
+	};
 
-    if (todayOnly) {
-      params.from = todayStart;
-      params.to = todayEnd;
-    } else {
-      if (dateFrom) params.from = `${dateFrom}T00:00:00Z`;
-      if (dateTo) params.to = `${dateTo}T23:59:59Z`;
-    }
+	if (todayOnly) {
+		params.from = todayStart;
+		params.to = todayEnd;
+	} else {
+		if (dateFrom) params.from = `${dateFrom}T00:00:00Z`;
+		if (dateTo) params.to = `${dateTo}T23:59:59Z`;
+	}
 
-    return params;
-  });
+	return params;
+});
 
-  // Mutable ref for tracking param changes
-  let currentParamsJson = "";
+// Mutable ref for tracking param changes
+let currentParamsJson = '';
 
-  // Goals query
-  const query = createQuery({
-    queryKey: ["goals-list"],
-    queryFn: () => getGoals(queryParams),
-    retry: false,
-  });
+// Goals query
+const query = createQuery({
+	queryKey: ['goals-list'],
+	queryFn: () => getGoals(queryParams),
+	retry: false,
+});
 
-  // Refetch when params change
-  $effect(() => {
-    const newParamsJson = JSON.stringify(queryParams);
-    if (currentParamsJson === "") {
-      currentParamsJson = newParamsJson;
-      return;
-    }
-    if (newParamsJson !== currentParamsJson) {
-      currentParamsJson = newParamsJson;
-      $query.refetch();
-    }
-  });
+// Refetch when params change
+$effect(() => {
+	const newParamsJson = JSON.stringify(queryParams);
+	if (currentParamsJson === '') {
+		currentParamsJson = newParamsJson;
+		return;
+	}
+	if (newParamsJson !== currentParamsJson) {
+		currentParamsJson = newParamsJson;
+		$query.refetch();
+	}
+});
 
-  const goals = $derived($query.data?.items || []);
-  const totalGoals = $derived($query.data?.total || 0);
+const goals = $derived($query.data?.items || []);
+const totalGoals = $derived($query.data?.total || 0);
 
-  // Modal states
-  let modalOpen = $state(false);
-  let editingGoal = $state<Goal | null>(null);
-  let deleteConfirmOpen = $state(false);
-  let deleteTargetId = $state<string | null>(null);
+// Modal states
+let modalOpen = $state(false);
+let editingGoal = $state<Goal | null>(null);
+let deleteConfirmOpen = $state(false);
+let deleteTargetId = $state<string | null>(null);
 
-  // Mutations
-  const deleteMut = createMutation({
-    mutationFn: (id: string) => deleteGoal(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["goals-list"] });
-      await queryClient.invalidateQueries({ queryKey: ["goals"] });
-      deleteConfirmOpen = false;
-      deleteTargetId = null;
-    },
-  });
+// Mutations
+const deleteMut = createMutation({
+	mutationFn: (id: string) => deleteGoal(id),
+	onSuccess: async () => {
+		await queryClient.invalidateQueries({ queryKey: ['goals-list'] });
+		await queryClient.invalidateQueries({ queryKey: ['goals'] });
+		deleteConfirmOpen = false;
+		deleteTargetId = null;
+	},
+});
 
-  function handleCreate() {
-    editingGoal = null;
-    modalOpen = true;
-  }
+function handleCreate() {
+	editingGoal = null;
+	modalOpen = true;
+}
 
-  function startEdit(goal: Goal) {
-    editingGoal = goal;
-    modalOpen = true;
-  }
+function startEdit(goal: Goal) {
+	editingGoal = goal;
+	modalOpen = true;
+}
 
-  function handleModalClose() {
-    modalOpen = false;
-    editingGoal = null;
-    queryClient.invalidateQueries({ queryKey: ["goals-list"] });
-    queryClient.invalidateQueries({ queryKey: ["goals"] });
-  }
+function handleModalClose() {
+	modalOpen = false;
+	editingGoal = null;
+	queryClient.invalidateQueries({ queryKey: ['goals-list'] });
+	queryClient.invalidateQueries({ queryKey: ['goals'] });
+}
 
-  function confirmDelete(id: string, e: Event) {
-    e.stopPropagation();
-    deleteTargetId = id;
-    deleteConfirmOpen = true;
-  }
+function confirmDelete(id: string, e: Event) {
+	e.stopPropagation();
+	deleteTargetId = id;
+	deleteConfirmOpen = true;
+}
 
-  function handleDelete() {
-    if (deleteTargetId) {
-      $deleteMut.mutate(deleteTargetId);
-    }
-  }
+function handleDelete() {
+	if (deleteTargetId) {
+		$deleteMut.mutate(deleteTargetId);
+	}
+}
 
-  function toggleSort(field: string) {
-    if (sortBy === `${field}-desc`) {
-      sortBy = `${field}-asc`;
-    } else if (sortBy === `${field}-asc`) {
-      sortBy = `${field}-desc`;
-    } else {
-      sortBy = `${field}-desc`;
-    }
-  }
+function toggleSort(field: string) {
+	if (sortBy === `${field}-desc`) {
+		sortBy = `${field}-asc`;
+	} else if (sortBy === `${field}-asc`) {
+		sortBy = `${field}-desc`;
+	} else {
+		sortBy = `${field}-desc`;
+	}
+}
 
-  function getSortIcon(field: string) {
-    if (sortBy === `${field}-desc`) return ChevronDown;
-    if (sortBy === `${field}-asc`) return ChevronUp;
-    return ArrowUpDown;
-  }
+function getSortIcon(field: string) {
+	if (sortBy === `${field}-desc`) return ChevronDown;
+	if (sortBy === `${field}-asc`) return ChevronUp;
+	return ArrowUpDown;
+}
 
-  // Derived sort icons for reactive updates
-  const TitleSortIcon = $derived(getSortIcon("title"));
-  const StreakSortIcon = $derived(getSortIcon("streak"));
+// Derived sort icons for reactive updates
+const TitleSortIcon = $derived(getSortIcon('title'));
+const StreakSortIcon = $derived(getSortIcon('streak'));
 
-  const isSearching = $derived(searchQuery !== debouncedSearch);
+const isSearching = $derived(searchQuery !== debouncedSearch);
 
-  const statusOptions = [
-    { value: "", label: "All Statuses" },
-    { value: "active", label: "Active" },
-    { value: "completed", label: "Completed" },
-    { value: "archived", label: "Archived" },
-  ];
+const statusOptions = [
+	{ value: '', label: 'All Statuses' },
+	{ value: 'active', label: 'Active' },
+	{ value: 'completed', label: 'Completed' },
+	{ value: 'archived', label: 'Archived' },
+];
 
-  const statusColors: Record<string, string> = {
-    active: "badge-success",
-    completed: "badge-info",
-    archived: "badge-neutral",
-  };
+const statusColors: Record<string, string> = {
+	active: 'badge-success',
+	completed: 'badge-info',
+	archived: 'badge-neutral',
+};
 
-  const typeOptions = [
-    { value: "", label: "All Types" },
-    { value: "habit", label: "Habits" },
-    { value: "measurable", label: "Measurable" },
-    { value: "simple", label: "Simple" },
-  ];
+const typeOptions = [
+	{ value: '', label: 'All Types' },
+	{ value: 'habit', label: 'Habits' },
+	{ value: 'measurable', label: 'Measurable' },
+	{ value: 'simple', label: 'Simple' },
+];
 
-  function getProgress(goal: Goal): number {
-    if (goal.stats) return Math.min(100, goal.stats.progress_percent);
-    // Fallback if stats not populated but target exists
-    if (goal.target && goal.target.value > 0) {
-      return 0; // cant calc without stats currently
-    }
-    return 0;
-  }
+function getProgress(goal: Goal): number {
+	if (goal.stats) return Math.min(100, goal.stats.progress_percent);
+	// Fallback if stats not populated but target exists
+	if (goal.target && goal.target.value > 0) {
+		return 0; // cant calc without stats currently
+	}
+	return 0;
+}
 
-  function formatRecurrence(rec: Goal["recurrence"]): string {
-    if (!rec) return "—";
-    const freq = rec.frequency || 1;
-    const periodMap: Record<string, string> = {
-      day: "daily",
-      week: "weekly",
-      month: "monthly",
-    };
-    const periodLabel = periodMap[rec.period] || rec.period;
-    return freq > 1 ? `${freq}× ${periodLabel}` : periodLabel;
-  }
+function formatRecurrence(rec: Goal['recurrence']): string {
+	if (!rec) return '—';
+	const freq = rec.frequency || 1;
+	const periodMap: Record<string, string> = {
+		day: 'daily',
+		week: 'weekly',
+		month: 'monthly',
+	};
+	const periodLabel = periodMap[rec.period] || rec.period;
+	return freq > 1 ? `${freq}× ${periodLabel}` : periodLabel;
+}
 
-  function getGoalTypeInfo(goal: Goal) {
-    if (goal.children && goal.children.length > 0)
-      return { icon: Layers, label: "Group" };
+function getGoalTypeInfo(goal: Goal) {
+	if (goal.children && goal.children.length > 0)
+		return { icon: Layers, label: 'Group' };
 
-    // For habits, show the recurrence period
-    if (goal.recurrence) {
-      const freq = goal.recurrence.frequency || 1;
-      const periodMap: Record<string, string> = {
-        day: "Daily",
-        week: "Weekly",
-        month: "Monthly",
-      };
-      const periodLabel =
-        periodMap[goal.recurrence.period] || goal.recurrence.period;
-      const habitLabel =
-        freq > 1 ? `${freq}× ${periodLabel} Habit` : `${periodLabel} Habit`;
-      return { icon: Repeat, label: habitLabel };
-    }
+	// For habits, show the recurrence period
+	if (goal.recurrence) {
+		const freq = goal.recurrence.frequency || 1;
+		const periodMap: Record<string, string> = {
+			day: 'Daily',
+			week: 'Weekly',
+			month: 'Monthly',
+		};
+		const periodLabel =
+			periodMap[goal.recurrence.period] || goal.recurrence.period;
+		const habitLabel =
+			freq > 1 ? `${freq}× ${periodLabel} Habit` : `${periodLabel} Habit`;
+		return { icon: Repeat, label: habitLabel };
+	}
 
-    if (goal.target) {
-      if (goal.target.operator === "lte" || goal.target.operator === "eq")
-        return { icon: Shield, label: "Limit" };
-      return { icon: BarChart3, label: "Measurable" };
-    }
-    return { icon: Crosshair, label: "Goal" };
-  }
+	if (goal.target) {
+		if (goal.target.operator === 'lte' || goal.target.operator === 'eq')
+			return { icon: Shield, label: 'Limit' };
+		return { icon: BarChart3, label: 'Measurable' };
+	}
+	return { icon: Crosshair, label: 'Goal' };
+}
 
-  // Highlight search matches
-  function highlightText(text: string, query: string): string {
-    if (!query || !text) return text;
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escapedQuery})`, "gi");
-    return text.replace(
-      regex,
-      '<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
-    );
-  }
+// Highlight search matches
+function highlightText(text: string, query: string): string {
+	if (!query || !text) return text;
+	const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const regex = new RegExp(`(${escapedQuery})`, 'gi');
+	return text.replace(
+		regex,
+		'<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
+	);
+}
 </script>
 
 <svelte:head>

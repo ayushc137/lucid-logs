@@ -1,61 +1,61 @@
 <script module lang="ts">
-    // Shared cache for computed URLs to avoid re-computation across instances
-    const urlCache = new Map<string, string>();
+// Shared cache for computed URLs to avoid re-computation across instances
+const urlCache = new Map<string, string>();
 
-    // Shared cache for loaded images to avoid fade-in animation for already loaded images
-    const loadedImageCache = new Set<string>();
+// Shared cache for loaded images to avoid fade-in animation for already loaded images
+const loadedImageCache = new Set<string>();
 
-    // Check if string looks like a hex code (e.g., "1F9B6" or "1F62E-200D-1F4A8")
-    function isHexCode(str: string): boolean {
-        return /^[0-9A-F]+(-[0-9A-F]+)*$/i.test(str);
-    }
+// Check if string looks like a hex code (e.g., "1F9B6" or "1F62E-200D-1F4A8")
+function isHexCode(str: string): boolean {
+	return /^[0-9A-F]+(-[0-9A-F]+)*$/i.test(str);
+}
 
-    // Generate OpenMoji URL from emoji (hex code or character)
-    export function getOpenMojiUrl(emoji: string): string {
-        if (!emoji) return "";
+// Generate OpenMoji URL from emoji (hex code or character)
+export function getOpenMojiUrl(emoji: string): string {
+	if (!emoji) return '';
 
-        if (urlCache.has(emoji)) {
-            return urlCache.get(emoji)!;
-        }
+	if (urlCache.has(emoji)) {
+		return urlCache.get(emoji)!;
+	}
 
-        try {
-            let hex: string;
+	try {
+		let hex: string;
 
-            if (isHexCode(emoji)) {
-                // Already a hex code from backend, use directly (uppercase)
-                hex = emoji.toUpperCase();
-            } else {
-                // Actual emoji character, convert to hex code points
-                hex = Array.from(emoji)
-                    .map((c) => c.codePointAt(0)?.toString(16).toUpperCase())
-                    .filter(Boolean)
-                    .join("-");
-            }
+		if (isHexCode(emoji)) {
+			// Already a hex code from backend, use directly (uppercase)
+			hex = emoji.toUpperCase();
+		} else {
+			// Actual emoji character, convert to hex code points
+			hex = Array.from(emoji)
+				.map((c) => c.codePointAt(0)?.toString(16).toUpperCase())
+				.filter(Boolean)
+				.join('-');
+		}
 
-            const url = `https://openmoji.org/data/color/svg/${hex}.svg`;
-            urlCache.set(emoji, url);
-            return url;
-        } catch (e) {
-            console.warn("Failed to generate OpenMoji URL for", emoji, e);
-            return "";
-        }
-    }
+		const url = `https://openmoji.org/data/color/svg/${hex}.svg`;
+		urlCache.set(emoji, url);
+		return url;
+	} catch (e) {
+		console.warn('Failed to generate OpenMoji URL for', emoji, e);
+		return '';
+	}
+}
 
-    // Convert hex code to actual emoji character for fallback
-    function hexToEmoji(input: string): string {
-        if (!input) return "";
-        if (!isHexCode(input)) {
-            return input; // Already an emoji character
-        }
-        try {
-            return input
-                .split("-")
-                .map((hex) => String.fromCodePoint(parseInt(hex, 16)))
-                .join("");
-        } catch {
-            return input;
-        }
-    }
+// Convert hex code to actual emoji character for fallback
+function hexToEmoji(input: string): string {
+	if (!input) return '';
+	if (!isHexCode(input)) {
+		return input; // Already an emoji character
+	}
+	try {
+		return input
+			.split('-')
+			.map((hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+			.join('');
+	} catch {
+		return input;
+	}
+}
 </script>
 
 <script lang="ts">

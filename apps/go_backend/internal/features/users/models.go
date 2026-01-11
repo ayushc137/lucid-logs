@@ -3,8 +3,9 @@ package users
 import (
 	"time"
 
-	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
+
+	"github.com/lucid-logs/go-backend/internal/shared/database"
 )
 
 // User represents a user record with metadata (API-facing domain model).

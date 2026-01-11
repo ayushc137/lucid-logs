@@ -1,73 +1,67 @@
 <script lang="ts">
-    import { createQuery } from "@tanstack/svelte-query";
-    import { getGoals, type Goal, type TaskTemplate } from "$lib/api";
-    import {
-        Target,
-        Flame,
-        ChevronRight,
-        Plus,
-        Check,
-        Repeat,
-        Play,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import { fly, fade } from "svelte/transition";
-    import { flip } from "svelte/animate";
-    import { goto } from "$app/navigation";
+import { goto } from '$app/navigation';
+import { type Goal, type TaskTemplate, getGoals } from '$lib/api';
+import { cn } from '$lib/utils';
+import { createQuery } from '@tanstack/svelte-query';
+import {
+	Check,
+	ChevronRight,
+	Flame,
+	Play,
+	Plus,
+	Repeat,
+	Target,
+} from 'lucide-svelte';
+import { flip } from 'svelte/animate';
+import { fade, fly } from 'svelte/transition';
 
-    interface Props {
-        selectedDate: Date;
-        onCreateTaskFromGoal?: (goal: Goal) => void;
-        onGoalClick?: (goal: Goal) => void;
-    }
+interface Props {
+	selectedDate: Date;
+	onCreateTaskFromGoal?: (goal: Goal) => void;
+	onGoalClick?: (goal: Goal) => void;
+}
 
-    let { selectedDate, onCreateTaskFromGoal, onGoalClick }: Props = $props();
+let { selectedDate, onCreateTaskFromGoal, onGoalClick }: Props = $props();
 
-    const goalsQuery = createQuery({
-        queryKey: ["goals", "active-recurring"],
-        queryFn: () => getGoals({ status: "active", limit: 50 }),
-    });
+const goalsQuery = createQuery({
+	queryKey: ['goals', 'active-recurring'],
+	queryFn: () => getGoals({ status: 'active', limit: 50 }),
+});
 
-    // Filter to only recurring goals (habits)
-    const recurringGoals = $derived(
-        ($goalsQuery.data?.items || []).filter((g) => g.recurrence),
-    );
+// Filter to only recurring goals (habits)
+const recurringGoals = $derived(
+	($goalsQuery.data?.items || []).filter((g) => g.recurrence),
+);
 
-    // Sort by streak (descending) and then by priority
-    const sortedGoals = $derived(
-        [...recurringGoals].sort((a, b) => {
-            if (
-                (b.stats?.current_streak || 0) !==
-                (a.stats?.current_streak || 0)
-            ) {
-                return (
-                    (b.stats?.current_streak || 0) -
-                    (a.stats?.current_streak || 0)
-                );
-            }
-            return (b.priority || 2) - (a.priority || 2);
-        }),
-    );
+// Sort by streak (descending) and then by priority
+const sortedGoals = $derived(
+	[...recurringGoals].sort((a, b) => {
+		if ((b.stats?.current_streak || 0) !== (a.stats?.current_streak || 0)) {
+			return (b.stats?.current_streak || 0) - (a.stats?.current_streak || 0);
+		}
+		return (b.priority || 2) - (a.priority || 2);
+	}),
+);
 
-    // Show first 5 by default
-    let expanded = $state(false);
-    const displayedGoals = $derived(
-        expanded ? sortedGoals : sortedGoals.slice(0, 5),
-    );
+// Show first 5 by default
+let expanded = $state(false);
+const displayedGoals = $derived(
+	expanded ? sortedGoals : sortedGoals.slice(0, 5),
+);
 
-    function handleGoalClick(goal: Goal) {
-        if (onGoalClick) {
-            onGoalClick(goal);
-        } else if (onCreateTaskFromGoal) {
-            onCreateTaskFromGoal(goal);
-        }
-    }
+function handleGoalClick(goal: Goal) {
+	if (onGoalClick) {
+		onGoalClick(goal);
+	} else if (onCreateTaskFromGoal) {
+		onCreateTaskFromGoal(goal);
+	}
+}
 
-    function formatRecurrence(rec: Goal["recurrence"]): string {
-        if (!rec) return "";
-        const times = rec.frequency === 1 ? "" : `${rec.frequency}x `;
-        return `${times}${rec.period}ly`;
-    }
+function formatRecurrence(rec: Goal['recurrence']): string {
+	if (!rec) return '';
+	const times = rec.frequency === 1 ? '' : `${rec.frequency}x `;
+	return `${times}${rec.period}ly`;
+}
 </script>
 
 <div class="space-y-3">

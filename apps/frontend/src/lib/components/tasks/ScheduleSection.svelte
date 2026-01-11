@@ -1,40 +1,40 @@
 <script lang="ts">
-    import { Card } from "$lib/components/ui";
-    import { Calendar, Clock } from "lucide-svelte";
+import { Card } from '$lib/components/ui';
+import { Calendar, Clock } from 'lucide-svelte';
 
-    interface Props {
-        startDate: string;
-        endDate: string;
-        startTime: string;
-        endTime: string;
-        isEditing: boolean;
-        liveEndTime: boolean;
-        useLastTaskStart: boolean;
-        lastTaskEndTime: Date | null;
-        onStartDateChange: (value: string) => void;
-        onEndDateChange: (value: string) => void;
-        onStartTimeChange: (value: string) => void;
-        onEndTimeChange: (value: string) => void;
-        onLiveEndTimeChange: (value: boolean) => void;
-        onUseLastTaskStartChange: (value: boolean) => void;
-    }
+interface Props {
+	startDate: string;
+	endDate: string;
+	startTime: string;
+	endTime: string;
+	isEditing: boolean;
+	liveEndTime: boolean;
+	useLastTaskStart: boolean;
+	lastTaskEndTime: Date | null;
+	onStartDateChange: (value: string) => void;
+	onEndDateChange: (value: string) => void;
+	onStartTimeChange: (value: string) => void;
+	onEndTimeChange: (value: string) => void;
+	onLiveEndTimeChange: (value: boolean) => void;
+	onUseLastTaskStartChange: (value: boolean) => void;
+}
 
-    let {
-        startDate = $bindable(""),
-        endDate = $bindable(""),
-        startTime = $bindable("09:00:00"),
-        endTime = $bindable("10:00:00"),
-        isEditing = false,
-        liveEndTime = $bindable(false),
-        useLastTaskStart = $bindable(false),
-        lastTaskEndTime = null,
-        onStartDateChange,
-        onEndDateChange,
-        onStartTimeChange,
-        onEndTimeChange,
-        onLiveEndTimeChange,
-        onUseLastTaskStartChange,
-    }: Props = $props();
+let {
+	startDate = $bindable(''),
+	endDate = $bindable(''),
+	startTime = $bindable('09:00:00'),
+	endTime = $bindable('10:00:00'),
+	isEditing = false,
+	liveEndTime = $bindable(false),
+	useLastTaskStart = $bindable(false),
+	lastTaskEndTime = null,
+	onStartDateChange,
+	onEndDateChange,
+	onStartTimeChange,
+	onEndTimeChange,
+	onLiveEndTimeChange,
+	onUseLastTaskStartChange,
+}: Props = $props();
 </script>
 
 <Card variant="bordered" class="transition-all duration-200 hover:shadow-md">

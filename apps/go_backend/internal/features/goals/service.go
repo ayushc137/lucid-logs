@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -231,8 +232,11 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 // =============================================================================
 
 func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Goal, error) {
-	// Get current state for change detection
-	oldGoal, _ := s.repo.FindByID(ctx, id, userID)
+	// Get old goal for change detection
+	var oldGoal *Goal
+	if g, err := s.repo.FindByID(ctx, id, userID); err == nil {
+		oldGoal = g
+	}
 
 	// Parse and validate dates if provided
 	if req.StartDate != nil {
@@ -338,8 +342,10 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 // =============================================================================
 
 func (s *service) Delete(ctx context.Context, id, userID string) error {
-	// Get goal info before deletion for logging
-	goal, _ := s.repo.FindByID(ctx, id, userID)
+	var goal *Goal
+	if g, err := s.repo.FindByID(ctx, id, userID); err == nil {
+		goal = g
+	}
 
 	err := s.repo.Delete(ctx, id, userID)
 	if err != nil {

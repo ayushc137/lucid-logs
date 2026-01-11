@@ -1,82 +1,78 @@
 <script lang="ts">
-    /**
-     * EmotionSelector Component
-     * - Displays selected and inferred emotions side by side
-     * - Shows emotion with emoji, quadrant color, and clear labels
-     * - Hover tooltips with quadrant details
-     * - Clean, professional design with fluid animations
-     */
-    import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
-    import {
-        QUADRANT_COLORS,
-        QUADRANT_META,
-        type Quadrant,
-    } from "./emotionData";
-    import { getIndicatorDots } from "./emotionUtils";
-    import type { Emotion, InferredEmotion } from "$lib/api/emotions";
-    import {
-        Heart,
-        Plus,
-        Sparkles,
-        X,
-        Info,
-        ArrowUp,
-        ArrowDown,
-        ArrowLeft,
-        ArrowRight,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import { emotionStore } from "$lib/stores/emotions.svelte";
+import type { Emotion, InferredEmotion } from '$lib/api/emotions';
+/**
+ * EmotionSelector Component
+ * - Displays selected and inferred emotions side by side
+ * - Shows emotion with emoji, quadrant color, and clear labels
+ * - Hover tooltips with quadrant details
+ * - Clean, professional design with fluid animations
+ */
+import OpenMoji from '$lib/components/ui/OpenMoji.svelte';
+import { emotionStore } from '$lib/stores/emotions.svelte';
+import { cn } from '$lib/utils';
+import {
+	ArrowDown,
+	ArrowLeft,
+	ArrowRight,
+	ArrowUp,
+	Heart,
+	Info,
+	Plus,
+	Sparkles,
+	X,
+} from 'lucide-svelte';
+import { QUADRANT_COLORS, QUADRANT_META, type Quadrant } from './emotionData';
+import { getIndicatorDots } from './emotionUtils';
 
-    interface Props {
-        /** User-selected emotion */
-        selectedEmotion: Emotion | null;
-        /** AI-inferred emotion from reflections */
-        inferredEmotion: InferredEmotion | null;
-        /** Callback when user wants to select/change emotion */
-        onSelect: () => void;
-        /** Callback when user clears the selected emotion */
-        onClear: () => void;
-        /** Additional classes */
-        class?: string;
-    }
+interface Props {
+	/** User-selected emotion */
+	selectedEmotion: Emotion | null;
+	/** AI-inferred emotion from reflections */
+	inferredEmotion: InferredEmotion | null;
+	/** Callback when user wants to select/change emotion */
+	onSelect: () => void;
+	/** Callback when user clears the selected emotion */
+	onClear: () => void;
+	/** Additional classes */
+	class?: string;
+}
 
-    let {
-        selectedEmotion,
-        inferredEmotion,
-        onSelect,
-        onClear,
-        class: className = "",
-    }: Props = $props();
+let {
+	selectedEmotion,
+	inferredEmotion,
+	onSelect,
+	onClear,
+	class: className = '',
+}: Props = $props();
 
-    // Hover state for tooltips
-    let hoveredQuadrant = $state<Quadrant | null>(null);
-    let tooltipTimeoutId: ReturnType<typeof setTimeout>;
+// Hover state for tooltips
+let hoveredQuadrant = $state<Quadrant | null>(null);
+let tooltipTimeoutId: ReturnType<typeof setTimeout>;
 
-    function getQuadrantIcon(quadrant: Quadrant | string) {
-        const meta = QUADRANT_META[quadrant as Quadrant];
-        const isHigh = meta?.energyLabel === "High";
-        const isPleasant = meta?.pleasantnessLabel === "Pleasant";
+function getQuadrantIcon(quadrant: Quadrant | string) {
+	const meta = QUADRANT_META[quadrant as Quadrant];
+	const isHigh = meta?.energyLabel === 'High';
+	const isPleasant = meta?.pleasantnessLabel === 'Pleasant';
 
-        if (isHigh && isPleasant)
-            return { energy: ArrowUp, pleasantness: ArrowRight };
-        if (isHigh && !isPleasant)
-            return { energy: ArrowUp, pleasantness: ArrowLeft };
-        if (!isHigh && isPleasant)
-            return { energy: ArrowDown, pleasantness: ArrowRight };
-        return { energy: ArrowDown, pleasantness: ArrowLeft };
-    }
+	if (isHigh && isPleasant)
+		return { energy: ArrowUp, pleasantness: ArrowRight };
+	if (isHigh && !isPleasant)
+		return { energy: ArrowUp, pleasantness: ArrowLeft };
+	if (!isHigh && isPleasant)
+		return { energy: ArrowDown, pleasantness: ArrowRight };
+	return { energy: ArrowDown, pleasantness: ArrowLeft };
+}
 
-    function handleMouseEnter(quadrant: Quadrant) {
-        clearTimeout(tooltipTimeoutId);
-        hoveredQuadrant = quadrant;
-    }
+function handleMouseEnter(quadrant: Quadrant) {
+	clearTimeout(tooltipTimeoutId);
+	hoveredQuadrant = quadrant;
+}
 
-    function handleMouseLeave() {
-        tooltipTimeoutId = setTimeout(() => {
-            hoveredQuadrant = null;
-        }, 150);
-    }
+function handleMouseLeave() {
+	tooltipTimeoutId = setTimeout(() => {
+		hoveredQuadrant = null;
+	}, 150);
+}
 </script>
 
 <div class={cn("space-y-4", className)}>

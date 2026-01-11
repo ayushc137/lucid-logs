@@ -5,11 +5,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 	"github.com/lucid-logs/go-backend/internal/shared/timeutil"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // =============================================================================
@@ -203,7 +204,11 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 
 func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
 	// Get old task for change detection
-	oldTask, _ := s.repo.FindByID(ctx, id, userID)
+	// Get old task for activity log
+	var oldTask *Task
+	if t, err := s.repo.FindByID(ctx, id, userID); err == nil {
+		oldTask = t
+	}
 
 	startDate, err := validateOptionalDate("start_date", req.StartDate)
 	if err != nil {
@@ -284,7 +289,10 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateRequest, use
 // Delete soft-deletes a task.
 func (s *service) Delete(ctx context.Context, id, userID string) error {
 	// Get task info before deletion for logging
-	task, _ := s.repo.FindByID(ctx, id, userID)
+	var task *Task
+	if t, err := s.repo.FindByID(ctx, id, userID); err == nil {
+		task = t
+	}
 
 	err := s.repo.Delete(ctx, id, userID)
 	if err != nil {

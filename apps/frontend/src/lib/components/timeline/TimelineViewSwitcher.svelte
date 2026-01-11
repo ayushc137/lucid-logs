@@ -1,14 +1,14 @@
 <script lang="ts">
-    import { AlignHorizontalJustifyStart, List } from "lucide-svelte";
+import { AlignHorizontalJustifyStart, List } from 'lucide-svelte';
 
-    export type TimelineView = "timeline" | "agenda";
+export type TimelineView = 'timeline' | 'agenda';
 
-    interface Props {
-        currentView: TimelineView;
-        onViewChange: (view: TimelineView) => void;
-    }
+interface Props {
+	currentView: TimelineView;
+	onViewChange: (view: TimelineView) => void;
+}
 
-    let { currentView, onViewChange }: Props = $props();
+let { currentView, onViewChange }: Props = $props();
 </script>
 
 <div class="join border border-base-300/60 rounded-lg">

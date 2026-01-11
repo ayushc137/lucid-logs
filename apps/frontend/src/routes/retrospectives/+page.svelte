@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { Calendar } from "lucide-svelte";
-  import { PageHeader, EmptyState } from "$lib/components/ui";
+import { EmptyState, PageHeader } from '$lib/components/ui';
+import { Calendar } from 'lucide-svelte';
 
-  function handleAdd() {
-    // TODO: Open create retrospective modal
-  }
+function handleAdd() {
+	// TODO: Open create retrospective modal
+}
 </script>
 
 <svelte:head>

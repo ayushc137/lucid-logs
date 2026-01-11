@@ -1,36 +1,36 @@
 <script lang="ts">
-    import { ChevronUp, ChevronDown, ArrowUpDown } from "lucide-svelte";
-    import { cn } from "$lib/utils";
+import { cn } from '$lib/utils';
+import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-svelte';
 
-    interface Props {
-        /** Column label */
-        label: string;
-        /** Field name for sorting */
-        field: string;
-        /** Current sort field */
-        sortField?: string;
-        /** Current sort direction */
-        sortDirection?: "asc" | "desc";
-        /** Sort handler */
-        onSort?: (field: string) => void;
-        /** Custom class */
-        class?: string;
-    }
+interface Props {
+	/** Column label */
+	label: string;
+	/** Field name for sorting */
+	field: string;
+	/** Current sort field */
+	sortField?: string;
+	/** Current sort direction */
+	sortDirection?: 'asc' | 'desc';
+	/** Sort handler */
+	onSort?: (field: string) => void;
+	/** Custom class */
+	class?: string;
+}
 
-    let {
-        label,
-        field,
-        sortField = "",
-        sortDirection = "asc",
-        onSort,
-        class: className = "",
-    }: Props = $props();
+let {
+	label,
+	field,
+	sortField = '',
+	sortDirection = 'asc',
+	onSort,
+	class: className = '',
+}: Props = $props();
 
-    const isActive = $derived(sortField === field);
+const isActive = $derived(sortField === field);
 
-    function handleClick() {
-        onSort?.(field);
-    }
+function handleClick() {
+	onSort?.(field);
+}
 </script>
 
 <th class={className}>

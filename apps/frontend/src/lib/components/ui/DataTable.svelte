@@ -1,38 +1,38 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
+import type { Snippet } from 'svelte';
 
-    interface Props {
-        /** Table variant */
-        variant?: "default" | "lg" | "compact";
-        /** Zebra striping */
-        zebra?: boolean;
-        /** Hover effect on rows */
-        hover?: boolean;
-        /** Pinned rows (sticky header) */
-        pinned?: boolean;
-        /** Custom class */
-        class?: string;
-        /** Table content (thead, tbody) */
-        children: Snippet;
-        /** Footer content */
-        footer?: Snippet;
-    }
+interface Props {
+	/** Table variant */
+	variant?: 'default' | 'lg' | 'compact';
+	/** Zebra striping */
+	zebra?: boolean;
+	/** Hover effect on rows */
+	hover?: boolean;
+	/** Pinned rows (sticky header) */
+	pinned?: boolean;
+	/** Custom class */
+	class?: string;
+	/** Table content (thead, tbody) */
+	children: Snippet;
+	/** Footer content */
+	footer?: Snippet;
+}
 
-    let {
-        variant = "default",
-        zebra = false,
-        hover = true,
-        pinned = false,
-        class: className = "",
-        children,
-        footer,
-    }: Props = $props();
+let {
+	variant = 'default',
+	zebra = false,
+	hover = true,
+	pinned = false,
+	class: className = '',
+	children,
+	footer,
+}: Props = $props();
 
-    const variantClasses: Record<string, string> = {
-        default: "table",
-        lg: "table table-lg",
-        compact: "table table-sm",
-    };
+const variantClasses: Record<string, string> = {
+	default: 'table',
+	lg: 'table table-lg',
+	compact: 'table table-sm',
+};
 </script>
 
 <div

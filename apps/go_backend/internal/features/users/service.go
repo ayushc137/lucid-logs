@@ -4,9 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
 
 // Service defines business logic for users.
@@ -61,9 +62,9 @@ func (s *service) Update(ctx context.Context, requesterID, targetID string, req 
 		if email == "" {
 			return nil, errors.ErrValidationFailed.WithMessage("Email cannot be empty")
 		}
-		existing, err := s.repo.FindByEmail(ctx, email)
-		if err != nil {
-			return nil, err
+		existing, findErr := s.repo.FindByEmail(ctx, email)
+		if findErr != nil {
+			return nil, findErr
 		}
 		if existing != nil && existing.ID != target.ID {
 			return nil, errors.ErrConflict.WithMessage("Email already in use")
@@ -76,8 +77,8 @@ func (s *service) Update(ctx context.Context, requesterID, targetID string, req 
 	}
 
 	if req.Password != nil {
-		if err := s.repo.UpdatePassword(ctx, target.ID, *req.Password); err != nil {
-			return nil, err
+		if updateErr := s.repo.UpdatePassword(ctx, target.ID, *req.Password); updateErr != nil {
+			return nil, updateErr
 		}
 		// Refresh user to capture updated_at change
 		target, err = s.repo.FindByID(ctx, target.ID)
@@ -122,13 +123,13 @@ func (s *service) Delete(ctx context.Context, requesterID, targetID string) erro
 	return nil
 }
 
-func (s *service) fetchAndAuthorize(ctx context.Context, requesterID, targetID string) (*User, *User, error) {
-	requester, err := s.repo.FindByID(ctx, requesterID)
+func (s *service) fetchAndAuthorize(ctx context.Context, requesterID, targetID string) (requester, target *User, err error) {
+	requester, err = s.repo.FindByID(ctx, requesterID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	target, err := s.repo.FindByID(ctx, targetID)
+	target, err = s.repo.FindByID(ctx, targetID)
 	if err != nil {
 		return nil, nil, err
 	}

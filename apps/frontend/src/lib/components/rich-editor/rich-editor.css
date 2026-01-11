@@ -1,150 +1,155 @@
 /**
  * Rich Text Editor Styles (TipTap/ProseMirror)
- * 
+ *
  * This file contains all CSS styles for the rich text editor component.
  * Imported by app.css
  */
 
 /* Base editor styles */
 .rich-editor .ProseMirror {
-    @apply outline-none min-h-full overflow-x-hidden;
+	@apply outline-none min-h-full overflow-x-hidden;
 }
 
 /* Placeholder text */
 .rich-editor .ProseMirror p.is-editor-empty:first-child::before {
-    @apply text-base-content/30 float-left h-0 pointer-events-none;
-    content: attr(data-placeholder);
+	@apply text-base-content/30 float-left h-0 pointer-events-none;
+	content: attr(data-placeholder);
 }
 
 /* Task lists */
 .rich-editor .ProseMirror ul[data-type="taskList"] {
-    @apply list-none p-0;
+	@apply list-none p-0;
 }
 
 .rich-editor .ProseMirror ul[data-type="taskList"] li {
-    @apply flex items-start gap-2;
+	@apply flex items-start gap-2;
 }
 
-.rich-editor .ProseMirror ul[data-type="taskList"] li>label input[type="checkbox"] {
-    @apply checkbox checkbox-sm checkbox-primary;
+.rich-editor
+	.ProseMirror
+	ul[data-type="taskList"]
+	li
+	> label
+	input[type="checkbox"] {
+	@apply checkbox checkbox-sm checkbox-primary;
 }
 
 /* Standard lists */
 .rich-editor .ProseMirror ul {
-    @apply list-disc pl-5;
+	@apply list-disc pl-5;
 }
 
 .rich-editor .ProseMirror ol {
-    @apply list-decimal pl-5;
+	@apply list-decimal pl-5;
 }
 
 /* List spacing */
 .rich-editor .ProseMirror ul,
 .rich-editor .ProseMirror ol {
-    @apply my-2;
+	@apply my-2;
 }
 
 .rich-editor .ProseMirror li {
-    @apply my-0.5;
+	@apply my-0.5;
 }
 
 .rich-editor .ProseMirror li p {
-    @apply my-0;
+	@apply my-0;
 }
 
 /* Blockquotes */
 .rich-editor .ProseMirror blockquote {
-    @apply border-l-4 border-primary/30 pl-4 italic my-3 py-1;
+	@apply border-l-4 border-primary/30 pl-4 italic my-3 py-1;
 }
 
 .rich-editor .ProseMirror blockquote p {
-    @apply my-0.5;
+	@apply my-0.5;
 }
 
 /* Code */
 .rich-editor .ProseMirror code {
-    @apply bg-base-300 px-1 py-0.5 rounded text-sm;
+	@apply bg-base-300 px-1 py-0.5 rounded text-sm;
 }
 
 .rich-editor .ProseMirror pre {
-    @apply bg-base-300 p-3 rounded-lg;
+	@apply bg-base-300 p-3 rounded-lg;
 }
 
 /* Links */
 .rich-editor .ProseMirror a {
-    @apply text-primary underline;
+	@apply text-primary underline;
 }
 
 /* Headings */
 .rich-editor .ProseMirror h1 {
-    @apply text-2xl font-bold mt-4 mb-2 text-base-content;
+	@apply text-2xl font-bold mt-4 mb-2 text-base-content;
 }
 
 .rich-editor .ProseMirror h2 {
-    @apply text-xl font-bold mt-3 mb-2 text-base-content;
+	@apply text-xl font-bold mt-3 mb-2 text-base-content;
 }
 
 .rich-editor .ProseMirror h3 {
-    @apply text-lg font-semibold mt-3 mb-1.5 text-base-content;
+	@apply text-lg font-semibold mt-3 mb-1.5 text-base-content;
 }
 
 .rich-editor .ProseMirror h4 {
-    @apply text-base font-semibold mt-2 mb-1 text-base-content;
+	@apply text-base font-semibold mt-2 mb-1 text-base-content;
 }
 
 .rich-editor .ProseMirror h5 {
-    @apply text-sm font-semibold mt-2 mb-1 text-base-content/90;
+	@apply text-sm font-semibold mt-2 mb-1 text-base-content/90;
 }
 
 .rich-editor .ProseMirror h6 {
-    @apply text-xs font-semibold mt-2 mb-1 text-base-content/80 uppercase tracking-wide;
+	@apply text-xs font-semibold mt-2 mb-1 text-base-content/80 uppercase tracking-wide;
 }
 
 /* Paragraphs */
 .rich-editor .ProseMirror p {
-    @apply my-1.5 leading-relaxed;
+	@apply my-1.5 leading-relaxed;
 }
 
 /* Horizontal rule */
 .rich-editor .ProseMirror hr {
-    @apply my-4 border-0 border-t-2 border-base-300;
+	@apply my-4 border-0 border-t-2 border-base-300;
 }
 
 /* Focus state */
 .rich-editor .ProseMirror:focus {
-    @apply outline-none;
+	@apply outline-none;
 }
 
 /* Scrollbar styling - hide by default, show on hover */
 .rich-editor {
-    /* Firefox */
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+	/* Firefox */
+	scrollbar-width: thin;
+	scrollbar-color: transparent transparent;
 }
 
 .rich-editor:hover {
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+	scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
 /* Webkit browsers (Chrome, Safari, Edge) */
 .rich-editor ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+	width: 6px;
+	height: 6px;
 }
 
 .rich-editor ::-webkit-scrollbar-track {
-    background: transparent;
+	background: transparent;
 }
 
 .rich-editor ::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 3px;
+	background: transparent;
+	border-radius: 3px;
 }
 
 .rich-editor:hover ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
+	background: rgba(0, 0, 0, 0.2);
 }
 
 .rich-editor ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
+	background: rgba(0, 0, 0, 0.3);
 }

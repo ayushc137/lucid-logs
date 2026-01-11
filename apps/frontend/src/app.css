@@ -1,15 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
-@import 'tailwindcss';
+@import "./lib/components/rich-editor/rich-editor.css";
 
+@import "tailwindcss";
+
+/* biome-ignore css/noUnknownProperty: tailwind 4 syntax */
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, nord, night, dim, lofi, winter, corporate, retro, dracula;
+	themes: light --default, dark --prefersdark, nord, night, dim, lofi, winter,
+		corporate, retro, dracula;
 }
 
-/* Import component styles */
-@import './lib/components/rich-editor/rich-editor.css';
+/* Base font */
 
 /* Base font */
 * {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
 }

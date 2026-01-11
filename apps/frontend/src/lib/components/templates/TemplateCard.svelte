@@ -1,66 +1,66 @@
 <script lang="ts">
-    import type { TaskTemplate } from "$lib/api";
-    import {
-        Zap,
-        Clock,
-        Hash,
-        ChevronRight,
-        MoreVertical,
-        Pencil,
-        Trash2,
-        Play,
-        Target,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import { fly } from "svelte/transition";
-    import { cubicOut } from "svelte/easing";
+import type { TaskTemplate } from '$lib/api';
+import { cn } from '$lib/utils';
+import {
+	ChevronRight,
+	Clock,
+	Hash,
+	MoreVertical,
+	Pencil,
+	Play,
+	Target,
+	Trash2,
+	Zap,
+} from 'lucide-svelte';
+import { cubicOut } from 'svelte/easing';
+import { fly } from 'svelte/transition';
 
-    interface Props {
-        template: TaskTemplate;
-        variant?: "card" | "compact";
-        transitionDelay?: number;
-        onEdit?: () => void;
-        onDelete?: () => void;
-        onUse?: () => void;
-        onClick?: () => void;
-    }
+interface Props {
+	template: TaskTemplate;
+	variant?: 'card' | 'compact';
+	transitionDelay?: number;
+	onEdit?: () => void;
+	onDelete?: () => void;
+	onUse?: () => void;
+	onClick?: () => void;
+}
 
-    let {
-        template,
-        variant = "card",
-        transitionDelay = 0,
-        onEdit,
-        onDelete,
-        onUse,
-        onClick,
-    }: Props = $props();
+let {
+	template,
+	variant = 'card',
+	transitionDelay = 0,
+	onEdit,
+	onDelete,
+	onUse,
+	onClick,
+}: Props = $props();
 
-    function formatDuration(seconds: number | undefined): string {
-        if (!seconds) return "";
-        const mins = Math.floor(seconds / 60);
-        if (mins < 60) return `${mins}m`;
-        const hrs = Math.floor(mins / 60);
-        const remMins = mins % 60;
-        return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
-    }
+function formatDuration(seconds: number | undefined): string {
+	if (!seconds) return '';
+	const mins = Math.floor(seconds / 60);
+	if (mins < 60) return `${mins}m`;
+	const hrs = Math.floor(mins / 60);
+	const remMins = mins % 60;
+	return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+}
 
-    function formatLastUsed(date: string | undefined): string {
-        if (!date) return "Never used";
-        const d = new Date(date);
-        const now = new Date();
-        const diff = Math.floor(
-            (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (diff === 0) return "Used today";
-        if (diff === 1) return "Used yesterday";
-        if (diff < 7) return `Used ${diff}d ago`;
-        return d.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-        });
-    }
+function formatLastUsed(date: string | undefined): string {
+	if (!date) return 'Never used';
+	const d = new Date(date);
+	const now = new Date();
+	const diff = Math.floor(
+		(now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
+	);
+	if (diff === 0) return 'Used today';
+	if (diff === 1) return 'Used yesterday';
+	if (diff < 7) return `Used ${diff}d ago`;
+	return d.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+	});
+}
 
-    let menuOpen = $state(false);
+let menuOpen = $state(false);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

@@ -4921,7 +4921,7 @@ const docTemplate = `{
                         "$ref": "#/definitions/retrospectives.CategoryCount"
                     }
                 },
-                "cancelled": {
+                "canceled": {
                     "type": "integer"
                 },
                 "completed": {

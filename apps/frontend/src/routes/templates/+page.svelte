@@ -1,189 +1,185 @@
 <script lang="ts">
-  import {
-    createQuery,
-    createMutation,
-    useQueryClient,
-  } from "@tanstack/svelte-query";
-  import { getTemplates, deleteTemplate, type TaskTemplate } from "$lib/api";
-  import { ErrorAlert, ConfirmDialog } from "$lib/components/ui";
-  import { TemplateModal } from "$lib/components/templates";
-  import {
-    Zap,
-    Plus,
-    Trash2,
-    SquarePen,
-    Search,
-    LoaderCircle,
-    Clock,
-    Hash,
-    Play,
-    Tag,
-    X,
-  } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import {
-    getUrlParams,
-    updateUrlParams,
-    parsers,
-  } from "$lib/utils/navigation";
-  import { goto } from "$app/navigation";
-  import { browser } from "$app/environment";
-  import { page } from "$app/stores";
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+import { type TaskTemplate, deleteTemplate, getTemplates } from '$lib/api';
+import { TemplateModal } from '$lib/components/templates';
+import { ConfirmDialog, ErrorAlert } from '$lib/components/ui';
+import { cn } from '$lib/utils';
+import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import {
+	Clock,
+	Hash,
+	LoaderCircle,
+	Play,
+	Plus,
+	Search,
+	SquarePen,
+	Tag,
+	Trash2,
+	X,
+	Zap,
+} from 'lucide-svelte';
 
-  const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
-  // Initialize state from URL
-  const initialParams = getUrlParams<{ q: string; quick_log: string }>({
-    q: parsers.string(""),
-    quick_log: parsers.string(""),
-  });
+// Initialize state from URL
+const initialParams = getUrlParams<{ q: string; quick_log: string }>({
+	q: parsers.string(''),
+	quick_log: parsers.string(''),
+});
 
-  // Search state
-  let searchQuery = $state(initialParams.q);
-  let debouncedSearch = $state(initialParams.q);
-  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+// Search state
+let searchQuery = $state(initialParams.q);
+let debouncedSearch = $state(initialParams.q);
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Filter state
-  let quickLogFilter = $state(initialParams.quick_log);
+// Filter state
+let quickLogFilter = $state(initialParams.quick_log);
 
-  function handleSearchInput(value: string) {
-    searchQuery = value;
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      debouncedSearch = value;
-    }, 300);
-  }
+function handleSearchInput(value: string) {
+	searchQuery = value;
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchTimeout = setTimeout(() => {
+		debouncedSearch = value;
+	}, 300);
+}
 
-  // Sync state to URL
-  $effect(() => {
-    updateUrlParams(
-      {
-        q: debouncedSearch,
-        quick_log: quickLogFilter,
-      },
-      { replace: true, keepFocus: true },
-    );
-  });
+// Sync state to URL
+$effect(() => {
+	updateUrlParams(
+		{
+			q: debouncedSearch,
+			quick_log: quickLogFilter,
+		},
+		{ replace: true, keepFocus: true },
+	);
+});
 
-  // Templates query
-  const query = createQuery({
-    queryKey: ["templates-list"],
-    queryFn: () => getTemplates({ limit: 100 }),
-    retry: false,
-  });
+// Templates query
+const query = createQuery({
+	queryKey: ['templates-list'],
+	queryFn: () => getTemplates({ limit: 100 }),
+	retry: false,
+});
 
-  // Client-side filtering since backend might not support search
-  const templates = $derived(() => {
-    let items = $query.data?.items || [];
+// Client-side filtering since backend might not support search
+const templates = $derived(() => {
+	let items = $query.data?.items || [];
 
-    // Search filter
-    if (debouncedSearch) {
-      const search = debouncedSearch.toLowerCase();
-      items = items.filter(
-        (t) =>
-          t.title.toLowerCase().includes(search) ||
-          (t.description?.toLowerCase().includes(search) ?? false),
-      );
-    }
+	// Search filter
+	if (debouncedSearch) {
+		const search = debouncedSearch.toLowerCase();
+		items = items.filter(
+			(t) =>
+				t.title.toLowerCase().includes(search) ||
+				(t.description?.toLowerCase().includes(search) ?? false),
+		);
+	}
 
-    // Quick log filter
-    if (quickLogFilter === "true") {
-      items = items.filter((t) => t.is_quick_log);
-    } else if (quickLogFilter === "false") {
-      items = items.filter((t) => !t.is_quick_log);
-    }
+	// Quick log filter
+	if (quickLogFilter === 'true') {
+		items = items.filter((t) => t.is_quick_log);
+	} else if (quickLogFilter === 'false') {
+		items = items.filter((t) => !t.is_quick_log);
+	}
 
-    return items;
-  });
+	return items;
+});
 
-  const totalTemplates = $derived($query.data?.total || 0);
+const totalTemplates = $derived($query.data?.total || 0);
 
-  // Modal states
-  let modalOpen = $state(false);
-  let editingTemplate = $state<TaskTemplate | null>(null);
-  let deleteConfirmOpen = $state(false);
-  let deleteTargetId = $state<string | null>(null);
+// Modal states
+let modalOpen = $state(false);
+let editingTemplate = $state<TaskTemplate | null>(null);
+let deleteConfirmOpen = $state(false);
+let deleteTargetId = $state<string | null>(null);
 
-  // Mutations
-  const deleteMut = createMutation({
-    mutationFn: (id: string) => deleteTemplate(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["templates-list"] });
-      await queryClient.invalidateQueries({ queryKey: ["templates"] });
-      deleteConfirmOpen = false;
-      deleteTargetId = null;
-    },
-  });
+// Mutations
+const deleteMut = createMutation({
+	mutationFn: (id: string) => deleteTemplate(id),
+	onSuccess: async () => {
+		await queryClient.invalidateQueries({ queryKey: ['templates-list'] });
+		await queryClient.invalidateQueries({ queryKey: ['templates'] });
+		deleteConfirmOpen = false;
+		deleteTargetId = null;
+	},
+});
 
-  function handleCreate() {
-    editingTemplate = null;
-    modalOpen = true;
-  }
+function handleCreate() {
+	editingTemplate = null;
+	modalOpen = true;
+}
 
-  function startEdit(template: TaskTemplate) {
-    editingTemplate = template;
-    modalOpen = true;
-  }
+function startEdit(template: TaskTemplate) {
+	editingTemplate = template;
+	modalOpen = true;
+}
 
-  function handleModalClose() {
-    modalOpen = false;
-    editingTemplate = null;
-    queryClient.invalidateQueries({ queryKey: ["templates-list"] });
-    queryClient.invalidateQueries({ queryKey: ["templates"] });
-  }
+function handleModalClose() {
+	modalOpen = false;
+	editingTemplate = null;
+	queryClient.invalidateQueries({ queryKey: ['templates-list'] });
+	queryClient.invalidateQueries({ queryKey: ['templates'] });
+}
 
-  function confirmDelete(id: string, e: Event) {
-    e.stopPropagation();
-    deleteTargetId = id;
-    deleteConfirmOpen = true;
-  }
+function confirmDelete(id: string, e: Event) {
+	e.stopPropagation();
+	deleteTargetId = id;
+	deleteConfirmOpen = true;
+}
 
-  function handleDelete() {
-    if (deleteTargetId) {
-      $deleteMut.mutate(deleteTargetId);
-    }
-  }
+function handleDelete() {
+	if (deleteTargetId) {
+		$deleteMut.mutate(deleteTargetId);
+	}
+}
 
-  function handleUse(template: TaskTemplate, e: Event) {
-    e.stopPropagation();
-    // Navigate to create task with template pre-filled
-    if (browser) {
-      sessionStorage.setItem(
-        "task-form-referrer",
-        $page.url.pathname + $page.url.search,
-      );
-      sessionStorage.setItem("task-template", JSON.stringify(template));
-    }
-    goto("/tasks/create");
-  }
+function handleUse(template: TaskTemplate, e: Event) {
+	e.stopPropagation();
+	// Navigate to create task with template pre-filled
+	if (browser) {
+		sessionStorage.setItem(
+			'task-form-referrer',
+			$page.url.pathname + $page.url.search,
+		);
+		sessionStorage.setItem('task-template', JSON.stringify(template));
+	}
+	goto('/tasks/create');
+}
 
-  const isSearching = $derived(searchQuery !== debouncedSearch);
+const isSearching = $derived(searchQuery !== debouncedSearch);
 
-  const quickLogOptions = [
-    { value: "", label: "All Templates" },
-    { value: "true", label: "Quick Log Only" },
-    { value: "false", label: "Standard Only" },
-  ];
+const quickLogOptions = [
+	{ value: '', label: 'All Templates' },
+	{ value: 'true', label: 'Quick Log Only' },
+	{ value: 'false', label: 'Standard Only' },
+];
 
-  function formatDuration(seconds?: number): string {
-    if (!seconds) return "—";
-    const mins = Math.floor(seconds / 60);
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    const remainMins = mins % 60;
-    return remainMins > 0 ? `${hours}h ${remainMins}m` : `${hours}h`;
-  }
+function formatDuration(seconds?: number): string {
+	if (!seconds) return '—';
+	const mins = Math.floor(seconds / 60);
+	if (mins < 60) return `${mins}m`;
+	const hours = Math.floor(mins / 60);
+	const remainMins = mins % 60;
+	return remainMins > 0 ? `${hours}h ${remainMins}m` : `${hours}h`;
+}
 
-  // Highlight search matches
-  function highlightText(text: string, query: string): string {
-    if (!query || !text) return text;
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escapedQuery})`, "gi");
-    return text.replace(
-      regex,
-      '<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
-    );
-  }
+// Highlight search matches
+function highlightText(text: string, query: string): string {
+	if (!query || !text) return text;
+	const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const regex = new RegExp(`(${escapedQuery})`, 'gi');
+	return text.replace(
+		regex,
+		'<mark class="bg-warning text-warning-content rounded px-0.5">$1</mark>',
+	);
+}
 </script>
 
 <svelte:head>

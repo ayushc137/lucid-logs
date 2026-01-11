@@ -1030,6 +1030,8 @@ func seedTemplates(categories, goals map[string]string) (map[string]string, erro
 
 func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, templates map[string]string, userID string) (totalTasks, totalLinks int) {
 	now := time.Now()
+	// Normalize "now" to midnight local time to ensure day.Add(hour) works as expected
+	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	// Track streaks state in memory to simulate realistic progression
 	streaks := make(map[string]int)
@@ -1060,8 +1062,8 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 	if isPast || dayOffset == 0 {
 		// Sleep from previous night (22:00 to 6:00)
 		sleepHours := 6.5 + rand.Float64()*2.0 // 6.5-8.5 hours
-		sleepStart := day.Add(-6 * time.Hour)  // 22:00 previous day
-		sleepEnd := day.Add(time.Duration(sleepHours-2) * time.Hour)
+		sleepStart := day.Add(-2 * time.Hour)  // 22:00 previous day (relative to midnight)
+		sleepEnd := sleepStart.Add(time.Duration(sleepHours) * time.Hour)
 
 		payload := map[string]any{
 			"title":       "Sleep",
@@ -1159,14 +1161,17 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 	// Check if hydration goal met
 	if isPast && dailyTotals[hydrationGoalTitle] >= 3.0 {
 		streaks[hydrationGoalTitle]++
+		//nolint:errcheck // seeding
 		_ = createGoalLog(ctx, db, goals[hydrationGoalTitle], "target_met", map[string]any{
 			"current_value": dailyTotals[hydrationGoalTitle],
 			"streak":        streaks[hydrationGoalTitle],
 		}, day, userID)
+		//nolint:errcheck // seeding
 		_ = updateGoalStreak(ctx, db, goals[hydrationGoalTitle], streaks[hydrationGoalTitle], day)
 	} else if isPast {
 		streaks[hydrationGoalTitle] = 0
 		if streaks[hydrationGoalTitle] > 0 {
+			//nolint:errcheck // seeding
 			_ = createGoalLog(ctx, db, goals[hydrationGoalTitle], "streak_broken", nil, day, userID)
 		}
 	}
@@ -1225,15 +1230,18 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 
 		if isPast && dailyTotals[readingGoalTitle] >= 30 {
 			streaks[readingGoalTitle]++
+			//nolint:errcheck // seeding
 			_ = createGoalLog(ctx, db, goals[readingGoalTitle], "target_met", map[string]any{
 				"current_value": dailyTotals[readingGoalTitle],
 				"streak":        streaks[readingGoalTitle],
 			}, day, userID)
+			//nolint:errcheck // seeding
 			_ = updateGoalStreak(ctx, db, goals[readingGoalTitle], streaks[readingGoalTitle], day)
 		}
 	} else if isPast && streaks[readingGoalTitle] > 0 {
 		// Streak broken and never recovered
 		streaks[readingGoalTitle] = 0
+		//nolint:errcheck // seeding
 		_ = createGoalLog(ctx, db, goals[readingGoalTitle], "streak_broken", nil, day, userID)
 	}
 
@@ -1312,10 +1320,12 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 	// Update exercise streak
 	if isPast && dailyTotals[exerciseGoalTitle] >= 30 {
 		streaks[exerciseGoalTitle]++
+		//nolint:errcheck // seeding
 		_ = createGoalLog(ctx, db, goals[exerciseGoalTitle], "target_met", map[string]any{
 			"current_value": dailyTotals[exerciseGoalTitle],
 			"streak":        streaks[exerciseGoalTitle],
 		}, day, userID)
+		//nolint:errcheck // seeding
 		_ = updateGoalStreak(ctx, db, goals[exerciseGoalTitle], streaks[exerciseGoalTitle], day)
 	} else if isPast {
 		streaks[exerciseGoalTitle] = 0
@@ -1676,11 +1686,9 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 				tasks++
 				links++
 			}
-		} else {
-			if createTaskWithDetails(day, lunchHour, 0, lunchDur, "Lunch Out", "🍽️",
-				categories["Personal"], nil, "", "", nil, isPast, nil, nil, "manual") {
-				tasks++
-			}
+		} else if createTaskWithDetails(day, lunchHour, 0, lunchDur, "Lunch Out", "🍽️",
+			categories["Personal"], nil, "", "", nil, isPast, nil, nil, "manual") {
+			tasks++
 		}
 	}
 

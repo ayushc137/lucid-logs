@@ -1,111 +1,108 @@
 <script lang="ts">
-    import type { Goal } from "$lib/api";
-    import {
-        Target,
-        Repeat,
-        Flame,
-        Check,
-        Pause,
-        X,
-        ChevronRight,
-        Calendar,
-        MoreVertical,
-        Pencil,
-        Trash2,
-        Play,
-        Archive,
-    } from "lucide-svelte";
-    import { cn } from "$lib/utils";
-    import { fly } from "svelte/transition";
-    import { cubicOut } from "svelte/easing";
+import type { Goal } from '$lib/api';
+import { cn } from '$lib/utils';
+import {
+	Archive,
+	Calendar,
+	Check,
+	ChevronRight,
+	Flame,
+	MoreVertical,
+	Pause,
+	Pencil,
+	Play,
+	Repeat,
+	Target,
+	Trash2,
+	X,
+} from 'lucide-svelte';
+import { cubicOut } from 'svelte/easing';
+import { fly } from 'svelte/transition';
 
-    interface Props {
-        goal: Goal;
-        variant?: "card" | "compact";
-        transitionDelay?: number;
-        onEdit?: () => void;
-        onDelete?: () => void;
-        onStatusChange?: (
-            status: "active" | "completed" | "paused" | "abandoned",
-        ) => void;
-        onClick?: () => void;
-    }
+interface Props {
+	goal: Goal;
+	variant?: 'card' | 'compact';
+	transitionDelay?: number;
+	onEdit?: () => void;
+	onDelete?: () => void;
+	onStatusChange?: (
+		status: 'active' | 'completed' | 'paused' | 'abandoned',
+	) => void;
+	onClick?: () => void;
+}
 
-    let {
-        goal,
-        variant = "card",
-        transitionDelay = 0,
-        onEdit,
-        onDelete,
-        onStatusChange,
-        onClick,
-    }: Props = $props();
+let {
+	goal,
+	variant = 'card',
+	transitionDelay = 0,
+	onEdit,
+	onDelete,
+	onStatusChange,
+	onClick,
+}: Props = $props();
 
-    const isRecurring = $derived(!!goal.recurrence);
-    const progress = $derived(
-        goal.target
-            ? Math.min(
-                  100,
-                  Math.round(
-                      ((goal.stats?.current_value || 0) / goal.target.value) *
-                          100,
-                  ),
-              )
-            : 0,
-    );
+const isRecurring = $derived(!!goal.recurrence);
+const progress = $derived(
+	goal.target
+		? Math.min(
+				100,
+				Math.round(
+					((goal.stats?.current_value || 0) / goal.target.value) * 100,
+				),
+			)
+		: 0,
+);
 
-    const statusColors = {
-        active: "badge-success",
-        completed: "badge-info",
-        paused: "badge-warning",
-        abandoned: "badge-error",
-        archived: "badge-ghost",
-    };
+const statusColors = {
+	active: 'badge-success',
+	completed: 'badge-info',
+	paused: 'badge-warning',
+	abandoned: 'badge-error',
+	archived: 'badge-ghost',
+};
 
-    const statusIcons = {
-        active: Play,
-        completed: Check,
-        paused: Pause,
-        abandoned: X,
-        archived: Archive,
-    };
+const statusIcons = {
+	active: Play,
+	completed: Check,
+	paused: Pause,
+	abandoned: X,
+	archived: Archive,
+};
 
-    // Derived status icon for the current goal
-    const StatusIcon = $derived(
-        statusIcons[goal.status as keyof typeof statusIcons] || Play,
-    );
+// Derived status icon for the current goal
+const StatusIcon = $derived(
+	statusIcons[goal.status as keyof typeof statusIcons] || Play,
+);
 
-    const goalTypeLabels = {
-        discrete: "One-time",
-        measurable: "Measurable",
-        epic: "Epic",
-        avoidance: "Avoidance",
-    };
+const goalTypeLabels = {
+	discrete: 'One-time',
+	measurable: 'Measurable',
+	epic: 'Epic',
+	avoidance: 'Avoidance',
+};
 
-    function formatRecurrence(rec: typeof goal.recurrence): string {
-        if (!rec) return "";
-        const times = rec.frequency === 1 ? "" : `${rec.frequency}x `;
-        return `${times}${rec.period}ly`;
-    }
+function formatRecurrence(rec: typeof goal.recurrence): string {
+	if (!rec) return '';
+	const times = rec.frequency === 1 ? '' : `${rec.frequency}x `;
+	return `${times}${rec.period}ly`;
+}
 
-    function formatDeadline(date: string | undefined): string {
-        if (!date) return "";
-        const d = new Date(date);
-        const now = new Date();
-        const diff = Math.ceil(
-            (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (diff < 0) return "Overdue";
-        if (diff === 0) return "Today";
-        if (diff === 1) return "Tomorrow";
-        if (diff <= 7) return `${diff}d left`;
-        return d.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-        });
-    }
+function formatDeadline(date: string | undefined): string {
+	if (!date) return '';
+	const d = new Date(date);
+	const now = new Date();
+	const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+	if (diff < 0) return 'Overdue';
+	if (diff === 0) return 'Today';
+	if (diff === 1) return 'Tomorrow';
+	if (diff <= 7) return `${diff}d left`;
+	return d.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+	});
+}
 
-    let menuOpen = $state(false);
+let menuOpen = $state(false);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

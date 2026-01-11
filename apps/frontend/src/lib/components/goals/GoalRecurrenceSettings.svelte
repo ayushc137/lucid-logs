@@ -1,52 +1,52 @@
 <script lang="ts">
-    import { cn } from "$lib/utils";
-    import { Repeat, Check } from "lucide-svelte";
+import { cn } from '$lib/utils';
+import { Check, Repeat } from 'lucide-svelte';
 
-    interface Props {
-        isHabit: boolean;
-        frequency: number;
-        period: "day" | "week" | "month";
-        activeDays: number[];
-        activeMonthDay: number;
-        onIsHabitChange: (value: boolean) => void;
-        onFrequencyChange: (value: number) => void;
-        onPeriodChange: (value: "day" | "week" | "month") => void;
-        onActiveDaysChange: (days: number[]) => void;
-        onActiveMonthDayChange: (day: number) => void;
-    }
+interface Props {
+	isHabit: boolean;
+	frequency: number;
+	period: 'day' | 'week' | 'month';
+	activeDays: number[];
+	activeMonthDay: number;
+	onIsHabitChange: (value: boolean) => void;
+	onFrequencyChange: (value: number) => void;
+	onPeriodChange: (value: 'day' | 'week' | 'month') => void;
+	onActiveDaysChange: (days: number[]) => void;
+	onActiveMonthDayChange: (day: number) => void;
+}
 
-    let {
-        isHabit = $bindable(false),
-        frequency = $bindable(1),
-        period = $bindable("day"),
-        activeDays = $bindable([]),
-        activeMonthDay = $bindable(1),
-        onIsHabitChange,
-        onFrequencyChange,
-        onPeriodChange,
-        onActiveDaysChange,
-        onActiveMonthDayChange,
-    }: Props = $props();
+let {
+	isHabit = $bindable(false),
+	frequency = $bindable(1),
+	period = $bindable('day'),
+	activeDays = $bindable([]),
+	activeMonthDay = $bindable(1),
+	onIsHabitChange,
+	onFrequencyChange,
+	onPeriodChange,
+	onActiveDaysChange,
+	onActiveMonthDayChange,
+}: Props = $props();
 
-    const dayOptions = [
-        { value: 0, label: "Sun" },
-        { value: 1, label: "Mon" },
-        { value: 2, label: "Tue" },
-        { value: 3, label: "Wed" },
-        { value: 4, label: "Thu" },
-        { value: 5, label: "Fri" },
-        { value: 6, label: "Sat" },
-    ];
+const dayOptions = [
+	{ value: 0, label: 'Sun' },
+	{ value: 1, label: 'Mon' },
+	{ value: 2, label: 'Tue' },
+	{ value: 3, label: 'Wed' },
+	{ value: 4, label: 'Thu' },
+	{ value: 5, label: 'Fri' },
+	{ value: 6, label: 'Sat' },
+];
 
-    function toggleDay(day: number) {
-        if (activeDays.includes(day)) {
-            const newDays = activeDays.filter((d) => d !== day);
-            onActiveDaysChange(newDays);
-        } else {
-            const newDays = [...activeDays, day];
-            onActiveDaysChange(newDays);
-        }
-    }
+function toggleDay(day: number) {
+	if (activeDays.includes(day)) {
+		const newDays = activeDays.filter((d) => d !== day);
+		onActiveDaysChange(newDays);
+	} else {
+		const newDays = [...activeDays, day];
+		onActiveDaysChange(newDays);
+	}
+}
 </script>
 
 <div

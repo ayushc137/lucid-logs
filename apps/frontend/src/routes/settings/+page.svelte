@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { ThemeSettings, AccountSettings } from "$lib/components/settings";
-  import { cn } from "$lib/utils";
+import { AccountSettings, ThemeSettings } from '$lib/components/settings';
+import { cn } from '$lib/utils';
 
-  let activeTab = $state<"appearance" | "account">("appearance");
+let activeTab = $state<'appearance' | 'account'>('appearance');
 </script>
 
 <svelte:head>

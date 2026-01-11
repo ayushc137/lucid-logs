@@ -1,95 +1,93 @@
 <script lang="ts">
-    import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-svelte";
-    import { onMount, onDestroy } from "svelte";
-    import { scale } from "svelte/transition";
+import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-svelte';
+import { onDestroy, onMount } from 'svelte';
+import { scale } from 'svelte/transition';
 
-    let {
-        selectedDate = new Date(),
-        onDateChange,
-    }: {
-        selectedDate: Date;
-        onDateChange?: (date: Date) => void;
-    } = $props();
+let {
+	selectedDate = new Date(),
+	onDateChange,
+}: {
+	selectedDate: Date;
+	onDateChange?: (date: Date) => void;
+} = $props();
 
-    let dateInputRef: HTMLInputElement = null!;
-    let currentTime = $state(new Date());
-    let timeInterval: ReturnType<typeof setInterval>;
+let dateInputRef: HTMLInputElement = null!;
+let currentTime = $state(new Date());
+let timeInterval: ReturnType<typeof setInterval>;
 
-    onMount(() => {
-        timeInterval = setInterval(() => (currentTime = new Date()), 1000);
-    });
+onMount(() => {
+	timeInterval = setInterval(() => (currentTime = new Date()), 1000);
+});
 
-    onDestroy(() => {
-        if (timeInterval) clearInterval(timeInterval);
-    });
+onDestroy(() => {
+	if (timeInterval) clearInterval(timeInterval);
+});
 
-    function goToPreviousDay() {
-        const d = new Date(selectedDate);
-        d.setDate(d.getDate() - 1);
-        onDateChange?.(d);
-    }
+function goToPreviousDay() {
+	const d = new Date(selectedDate);
+	d.setDate(d.getDate() - 1);
+	onDateChange?.(d);
+}
 
-    function goToNextDay() {
-        const d = new Date(selectedDate);
-        d.setDate(d.getDate() + 1);
-        onDateChange?.(d);
-    }
+function goToNextDay() {
+	const d = new Date(selectedDate);
+	d.setDate(d.getDate() + 1);
+	onDateChange?.(d);
+}
 
-    function goToToday() {
-        onDateChange?.(new Date());
-    }
+function goToToday() {
+	onDateChange?.(new Date());
+}
 
-    function openDatePicker() {
-        dateInputRef?.showPicker?.();
-    }
+function openDatePicker() {
+	dateInputRef?.showPicker?.();
+}
 
-    function handleDateSelect(e: Event) {
-        const input = e.target as HTMLInputElement;
-        if (input.value) {
-            const [year, month, day] = input.value.split("-").map(Number);
-            const newDate = new Date(year, month - 1, day);
-            onDateChange?.(newDate);
-        }
-    }
+function handleDateSelect(e: Event) {
+	const input = e.target as HTMLInputElement;
+	if (input.value) {
+		const [year, month, day] = input.value.split('-').map(Number);
+		const newDate = new Date(year, month - 1, day);
+		onDateChange?.(newDate);
+	}
+}
 
-    const isToday = $derived(() => {
-        const t = new Date();
-        return (
-            selectedDate.getFullYear() === t.getFullYear() &&
-            selectedDate.getMonth() === t.getMonth() &&
-            selectedDate.getDate() === t.getDate()
-        );
-    });
+const isToday = $derived(() => {
+	const t = new Date();
+	return (
+		selectedDate.getFullYear() === t.getFullYear() &&
+		selectedDate.getMonth() === t.getMonth() &&
+		selectedDate.getDate() === t.getDate()
+	);
+});
 
-    const dateLabel = $derived(() => {
-        const t = new Date();
-        const y = new Date(t);
-        y.setDate(y.getDate() - 1);
-        const tm = new Date(t);
-        tm.setDate(tm.getDate() + 1);
-        if (isToday()) return "Today";
-        if (selectedDate.toDateString() === y.toDateString())
-            return "Yesterday";
-        if (selectedDate.toDateString() === tm.toDateString())
-            return "Tomorrow";
-        return selectedDate.toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-        });
-    });
+const dateLabel = $derived(() => {
+	const t = new Date();
+	const y = new Date(t);
+	y.setDate(y.getDate() - 1);
+	const tm = new Date(t);
+	tm.setDate(tm.getDate() + 1);
+	if (isToday()) return 'Today';
+	if (selectedDate.toDateString() === y.toDateString()) return 'Yesterday';
+	if (selectedDate.toDateString() === tm.toDateString()) return 'Tomorrow';
+	return selectedDate.toLocaleDateString('en-US', {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+	});
+});
 
-    const datePickerValue = $derived(
-        `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`,
-    );
+const datePickerValue = $derived(
+	`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
+);
 
-    const nowFormatted = $derived(
-        currentTime.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        }),
-    );
+const nowFormatted = $derived(
+	currentTime.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	}),
+);
 </script>
 
 <div class="flex items-center gap-3">

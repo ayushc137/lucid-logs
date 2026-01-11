@@ -1,103 +1,102 @@
 <script lang="ts">
-    import { Check, Clock, FileText, Heart, Sparkles } from "lucide-svelte";
-    import { scale } from "svelte/transition";
-    import type { TimelineTask } from "./types";
-    import { stripHtml } from "$lib/utils";
-    import {
-        QUADRANT_COLORS,
-        type Quadrant,
-    } from "$lib/components/emotions/emotionData";
-    import { OpenMoji } from "$lib/components/ui";
+import {
+	QUADRANT_COLORS,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { OpenMoji } from '$lib/components/ui';
+import { stripHtml } from '$lib/utils';
+import { Check, Clock, FileText, Heart, Sparkles } from 'lucide-svelte';
+import { scale } from 'svelte/transition';
+import type { TimelineTask } from './types';
 
-    interface Props {
-        task: TimelineTask;
-        position: { x: number; y: number };
-    }
+interface Props {
+	task: TimelineTask;
+	position: { x: number; y: number };
+}
 
-    let { task, position }: Props = $props();
+let { task, position }: Props = $props();
 
-    // Calculate smart positioning to avoid edge overflow
-    const smartPosition = $derived.by(() => {
-        if (typeof window === "undefined") {
-            return {
-                x: position.x,
-                y: position.y,
-                anchor: "top-left" as const,
-            };
-        }
+// Calculate smart positioning to avoid edge overflow
+const smartPosition = $derived.by(() => {
+	if (typeof window === 'undefined') {
+		return {
+			x: position.x,
+			y: position.y,
+			anchor: 'top-left' as const,
+		};
+	}
 
-        const POPOVER_WIDTH = 280;
-        const POPOVER_HEIGHT = 280; // Increased for emotion content
-        const PADDING = 16;
-        const CURSOR_OFFSET = 12;
+	const POPOVER_WIDTH = 280;
+	const POPOVER_HEIGHT = 280; // Increased for emotion content
+	const PADDING = 16;
+	const CURSOR_OFFSET = 12;
 
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
+	const viewportWidth = window.innerWidth;
+	const viewportHeight = window.innerHeight;
 
-        let x = position.x + CURSOR_OFFSET;
-        let y = position.y + CURSOR_OFFSET;
-        let anchor: "top-left" | "top-right" | "bottom-left" | "bottom-right" =
-            "top-left";
+	let x = position.x + CURSOR_OFFSET;
+	let y = position.y + CURSOR_OFFSET;
+	let anchor: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' =
+		'top-left';
 
-        // Check horizontal overflow
-        if (x + POPOVER_WIDTH > viewportWidth - PADDING) {
-            x = position.x - POPOVER_WIDTH - CURSOR_OFFSET;
-            anchor = anchor.replace("left", "right") as typeof anchor;
-        }
+	// Check horizontal overflow
+	if (x + POPOVER_WIDTH > viewportWidth - PADDING) {
+		x = position.x - POPOVER_WIDTH - CURSOR_OFFSET;
+		anchor = anchor.replace('left', 'right') as typeof anchor;
+	}
 
-        // Check vertical overflow
-        if (y + POPOVER_HEIGHT > viewportHeight - PADDING) {
-            y = position.y - POPOVER_HEIGHT - CURSOR_OFFSET;
-            anchor = anchor.replace("top", "bottom") as typeof anchor;
-        }
+	// Check vertical overflow
+	if (y + POPOVER_HEIGHT > viewportHeight - PADDING) {
+		y = position.y - POPOVER_HEIGHT - CURSOR_OFFSET;
+		anchor = anchor.replace('top', 'bottom') as typeof anchor;
+	}
 
-        // Ensure minimum bounds
-        x = Math.max(PADDING, x);
-        y = Math.max(PADDING, y);
+	// Ensure minimum bounds
+	x = Math.max(PADDING, x);
+	y = Math.max(PADDING, y);
 
-        return { x, y, anchor };
-    });
+	return { x, y, anchor };
+});
 
-    // Check for emotions
-    const hasSelectedEmotion = $derived(
-        !!task?.emotionId &&
-            !!task?.emotionName &&
-            !!task?.emotionEmoji &&
-            !!task?.emotionQuadrant,
-    );
-    const hasInferredEmotion = $derived(
-        !!task?.inferredEmotionId &&
-            !!task?.inferredEmotionName &&
-            !!task?.inferredEmotionEmoji &&
-            !!task?.inferredEmotionQuadrant,
-    );
-    const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
+// Check for emotions
+const hasSelectedEmotion = $derived(
+	!!task?.emotionId &&
+		!!task?.emotionName &&
+		!!task?.emotionEmoji &&
+		!!task?.emotionQuadrant,
+);
+const hasInferredEmotion = $derived(
+	!!task?.inferredEmotionId &&
+		!!task?.inferredEmotionName &&
+		!!task?.inferredEmotionEmoji &&
+		!!task?.inferredEmotionQuadrant,
+);
+const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
 
-    function formatTime(d: Date): string {
-        if (!(d instanceof Date) || isNaN(d.getTime())) return "--:--";
-        return d.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        });
-    }
+function formatTime(d: Date): string {
+	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
+	return d.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	});
+}
 
-    function formatDuration(s: Date, e: Date): string {
-        if (!(s instanceof Date) || !(e instanceof Date)) return "";
-        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-        if (mins < 1)
-            return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
-        if (mins < 60) return `${mins}m`;
-        const h = Math.floor(mins / 60),
-            m = mins % 60;
-        return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    }
+function formatDuration(s: Date, e: Date): string {
+	if (!(s instanceof Date) || !(e instanceof Date)) return '';
+	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+	if (mins < 1) return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
+	if (mins < 60) return `${mins}m`;
+	const h = Math.floor(mins / 60);
+	const m = mins % 60;
+	return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
-    const descriptionPreview = $derived(
-        task.description
-            ? stripHtml(task.description, { newlineSeparator: " · " })
-            : null,
-    );
+const descriptionPreview = $derived(
+	task.description
+		? stripHtml(task.description, { newlineSeparator: ' · ' })
+		: null,
+);
 </script>
 
 <div

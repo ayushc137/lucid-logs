@@ -1,66 +1,66 @@
 <script lang="ts">
-    import { Check, ArrowRight, Sparkles } from "lucide-svelte";
-    import { fly } from "svelte/transition";
-    import { cubicOut } from "svelte/easing";
-    import type { TimelineTask } from "./types";
-    import { stripHtml } from "$lib/utils";
-    import {
-        QUADRANT_COLORS,
-        type Quadrant,
-    } from "$lib/components/emotions/emotionData";
-    import { OpenMoji } from "$lib/components/ui";
+import {
+	QUADRANT_COLORS,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { OpenMoji } from '$lib/components/ui';
+import { stripHtml } from '$lib/utils';
+import { ArrowRight, Check, Sparkles } from 'lucide-svelte';
+import { cubicOut } from 'svelte/easing';
+import { fly } from 'svelte/transition';
+import type { TimelineTask } from './types';
 
-    interface Props {
-        task: TimelineTask;
-        status: "past" | "current" | "future";
-        transitionDelay?: number;
-        onTaskClick?: (taskId: string) => void;
-    }
+interface Props {
+	task: TimelineTask;
+	status: 'past' | 'current' | 'future';
+	transitionDelay?: number;
+	onTaskClick?: (taskId: string) => void;
+}
 
-    let { task, status, transitionDelay = 0, onTaskClick }: Props = $props();
+let { task, status, transitionDelay = 0, onTaskClick }: Props = $props();
 
-    const bg = $derived(task.categoryColor || "#6b7280");
-    const isCompleted = $derived(task.completed);
+const bg = $derived(task.categoryColor || '#6b7280');
+const isCompleted = $derived(task.completed);
 
-    // Determine emotion to display (actual or inferred)
-    const hasActualEmotion = $derived(
-        !!task.emotionId &&
-            !!task.emotionName &&
-            !!task.emotionEmoji &&
-            !!task.emotionQuadrant,
-    );
-    const hasInferredEmotion = $derived(
-        !hasActualEmotion &&
-            !!task.inferredEmotionId &&
-            !!task.inferredEmotionName &&
-            !!task.inferredEmotionEmoji &&
-            !!task.inferredEmotionQuadrant,
-    );
+// Determine emotion to display (actual or inferred)
+const hasActualEmotion = $derived(
+	!!task.emotionId &&
+		!!task.emotionName &&
+		!!task.emotionEmoji &&
+		!!task.emotionQuadrant,
+);
+const hasInferredEmotion = $derived(
+	!hasActualEmotion &&
+		!!task.inferredEmotionId &&
+		!!task.inferredEmotionName &&
+		!!task.inferredEmotionEmoji &&
+		!!task.inferredEmotionQuadrant,
+);
 
-    function formatTime(d: Date): string {
-        if (!(d instanceof Date) || isNaN(d.getTime())) return "--:--";
-        return d.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        });
-    }
+function formatTime(d: Date): string {
+	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
+	return d.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	});
+}
 
-    function formatDuration(s: Date, e: Date): string {
-        if (!(s instanceof Date) || !(e instanceof Date)) return "";
-        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-        if (mins < 1) return `<1m`;
-        if (mins < 60) return `${mins}m`;
-        const h = Math.floor(mins / 60),
-            m = mins % 60;
-        return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    }
+function formatDuration(s: Date, e: Date): string {
+	if (!(s instanceof Date) || !(e instanceof Date)) return '';
+	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+	if (mins < 1) return '<1m';
+	if (mins < 60) return `${mins}m`;
+	const h = Math.floor(mins / 60);
+	const m = mins % 60;
+	return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
-    const descriptionPreview = $derived(
-        task.description
-            ? stripHtml(task.description, { newlineSeparator: " · " })
-            : null,
-    );
+const descriptionPreview = $derived(
+	task.description
+		? stripHtml(task.description, { newlineSeparator: ' · ' })
+		: null,
+);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
