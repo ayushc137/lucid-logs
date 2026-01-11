@@ -2868,6 +2868,7 @@ func randomElement(items []string) string {
 // createGoalLog creates a log entry using the same format as the goallogs repository
 func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, changes map[string]any, createdAt time.Time, userID string) error {
 	goalRecordID := database.MustRecordID("goals", goalID)
+	userRecordID := database.MustRecordID("users", userID)
 
 	// First create a snapshot
 	snapshotResult, err := database.QueryFirst[struct {
@@ -2876,10 +2877,12 @@ func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, c
 		CREATE goal_snapshots CONTENT {
 			goal_id: $goal_id,
 			status: "active",
+			created_by: $user,
 			created_at: $now
 		}
 	`, map[string]any{
 		"goal_id": goalRecordID,
+		"user":    userRecordID,
 		"now":     createdAt,
 	})
 	if err != nil {
@@ -2896,6 +2899,7 @@ func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, c
 		RELATE $goal_id->goal_logs->$snapshot_id CONTENT {
 			event_type: $event,
 			changes: $changes,
+			created_by: $user,
 			created_at: $now
 		}
 	`, map[string]any{
@@ -2903,6 +2907,7 @@ func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, c
 		"snapshot_id": snapshotResult.ID,
 		"event":       event,
 		"changes":     changes,
+		"user":        userRecordID,
 		"now":         createdAt,
 	})
 	return err

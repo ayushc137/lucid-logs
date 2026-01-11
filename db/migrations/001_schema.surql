@@ -52,7 +52,9 @@ DEFINE INDEX IF NOT EXISTS idx_goals_priority ON TABLE goals COLUMNS created_by,
 
 -- GOAL_SNAPSHOTS (point-in-time state for history)
 DEFINE TABLE IF NOT EXISTS goal_snapshots PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_snapshots TYPE record<users>;
 DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_goal ON TABLE goal_snapshots COLUMNS goal_id;
+DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_user ON TABLE goal_snapshots COLUMNS created_by;
 
 -- TEMPLATES
 DEFINE TABLE IF NOT EXISTS templates PERMISSIONS FULL;
@@ -114,11 +116,13 @@ DEFINE INDEX IF NOT EXISTS idx_task_goals_milestone ON TABLE task_goals COLUMNS 
 
 -- GOAL_LOGS (goals -> goal_snapshots) event history
 DEFINE TABLE goal_logs PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_logs TYPE record<users>;
 DEFINE FIELD IF NOT EXISTS event_type ON goal_logs TYPE string;
 DEFINE FIELD IF NOT EXISTS changes ON goal_logs TYPE option<object>;
 DEFINE FIELD IF NOT EXISTS triggered_by_task_id ON goal_logs TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS created_at ON goal_logs TYPE datetime DEFAULT time::now();
 DEFINE INDEX IF NOT EXISTS idx_goal_logs_goal ON TABLE goal_logs COLUMNS in, created_at;
+DEFINE INDEX IF NOT EXISTS idx_goal_logs_user ON TABLE goal_logs COLUMNS created_by;
 DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_type;
 
 

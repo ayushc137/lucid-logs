@@ -7,8 +7,6 @@ import {
 	ArrowDown,
 	ArrowUp,
 	CalendarDays,
-	ChevronDown,
-	ChevronUp,
 	Clock,
 	Flame,
 	Link2,
@@ -32,8 +30,6 @@ let {
 	filter = 'all',
 	onFilterChange,
 }: Props = $props();
-
-let showEventDetails = $state<string | null>(null);
 
 // Event display config
 const eventConfig: Record<
@@ -156,22 +152,33 @@ function formatEventDate(dateStr: string): string {
 	});
 }
 
-function formatChanges(changes: Record<string, unknown>): string {
-	const entries = Object.entries(changes);
-	if (entries.length === 0) return '';
-	return entries
-		.map(([key, value]) => {
-			const formattedKey = key.replace(/_/g, ' ');
-			if (typeof value === 'object') {
-				return `${formattedKey}: ${JSON.stringify(value)}`;
-			}
-			return `${formattedKey}: ${value}`;
-		})
-		.join(', ');
-}
+function formatChanges(changes: Record<string, unknown>): Array<{
+	key: string;
+	value: string;
+}> {
+	return Object.entries(changes).map(([key, value]) => {
+		const formattedKey = key
+			.replace(/_/g, ' ')
+			.replace(/\b\w/g, (l) => l.toUpperCase());
 
-function toggleEventDetails(logId: string) {
-	showEventDetails = showEventDetails === logId ? null : logId;
+		let formattedValue: string;
+		if (typeof value === 'boolean') {
+			formattedValue = value ? '✓ Yes' : '✗ No';
+		} else if (typeof value === 'object' && value !== null) {
+			// Handle objects more gracefully
+			if ('from' in value && 'to' in value) {
+				formattedValue = `${value.from} → ${value.to}`;
+			} else {
+				formattedValue = JSON.stringify(value, null, 2);
+			}
+		} else if (value === null || value === undefined) {
+			formattedValue = '—';
+		} else {
+			formattedValue = String(value);
+		}
+
+		return { key: formattedKey, value: formattedValue };
+	});
 }
 </script>
 
@@ -255,37 +262,35 @@ function toggleEventDetails(logId: string) {
                     <div
                         class="timeline-end timeline-box py-2 px-3 ml-2 bg-base-100 border-base-300"
                     >
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm font-medium"
-                                    >{config.label}</span
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-sm font-medium"
+                                >{config.label}</span
+                            >
+                            {#if log.triggered_by_task_id}
+                                <span class="badge badge-xs badge-ghost"
+                                    >via task</span
                                 >
-                                {#if log.triggered_by_task_id}
-                                    <span class="badge badge-xs badge-ghost"
-                                        >via task</span
-                                    >
-                                {/if}
-                            </div>
-                            {#if hasChanges}
-                                <button
-                                    class="btn btn-ghost btn-xs p-0.5"
-                                    onclick={() => toggleEventDetails(log.id)}
-                                >
-                                    {#if showEventDetails === log.id}
-                                        <ChevronUp class="w-3.5 h-3.5" />
-                                    {:else}
-                                        <ChevronDown class="w-3.5 h-3.5" />
-                                    {/if}
-                                </button>
                             {/if}
                         </div>
 
-                        {#if showEventDetails === log.id && hasChanges}
-                            <div class="mt-2 pt-2 border-t border-base-300">
-                                <pre
-                                    class="text-[10px] text-base-content/60 whitespace-pre-wrap break-all">{formatChanges(
-                                        log.changes!,
-                                    )}</pre>
+                        {#if hasChanges}
+                            {@const formattedChanges = formatChanges(
+                                log.changes!,
+                            )}
+                            <div class="space-y-0.5 mt-1.5">
+                                {#each formattedChanges as change}
+                                    <div
+                                        class="text-xs text-base-content/60 flex items-start gap-1.5"
+                                    >
+                                        <span class="opacity-50">•</span>
+                                        <span class="font-medium opacity-70"
+                                            >{change.key}:</span
+                                        >
+                                        <span class="opacity-90"
+                                            >{change.value}</span
+                                        >
+                                    </div>
+                                {/each}
                             </div>
                         {/if}
                     </div>

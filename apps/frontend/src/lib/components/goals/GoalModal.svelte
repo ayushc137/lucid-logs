@@ -281,6 +281,7 @@ const updateMut = createMutation({
 	onSuccess: () => {
 		queryClient.invalidateQueries({ queryKey: ['goals'] });
 		queryClient.invalidateQueries({ queryKey: ['goals-list'] });
+		queryClient.invalidateQueries({ queryKey: ['goal-logs'] });
 		resetForm();
 		onClose?.();
 	},

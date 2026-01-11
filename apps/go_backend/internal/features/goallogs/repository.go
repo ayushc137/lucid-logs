@@ -61,6 +61,7 @@ type goalLogDB struct {
 	Event             string               `json:"event_type"` // Changed to match schema
 	Changes           map[string]any       `json:"changes,omitempty"`
 	TriggeredByTaskID string               `json:"triggered_by_task_id,omitempty"` // Changed to match schema
+	CreatedBy         models.RecordID      `json:"created_by"`
 	CreatedAt         database.SurrealTime `json:"created_at"`
 }
 
@@ -82,6 +83,7 @@ type goalSnapshotDB struct {
 	Status    string               `json:"status"`
 	Stats     *goals.GoalStats     `json:"stats,omitempty"`
 	Target    *goals.Target        `json:"target,omitempty"`
+	CreatedBy models.RecordID      `json:"created_by"`
 	CreatedAt database.SurrealTime `json:"created_at"`
 }
 
@@ -103,6 +105,7 @@ func (s *goalSnapshotDB) toGoalSnapshot() *GoalSnapshot {
 func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID string) (*GoalLog, error) {
 	now := time.Now()
 	goalID := database.MustRecordID(goals.Table, req.GoalID)
+	userRecordID := database.MustRecordID("users", userID)
 
 	// First create a snapshot if stats are provided
 	snapshotID := ""
@@ -112,12 +115,14 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 				goal_id: $goal_id,
 				status: $status,
 				stats: $stats,
+				created_by: $user,
 				created_at: $now
 			}
 		`, map[string]any{
 			"goal_id": goalID,
 			"status":  goals.StatusActive, // Will be updated from actual goal
 			"stats":   req.Stats,
+			"user":    userRecordID,
 			"now":     now,
 		})
 		if err != nil {
@@ -145,6 +150,7 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 				event_type: $event,
 				changes: $changes,
 				triggered_by_task_id: $triggered_by,
+				created_by: $user,
 				created_at: $now
 			}
 		`, map[string]any{
@@ -153,6 +159,7 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 			"event":        req.Event,
 			"changes":      changes,
 			"triggered_by": req.TriggeredByTaskID,
+			"user":         userRecordID,
 			"now":          now,
 		})
 	} else {
@@ -172,12 +179,14 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 				event_type = $event,
 				changes = $changes,
 				triggered_by_task_id = $triggered_by,
+				created_by = $user,
 				created_at = $now
 		`, map[string]any{
 			"goal_id":      goalID,
 			"event":        req.Event,
 			"changes":      changes,
 			"triggered_by": req.TriggeredByTaskID,
+			"user":         userRecordID,
 			"now":          now,
 		})
 	}
@@ -194,16 +203,17 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 
 func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, params pagination.Params) ([]*GoalLog, int64, error) {
 	gID := database.MustRecordID(goals.Table, goalID)
+	userRecordID := database.MustRecordID("users", userID)
 
 	// Count total
 	countResult, err := database.QueryFirst[struct {
 		Count int64 `json:"count"`
 	}](ctx, r.db, `
-		SELECT count() as count FROM goal_logs 
+		SELECT count() as count FROM goal_logs
 		WHERE `+"`in`"+` = $goal_id AND created_by = $user
 	`, map[string]any{
 		"goal_id": gID,
-		"user":    userID,
+		"user":    userRecordID,
 	})
 	if err != nil {
 		return nil, 0, errors.ErrDatabase.Wrap(err)
@@ -216,13 +226,13 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 
 	// Fetch logs
 	logsDB, err := database.QueryAll[goalLogDB](ctx, r.db, `
-		SELECT * FROM goal_logs 
+		SELECT * FROM goal_logs
 		WHERE `+"`in`"+` = $goal_id AND created_by = $user
 		ORDER BY created_at DESC
-		LIMIT $limit OFFSET $offset
+		LIMIT $limit START $offset
 	`, map[string]any{
 		"goal_id": gID,
-		"user":    userID,
+		"user":    userRecordID,
 		"limit":   params.Limit,
 		"offset":  params.Offset,
 	})

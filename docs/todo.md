@@ -264,3 +264,7 @@ create cub components for all huge components where ever its sensable throughtou
 
 
 timezone settings throughtout --- > need to change 
+check created_from ?? what used ??also check design tab in surrealist
+
+
+on goal update only add to logs if somethign changes and mention what updated , also mention more dratils of ehat all is target etc ------
