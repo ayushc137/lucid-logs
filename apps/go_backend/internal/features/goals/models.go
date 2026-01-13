@@ -80,10 +80,9 @@ type Goal struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 
 	// Populated via graph queries (not stored on goal record)
-	Category    *categories.Category `json:"category,omitempty"`     // From in_category edge
-	LinkedTasks []GoalTaskLink       `json:"linked_tasks,omitempty"` // From task_goals
-	Children    []*Goal              `json:"children,omitempty"`     // From goal_children (forward)
-	Parent      *Goal                `json:"parent,omitempty"`       // From goal_children (reverse)
+	Category *categories.Category `json:"category,omitempty"` // From in_category edge
+	Children []*Goal              `json:"children,omitempty"` // From goal_children (forward)
+	Parent   *Goal                `json:"parent,omitempty"`   // From goal_children (reverse)
 }
 
 // Target defines what success looks like for a measurable goal.
@@ -136,6 +135,22 @@ type GoalTaskLink struct {
 	ImpactMagnitude int      `json:"impact_magnitude"` // 1-5
 	QuantityValue   *float64 `json:"quantity_value,omitempty"`
 	UnitID          *string  `json:"unit_id,omitempty"`
+
+	// Additional task details for rich display
+	TaskJournal   string     `json:"task_journal,omitempty"`
+	TaskStartDate *time.Time `json:"task_start_date,omitempty"`
+	TaskEndDate   *time.Time `json:"task_end_date,omitempty"`
+	TaskCompleted bool       `json:"task_completed"`
+	TaskEmotionID *string    `json:"task_emotion_id,omitempty"`
+	TaskCategory  *struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"task_category,omitempty"`
+
+	// Link metadata
+	LinkedAt *time.Time `json:"linked_at,omitempty"`
+	Notes    string     `json:"notes,omitempty"`
 }
 
 // Recurrence defines how often a recurring goal/habit should be completed.
@@ -303,6 +318,14 @@ type ChildGoalLink struct {
 	GoalID   string `json:"goal_id"`
 	Order    int    `json:"order"`
 	Required bool   `json:"required"`
+}
+
+// GoalTasksResponse is the response for GET /goals/{id}/tasks.
+//
+// @Description Tasks linked to a goal
+type GoalTasksResponse struct {
+	GoalID string          `json:"goal_id"`
+	Tasks  []GoalTaskLink  `json:"tasks"`
 }
 
 // =============================================================================

@@ -635,11 +635,25 @@ definitions:
       id:
         description: goal_logs:xxx
         type: string
+      progress_after:
+        type: number
+      progress_before:
+        description: Progress at time of event
+        type: number
       snapshot_id:
         description: Snapshot reference
         type: string
       triggered_by_task_id:
         description: What triggered this event (optional)
+        type: string
+      triggering_task:
+        allOf:
+        - $ref: '#/definitions/goallogs.TriggeringTaskInfo'
+        description: Triggering task details (populated on read for task-related events)
+      value_contributed:
+        description: Value contributed (for task_linked events)
+        type: number
+      value_unit:
         type: string
     type: object
   goallogs.GoalLogsResponse:
@@ -670,6 +684,31 @@ definitions:
         type: integer
       days_missed:
         type: integer
+    type: object
+  goallogs.TriggeringTaskInfo:
+    description: Task info that triggered a goal event
+    properties:
+      category:
+        properties:
+          color:
+            type: string
+          id:
+            type: string
+          name:
+            type: string
+        type: object
+      completed:
+        type: boolean
+      emotion_id:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: string
+      start_date:
+        type: string
+      title:
+        type: string
     type: object
   goals.AddChildRequest:
     description: Request for adding a child to a grouped goal
@@ -761,11 +800,6 @@ definitions:
         type: string
       id:
         type: string
-      linked_tasks:
-        description: From task_goals
-        items:
-          $ref: '#/definitions/goals.GoalTaskLink'
-        type: array
       parent:
         allOf:
         - $ref: '#/definitions/goals.Goal'
@@ -852,14 +886,49 @@ definitions:
       impact_type:
         description: '"positive", "negative", "neutral"'
         type: string
+      linked_at:
+        description: Link metadata
+        type: string
+      notes:
+        type: string
       quantity_value:
         type: number
+      task_category:
+        properties:
+          color:
+            type: string
+          id:
+            type: string
+          name:
+            type: string
+        type: object
+      task_completed:
+        type: boolean
+      task_emotion_id:
+        type: string
+      task_end_date:
+        type: string
       task_id:
+        type: string
+      task_journal:
+        description: Additional task details for rich display
+        type: string
+      task_start_date:
         type: string
       task_title:
         type: string
       unit_id:
         type: string
+    type: object
+  goals.GoalTasksResponse:
+    description: Tasks linked to a goal
+    properties:
+      goal_id:
+        type: string
+      tasks:
+        items:
+          $ref: '#/definitions/goals.GoalTaskLink'
+        type: array
     type: object
   goals.Recurrence:
     description: Recurrence settings for habits
@@ -1601,11 +1670,6 @@ definitions:
         description: Computed on write
       journal:
         type: string
-      linked_goals:
-        description: From task_goals
-        items:
-          $ref: '#/definitions/tasks.TaskGoalLink'
-        type: array
       negatives:
         items:
           $ref: '#/definitions/tasks.TaskItem'
@@ -1637,10 +1701,33 @@ definitions:
   tasks.TaskGoalLink:
     description: Goal linked to task with impact data
     properties:
+      goal_category:
+        properties:
+          color:
+            type: string
+          id:
+            type: string
+          name:
+            type: string
+        type: object
+      goal_description:
+        description: Additional goal details for rich display
+        type: string
       goal_icon:
         type: string
       goal_id:
         type: string
+      goal_priority:
+        type: integer
+      goal_progress:
+        description: Current progress percentage
+        type: number
+      goal_status:
+        type: string
+      goal_target_unit:
+        type: string
+      goal_target_value:
+        type: number
       goal_title:
         type: string
       impact_magnitude:
@@ -1651,11 +1738,26 @@ definitions:
         type: string
       is_milestone:
         type: boolean
+      linked_at:
+        description: Link metadata
+        type: string
       milestone_label:
+        type: string
+      notes:
         type: string
       quantity_value:
         type: number
       unit_id:
+        type: string
+    type: object
+  tasks.TaskGoalsResponse:
+    description: Goals linked to a task
+    properties:
+      goals:
+        items:
+          $ref: '#/definitions/tasks.TaskGoalLink'
+        type: array
+      task_id:
         type: string
     type: object
   tasks.TaskItem:
@@ -2999,6 +3101,39 @@ paths:
       summary: Get goal logs summary
       tags:
       - goal-logs
+  /api/v1/goals/{id}/tasks:
+    get:
+      description: Get all tasks linked to a specific goal with impact details
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goals.GoalTasksResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get tasks linked to goal
+      tags:
+      - goals
   /api/v1/goals/today:
     get:
       description: Get recurring goals with today's completion status
@@ -3407,6 +3542,39 @@ paths:
       security:
       - BearerAuth: []
       summary: Update task
+      tags:
+      - tasks
+  /api/v1/tasks/{id}/goals:
+    get:
+      description: Get all goals linked to a specific task with impact details
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tasks.TaskGoalsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get goals linked to task
       tags:
       - tasks
   /api/v1/tasks/{taskId}/goals:

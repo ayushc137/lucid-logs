@@ -10,6 +10,7 @@ import {
 	createTask,
 	deleteTask,
 	getLastTaskEndTime,
+	getTaskGoals,
 	updateTask,
 } from '$lib/api';
 import { createCategory, getCategories } from '$lib/api/categories';
@@ -113,6 +114,27 @@ const lastTaskEndTime = $derived(
 		: null,
 );
 
+// Fetch task goals when editing
+const taskId = $derived(task?.id);
+const taskGoalsOptions = writable({
+	queryKey: ['task-goals', null as string | null | undefined],
+	queryFn: () => Promise.resolve({ task_id: '', goals: [] as any[] }),
+	enabled: false,
+});
+
+$effect(() => {
+	taskGoalsOptions.set({
+		queryKey: ['task-goals', taskId],
+		queryFn: () =>
+			taskId
+				? getTaskGoals(taskId)
+				: Promise.resolve({ task_id: '', goals: [] }),
+		enabled: !!taskId,
+	});
+});
+
+const taskGoalsQuery = createQuery(taskGoalsOptions);
+
 // Form state
 let title = $state('');
 let journal = $state('');
@@ -208,14 +230,7 @@ $effect(() => {
 		positives = task.positives || [];
 		negatives = task.negatives || [];
 		completed = task.completed || false;
-		goalLinks = (task.linked_goals || []).map((l) => ({
-			goal_id: l.goal_id,
-			impact_type:
-				(l.impact_type as 'positive' | 'negative' | 'neutral') || 'positive',
-			impact_magnitude: l.impact_magnitude,
-			quantity_value: l.quantity_value,
-			quantity_unit: l.quantity_unit,
-		}));
+		// Goal links are populated via separate effect from taskGoalsQuery
 
 		const startDateObj = new Date(task.start_date);
 		const endDateObj = new Date(task.end_date);
@@ -235,6 +250,8 @@ $effect(() => {
 
 		// Set initial hash to prevent immediate inference
 		lastInferredHash = getReflectionsHash(positives, negatives);
+
+		formInitialized = true;
 	} else {
 		// Create mode - set defaults
 		const today = getTodayString();
@@ -305,6 +322,22 @@ $effect(() => {
 		lastInferredHash,
 		formInitialized,
 	});
+});
+
+// Populate goal links when query data arrives (edit mode)
+let goalLinksInitialized = $state(false);
+$effect(() => {
+	if (isEditing && $taskGoalsQuery.data?.goals && !goalLinksInitialized) {
+		goalLinks = $taskGoalsQuery.data.goals.map((l) => ({
+			goal_id: l.goal_id,
+			impact_type:
+				(l.impact_type as 'positive' | 'negative' | 'neutral') || 'positive',
+			impact_magnitude: l.impact_magnitude,
+			quantity_value: l.quantity_value,
+			quantity_unit: l.quantity_unit,
+		}));
+		goalLinksInitialized = true;
+	}
 });
 
 // Live time interval for create mode
@@ -674,7 +707,7 @@ function handleSubmit() {
 		negatives: negatives.length > 0 ? negatives : undefined,
 		completed: completed,
 		emotion_id: selectedEmotion?.id || undefined,
-		linked_goals:
+		goal_links:
 			goalLinks.length > 0
 				? goalLinks.map((l) => ({
 						goal_id: l.goal_id,

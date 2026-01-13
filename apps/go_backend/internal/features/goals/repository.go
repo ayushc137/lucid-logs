@@ -56,6 +56,9 @@ type Repository interface {
 	// FindChildren retrieves all child goals of a parent goal.
 	FindChildren(ctx context.Context, parentGoalID, userID string) ([]*Goal, error)
 
+	// FindTasksForGoal retrieves all tasks linked to a goal.
+	FindTasksForGoal(ctx context.Context, goalID, userID string) ([]GoalTaskLink, error)
+
 	// AddChild links a child goal to a parent.
 	AddChild(ctx context.Context, parentID, childID, userID string, order int, required bool) error
 
@@ -130,9 +133,6 @@ type goalDB struct {
 	LongestStreak     int                   `json:"longest_streak"`
 	LastCompletedDate *database.SurrealTime `json:"last_completed_date,omitempty"`
 
-	// Linked tasks (populated via subquery)
-	LinkedTasks []goalTaskDB `json:"linked_tasks,omitempty"`
-
 	// Category (populated via in_category edge)
 	Category *categoryDB `json:"category,omitempty"`
 
@@ -154,16 +154,6 @@ type goalDB struct {
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
-}
-
-// goalTaskDB represents a linked task from the task_goals relation.
-type goalTaskDB struct {
-	TaskID          string   `json:"task_id"`
-	TaskTitle       string   `json:"task_title"`
-	ImpactType      string   `json:"impact_type"`
-	ImpactMagnitude int      `json:"impact_magnitude"`
-	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	UnitID          *string  `json:"unit_id,omitempty"`
 }
 
 // goalChildDB represents a child goal link.
@@ -252,14 +242,6 @@ func (g *goalDB) toGoal() *Goal {
 	// Convert target
 	if g.Target != nil {
 		goal.Target = mapToTarget(g.Target)
-	}
-
-	// Convert linked tasks
-	if len(g.LinkedTasks) > 0 {
-		goal.LinkedTasks = make([]GoalTaskLink, len(g.LinkedTasks))
-		for i, lt := range g.LinkedTasks {
-			goal.LinkedTasks[i] = GoalTaskLink(lt)
-		}
 	}
 
 	// Convert computed stats using helper functions for any -> numeric conversion
@@ -491,19 +473,11 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 
 	goal, err := database.QueryFirst[goalDB](ctx, r.db, `
 		SELECT *,
-			(SELECT
-				type::string(in) as task_id,
-				in.title as task_title,
-				impact_type,
-				impact_magnitude,
-				quantity_value,
-				unit_id
-			 FROM <-task_goals) as linked_tasks,
 			(->in_category.out.*)[0] as category,
-			(SELECT 
+			(SELECT
 				math::sum(quantity_value) AS total,
 				count() AS count
-			 FROM <-task_goals 
+			 FROM <-task_goals
 				WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
 				AND (
 					$parent.target.per_period IS NOT TRUE
@@ -519,7 +493,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 					)
 				)
 				GROUP ALL)[0] as filtered_stats,
-			(SELECT 
+			(SELECT
 				count() AS total,
 				count(out.status = 'completed') AS completed
 			 FROM ->goal_children GROUP ALL)[0] as children_stats
@@ -611,11 +585,10 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		return nil, 0, err
 	}
 
-	// Main query with linked tasks subquery and computed stats
+	// Main query with computed stats
 	// Use period-based filtering for per_period goals (day/week/month)
 	// This ensures stats show only current period data
 	dataQuery := `SELECT *,
-		(SELECT type::string(in) as task_id, in.title as task_title, impact_type, impact_magnitude, quantity_value, unit_id FROM <-task_goals) as linked_tasks,
 		(->in_category.out.*)[0] as category,
 		(SELECT
 			math::sum(quantity_value) AS total,
@@ -934,6 +907,103 @@ func (r *repository) FindChildren(ctx context.Context, parentGoalID, userID stri
 	}
 
 	return goals, nil
+}
+
+func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string) ([]GoalTaskLink, error) {
+	gID := database.MustRecordID(Table, goalID)
+
+	type taskCategoryDB struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+
+	type taskLinkDB struct {
+		TaskID          string                `json:"task_id"`
+		TaskTitle       string                `json:"task_title"`
+		ImpactType      string                `json:"impact_type"`
+		ImpactMagnitude int                   `json:"impact_magnitude"`
+		QuantityValue   *float64              `json:"quantity_value,omitempty"`
+		UnitID          *string               `json:"unit_id,omitempty"`
+		TaskJournal     string                `json:"task_journal,omitempty"`
+		TaskStartDate   *database.SurrealTime `json:"task_start_date,omitempty"`
+		TaskEndDate     *database.SurrealTime `json:"task_end_date,omitempty"`
+		TaskCompleted   bool                  `json:"task_completed"`
+		TaskEmotionID   *string               `json:"task_emotion_id,omitempty"`
+		TaskCategory    *taskCategoryDB       `json:"task_category,omitempty"`
+		LinkedAt        *database.SurrealTime `json:"linked_at,omitempty"`
+		Notes           string                `json:"notes,omitempty"`
+	}
+
+	tasksDB, err := database.QueryAll[taskLinkDB](ctx, r.db, `
+		SELECT
+			type::string(in) as task_id,
+			in.title as task_title,
+			impact_type,
+			impact_magnitude,
+			quantity_value,
+			unit_id,
+			in.journal as task_journal,
+			in.start_date as task_start_date,
+			in.end_date as task_end_date,
+			in.completed as task_completed,
+			in.emotion_id as task_emotion_id,
+			in.category as task_category,
+			created_at as linked_at,
+			notes
+		FROM $goal_id<-task_goals
+		WHERE in.deleted_at IS NONE
+	`, map[string]any{
+		"goal_id": gID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("goal_id", goalID).Msg("find tasks for goal failed")
+		return nil, err
+	}
+
+	tasks := make([]GoalTaskLink, len(tasksDB))
+	for i, t := range tasksDB {
+		link := GoalTaskLink{
+			TaskID:          t.TaskID,
+			TaskTitle:       t.TaskTitle,
+			ImpactType:      t.ImpactType,
+			ImpactMagnitude: t.ImpactMagnitude,
+			QuantityValue:   t.QuantityValue,
+			UnitID:          t.UnitID,
+			TaskJournal:     t.TaskJournal,
+			TaskCompleted:   t.TaskCompleted,
+			TaskEmotionID:   t.TaskEmotionID,
+			Notes:           t.Notes,
+		}
+
+		if t.TaskStartDate != nil {
+			startDate := t.TaskStartDate.Time
+			link.TaskStartDate = &startDate
+		}
+		if t.TaskEndDate != nil {
+			endDate := t.TaskEndDate.Time
+			link.TaskEndDate = &endDate
+		}
+		if t.LinkedAt != nil {
+			linkedAt := t.LinkedAt.Time
+			link.LinkedAt = &linkedAt
+		}
+		if t.TaskCategory != nil {
+			link.TaskCategory = &struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Color string `json:"color"`
+			}{
+				ID:    t.TaskCategory.ID,
+				Name:  t.TaskCategory.Name,
+				Color: t.TaskCategory.Color,
+			}
+		}
+
+		tasks[i] = link
+	}
+
+	return tasks, nil
 }
 
 func (r *repository) AddChild(ctx context.Context, parentID, childID, userID string, order int, required bool) error {

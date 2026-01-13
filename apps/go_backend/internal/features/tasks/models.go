@@ -70,10 +70,9 @@ type Task struct {
 	CreatedBy string     `json:"-"` // Hidden: ownership field
 
 	// Populated via graph queries (not stored on task)
-	Category    *categories.Category    `json:"category,omitempty"`     // From in_category edge
-	Template    *templates.TaskTemplate `json:"template,omitempty"`     // From created_from edge
-	LinkedGoals []TaskGoalLink          `json:"linked_goals,omitempty"` // From task_goals
-	Emotion     *emotions.EmotionDetail `json:"emotion,omitempty"`      // Full emotion details
+	Category *categories.Category    `json:"category,omitempty"` // From in_category edge
+	Template *templates.TaskTemplate `json:"template,omitempty"` // From created_from edge
+	Emotion  *emotions.EmotionDetail `json:"emotion,omitempty"`  // Full emotion details
 }
 
 // Quantity represents a measured value with unit for task contribution to goals.
@@ -107,6 +106,23 @@ type TaskGoalLink struct {
 	UnitID          *string  `json:"unit_id,omitempty"`
 	IsMilestone     bool     `json:"is_milestone,omitempty"`
 	MilestoneLabel  string   `json:"milestone_label,omitempty"`
+
+	// Additional goal details for rich display
+	GoalDescription string  `json:"goal_description,omitempty"`
+	GoalStatus      string  `json:"goal_status,omitempty"`
+	GoalPriority    int     `json:"goal_priority,omitempty"`
+	GoalTargetValue *float64 `json:"goal_target_value,omitempty"`
+	GoalTargetUnit  string  `json:"goal_target_unit,omitempty"`
+	GoalProgress    float64 `json:"goal_progress,omitempty"` // Current progress percentage
+	GoalCategory    *struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"goal_category,omitempty"`
+
+	// Link metadata
+	LinkedAt *time.Time `json:"linked_at,omitempty"`
+	Notes    string     `json:"notes,omitempty"`
 }
 
 // =============================================================================
@@ -216,6 +232,14 @@ type TaskPageResponse struct {
 	Limit   int     `json:"limit"`
 	Offset  int     `json:"offset"`
 	HasMore bool    `json:"has_more"`
+}
+
+// TaskGoalsResponse is the response for GET /tasks/{id}/goals.
+//
+// @Description Goals linked to a task
+type TaskGoalsResponse struct {
+	TaskID string          `json:"task_id"`
+	Goals  []TaskGoalLink  `json:"goals"`
 }
 
 // =============================================================================

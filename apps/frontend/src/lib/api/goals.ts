@@ -37,7 +37,6 @@ export interface Goal {
 
 	// Populated via graph queries (not stored on goal record)
 	category?: { id: string; name: string; color: string; icon: string }; // Simplified from Category type for now
-	linked_tasks?: GoalTaskLink[];
 	children?: Goal[];
 	parent?: Goal;
 }
@@ -78,6 +77,19 @@ export interface GoalTaskLink {
 	impact_magnitude: number;
 	quantity_value?: number;
 	unit_id?: string;
+	// Additional task details
+	task_journal?: string;
+	task_start_date?: string;
+	task_end_date?: string;
+	task_completed: boolean;
+	task_emotion_id?: string;
+	task_category?: {
+		id: string;
+		name: string;
+		color: string;
+	};
+	linked_at?: string;
+	notes?: string;
 }
 
 export interface CreateGoalRequest {
@@ -154,6 +166,19 @@ export async function getTodayGoals(): Promise<Goal[]> {
 }
 
 // =============================================================================
+// GOAL TASKS API
+// =============================================================================
+
+export interface GoalTasksResponse {
+	goal_id: string;
+	tasks: GoalTaskLink[];
+}
+
+export async function getGoalTasks(goalId: string): Promise<GoalTasksResponse> {
+	return unwrap(api.get(`goals/${goalId}/tasks`));
+}
+
+// =============================================================================
 // GOAL LOGS TYPES
 // =============================================================================
 
@@ -165,6 +190,26 @@ export interface GoalLog {
 	triggered_by_task_id?: string;
 	snapshot_id?: string;
 	created_at: string;
+	// Enhanced details
+	triggering_task?: TriggeringTaskInfo;
+	value_contributed?: number;
+	value_unit?: string;
+	progress_before?: number;
+	progress_after?: number;
+}
+
+export interface TriggeringTaskInfo {
+	id: string;
+	title: string;
+	start_date?: string;
+	end_date?: string;
+	completed: boolean;
+	emotion_id?: string;
+	category?: {
+		id: string;
+		name: string;
+		color: string;
+	};
 }
 
 export type GoalLogEvent =

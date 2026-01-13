@@ -28,6 +28,7 @@ export {
 	updateTask,
 	deleteTask,
 	getLastTaskEndTime,
+	getTaskGoals,
 	type Task,
 	type TaskItem,
 	type Quantity,
@@ -36,6 +37,7 @@ export {
 	type CreateTaskRequest,
 	type UpdateTaskRequest,
 	type TaskFilterParams,
+	type TaskGoalsResponse,
 } from './tasks';
 
 // Goals
@@ -48,6 +50,7 @@ export {
 	getTodayGoals,
 	getGoalLogs,
 	getGoalLogsSummary,
+	getGoalTasks,
 	type Goal,
 	type Recurrence,
 	type Target,
@@ -57,6 +60,8 @@ export {
 	type GoalLogEvent,
 	type GoalLogsResponse,
 	type GoalLogsSummary,
+	type GoalTasksResponse,
+	type TriggeringTaskInfo,
 } from './goals';
 
 // Emotions

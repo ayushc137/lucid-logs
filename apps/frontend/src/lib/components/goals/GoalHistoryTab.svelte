@@ -1,29 +1,33 @@
 <script lang="ts">
-import type { Goal, GoalLog } from '$lib/api';
-import { GoalTimeline } from '$lib/components/goals';
-import { Award, BarChart3, Flame, History, TrendingUp } from 'lucide-svelte';
+    import type { Goal, GoalLog } from "$lib/api";
+    import { GoalTimeline } from "$lib/components/goals";
+    import {
+        Award,
+        BarChart3,
+        Flame,
+        History,
+        TrendingUp,
+    } from "lucide-svelte";
 
-interface Props {
-	goal: Goal | null;
-	logs: GoalLog[];
-	isLoading: boolean;
-	currentStreak: number;
-	longestStreak: number;
-	progressPercent: number;
-	currentValue: number;
-}
+    interface Props {
+        goal: Goal | null;
+        logs: GoalLog[];
+        isLoading: boolean;
+        currentStreak: number;
+        longestStreak: number;
+        progressPercent: number;
+        currentValue: number;
+    }
 
-let {
-	goal = null,
-	logs = [],
-	isLoading = false,
-	currentStreak = 0,
-	longestStreak = 0,
-	progressPercent = 0,
-	currentValue = 0,
-}: Props = $props();
-
-let historyFilter = $state<'all' | 'with_tasks' | 'without_tasks'>('all');
+    let {
+        goal = null,
+        logs = [],
+        isLoading = false,
+        currentStreak = 0,
+        longestStreak = 0,
+        progressPercent = 0,
+        currentValue = 0,
+    }: Props = $props();
 </script>
 
 <div class="p-6">
@@ -79,22 +83,7 @@ let historyFilter = $state<'all' | 'with_tasks' | 'without_tasks'>('all');
             class="border border-base-300 rounded-2xl p-4 bg-base-200/30 max-h-[350px] overflow-y-auto"
         >
             <h4 class="font-semibold mb-4 text-center">Activity Timeline</h4>
-            <GoalTimeline
-                {logs}
-                {isLoading}
-                filter={historyFilter === "with_tasks"
-                    ? "with-tasks"
-                    : historyFilter === "without_tasks"
-                      ? "goal-only"
-                      : "all"}
-                onFilterChange={(f) =>
-                    (historyFilter =
-                        f === "with-tasks"
-                            ? "with_tasks"
-                            : f === "goal-only"
-                              ? "without_tasks"
-                              : "all")}
-            />
+            <GoalTimeline {logs} {isLoading} />
         </div>
     {:else}
         <div class="text-center py-16 text-base-content/50">

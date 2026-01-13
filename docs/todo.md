@@ -212,8 +212,7 @@ make ui for goals, and goal modal prettier, cleaner and more user friendly , eas
 check goal tasks remove it from goal  main api, get api , list api and make it to sepete api  with more task related details to show in fe 
 make sure there is a goal logs api to fetch all logs for goals logs and snapshot history for histortyy view 
 add start date for goals
-remove longest_streak from parent onject of goal as its already in stats 
-trmove linked goals from get task list api and get task api and create speerate pai for linekd goals if not exsiting 
+remove linked goals from get task list api and get task api and create speerate pai for linekd goals if not exsiting 
 also make sure ther eis crud for unit 
 
 
@@ -226,6 +225,21 @@ the modal is not showing  start date , end date, unti etc ?
 alsothe 
 
 
+
+
+
+
+
+better goal logs in genral check all 
+update tasks tab in goal modal 
+
+
+
+
+
+
+
+fix time timeline next
 
 
 
@@ -268,3 +282,22 @@ check created_from ?? what used ??also check design tab in surrealist
 
 
 on goal update only add to logs if somethign changes and mention what updated , also mention more dratils of ehat all is target etc ------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Streak Current Value all too bug in history 

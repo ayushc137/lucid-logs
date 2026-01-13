@@ -53,6 +53,9 @@ type Service interface {
 	// RemoveChild removes a child goal from a parent.
 	RemoveChild(ctx context.Context, parentID, childID, userID string) error
 
+	// GetTasks retrieves all tasks linked to a goal.
+	GetTasks(ctx context.Context, goalID, userID string) ([]GoalTaskLink, error)
+
 	// UpdateCategory updates the category for a goal.
 	UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error
 
@@ -71,6 +74,8 @@ type TemplateCreator interface {
 // This allows the goals service to log events without circular imports with goallogs.
 type GoalLogger interface {
 	LogEvent(ctx context.Context, goalID, event, userID string, changes map[string]any, stats *GoalStats) error
+	// LogTaskEvent logs an event triggered by a task with additional task-related metadata
+	LogTaskEvent(ctx context.Context, goalID, event, userID, triggeredByTaskID string, changes map[string]any, valueContributed *float64, valueUnit string) error
 }
 
 // =============================================================================
@@ -494,6 +499,26 @@ func (s *service) RemoveChild(ctx context.Context, parentID, childID, userID str
 		Msg("child goal removed")
 
 	return nil
+}
+
+// =============================================================================
+// TASKS MANAGEMENT
+// =============================================================================
+
+func (s *service) GetTasks(ctx context.Context, goalID, userID string) ([]GoalTaskLink, error) {
+	// Verify goal exists
+	_, err := s.repo.FindByID(ctx, goalID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks, err := s.repo.FindTasksForGoal(ctx, goalID, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("goal_id", goalID).Msg("failed to get tasks for goal")
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 // =============================================================================

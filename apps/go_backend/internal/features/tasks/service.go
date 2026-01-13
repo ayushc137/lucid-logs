@@ -45,6 +45,9 @@ type Service interface {
 
 	// GetLastTaskEndTime retrieves the end time of the most recently finished task.
 	GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error)
+
+	// GetGoals retrieves all goals linked to a task.
+	GetGoals(ctx context.Context, taskID, userID string) ([]TaskGoalLink, error)
 }
 
 // ActivityLogger is an interface for logging activity events.
@@ -336,6 +339,27 @@ func (s *service) GetLastTaskEndTime(ctx context.Context, userID string) (*time.
 		return nil, err
 	}
 	return endTime, nil
+}
+
+// =============================================================================
+// GET GOALS
+// =============================================================================
+
+// GetGoals retrieves all goals linked to a task.
+func (s *service) GetGoals(ctx context.Context, taskID, userID string) ([]TaskGoalLink, error) {
+	// Verify task exists
+	_, err := s.repo.FindByID(ctx, taskID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	goals, err := s.repo.FindGoalsForTask(ctx, taskID, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("task_id", taskID).Msg("failed to get goals for task")
+		return nil, err
+	}
+
+	return goals, nil
 }
 
 func validateOptionalDate(field string, value *string) (*time.Time, error) {

@@ -50,14 +50,12 @@ export interface UpdateLinkRequest {
 
 export interface GoalsForTaskResponse {
 	task_id: string;
-	links: TaskGoalWithGoal[];
-	count: number;
+	goals: TaskGoalWithGoal[];
 }
 
 export interface TasksForGoalResponse {
 	goal_id: string;
-	links: TaskGoalWithTask[];
-	count: number;
+	tasks: TaskGoalWithTask[];
 }
 
 // =============================================================================

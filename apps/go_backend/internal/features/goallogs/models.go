@@ -37,11 +37,39 @@ type GoalLog struct {
 	// What triggered this event (optional)
 	TriggeredByTaskID string `json:"triggered_by_task_id,omitempty"` // tasks:xxx
 
+	// Triggering task details (populated on read for task-related events)
+	TriggeringTask *TriggeringTaskInfo `json:"triggering_task,omitempty"`
+
+	// Value contributed (for task_linked events)
+	ValueContributed *float64 `json:"value_contributed,omitempty"`
+	ValueUnit        string   `json:"value_unit,omitempty"`
+
+	// Progress at time of event
+	ProgressBefore *float64 `json:"progress_before,omitempty"`
+	ProgressAfter  *float64 `json:"progress_after,omitempty"`
+
 	// Snapshot reference
 	SnapshotID string `json:"snapshot_id,omitempty"` // goal_snapshots:xxx
 
 	// Metadata
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// TriggeringTaskInfo contains details about the task that triggered a goal event.
+//
+// @Description Task info that triggered a goal event
+type TriggeringTaskInfo struct {
+	ID        string     `json:"id"`
+	Title     string     `json:"title"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
+	Completed bool       `json:"completed"`
+	EmotionID *string    `json:"emotion_id,omitempty"`
+	Category  *struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"category,omitempty"`
 }
 
 // GoalSnapshot represents a point-in-time snapshot of goal state.
@@ -115,6 +143,12 @@ type LogEventRequest struct {
 	Changes           map[string]any
 	TriggeredByTaskID string
 	Stats             *goals.GoalStats // Optional: creates a snapshot if provided
+
+	// Value tracking for task events
+	ValueContributed *float64
+	ValueUnit        string
+	ProgressBefore   *float64
+	ProgressAfter    *float64
 }
 
 // =============================================================================

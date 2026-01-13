@@ -79,6 +79,9 @@ type Repository interface {
 
 	// GetLastTaskEndTime retrieves the end time of the most recently finished task.
 	GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error)
+
+	// FindGoalsForTask retrieves all goals linked to a task.
+	FindGoalsForTask(ctx context.Context, taskID, userID string) ([]TaskGoalLink, error)
 }
 
 // =============================================================================
@@ -128,27 +131,11 @@ type taskDB struct {
 	EmotionID       *string                   `json:"emotion_id,omitempty"`
 	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
 
-	// Linked goals (populated via subquery)
-	LinkedGoals []taskGoalDB `json:"linked_goals,omitempty"`
-
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
 	CreatedBy string                `json:"created_by"`
 	UpdatedBy string                `json:"updated_by"`
-}
-
-// taskGoalDB represents a linked goal from the task_goals relation.
-type taskGoalDB struct {
-	GoalID          string   `json:"goal_id"`
-	GoalTitle       string   `json:"goal_title"`
-	GoalIcon        string   `json:"goal_icon,omitempty"`
-	ImpactType      string   `json:"impact_type"`
-	ImpactMagnitude int      `json:"impact_magnitude"`
-	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	UnitID          *string  `json:"unit_id,omitempty"`
-	IsMilestone     bool     `json:"is_milestone"`
-	MilestoneLabel  string   `json:"milestone_label,omitempty"`
 }
 
 // categoryDB is the database representation of a category when fetched.
@@ -204,15 +191,6 @@ func (t *taskDB) toTask() *Task {
 		deletedAt = &dt
 	}
 
-	// Convert linked goals
-	var linkedGoals []TaskGoalLink
-	if len(t.LinkedGoals) > 0 {
-		linkedGoals = make([]TaskGoalLink, len(t.LinkedGoals))
-		for i, lg := range t.LinkedGoals {
-			linkedGoals[i] = TaskGoalLink(lg)
-		}
-	}
-
 	return &Task{
 		ID:              database.ToStringID(t.ID),
 		Title:           t.Title,
@@ -227,7 +205,6 @@ func (t *taskDB) toTask() *Task {
 		Category:        cat,
 		EmotionID:       t.EmotionID,
 		InferredEmotion: t.InferredEmotion,
-		LinkedGoals:     linkedGoals,
 		CreatedAt:       t.CreatedAt.Time,
 		UpdatedAt:       t.UpdatedAt.Time,
 		DeletedAt:       deletedAt,
@@ -277,18 +254,10 @@ type taskCreateData struct {
 func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, error) {
 	taskID := database.MustRecordID(Table, id)
 
-	// Use SDK's typed query to fetch task with category and linked goals
+	// Use SDK's typed query to fetch task with category
 	// models.RecordID handles ID serialization automatically
 	task, err := database.QueryFirst[taskDB](ctx, r.db, `
-		SELECT *,
-			(SELECT 
-				type::string(out) as goal_id,
-				out.title as goal_title,
-				impact_type,
-				impact_magnitude,
-				quantity_value,
-				quantity_unit
-			 FROM task_goals WHERE in = $parent.id) as linked_goals
+		SELECT *
 		FROM type::thing($id) FETCH category
 	`, map[string]any{
 		"id": taskID,
@@ -342,15 +311,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	// Get paginated tasks using SDK's typed QueryAll
 	// models.RecordID handles ID deserialization automatically
 	tasksDB, err := database.QueryAll[taskDB](ctx, r.db, `
-		SELECT *,
-			(SELECT 
-				type::string(out) as goal_id,
-				out.title as goal_title,
-				impact_type,
-				impact_magnitude,
-				quantity_value,
-				quantity_unit
-			 FROM task_goals WHERE in = $parent.id) as linked_goals
+		SELECT *
 		FROM tasks
 		WHERE created_by = $user AND deleted_at = NONE
 		ORDER BY start_date DESC
@@ -483,17 +444,9 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 		return nil, 0, err
 	}
 
-	// Main query with linked goals and category fetch
+	// Main query with category fetch
 	selectQuery := `
-		SELECT *,
-			(SELECT 
-				type::string(out) as goal_id,
-				out.title as goal_title,
-				impact_type,
-				impact_magnitude,
-				quantity_value,
-				quantity_unit
-			 FROM task_goals WHERE in = $parent.id) as linked_goals
+		SELECT *
 		FROM tasks
 		WHERE ` + whereClause + `
 		` + orderClause + `
@@ -929,6 +882,107 @@ func (r *repository) GetLastTaskEndTime(ctx context.Context, userID string) (*ti
 	}
 
 	return &record.EndDate.Time, nil
+}
+
+func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string) ([]TaskGoalLink, error) {
+	tID := database.MustRecordID(Table, taskID)
+
+	type goalCategoryDB struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+
+	type goalLinkDB struct {
+		GoalID          string   `json:"goal_id"`
+		GoalTitle       string   `json:"goal_title"`
+		GoalIcon        string   `json:"goal_icon,omitempty"`
+		ImpactType      string   `json:"impact_type"`
+		ImpactMagnitude int      `json:"impact_magnitude"`
+		QuantityValue   *float64 `json:"quantity_value,omitempty"`
+		UnitID          *string  `json:"unit_id,omitempty"`
+		IsMilestone     bool     `json:"is_milestone"`
+		MilestoneLabel  string   `json:"milestone_label,omitempty"`
+		// Additional goal details
+		GoalDescription string                `json:"goal_description,omitempty"`
+		GoalStatus      string                `json:"goal_status,omitempty"`
+		GoalPriority    int                   `json:"goal_priority,omitempty"`
+		GoalTargetValue *float64              `json:"goal_target_value,omitempty"`
+		GoalTargetUnit  string                `json:"goal_target_unit,omitempty"`
+		GoalCategory    *goalCategoryDB       `json:"goal_category,omitempty"`
+		LinkedAt        *database.SurrealTime `json:"linked_at,omitempty"`
+		Notes           string                `json:"notes,omitempty"`
+	}
+
+	goalsDB, err := database.QueryAll[goalLinkDB](ctx, r.db, `
+		SELECT
+			type::string(out) as goal_id,
+			out.title as goal_title,
+			out.icon as goal_icon,
+			impact_type,
+			impact_magnitude,
+			quantity_value,
+			unit_id,
+			is_milestone,
+			milestone_label,
+			out.description as goal_description,
+			out.status as goal_status,
+			out.priority as goal_priority,
+			out.target.value as goal_target_value,
+			out.target.unit_id as goal_target_unit,
+			(out->in_category.out.*)[0] as goal_category,
+			created_at as linked_at,
+			notes
+		FROM $task_id->task_goals
+		WHERE out.deleted_at IS NONE
+	`, map[string]any{
+		"task_id": tID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("task_id", taskID).Msg("find goals for task failed")
+		return nil, err
+	}
+
+	goals := make([]TaskGoalLink, len(goalsDB))
+	for i, g := range goalsDB {
+		link := TaskGoalLink{
+			GoalID:          g.GoalID,
+			GoalTitle:       g.GoalTitle,
+			GoalIcon:        g.GoalIcon,
+			ImpactType:      g.ImpactType,
+			ImpactMagnitude: g.ImpactMagnitude,
+			QuantityValue:   g.QuantityValue,
+			UnitID:          g.UnitID,
+			IsMilestone:     g.IsMilestone,
+			MilestoneLabel:  g.MilestoneLabel,
+			GoalDescription: g.GoalDescription,
+			GoalStatus:      g.GoalStatus,
+			GoalPriority:    g.GoalPriority,
+			GoalTargetValue: g.GoalTargetValue,
+			GoalTargetUnit:  g.GoalTargetUnit,
+			Notes:           g.Notes,
+		}
+
+		if g.LinkedAt != nil {
+			linkedAt := g.LinkedAt.Time
+			link.LinkedAt = &linkedAt
+		}
+		if g.GoalCategory != nil {
+			link.GoalCategory = &struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Color string `json:"color"`
+			}{
+				ID:    g.GoalCategory.ID,
+				Name:  g.GoalCategory.Name,
+				Color: g.GoalCategory.Color,
+			}
+		}
+
+		goals[i] = link
+	}
+
+	return goals, nil
 }
 
 // generateTaskRecordID generates a unique task ID as models.RecordID.

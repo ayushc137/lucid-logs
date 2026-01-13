@@ -24,7 +24,6 @@ export interface Task {
 	activity_key?: string;
 	template_id?: string;
 	quantity?: Quantity;
-	linked_goals?: TaskGoalLink[];
 	created_at: string;
 	updated_at: string;
 	deleted_at?: string;
@@ -43,10 +42,27 @@ export interface Quantity {
 export interface TaskGoalLink {
 	goal_id: string;
 	goal_title: string;
+	goal_icon?: string;
 	impact_type: string;
 	impact_magnitude: number;
 	quantity_value?: number;
-	quantity_unit?: string;
+	unit_id?: string;
+	is_milestone?: boolean;
+	milestone_label?: string;
+	// Additional goal details
+	goal_description?: string;
+	goal_status?: string;
+	goal_priority?: number;
+	goal_target_value?: number;
+	goal_target_unit?: string;
+	goal_progress?: number;
+	goal_category?: {
+		id: string;
+		name: string;
+		color: string;
+	};
+	linked_at?: string;
+	notes?: string;
 }
 
 export interface Category {
@@ -70,7 +86,7 @@ export interface CreateTaskRequest {
 	category_id?: string;
 	emotion_id?: string;
 	quantity?: Quantity;
-	linked_goals?: TaskGoalLinkInput[];
+	goal_links?: TaskGoalLinkInput[];
 }
 
 export interface UpdateTaskRequest {
@@ -86,7 +102,7 @@ export interface UpdateTaskRequest {
 	category_id?: string;
 	emotion_id?: string;
 	quantity?: Quantity;
-	linked_goals?: TaskGoalLinkInput[];
+	goal_links?: TaskGoalLinkInput[];
 }
 
 export interface TaskGoalLinkInput {
@@ -194,4 +210,17 @@ export async function getLastTaskEndTime(): Promise<{
 	end_time: string | null;
 }> {
 	return unwrap(api.get('tasks/last-end-time'));
+}
+
+// =============================================================================
+// TASK GOALS API
+// =============================================================================
+
+export interface TaskGoalsResponse {
+	task_id: string;
+	goals: TaskGoalLink[];
+}
+
+export async function getTaskGoals(taskId: string): Promise<TaskGoalsResponse> {
+	return unwrap(api.get(`tasks/${encodeURIComponent(taskId)}/goals`));
 }

@@ -63,10 +63,33 @@ type goalLogDB struct {
 	TriggeredByTaskID string               `json:"triggered_by_task_id,omitempty"` // Changed to match schema
 	CreatedBy         models.RecordID      `json:"created_by"`
 	CreatedAt         database.SurrealTime `json:"created_at"`
+
+	// Value tracking
+	ValueContributed *float64 `json:"value_contributed,omitempty"`
+	ValueUnit        string   `json:"value_unit,omitempty"`
+	ProgressBefore   *float64 `json:"progress_before,omitempty"`
+	ProgressAfter    *float64 `json:"progress_after,omitempty"`
+
+	// Task details (populated on read via subquery)
+	TriggeringTask *triggeringTaskDB `json:"triggering_task,omitempty"`
+}
+
+type triggeringTaskDB struct {
+	ID        string                `json:"id"`
+	Title     string                `json:"title"`
+	StartDate *database.SurrealTime `json:"start_date,omitempty"`
+	EndDate   *database.SurrealTime `json:"end_date,omitempty"`
+	Completed bool                  `json:"completed"`
+	EmotionID *string               `json:"emotion_id,omitempty"`
+	Category  *struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"category,omitempty"`
 }
 
 func (l *goalLogDB) toGoalLog() *GoalLog {
-	return &GoalLog{
+	log := &GoalLog{
 		ID:                database.ToStringID(l.ID),
 		GoalID:            database.ToStringID(l.GoalID),
 		Event:             l.Event,
@@ -74,7 +97,34 @@ func (l *goalLogDB) toGoalLog() *GoalLog {
 		TriggeredByTaskID: l.TriggeredByTaskID,
 		SnapshotID:        database.ToStringID(l.SnapshotID),
 		CreatedAt:         l.CreatedAt.Time,
+		ValueContributed:  l.ValueContributed,
+		ValueUnit:         l.ValueUnit,
+		ProgressBefore:    l.ProgressBefore,
+		ProgressAfter:     l.ProgressAfter,
 	}
+
+	if l.TriggeringTask != nil {
+		taskInfo := &TriggeringTaskInfo{
+			ID:        l.TriggeringTask.ID,
+			Title:     l.TriggeringTask.Title,
+			Completed: l.TriggeringTask.Completed,
+			EmotionID: l.TriggeringTask.EmotionID,
+		}
+		if l.TriggeringTask.StartDate != nil {
+			t := l.TriggeringTask.StartDate.Time
+			taskInfo.StartDate = &t
+		}
+		if l.TriggeringTask.EndDate != nil {
+			t := l.TriggeringTask.EndDate.Time
+			taskInfo.EndDate = &t
+		}
+		if l.TriggeringTask.Category != nil {
+			taskInfo.Category = l.TriggeringTask.Category
+		}
+		log.TriggeringTask = taskInfo
+	}
+
+	return log
 }
 
 type goalSnapshotDB struct {
@@ -136,41 +186,38 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 	var logResult *goalLogDB
 	var err error
 
+	// Prepare changes - use NONE if nil
+	changes := req.Changes
+	if changes == nil {
+		changes = map[string]any{}
+	}
+
+	// Build content data with optional fields
+	contentData := map[string]any{
+		"event_type":           req.Event,
+		"changes":              changes,
+		"triggered_by_task_id": req.TriggeredByTaskID,
+		"created_by":           userRecordID,
+		"created_at":           now,
+		"value_contributed":    req.ValueContributed,
+		"value_unit":           req.ValueUnit,
+		"progress_before":      req.ProgressBefore,
+		"progress_after":       req.ProgressAfter,
+	}
+
 	if snapshotID != "" {
 		snapshotRecordID := database.MustRecordID(SnapshotsTable, snapshotID)
 
-		// Prepare changes - use NONE if nil
-		changes := req.Changes
-		if changes == nil {
-			changes = map[string]any{}
-		}
-
 		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
-			RELATE $goal_id->goal_logs->$snapshot_id CONTENT {
-				event_type: $event,
-				changes: $changes,
-				triggered_by_task_id: $triggered_by,
-				created_by: $user,
-				created_at: $now
-			}
+			RELATE $goal_id->goal_logs->$snapshot_id CONTENT $content
 		`, map[string]any{
-			"goal_id":      goalID,
-			"snapshot_id":  snapshotRecordID,
-			"event":        req.Event,
-			"changes":      changes,
-			"triggered_by": req.TriggeredByTaskID,
-			"user":         userRecordID,
-			"now":          now,
+			"goal_id":     goalID,
+			"snapshot_id": snapshotRecordID,
+			"content":     contentData,
 		})
 	} else {
 		// For events without snapshots, we still need a RELATE but with a null out
 		// We'll create a dummy snapshot or skip the out field
-
-		// Prepare changes - use NONE if nil
-		changes := req.Changes
-		if changes == nil {
-			changes = map[string]any{}
-		}
 
 		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
 			CREATE goal_logs SET
@@ -180,14 +227,22 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 				changes = $changes,
 				triggered_by_task_id = $triggered_by,
 				created_by = $user,
-				created_at = $now
+				created_at = $now,
+				value_contributed = $value_contributed,
+				value_unit = $value_unit,
+				progress_before = $progress_before,
+				progress_after = $progress_after
 		`, map[string]any{
-			"goal_id":      goalID,
-			"event":        req.Event,
-			"changes":      changes,
-			"triggered_by": req.TriggeredByTaskID,
-			"user":         userRecordID,
-			"now":          now,
+			"goal_id":           goalID,
+			"event":             req.Event,
+			"changes":           changes,
+			"triggered_by":      req.TriggeredByTaskID,
+			"user":              userRecordID,
+			"now":               now,
+			"value_contributed": req.ValueContributed,
+			"value_unit":        req.ValueUnit,
+			"progress_before":   req.ProgressBefore,
+			"progress_after":    req.ProgressAfter,
 		})
 	}
 	if err != nil {
@@ -224,9 +279,23 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 		total = countResult.Count
 	}
 
-	// Fetch logs
+	// Fetch logs with task details when triggered_by_task_id is present
 	logsDB, err := database.QueryAll[goalLogDB](ctx, r.db, `
-		SELECT * FROM goal_logs
+		SELECT *,
+			IF triggered_by_task_id != NONE AND triggered_by_task_id != "" THEN
+				(SELECT
+					type::string(id) as id,
+					title,
+					start_date,
+					end_date,
+					completed,
+					emotion_id,
+					category
+				FROM type::record(triggered_by_task_id))[0]
+			ELSE
+				NONE
+			END as triggering_task
+		FROM goal_logs
 		WHERE `+"`in`"+` = $goal_id AND created_by = $user
 		ORDER BY created_at DESC
 		LIMIT $limit START $offset
@@ -320,6 +389,19 @@ func (a *GoalLoggerAdapter) LogEvent(ctx context.Context, goalID, event, userID 
 		Event:   event,
 		Changes: changes,
 		Stats:   stats,
+	}, userID)
+	return err
+}
+
+// LogTaskEvent logs an event triggered by a task with additional task-related metadata.
+func (a *GoalLoggerAdapter) LogTaskEvent(ctx context.Context, goalID, event, userID, triggeredByTaskID string, changes map[string]any, valueContributed *float64, valueUnit string) error {
+	_, err := a.repo.LogEvent(ctx, &LogEventRequest{
+		GoalID:            goalID,
+		Event:             event,
+		Changes:           changes,
+		TriggeredByTaskID: triggeredByTaskID,
+		ValueContributed:  valueContributed,
+		ValueUnit:         valueUnit,
 	}, userID)
 	return err
 }

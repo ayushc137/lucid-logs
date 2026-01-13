@@ -46,6 +46,7 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 //   - GET    /{id}    : Get task by ID
 //   - PUT    /{id}    : Update task
 //   - DELETE /{id}    : Soft delete task
+//   - GET    /{id}/goals : Get goals linked to task
 func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
@@ -55,6 +56,9 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 	r.GET("/:id", h.Get)
 	r.PUT("/:id", h.Update)
 	r.DELETE("/:id", h.Delete)
+
+	// Linked goals
+	r.GET("/:id/goals", h.GetGoals)
 }
 
 // =============================================================================
@@ -374,6 +378,44 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	response.Message(c, http.StatusOK, "Task deleted")
+}
+
+// =============================================================================
+// GET GOALS
+// =============================================================================
+
+// GetGoals handles GET /tasks/{id}/goals - get goals linked to task.
+//
+// @Summary      Get goals linked to task
+// @Description  Get all goals linked to a specific task with impact details
+// @Tags         tasks
+// @Produce      json
+// @Param        id path string true "Task ID"
+// @Success      200 {object} TaskGoalsResponse
+// @Failure      401 {object} response.APIResponse
+// @Failure      404 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/tasks/{id}/goals [get]
+func (h *Handler) GetGoals(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	taskID := c.Param("id")
+
+	goals, err := h.service.GetGoals(c.Request.Context(), taskID, user.UserID)
+	if err != nil {
+		handleTaskError(c, err)
+		return
+	}
+
+	response.OK(c, TaskGoalsResponse{
+		TaskID: taskID,
+		Goals:  goals,
+	})
 }
 
 // =============================================================================

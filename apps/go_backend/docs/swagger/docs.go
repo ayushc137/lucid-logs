@@ -1619,6 +1619,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/goals/{id}/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all tasks linked to a specific goal with impact details",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Get tasks linked to goal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Goal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/goals.GoalTasksResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Returns health status including database connectivity",
@@ -2240,6 +2292,58 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{id}/goals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all goals linked to a specific task with impact details",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Get goals linked to task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tasks.TaskGoalsResponse"
                         }
                     },
                     "401": {
@@ -3923,12 +4027,34 @@ const docTemplate = `{
                     "description": "goal_logs:xxx",
                     "type": "string"
                 },
+                "progress_after": {
+                    "type": "number"
+                },
+                "progress_before": {
+                    "description": "Progress at time of event",
+                    "type": "number"
+                },
                 "snapshot_id": {
                     "description": "Snapshot reference",
                     "type": "string"
                 },
                 "triggered_by_task_id": {
                     "description": "What triggered this event (optional)",
+                    "type": "string"
+                },
+                "triggering_task": {
+                    "description": "Triggering task details (populated on read for task-related events)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/goallogs.TriggeringTaskInfo"
+                        }
+                    ]
+                },
+                "value_contributed": {
+                    "description": "Value contributed (for task_linked events)",
+                    "type": "number"
+                },
+                "value_unit": {
                     "type": "string"
                 }
             }
@@ -3974,6 +4100,44 @@ const docTemplate = `{
                 },
                 "days_missed": {
                     "type": "integer"
+                }
+            }
+        },
+        "goallogs.TriggeringTaskInfo": {
+            "description": "Task info that triggered a goal event",
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "object",
+                    "properties": {
+                        "color": {
+                            "type": "string"
+                        },
+                        "id": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "completed": {
+                    "type": "boolean"
+                },
+                "emotion_id": {
+                    "type": "string"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -4106,13 +4270,6 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "linked_tasks": {
-                    "description": "From task_goals",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/goals.GoalTaskLink"
-                    }
-                },
                 "parent": {
                     "description": "From goal_children (reverse)",
                     "allOf": [
@@ -4241,10 +4398,47 @@ const docTemplate = `{
                     "description": "\"positive\", \"negative\", \"neutral\"",
                     "type": "string"
                 },
+                "linked_at": {
+                    "description": "Link metadata",
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
                 "quantity_value": {
                     "type": "number"
                 },
+                "task_category": {
+                    "type": "object",
+                    "properties": {
+                        "color": {
+                            "type": "string"
+                        },
+                        "id": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "task_completed": {
+                    "type": "boolean"
+                },
+                "task_emotion_id": {
+                    "type": "string"
+                },
+                "task_end_date": {
+                    "type": "string"
+                },
                 "task_id": {
+                    "type": "string"
+                },
+                "task_journal": {
+                    "description": "Additional task details for rich display",
+                    "type": "string"
+                },
+                "task_start_date": {
                     "type": "string"
                 },
                 "task_title": {
@@ -4252,6 +4446,21 @@ const docTemplate = `{
                 },
                 "unit_id": {
                     "type": "string"
+                }
+            }
+        },
+        "goals.GoalTasksResponse": {
+            "description": "Tasks linked to a goal",
+            "type": "object",
+            "properties": {
+                "goal_id": {
+                    "type": "string"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/goals.GoalTaskLink"
+                    }
                 }
             }
         },
@@ -5319,13 +5528,6 @@ const docTemplate = `{
                 "journal": {
                     "type": "string"
                 },
-                "linked_goals": {
-                    "description": "From task_goals",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/tasks.TaskGoalLink"
-                    }
-                },
                 "negatives": {
                     "type": "array",
                     "items": {
@@ -5376,11 +5578,45 @@ const docTemplate = `{
             "description": "Goal linked to task with impact data",
             "type": "object",
             "properties": {
+                "goal_category": {
+                    "type": "object",
+                    "properties": {
+                        "color": {
+                            "type": "string"
+                        },
+                        "id": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "goal_description": {
+                    "description": "Additional goal details for rich display",
+                    "type": "string"
+                },
                 "goal_icon": {
                     "type": "string"
                 },
                 "goal_id": {
                     "type": "string"
+                },
+                "goal_priority": {
+                    "type": "integer"
+                },
+                "goal_progress": {
+                    "description": "Current progress percentage",
+                    "type": "number"
+                },
+                "goal_status": {
+                    "type": "string"
+                },
+                "goal_target_unit": {
+                    "type": "string"
+                },
+                "goal_target_value": {
+                    "type": "number"
                 },
                 "goal_title": {
                     "type": "string"
@@ -5396,13 +5632,35 @@ const docTemplate = `{
                 "is_milestone": {
                     "type": "boolean"
                 },
+                "linked_at": {
+                    "description": "Link metadata",
+                    "type": "string"
+                },
                 "milestone_label": {
+                    "type": "string"
+                },
+                "notes": {
                     "type": "string"
                 },
                 "quantity_value": {
                     "type": "number"
                 },
                 "unit_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "tasks.TaskGoalsResponse": {
+            "description": "Goals linked to a task",
+            "type": "object",
+            "properties": {
+                "goals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.TaskGoalLink"
+                    }
+                },
+                "task_id": {
                     "type": "string"
                 }
             }

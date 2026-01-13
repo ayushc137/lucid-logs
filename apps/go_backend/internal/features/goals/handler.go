@@ -46,6 +46,7 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 //   - GET    /{id}       : Get goal by ID
 //   - PUT    /{id}       : Update goal
 //   - DELETE /{id}       : Soft delete goal
+//   - GET    /{id}/tasks        : Get tasks linked to goal
 //   - GET    /{id}/children     : Get child goals
 //   - POST   /{id}/children     : Add child goal
 //   - DELETE /{id}/children/{child_id} : Remove child goal
@@ -58,6 +59,9 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 	r.GET("/:id", h.Get)
 	r.PUT("/:id", h.Update)
 	r.DELETE("/:id", h.Delete)
+
+	// Linked tasks
+	r.GET("/:id/tasks", h.GetTasks)
 
 	// Child goal management (grouped goals)
 	r.GET("/:id/children", h.GetChildren)
@@ -443,6 +447,44 @@ func (h *Handler) RemoveChild(c *gin.Context) {
 	}
 
 	response.Message(c, http.StatusOK, "Child goal removed")
+}
+
+// =============================================================================
+// GET TASKS
+// =============================================================================
+
+// GetTasks handles GET /goals/{id}/tasks - get tasks linked to goal.
+//
+// @Summary      Get tasks linked to goal
+// @Description  Get all tasks linked to a specific goal with impact details
+// @Tags         goals
+// @Produce      json
+// @Param        id path string true "Goal ID"
+// @Success      200 {object} GoalTasksResponse
+// @Failure      401 {object} response.APIResponse
+// @Failure      404 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/goals/{id}/tasks [get]
+func (h *Handler) GetTasks(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	goalID := c.Param("id")
+
+	tasks, err := h.service.GetTasks(c.Request.Context(), goalID, user.UserID)
+	if err != nil {
+		handleGoalError(c, err)
+		return
+	}
+
+	response.OK(c, GoalTasksResponse{
+		GoalID: goalID,
+		Tasks:  tasks,
+	})
 }
 
 // =============================================================================

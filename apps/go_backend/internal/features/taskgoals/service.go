@@ -31,6 +31,8 @@ type Service interface {
 // This allows logging task link/unlink events without circular imports.
 type GoalLogger interface {
 	LogEvent(ctx context.Context, goalID, event, userID string, changes map[string]any, stats *goals.GoalStats) error
+	// LogTaskEvent logs an event triggered by a task with additional task-related metadata
+	LogTaskEvent(ctx context.Context, goalID, event, userID, triggeredByTaskID string, changes map[string]any, valueContributed *float64, valueUnit string) error
 }
 
 // =============================================================================
@@ -117,10 +119,19 @@ func (s *service) Link(ctx context.Context, taskID string, req *LinkRequest, use
 		if req.ImpactMagnitude > 0 {
 			changes["impact_magnitude"] = req.ImpactMagnitude
 		}
+
+		// Use LogTaskEvent to include the task ID for proper filtering
+		var valueContributed *float64
+		var valueUnit string
 		if req.QuantityValue != nil && *req.QuantityValue > 0 {
+			valueContributed = req.QuantityValue
 			changes["quantity_value"] = *req.QuantityValue
 		}
-		if err := s.goalLogger.LogEvent(ctx, req.GoalID, "task_linked", userID, changes, nil); err != nil {
+		if req.UnitID != nil {
+			valueUnit = *req.UnitID
+		}
+
+		if err := s.goalLogger.LogTaskEvent(ctx, req.GoalID, "task_linked", userID, taskID, changes, valueContributed, valueUnit); err != nil {
 			s.logger.Warn().Err(err).Str("goal_id", req.GoalID).Msg("failed to log task_linked event")
 		}
 	}
@@ -216,7 +227,7 @@ func (s *service) Unlink(ctx context.Context, taskID, goalID, userID string) err
 			"task_id":    taskID,
 			"task_title": task.Title,
 		}
-		if err := s.goalLogger.LogEvent(ctx, goalID, "task_unlinked", userID, changes, nil); err != nil {
+		if err := s.goalLogger.LogTaskEvent(ctx, goalID, "task_unlinked", userID, taskID, changes, nil, ""); err != nil {
 			s.logger.Warn().Err(err).Str("goal_id", goalID).Msg("failed to log task_unlinked event")
 		}
 	}

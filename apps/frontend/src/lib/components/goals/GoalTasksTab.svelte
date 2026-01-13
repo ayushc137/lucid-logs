@@ -1,31 +1,37 @@
 <script lang="ts">
-import type { Goal } from '$lib/api';
+import type { Goal, GoalTaskLink } from '$lib/api';
 import { cn } from '$lib/utils';
 import {
 	ArrowUp,
+	ArrowUpDown,
+	Calendar,
 	Check,
 	ListTodo,
 	Minus,
 	Search,
+	Tag,
 	TrendingUp,
 	X as XIcon,
 } from 'lucide-svelte';
 
-interface LinkedTask {
-	task_id: string;
-	task_title: string;
-	impact_type: 'positive' | 'negative' | 'neutral';
-	impact_magnitude?: number;
-	quantity_value?: number;
-	unit_id?: string;
-}
-
 interface Props {
-	linkedTasks: LinkedTask[];
+	linkedTasks: GoalTaskLink[];
 	totalContributions: number;
 }
 
 let { linkedTasks = [], totalContributions = 0 }: Props = $props();
+
+function formatDate(dateStr?: string): string {
+	if (!dateStr) return '';
+	const date = new Date(dateStr);
+	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTime(dateStr?: string): string {
+	if (!dateStr) return '';
+	const date = new Date(dateStr);
+	return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 let taskFilter = $state<'all' | 'positive' | 'negative' | 'neutral'>('all');
 let taskSearch = $state('');
@@ -43,10 +49,18 @@ const filteredTasks = $derived.by(() => {
 		tasks = tasks.filter((t) => t.task_title.toLowerCase().includes(search));
 	}
 
+	// Sort by selected criteria
 	if (taskSortBy === 'impact') {
 		tasks = [...tasks].sort(
 			(a, b) => (b.impact_magnitude || 0) - (a.impact_magnitude || 0),
 		);
+	} else if (taskSortBy === 'date') {
+		// Sort by task start date (most recent first), then by linked_at
+		tasks = [...tasks].sort((a, b) => {
+			const dateA = a.task_start_date || a.linked_at || '';
+			const dateB = b.task_start_date || b.linked_at || '';
+			return new Date(dateB).getTime() - new Date(dateA).getTime();
+		});
 	}
 
 	return tasks;
@@ -138,13 +152,42 @@ const taskCounts = $derived({
                     </button>
                 {/if}
             </div>
+
+            <!-- Sort dropdown -->
+            <div class="dropdown dropdown-end">
+                <button class="btn btn-sm btn-ghost gap-1">
+                    <ArrowUpDown class="w-3 h-3" />
+                    {taskSortBy === 'date' ? 'Date' : 'Impact'}
+                </button>
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-40">
+                    <li>
+                        <button
+                            class={cn(taskSortBy === 'date' && 'active')}
+                            onclick={() => (taskSortBy = 'date')}
+                        >
+                            <Calendar class="w-4 h-4" />
+                            By Date
+                        </button>
+                    </li>
+                    <li>
+                        <button
+                            class={cn(taskSortBy === 'impact' && 'active')}
+                            onclick={() => (taskSortBy = 'impact')}
+                        >
+                            <TrendingUp class="w-4 h-4" />
+                            By Impact
+                        </button>
+                    </li>
+                </ul>
+            </div>
         </div>
 
         <!-- Task List -->
         <div class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
             {#each filteredTasks as task (task.task_id)}
                 <div
-                    class="flex items-center gap-3 p-4 rounded-xl bg-base-200/30 hover:bg-base-200/60 transition-all border border-transparent hover:border-base-300 group"
+                    class="flex items-start gap-3 p-4 rounded-xl bg-base-200/30 hover:bg-base-200/60 transition-all border border-transparent hover:border-base-300 group"
                 >
                     <!-- Impact indicator -->
                     <div
@@ -168,13 +211,39 @@ const taskCounts = $derived({
 
                     <!-- Task info -->
                     <div class="flex-1 min-w-0">
-                        <p class="font-medium truncate">{task.task_title}</p>
-                        <div class="flex items-center gap-2 mt-1 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <p class="font-medium truncate">{task.task_title}</p>
+                            {#if task.task_completed}
+                                <span class="badge badge-xs badge-success">Done</span>
+                            {/if}
+                        </div>
+
+                        <!-- Date and time info -->
+                        {#if task.task_start_date}
+                            <div class="flex items-center gap-1 mt-1 text-xs text-base-content/50">
+                                <Calendar class="w-3 h-3" />
+                                <span>{formatDate(task.task_start_date)}</span>
+                                {#if task.task_start_date && task.task_end_date}
+                                    <span>{formatTime(task.task_start_date)} - {formatTime(task.task_end_date)}</span>
+                                {/if}
+                            </div>
+                        {/if}
+
+                        <div class="flex items-center gap-2 mt-2 flex-wrap">
                             {#if task.quantity_value}
                                 <span class="badge badge-sm bg-base-300 gap-1">
                                     <ArrowUp class="w-3 h-3 text-success" />
                                     +{task.quantity_value}
                                     {task.unit_id?.replace("units:", "") || ""}
+                                </span>
+                            {/if}
+                            {#if task.task_category}
+                                <span
+                                    class="badge badge-sm gap-1"
+                                    style="background-color: {task.task_category.color}20; color: {task.task_category.color}; border-color: {task.task_category.color}40"
+                                >
+                                    <Tag class="w-3 h-3" />
+                                    {task.task_category.name}
                                 </span>
                             {/if}
                             {#if task.impact_magnitude && task.impact_magnitude > 0}
@@ -183,7 +252,18 @@ const taskCounts = $derived({
                                 </span>
                             {/if}
                         </div>
+
+                        {#if task.notes}
+                            <p class="text-xs text-base-content/60 mt-2 line-clamp-2">{task.notes}</p>
+                        {/if}
                     </div>
+
+                    <!-- Linked time -->
+                    {#if task.linked_at}
+                        <div class="text-xs text-base-content/40 text-right">
+                            {formatDate(task.linked_at)}
+                        </div>
+                    {/if}
                 </div>
             {:else}
                 <div class="text-center py-8 text-base-content/50">
