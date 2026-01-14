@@ -1,3 +1,38 @@
+// Goal view mode - now only 'lane' or 'off'
+export type GoalViewMode = 'lane' | 'off';
+
+// Goal representation for timeline
+export interface TimelineGoal {
+	id: string;
+	title: string;
+	icon: string;
+	color: string;
+	startDate?: Date;
+	deadline?: Date;
+	recurrence?: {
+		frequency: number;
+		period: 'day' | 'week' | 'month';
+	};
+	progress: number;
+	currentStreak: number;
+	todayStatus: 'pending' | 'met' | 'exceeded' | undefined;
+	linkedTaskIds: string[];
+	target?: {
+		value: number;
+		currentValue: number;
+		unitId: string;
+	};
+}
+
+// Linked goal info on a task
+export interface LinkedGoalInfo {
+	id: string;
+	title: string;
+	icon: string;
+	color: string;
+	impactType: 'positive' | 'negative' | 'neutral';
+}
+
 export interface TimelineTask {
 	id: string;
 	title: string;
@@ -21,10 +56,13 @@ export interface TimelineTask {
 	inferredEmotionEmoji?: string;
 	inferredEmotionQuadrant?: 'yellow' | 'green' | 'red' | 'blue';
 	inferredEmotionDescription?: string;
+	// Linked goals (optional)
+	linkedGoals?: LinkedGoalInfo[];
 }
 
 export interface TimelineProps {
 	tasks?: TimelineTask[];
+	goals?: TimelineGoal[];
 	selectedDate?: Date;
 	onTaskClick?: (taskId: string) => void;
 	onToggleComplete?: (taskId: string, completed: boolean) => void;
@@ -33,4 +71,9 @@ export interface TimelineProps {
 	onTaskTimeUpdate?: (taskId: string, startTime: Date, endTime: Date) => void;
 	editMode?: boolean;
 	onEditModeChange?: (enabled: boolean) => void;
+	// Goal-related props
+	showGoals?: boolean;
+	onShowGoalsChange?: (show: boolean) => void;
+	onGoalClick?: (goalId: string) => void;
+	onCreateTaskFromGoal?: (goalId: string) => void;
 }
