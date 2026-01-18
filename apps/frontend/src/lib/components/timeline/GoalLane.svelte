@@ -6,10 +6,12 @@
         ChevronRight,
         Flame,
         Plus,
+        Repeat,
         Target,
     } from "lucide-svelte";
     import { slide } from "svelte/transition";
     import type { TimelineGoal } from "./types";
+    import GoalPopover from "./GoalPopover.svelte";
 
     interface Props {
         goals: TimelineGoal[];
@@ -33,6 +35,11 @@
     // Scroll container ref for auto-scrolling
     let scrollContainer = $state<HTMLDivElement | null>(null);
 
+    // Hover state for popover
+    let hoveredGoalId = $state<string | null>(null);
+    let popoverPosition = $state<{ x: number; y: number } | null>(null);
+    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+
     // Auto-scroll to first highlighted goal
     $effect(() => {
         if (highlightedGoalIds.length > 0 && scrollContainer && isExpanded) {
@@ -50,31 +57,24 @@
         }
     });
 
-    // Format recurrence properly (fix "dayly" -> "daily")
+    // Format recurrence properly
     function formatRecurrence(
         rec: { frequency: number; period: string } | undefined,
     ): string {
         if (!rec) return "";
         const times = rec.frequency === 1 ? "" : `${rec.frequency}x/`;
         const periodMap: Record<string, string> = {
-            day: "daily",
-            week: "weekly",
-            month: "monthly",
+            day: "day",
+            week: "week",
+            month: "month",
         };
-        return times + (periodMap[rec.period] || `${rec.period}ly`);
+        return times + (periodMap[rec.period] || rec.period);
     }
 
-    // Format numbers nicely (cap large numbers)
+    // Format numbers nicely
     function formatNumber(value: number, max: number = 99): string {
         if (value > max) return `${max}+`;
         return String(value);
-    }
-
-    // Format progress (cap at 999%)
-    function formatProgress(value: number): string {
-        const rounded = Math.round(value);
-        if (rounded > 999) return "999+%";
-        return `${rounded}%`;
     }
 
     // Stats
@@ -87,10 +87,36 @@
     // Local hover state for dimming other goals
     let localHoveredGoalId = $state<string | null>(null);
 
-    function handleLocalHover(goalId: string | null) {
+    function handleLocalHover(goalId: string | null, e?: MouseEvent) {
+        // Clear any pending hover timeout
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
+
         localHoveredGoalId = goalId;
         onGoalHover?.(goalId);
+
+        if (goalId && e) {
+            hoveredGoalId = goalId;
+            updatePopoverPosition(e);
+        } else {
+            hoveredGoalId = null;
+            popoverPosition = null;
+        }
     }
+
+    function updatePopoverPosition(e: MouseEvent) {
+        popoverPosition = { x: e.clientX, y: e.clientY };
+    }
+
+    function onMouseMove(e: MouseEvent) {
+        if (hoveredGoalId) {
+            updatePopoverPosition(e);
+        }
+    }
+
+    const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
 </script>
 
 {#if goals.length > 0}
@@ -98,20 +124,22 @@
         class="goal-lane bg-base-100 border-b border-base-200 relative z-30"
         transition:slide={{ duration: 200 }}
     >
-        <!-- Header (collapsible toggle) -->
+        <!-- Header -->
         <button
             type="button"
-            class="w-full flex items-center justify-between px-4 py-2 hover:bg-base-200/30 transition-colors"
+            class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-base-200/30 transition-colors"
             onclick={() => (isExpanded = !isExpanded)}
         >
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2.5">
                 <div
-                    class="w-6 h-6 rounded-md bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center text-accent-content"
+                    class="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-content shadow-sm"
                 >
-                    <Target class="w-3 h-3" />
+                    <Target class="w-3.5 h-3.5" />
                 </div>
-                <span class="font-semibold text-sm">Today's Goals/Habits</span>
-                <span class="text-xs text-base-content/50 font-mono">
+                <span class="font-bold text-sm">Today's Goals & Habits</span>
+                <span
+                    class="text-xs text-base-content/40 font-mono bg-base-200/50 px-2 py-0.5 rounded-full"
+                >
                     {doneCount}/{goals.length}
                 </span>
             </div>
@@ -124,133 +152,160 @@
             </div>
         </button>
 
-        <!-- Goal Cards (horizontal scroll) -->
+        <!-- Goal Cards -->
         {#if isExpanded}
             <div
-                class="px-4 pb-4 pt-1 overflow-x-auto overflow-y-visible scrollbar-thin"
+                class="px-4 overflow-x-auto overflow-visible scrollbar-thin"
                 transition:slide={{ duration: 150 }}
                 bind:this={scrollContainer}
             >
-                <div class="flex gap-2.5 py-1">
+                <div class="flex gap-2.5 py-3">
                     {#each goals as goal (goal.id)}
                         {@const isMet =
                             goal.todayStatus === "met" ||
                             goal.todayStatus === "exceeded"}
-                        {@const isPending = goal.todayStatus === "pending"}
                         {@const isHighlighted = highlightedGoalIds.includes(
                             goal.id,
                         )}
                         {@const isHovered = localHoveredGoalId === goal.id}
                         {@const isDimmed =
-                            localHoveredGoalId &&
-                            localHoveredGoalId !== goal.id &&
-                            !isHighlighted}
-
-                        <!-- Check if this goal should have the hover effect (direct hover OR linked to hovered task) -->
-                        {@const shouldShowHoverEffect = isHovered || isHighlighted}
+                            (localHoveredGoalId &&
+                                localHoveredGoalId !== goal.id &&
+                                !isHighlighted) ||
+                            (highlightedGoalIds.length > 0 && !isHighlighted)}
+                        {@const shouldShowHoverEffect =
+                            isHovered || isHighlighted}
+                        {@const isHabit = !!goal.recurrence}
 
                         <button
                             type="button"
                             data-goal-id={goal.id}
                             class={cn(
-                                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-300 group border-0 whitespace-nowrap relative",
+                                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 group border bg-base-100 relative",
                                 isDimmed
-                                    ? "opacity-40 scale-[0.98] grayscale-[50%] blur-[0.5px]"
-                                    : "opacity-100",
+                                    ? "opacity-30 grayscale border-base-300"
+                                    : "opacity-100 border-base-300",
                                 shouldShowHoverEffect
-                                    ? "shadow-[0_8px_30px_rgb(0,0,0,0.12)] scale-[1.02] -translate-y-1 z-20 ring-2 ring-white/60"
-                                    : isMet
-                                      ? "bg-success/10 hover:bg-success/15"
-                                      : isPending
-                                        ? "bg-warning/5 hover:bg-warning/10"
-                                        : "bg-base-200/30 hover:bg-base-200/50",
+                                    ? "shadow-xl z-20 border-2"
+                                    : "hover:shadow-md",
                             )}
                             style={shouldShowHoverEffect
-                                ? `box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 0 20px ${goal.color}40;`
+                                ? `border-color: ${goal.color};`
                                 : ""}
                             onclick={() => onGoalClick?.(goal.id)}
-                            onmouseenter={() => handleLocalHover(goal.id)}
+                            onmouseenter={(e) => handleLocalHover(goal.id, e)}
+                            onmousemove={onMouseMove}
                             onmouseleave={() => handleLocalHover(null)}
                         >
-                            <!-- Plus button - top right corner -->
+                            <!-- Icon - shows goal icon normally, plus icon on hover -->
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <div
-                                class="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-125 shadow-md z-10"
-                                style="background-color: {goal.color}; color: white;"
+                                class="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 transition-all duration-200 relative cursor-pointer"
+                                style="background: linear-gradient(135deg, {goal.color}15 0%, {goal.color}08 100%); border: 1.5px solid {goal.color}30;"
                                 onclick={(e) => {
                                     e.stopPropagation();
                                     onCreateTaskFromGoal?.(goal.id);
                                 }}
                             >
-                                <Plus class="w-3 h-3" strokeWidth={2.5} />
-                            </div>
-
-                            <!-- Icon -->
-                            <div
-                                class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 transition-transform group-hover:scale-110"
-                                style="background-color: {goal.color}15; border: 1px solid {goal.color}30;"
-                            >
-                                {goal.icon}
+                                <span
+                                    class="absolute inset-0 flex items-center justify-center transition-all duration-200 group-hover:opacity-0 group-hover:scale-75"
+                                >
+                                    {goal.icon}
+                                </span>
+                                <span
+                                    class="absolute inset-0 flex items-center justify-center opacity-0 scale-75 transition-all duration-200 group-hover:opacity-100 group-hover:scale-100"
+                                    style="color: {goal.color};"
+                                >
+                                    <Plus
+                                        class="w-4.5 h-4.5"
+                                        strokeWidth={2.5}
+                                    />
+                                </span>
                             </div>
 
                             <!-- Content -->
-                            <div class="flex flex-col items-start min-w-0">
-                                <span
-                                    class="font-medium text-sm truncate max-w-28"
-                                    class:text-success={isMet}
-                                >
-                                    {goal.title}
-                                </span>
-                                <div class="flex items-center gap-1.5 mt-0.5">
-                                    {#if goal.recurrence}
-                                        <span
-                                            class="text-[10px] text-base-content/50"
+                            <div class="flex flex-col gap-1.5 min-w-0 flex-1">
+                                <!-- Title and type -->
+                                <div class="flex items-center gap-2">
+                                    <h3
+                                        class="font-semibold text-sm leading-tight truncate max-w-[140px]"
+                                    >
+                                        {goal.title}
+                                    </h3>
+                                    {#if isHabit}
+                                        <div
+                                            class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-base-200/50"
                                         >
-                                            {formatRecurrence(goal.recurrence)}
-                                        </span>
-                                    {/if}
-                                    {#if goal.target}
-                                        <span
-                                            class="text-[10px] text-base-content/60 font-medium"
+                                            <Repeat
+                                                class="w-2.5 h-2.5 text-base-content/50 shrink-0"
+                                            />
+                                            <span
+                                                class="text-[9px] font-semibold text-base-content/60 uppercase"
+                                                >Habit</span
+                                            >
+                                        </div>
+                                    {:else}
+                                        <div
+                                            class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-base-200/50"
                                         >
-                                            {formatNumber(
-                                                goal.target.currentValue,
-                                                999,
-                                            )}/{formatNumber(
-                                                goal.target.value,
-                                                999,
-                                            )}
-                                        </span>
+                                            <Target
+                                                class="w-2.5 h-2.5 text-base-content/50 shrink-0"
+                                            />
+                                            <span
+                                                class="text-[9px] font-semibold text-base-content/60 uppercase"
+                                                >Goal</span
+                                            >
+                                        </div>
                                     {/if}
                                 </div>
-                            </div>
 
-                            <!-- Status Indicator -->
-                            <div class="shrink-0 ml-1 flex items-center gap-1">
-                                {#if isMet}
+                                <!-- Progress or Status -->
+                                {#if goal.target}
+                                    <div class="flex items-center gap-2.5">
+                                        <div
+                                            class="flex-1 h-1.5 bg-base-200/60 rounded-full overflow-hidden min-w-[70px]"
+                                        >
+                                            <div
+                                                class="h-full rounded-full transition-all duration-300"
+                                                style="width: {Math.min(
+                                                    goal.progress,
+                                                    100,
+                                                )}%; background-color: {goal.color};"
+                                            ></div>
+                                        </div>
+                                        <span
+                                            class="text-[10px] font-bold shrink-0 tabular-nums"
+                                            style="color: {goal.color};"
+                                        >
+                                            {Math.round(goal.target.currentValue * 100) / 100}/{formatNumber(goal.target.value)}
+                                        </span>
+                                    </div>
+                                {:else if isMet}
                                     <div
-                                        class="w-6 h-6 rounded-full bg-success text-success-content flex items-center justify-center"
+                                        class="flex items-center gap-1.5 text-success"
                                     >
                                         <Check
-                                            class="w-3.5 h-3.5"
+                                            class="w-3 h-3"
                                             strokeWidth={3}
                                         />
+                                        <span
+                                            class="text-[10px] font-bold uppercase tracking-wide"
+                                            >Completed</span
+                                        >
                                     </div>
                                 {:else if goal.currentStreak > 0}
-                                    <span
-                                        class="flex items-center gap-0.5 text-xs text-warning font-bold bg-warning/10 px-1.5 py-0.5 rounded"
-                                    >
-                                        <Flame class="w-3 h-3" />
-                                        {formatNumber(goal.currentStreak)}
-                                    </span>
-                                {:else if goal.target && goal.progress > 0}
-                                    <span
-                                        class="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                                        style="color: {goal.color}; background-color: {goal.color}15;"
-                                    >
-                                        {formatProgress(goal.progress)}
-                                    </span>
+                                    <div class="flex items-center gap-1.5">
+                                        <Flame class="w-3 h-3 text-warning" />
+                                        <span
+                                            class="text-[10px] font-bold text-warning tabular-nums"
+                                        >
+                                            {formatNumber(goal.currentStreak)} day{goal.currentStreak !==
+                                            1
+                                                ? "s"
+                                                : ""}
+                                        </span>
+                                    </div>
                                 {/if}
                             </div>
                         </button>
@@ -259,6 +314,11 @@
             </div>
         {/if}
     </div>
+{/if}
+
+<!-- Goal Popover -->
+{#if hoveredGoal && popoverPosition}
+    <GoalPopover goal={hoveredGoal} position={popoverPosition} />
 {/if}
 
 <style>
@@ -274,19 +334,5 @@
     }
     .scrollbar-thin::-webkit-scrollbar-thumb:hover {
         background: oklch(var(--bc) / 0.25);
-    }
-
-    @keyframes pulse-glow {
-        0%,
-        100% {
-            opacity: 0.6;
-        }
-        50% {
-            opacity: 1;
-        }
-    }
-
-    :global(.animate-pulse-glow) {
-        animation: pulse-glow 1.5s ease-in-out infinite;
     }
 </style>
