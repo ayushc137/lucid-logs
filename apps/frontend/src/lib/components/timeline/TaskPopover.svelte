@@ -1,113 +1,111 @@
 <script lang="ts">
-import {
-	QUADRANT_COLORS,
-	type Quadrant,
-} from '$lib/components/emotions/emotionData';
-import { OpenMoji } from '$lib/components/ui';
-import { stripHtml } from '$lib/utils';
-import { Check, Clock, FileText, Heart, Sparkles } from 'lucide-svelte';
-import { scale } from 'svelte/transition';
-import type { TimelineTask } from './types';
+    import {
+        QUADRANT_COLORS,
+        type Quadrant,
+    } from "$lib/components/emotions/emotionData";
+    import { OpenMoji } from "$lib/components/ui";
+    import { stripHtml } from "$lib/utils";
+    import { Check, Clock, FileText, Heart, Sparkles } from "lucide-svelte";
+    import { scale } from "svelte/transition";
+    import type { TimelineTask } from "./types";
 
-interface Props {
-	task: TimelineTask;
-	position: { x: number; y: number };
-}
+    interface Props {
+        task: TimelineTask;
+        position: { x: number; y: number };
+    }
 
-let { task, position }: Props = $props();
+    let { task, position }: Props = $props();
 
-// Calculate smart positioning to avoid edge overflow
-const smartPosition = $derived.by(() => {
-	if (typeof window === 'undefined') {
-		return {
-			x: position.x,
-			y: position.y,
-			anchor: 'top-left' as const,
-		};
-	}
+    // Calculate smart positioning to avoid edge overflow
+    const smartPosition = $derived.by(() => {
+        if (typeof window === "undefined") {
+            return {
+                x: position.x,
+                y: position.y,
+            };
+        }
 
-	const POPOVER_WIDTH = 280;
-	const POPOVER_HEIGHT = 280; // Increased for emotion content
-	const PADDING = 16;
-	const CURSOR_OFFSET = 12;
+        const POPOVER_WIDTH = 300;
+        const MAX_POPOVER_HEIGHT = 400; // Maximum possible height
+        const OFFSET = 12; // Distance from cursor
+        const PADDING = 8;
 
-	const viewportWidth = window.innerWidth;
-	const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
 
-	let x = position.x + CURSOR_OFFSET;
-	let y = position.y + CURSOR_OFFSET;
-	let anchor: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' =
-		'top-left';
+        // Calculate available space
+        const spaceRight = viewportWidth - position.x;
+        const spaceLeft = position.x;
+        const spaceBelow = viewportHeight - position.y;
+        const spaceAbove = position.y;
 
-	// Check horizontal overflow
-	if (x + POPOVER_WIDTH > viewportWidth - PADDING) {
-		x = position.x - POPOVER_WIDTH - CURSOR_OFFSET;
-		anchor = anchor.replace('left', 'right') as typeof anchor;
-	}
+        // Determine if we should flip horizontally
+        const shouldFlipX = spaceRight < POPOVER_WIDTH + OFFSET + PADDING;
 
-	// Check vertical overflow
-	if (y + POPOVER_HEIGHT > viewportHeight - PADDING) {
-		y = position.y - POPOVER_HEIGHT - CURSOR_OFFSET;
-		anchor = anchor.replace('top', 'bottom') as typeof anchor;
-	}
+        // Determine if we should flip vertically
+        // Only flip if there's more space above AND not enough space below
+        const shouldFlipY = spaceBelow < MAX_POPOVER_HEIGHT + OFFSET + PADDING && spaceAbove > spaceBelow;
 
-	// Ensure minimum bounds
-	x = Math.max(PADDING, x);
-	y = Math.max(PADDING, y);
+        // Calculate position
+        let x = shouldFlipX
+            ? Math.max(PADDING, position.x - POPOVER_WIDTH - OFFSET)
+            : position.x + OFFSET;
 
-	return { x, y, anchor };
-});
+        // For Y position, stay close to cursor
+        let y = position.y + (shouldFlipY ? -OFFSET : OFFSET);
 
-// Check for emotions
-const hasSelectedEmotion = $derived(
-	!!task?.emotionId &&
-		!!task?.emotionName &&
-		!!task?.emotionEmoji &&
-		!!task?.emotionQuadrant,
-);
-const hasInferredEmotion = $derived(
-	!!task?.inferredEmotionId &&
-		!!task?.inferredEmotionName &&
-		!!task?.inferredEmotionEmoji &&
-		!!task?.inferredEmotionQuadrant,
-);
-const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
+        return { x, y, shouldFlipY };
+    });
 
-function formatTime(d: Date): string {
-	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
-	return d.toLocaleTimeString([], {
-		hour: 'numeric',
-		minute: '2-digit',
-		hour12: true,
-	});
-}
+    // Check for emotions
+    const hasSelectedEmotion = $derived(
+        !!task?.emotionId &&
+            !!task?.emotionName &&
+            !!task?.emotionEmoji &&
+            !!task?.emotionQuadrant,
+    );
+    const hasInferredEmotion = $derived(
+        !!task?.inferredEmotionId &&
+            !!task?.inferredEmotionName &&
+            !!task?.inferredEmotionEmoji &&
+            !!task?.inferredEmotionQuadrant,
+    );
+    const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
 
-function formatDuration(s: Date, e: Date): string {
-	if (!(s instanceof Date) || !(e instanceof Date)) return '';
-	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-	if (mins < 1) return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
-	if (mins < 60) return `${mins}m`;
-	const h = Math.floor(mins / 60);
-	const m = mins % 60;
-	return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
+    function formatTime(d: Date): string {
+        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "--:--";
+        return d.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        });
+    }
 
-const descriptionPreview = $derived(
-	task.description
-		? stripHtml(task.description, { newlineSeparator: ' · ' })
-		: null,
-);
+    function formatDuration(s: Date, e: Date): string {
+        if (!(s instanceof Date) || !(e instanceof Date)) return "";
+        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+        if (mins < 1)
+            return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
+        if (mins < 60) return `${mins}m`;
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+
+    const descriptionPreview = $derived(
+        task.description
+            ? stripHtml(task.description, { newlineSeparator: " · " })
+            : null,
+    );
 </script>
 
 <div
-    class="fixed z-[9999] pointer-events-none"
-    style="top: {smartPosition.y}px; left: {smartPosition.x}px;"
-    in:scale={{ duration: 150, start: 0.95, opacity: 0 }}
+    class="fixed z-[9999] pointer-events-none transition-all duration-150 ease-out {smartPosition.shouldFlipY ? 'origin-bottom' : 'origin-top'}"
+    style="top: {smartPosition.y}px; left: {smartPosition.x}px; {smartPosition.shouldFlipY ? 'transform: translateY(-100%);' : ''}"
+    in:scale={{ duration: 200, start: 0.9, opacity: 0, easing: (t) => t * (2 - t) }}
+    out:scale={{ duration: 150, start: 1, opacity: 0, easing: (t) => t * t }}
 >
-    <div
-        class="bg-base-100 backdrop-blur-xl rounded-2xl shadow-2xl border border-base-200 overflow-hidden"
-        style="width: 280px;"
-    >
+    <div class="w-[300px] bg-base-100/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15),0_0_30px_rgba(0,0,0,0.05)] border border-base-200/50 overflow-hidden">
         <!-- Header with category color accent -->
         <div
             class="h-1.5 w-full"
@@ -234,6 +232,54 @@ const descriptionPreview = $derived(
                             </div>
                         </div>
                     {/if}
+                </div>
+            {/if}
+
+            <!-- Linked Goals Section -->
+            {#if task.linkedGoals && task.linkedGoals.length > 0}
+                <div class="mb-3">
+                    <div
+                        class="flex items-center gap-2 text-[10px] font-semibold uppercase text-base-content/40 mb-2"
+                    >
+                        <span class="text-sm">🎯</span>
+                        <span>Linked Goals</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        {#each task.linkedGoals as goal}
+                            {@const unitDisplay =
+                                goal.unitSymbol?.replace("units:", "") || ""}
+                            {@const formattedQty = goal.quantityValue
+                                ? Number.isInteger(goal.quantityValue)
+                                    ? goal.quantityValue
+                                    : goal.quantityValue.toFixed(1)
+                                : null}
+                            {@const impactSign =
+                                goal.impactType === "negative" ? "−" : "+"}
+                            <div
+                                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs bg-base-200/40 w-full"
+                            >
+                                <span class="text-sm">{goal.icon || "🎯"}</span>
+                                <span
+                                    class="font-medium flex-1 truncate"
+                                    style="color: {goal.color || '#8b5cf6'};"
+                                >
+                                    {goal.title}
+                                </span>
+                                {#if formattedQty}
+                                    <span
+                                        class="text-[10px] font-semibold px-1.5 py-0.5 rounded {goal.impactType ===
+                                        'positive'
+                                            ? 'text-success bg-success/10'
+                                            : goal.impactType === 'negative'
+                                              ? 'text-error bg-error/10'
+                                              : 'text-base-content/60'}"
+                                    >
+                                        {impactSign}{formattedQty}<span class="ml-0.5">{unitDisplay}</span>
+                                    </span>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
                 </div>
             {/if}
 

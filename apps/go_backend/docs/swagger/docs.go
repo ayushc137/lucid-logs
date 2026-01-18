@@ -4270,6 +4270,13 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "linked_task_ids": {
+                    "description": "From task_goals edge (for highlighting)",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "parent": {
                     "description": "From goal_children (reverse)",
                     "allOf": [
@@ -5446,6 +5453,36 @@ const docTemplate = `{
                 }
             }
         },
+        "tasks.LinkedGoalSummary": {
+            "description": "Lightweight goal summary for task highlighting",
+            "type": "object",
+            "properties": {
+                "color": {
+                    "description": "From goal's category",
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "impact_type": {
+                    "description": "\"positive\", \"negative\", \"neutral\"",
+                    "type": "string"
+                },
+                "quantity_value": {
+                    "type": "number"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "unit_symbol": {
+                    "description": "e.g., \"km\", \"min\"",
+                    "type": "string"
+                }
+            }
+        },
         "tasks.Quantity": {
             "description": "Quantity measurement for task",
             "type": "object",
@@ -5527,6 +5564,13 @@ const docTemplate = `{
                 },
                 "journal": {
                     "type": "string"
+                },
+                "linked_goals": {
+                    "description": "From task_goals edge",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tasks.LinkedGoalSummary"
+                    }
                 },
                 "negatives": {
                     "type": "array",

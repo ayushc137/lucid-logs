@@ -131,11 +131,25 @@ type taskDB struct {
 	EmotionID       *string                   `json:"emotion_id,omitempty"`
 	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
 
+	// Linked goals (populated via subquery)
+	LinkedGoals []linkedGoalDB `json:"linked_goals,omitempty"`
+
 	CreatedAt database.SurrealTime  `json:"created_at"`
 	UpdatedAt database.SurrealTime  `json:"updated_at"`
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
 	CreatedBy string                `json:"created_by"`
 	UpdatedBy string                `json:"updated_by"`
+}
+
+// linkedGoalDB is the database representation of a linked goal from subquery.
+type linkedGoalDB struct {
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Icon          string   `json:"icon"`
+	Color         string   `json:"color"`
+	ImpactType    string   `json:"impact_type"`
+	QuantityValue *float64 `json:"quantity_value"`
+	UnitSymbol    string   `json:"unit_symbol"`
 }
 
 // categoryDB is the database representation of a category when fetched.
@@ -191,6 +205,23 @@ func (t *taskDB) toTask() *Task {
 		deletedAt = &dt
 	}
 
+	// Convert linked goals
+	var linkedGoals []LinkedGoalSummary
+	if len(t.LinkedGoals) > 0 {
+		linkedGoals = make([]LinkedGoalSummary, len(t.LinkedGoals))
+		for i, lg := range t.LinkedGoals {
+			linkedGoals[i] = LinkedGoalSummary{
+				ID:            lg.ID,
+				Title:         lg.Title,
+				Icon:          lg.Icon,
+				Color:         lg.Color,
+				ImpactType:    lg.ImpactType,
+				QuantityValue: lg.QuantityValue,
+				UnitSymbol:    lg.UnitSymbol,
+			}
+		}
+	}
+
 	return &Task{
 		ID:              database.ToStringID(t.ID),
 		Title:           t.Title,
@@ -205,6 +236,7 @@ func (t *taskDB) toTask() *Task {
 		Category:        cat,
 		EmotionID:       t.EmotionID,
 		InferredEmotion: t.InferredEmotion,
+		LinkedGoals:     linkedGoals,
 		CreatedAt:       t.CreatedAt.Time,
 		UpdatedAt:       t.UpdatedAt.Time,
 		DeletedAt:       deletedAt,
@@ -444,9 +476,22 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 		return nil, 0, err
 	}
 
-	// Main query with category fetch
+	// Main query with category fetch and linked goals subquery
+	// The linked_goals subquery fetches goal summary data for highlighting:
+	// - Joins task_goals edge with goals table
+	// - Gets goal's category color via FETCH or subquery
+	// - Includes quantity_value for displaying contribution in popover
 	selectQuery := `
-		SELECT *
+		SELECT *,
+			(SELECT 
+				type::string(out.id) as id,
+				out.title as title,
+				out.icon as icon,
+				out.category.color as color,
+				impact_type,
+				quantity_value,
+				out.target.unit_id as unit_symbol
+			FROM task_goals WHERE in = $parent.id) as linked_goals
 		FROM tasks
 		WHERE ` + whereClause + `
 		` + orderClause + `

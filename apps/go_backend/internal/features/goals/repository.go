@@ -139,6 +139,9 @@ type goalDB struct {
 	// Children (populated via goal_children edge)
 	Children []goalChildDB `json:"children,omitempty"`
 
+	// Linked task IDs (populated via task_goals edge, for highlighting)
+	LinkedTaskIDs []string `json:"linked_task_ids,omitempty"`
+
 	// Computed stats (populated via subquery in optimized fetches)
 	// Consolidating stats into single objects to reduce graph traversals
 	FilteredStats *struct {
@@ -303,6 +306,9 @@ func (g *goalDB) toGoal() *Goal {
 	}
 
 	goal.Stats = stats
+
+	// Copy linked task IDs for highlighting
+	goal.LinkedTaskIDs = g.LinkedTaskIDs
 
 	return goal
 }
@@ -585,11 +591,13 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		return nil, 0, err
 	}
 
-	// Main query with computed stats
+	// Main query with computed stats and linked task IDs
 	// Use period-based filtering for per_period goals (day/week/month)
 	// This ensures stats show only current period data
+	// linked_task_ids enables bi-directional highlighting in the UI
 	dataQuery := `SELECT *,
 		(->in_category.out.*)[0] as category,
+		(SELECT VALUE type::string(in.id) FROM <-task_goals) as linked_task_ids,
 		(SELECT
 			math::sum(quantity_value) AS total,
 			count() AS count

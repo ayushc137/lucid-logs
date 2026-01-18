@@ -28,9 +28,11 @@ export interface TimelineGoal {
 export interface LinkedGoalInfo {
 	id: string;
 	title: string;
-	icon: string;
-	color: string;
+	icon?: string;
+	color?: string;
 	impactType: 'positive' | 'negative' | 'neutral';
+	quantityValue?: number;
+	unitSymbol?: string;
 }
 
 export interface TimelineTask {

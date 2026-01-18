@@ -37,25 +37,64 @@
 		onCreateTaskFromGoal,
 	}: TimelineProps = $props();
 
-	// Bi-directional hover highlighting between tasks and goals
-	// When hovering a task, get its linked goal IDs to highlight in GoalLane
-	const highlightedGoalIds = $derived.by(() => {
-		if (!hoveredTaskId) return [];
-		const task = tasks.find((t) => t.id === hoveredTaskId);
-		return task?.linkedGoals?.map((g) => g.id) || [];
-	});
-
-	// When hovering a goal in the lane, highlight linked tasks
+	// Hover states - declared first so they can be used in derived values
 	let hoveredGoalId = $state<string | null>(null);
 
 	function handleGoalHover(goalId: string | null) {
 		hoveredGoalId = goalId;
 	}
 
+	// Build a map from goalId -> taskIds using goals' linkedTaskIds
+	// This is used to highlight tasks when hovering a goal
+	const goalToTasksMap = $derived.by(() => {
+		const map = new Map<string, string[]>();
+		for (const goal of goals) {
+			if (goal.linkedTaskIds && goal.linkedTaskIds.length > 0) {
+				map.set(goal.id, goal.linkedTaskIds);
+			}
+		}
+		return map;
+	});
+
+	// Build a map from taskId -> goalIds using tasks' linkedGoals OR reverse lookup from goals
+	const taskToGoalsMap = $derived.by(() => {
+		const map = new Map<string, string[]>();
+
+		// First, use tasks' linkedGoals if available
+		for (const task of tasks) {
+			if (task.linkedGoals && task.linkedGoals.length > 0) {
+				map.set(
+					task.id,
+					task.linkedGoals.map((g) => g.id),
+				);
+			}
+		}
+
+		// Also build reverse mapping from goals' linkedTaskIds
+		for (const goal of goals) {
+			if (goal.linkedTaskIds) {
+				for (const taskId of goal.linkedTaskIds) {
+					const existing = map.get(taskId) || [];
+					if (!existing.includes(goal.id)) {
+						map.set(taskId, [...existing, goal.id]);
+					}
+				}
+			}
+		}
+
+		return map;
+	});
+
+	// Get highlighted task IDs when hovering a goal
+	const highlightedTaskIds = $derived.by(() => {
+		if (!hoveredGoalId) return new Set<string>();
+		const taskIds = goalToTasksMap.get(hoveredGoalId) || [];
+		return new Set(taskIds);
+	});
+
 	// Check if a task is linked to the currently hovered goal
-	function isTaskLinkedToHoveredGoal(task: TimelineTask): boolean {
-		if (!hoveredGoalId) return false;
-		return task.linkedGoals?.some((g) => g.id === hoveredGoalId) || false;
+	function isTaskLinkedToHoveredGoal(taskId: string): boolean {
+		return highlightedTaskIds.has(taskId);
 	}
 
 	// Internal edit mode state (can be controlled externally or internally)
@@ -479,6 +518,13 @@
 	let hoveredTaskId = $state<string | null>(null);
 	let tooltipPosition = $state<{ x: number; y: number } | null>(null);
 
+	// Get highlighted goal IDs when hovering a task
+	const highlightedGoalIds = $derived.by(() => {
+		if (!hoveredTaskId) return [];
+		// Use the precomputed map for efficient lookup
+		return taskToGoalsMap.get(hoveredTaskId) || [];
+	});
+
 	onMount(() => {
 		timeInterval = setInterval(() => (currentTime = new Date()), 1000);
 
@@ -808,19 +854,21 @@
 	}
 
 	function updateTooltipPosition(e: MouseEvent) {
-		// Position tooltip below and to the right of the mouse
-		const x = e.clientX + 16;
-		const y = e.clientY + 16;
+		// Position tooltip near the mouse (offset is applied in TaskPopover)
+		const x = e.clientX;
+		const y = e.clientY;
 		tooltipPosition = { x, y };
 	}
 
 	function onMouseMove(e: MouseEvent) {
+		// Update tooltip position as mouse moves for smooth following
 		if (hoveredTaskId && !dragMode) {
 			updateTooltipPosition(e);
 		}
 	}
 	function onMouseLeave() {
 		hoveredTaskId = null;
+		tooltipPosition = null;
 	}
 	const hovered = $derived(tasks.find((t) => t.id === hoveredTaskId));
 
@@ -1054,14 +1102,20 @@
 						{@const txt = getTextColor(bg)}
 						{@const isHov = hoveredTaskId === task.id}
 						{@const isDragging = draggedTaskId === task.id}
-						{@const isGoalLinked = isTaskLinkedToHoveredGoal(task)}
+						{@const isGoalLinked = isTaskLinkedToHoveredGoal(
+							task.id,
+						)}
 
-						<!-- Dim other tasks when focusing, but not if linked to hovered goal -->
+						<!-- Dim tasks when focusing on one task OR when hovering a goal (unless linked) -->
 						{@const isDimmed =
-							(hoveredTaskId || draggedTaskId) &&
-							!isHov &&
-							!isDragging &&
-							!isGoalLinked}
+							((hoveredTaskId || draggedTaskId) &&
+								!isHov &&
+								!isDragging &&
+								!isGoalLinked) ||
+							(hoveredGoalId && !isGoalLinked)}
+
+						<!-- Check if this task should have the hover effect (direct hover OR linked to hovered goal) -->
+						{@const shouldShowHoverEffect = (isHov || isGoalLinked) && !isDragging}
 
 						<!-- Calculate times & Dragging Logic -->
 						{@const previewTimes =
@@ -1099,10 +1153,7 @@
                                 {isDimmed
 								? 'opacity-30 grayscale-[50%] blur-[1px]'
 								: 'opacity-100'}
-                                {isGoalLinked && !isHov
-								? 'ring-2 ring-primary ring-offset-1 z-40'
-								: ''}
-                                {isHov && !isDragging ? 'z-50' : 'z-10'} 
+                                {shouldShowHoverEffect ? 'z-50' : 'z-10'}
                                 {isDragging ? 'z-[100]' : ''}"
 							style="
                                 left: {pos.left}%; 
@@ -1125,8 +1176,8 @@
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="task-bar relative h-full rounded-lg overflow-hidden transition-all duration-300
-                                    {isHov && !isDragging
-									? 'shadow-xl ring-2 ring-white/60 scale-[1.01] -translate-y-0.5'
+                                    {shouldShowHoverEffect
+									? 'shadow-[0_8px_30px_rgb(0,0,0,0.12)] ring-2 ring-white/60 scale-[1.02] -translate-y-1'
 									: 'shadow-md'}
                                     {isDragging
 									? 'shadow-2xl ring-2 ring-warning scale-[1.02] cursor-grabbing'
@@ -1137,9 +1188,11 @@
                                     {task.completed
 									? 'ring-1 ring-base-content/5 opacity-85 saturate-[0.8]'
 									: ''}
-                                    {isLeftEdge ? '!rounded-l-none' : ''} 
+                                    {isLeftEdge ? '!rounded-l-none' : ''}
                                     {isRightEdge ? '!rounded-r-none' : ''}"
-								style="background-color: {bg} !important;"
+								style="background-color: {bg} !important; {shouldShowHoverEffect
+									? `box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 0 20px ${bg}40;`
+									: ''}"
 								onmousedown={(e) =>
 									isEditMode &&
 									handleDragStart(e, task, "move")}
@@ -1148,7 +1201,7 @@
 								<div
 									class="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/10 pointer-events-none"
 								></div>
-								{#if isHov && !isDragging}
+								{#if shouldShowHoverEffect}
 									<div
 										class="absolute inset-0 bg-white/10 pointer-events-none transition-opacity duration-200"
 									></div>

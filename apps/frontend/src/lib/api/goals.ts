@@ -39,6 +39,7 @@ export interface Goal {
 	category?: { id: string; name: string; color: string; icon: string }; // Simplified from Category type for now
 	children?: Goal[];
 	parent?: Goal;
+	linked_task_ids?: string[]; // Linked task IDs for highlighting
 }
 
 export interface Target {

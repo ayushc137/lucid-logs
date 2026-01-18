@@ -30,6 +30,26 @@
     // Expanded state
     let isExpanded = $state(true);
 
+    // Scroll container ref for auto-scrolling
+    let scrollContainer = $state<HTMLDivElement | null>(null);
+
+    // Auto-scroll to first highlighted goal
+    $effect(() => {
+        if (highlightedGoalIds.length > 0 && scrollContainer && isExpanded) {
+            const firstHighlightedId = highlightedGoalIds[0];
+            const goalElement = scrollContainer.querySelector(
+                `[data-goal-id="${firstHighlightedId}"]`,
+            );
+            if (goalElement) {
+                goalElement.scrollIntoView({
+                    behavior: "smooth",
+                    block: "nearest",
+                    inline: "center",
+                });
+            }
+        }
+    });
+
     // Format recurrence properly (fix "dayly" -> "daily")
     function formatRecurrence(
         rec: { frequency: number; period: string } | undefined,
@@ -63,11 +83,19 @@
             (g) => g.todayStatus === "met" || g.todayStatus === "exceeded",
         ).length,
     );
+
+    // Local hover state for dimming other goals
+    let localHoveredGoalId = $state<string | null>(null);
+
+    function handleLocalHover(goalId: string | null) {
+        localHoveredGoalId = goalId;
+        onGoalHover?.(goalId);
+    }
 </script>
 
 {#if goals.length > 0}
     <div
-        class="goal-lane bg-base-100 border-b border-base-200"
+        class="goal-lane bg-base-100 border-b border-base-200 relative z-30"
         transition:slide={{ duration: 200 }}
     >
         <!-- Header (collapsible toggle) -->
@@ -99,10 +127,11 @@
         <!-- Goal Cards (horizontal scroll) -->
         {#if isExpanded}
             <div
-                class="px-4 pb-3 overflow-x-auto scrollbar-thin"
+                class="px-4 pb-4 pt-1 overflow-x-auto overflow-y-visible scrollbar-thin"
                 transition:slide={{ duration: 150 }}
+                bind:this={scrollContainer}
             >
-                <div class="flex gap-2">
+                <div class="flex gap-2.5 py-1">
                     {#each goals as goal (goal.id)}
                         {@const isMet =
                             goal.todayStatus === "met" ||
@@ -111,27 +140,56 @@
                         {@const isHighlighted = highlightedGoalIds.includes(
                             goal.id,
                         )}
+                        {@const isHovered = localHoveredGoalId === goal.id}
+                        {@const isDimmed =
+                            localHoveredGoalId &&
+                            localHoveredGoalId !== goal.id &&
+                            !isHighlighted}
+
+                        <!-- Check if this goal should have the hover effect (direct hover OR linked to hovered task) -->
+                        {@const shouldShowHoverEffect = isHovered || isHighlighted}
 
                         <button
                             type="button"
+                            data-goal-id={goal.id}
                             class={cn(
-                                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 group border whitespace-nowrap",
-                                isHighlighted
-                                    ? "ring-2 ring-primary ring-offset-1 bg-primary/10 border-primary/40 scale-[1.02] shadow-md"
+                                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-300 group border-0 whitespace-nowrap relative",
+                                isDimmed
+                                    ? "opacity-40 scale-[0.98] grayscale-[50%] blur-[0.5px]"
+                                    : "opacity-100",
+                                shouldShowHoverEffect
+                                    ? "shadow-[0_8px_30px_rgb(0,0,0,0.12)] scale-[1.02] -translate-y-1 z-20 ring-2 ring-white/60"
                                     : isMet
-                                      ? "bg-success/10 border-success/30 hover:bg-success/15"
+                                      ? "bg-success/10 hover:bg-success/15"
                                       : isPending
-                                        ? "bg-warning/5 border-warning/25 hover:bg-warning/10"
-                                        : "bg-base-200/30 border-base-200 hover:bg-base-200/50",
+                                        ? "bg-warning/5 hover:bg-warning/10"
+                                        : "bg-base-200/30 hover:bg-base-200/50",
                             )}
+                            style={shouldShowHoverEffect
+                                ? `box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 0 20px ${goal.color}40;`
+                                : ""}
                             onclick={() => onGoalClick?.(goal.id)}
-                            onmouseenter={() => onGoalHover?.(goal.id)}
-                            onmouseleave={() => onGoalHover?.(null)}
+                            onmouseenter={() => handleLocalHover(goal.id)}
+                            onmouseleave={() => handleLocalHover(null)}
                         >
+                            <!-- Plus button - top right corner -->
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div
+                                class="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-125 shadow-md z-10"
+                                style="background-color: {goal.color}; color: white;"
+                                onclick={(e) => {
+                                    e.stopPropagation();
+                                    onCreateTaskFromGoal?.(goal.id);
+                                }}
+                            >
+                                <Plus class="w-3 h-3" strokeWidth={2.5} />
+                            </div>
+
                             <!-- Icon -->
                             <div
-                                class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 transition-transform group-hover:scale-105"
-                                style="background-color: {goal.color}15; border: 1px solid {goal.color}25;"
+                                class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 transition-transform group-hover:scale-110"
+                                style="background-color: {goal.color}15; border: 1px solid {goal.color}30;"
                             >
                                 {goal.icon}
                             </div>
@@ -169,7 +227,7 @@
                             </div>
 
                             <!-- Status Indicator -->
-                            <div class="shrink-0 ml-1">
+                            <div class="shrink-0 ml-1 flex items-center gap-1">
                                 {#if isMet}
                                     <div
                                         class="w-6 h-6 rounded-full bg-success text-success-content flex items-center justify-center"
@@ -193,22 +251,6 @@
                                     >
                                         {formatProgress(goal.progress)}
                                     </span>
-                                {:else}
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div
-                                        class="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                        style="background-color: {goal.color}20;"
-                                        onclick={(e) => {
-                                            e.stopPropagation();
-                                            onCreateTaskFromGoal?.(goal.id);
-                                        }}
-                                    >
-                                        <Plus
-                                            class="w-3.5 h-3.5"
-                                            style="color: {goal.color};"
-                                        />
-                                    </div>
                                 {/if}
                             </div>
                         </button>
@@ -232,5 +274,19 @@
     }
     .scrollbar-thin::-webkit-scrollbar-thumb:hover {
         background: oklch(var(--bc) / 0.25);
+    }
+
+    @keyframes pulse-glow {
+        0%,
+        100% {
+            opacity: 0.6;
+        }
+        50% {
+            opacity: 1;
+        }
+    }
+
+    :global(.animate-pulse-glow) {
+        animation: pulse-glow 1.5s ease-in-out infinite;
     }
 </style>

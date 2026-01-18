@@ -200,7 +200,7 @@
 			progress: goal.stats?.progress_percent || 0,
 			currentStreak: goal.stats?.current_streak || 0,
 			todayStatus: goal.stats?.today_status,
-			linkedTaskIds: [],
+			linkedTaskIds: goal.linked_task_ids || [],
 			target: goal.target
 				? {
 						value: goal.target.value,
@@ -260,6 +260,14 @@
 		inferredEmotionEmoji?: string;
 		inferredEmotionQuadrant?: "yellow" | "green" | "red" | "blue";
 		inferredEmotionDescription?: string;
+		// Linked goals for highlighting
+		linkedGoals?: {
+			id: string;
+			title: string;
+			icon?: string;
+			color?: string;
+			impactType: "positive" | "negative" | "neutral";
+		}[];
 	};
 
 	function transformTasks(apiTasks: Task[]): TimelineTask[] {
@@ -284,6 +292,15 @@
 				categoryId: task.category?.id,
 				emotionId: task.emotion_id,
 				inferredEmotionId: task.inferred_emotion?.closest_emotion_id,
+				linkedGoals: task.linked_goals?.map((g) => ({
+					id: g.id,
+					title: g.title,
+					icon: g.icon,
+					color: g.color,
+					impactType: g.impact_type,
+					quantityValue: g.quantity_value,
+					unitSymbol: g.unit_symbol,
+				})),
 			};
 		});
 	}
@@ -647,24 +664,24 @@
 		</div>
 
 		<!-- Stats & Quick Log Card -->
-		<div class="card bg-base-100 shadow-sm border border-base-200/50">
-			<div class="card-body p-4">
+		<div class="card bg-base-100 shadow-md border border-base-200/50 rounded-2xl overflow-hidden">
+			<div class="card-body p-5">
 				<!-- Stats Row -->
 				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 					<!-- Streak -->
-					<div class="flex items-center gap-3">
+					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
 						<div
-							class="w-10 h-10 rounded-xl bg-gradient-to-br from-warning to-warning/70 flex items-center justify-center text-warning-content shadow-sm"
+							class="w-11 h-11 rounded-xl bg-gradient-to-br from-warning to-warning/70 flex items-center justify-center text-warning-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<Flame class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-xs font-medium uppercase opacity-50">
+							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
 								Streak
 							</p>
-							<p class="text-xl font-bold text-warning">
+							<p class="text-2xl font-bold text-warning leading-tight">
 								7<span
-									class="text-sm font-medium opacity-60 ml-0.5"
+									class="text-xs font-medium opacity-60 ml-0.5"
 									>d</span
 								>
 							</p>
@@ -672,19 +689,19 @@
 					</div>
 
 					<!-- Tasks -->
-					<div class="flex items-center gap-3">
+					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
 						<div
-							class="w-10 h-10 rounded-xl bg-gradient-to-br from-info to-info/70 flex items-center justify-center text-info-content shadow-sm"
+							class="w-11 h-11 rounded-xl bg-gradient-to-br from-info to-info/70 flex items-center justify-center text-info-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<ListTodo class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-xs font-medium uppercase opacity-50">
+							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
 								Tasks
 							</p>
-							<p class="text-xl font-bold text-info">
+							<p class="text-2xl font-bold text-info leading-tight">
 								{completedCount}<span
-									class="text-sm font-medium opacity-60 ml-0.5"
+									class="text-xs font-medium opacity-60 ml-0.5"
 									>/{totalCount}</span
 								>
 							</p>
@@ -692,19 +709,19 @@
 					</div>
 
 					<!-- Goals -->
-					<div class="flex items-center gap-3">
+					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
 						<div
-							class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center text-accent-content shadow-sm"
+							class="w-11 h-11 rounded-xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center text-accent-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<Target class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-xs font-medium uppercase opacity-50">
+							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
 								Goals
 							</p>
-							<p class="text-xl font-bold text-accent">
+							<p class="text-2xl font-bold text-accent leading-tight">
 								3<span
-									class="text-sm font-medium opacity-60 ml-0.5"
+									class="text-xs font-medium opacity-60 ml-0.5"
 									>active</span
 								>
 							</p>
@@ -712,14 +729,14 @@
 					</div>
 
 					<!-- Mood -->
-					<div class="flex items-center gap-3">
+					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
 						<div
-							class="w-10 h-10 rounded-xl bg-gradient-to-br from-success to-success/70 flex items-center justify-center text-success-content shadow-sm"
+							class="w-11 h-11 rounded-xl bg-gradient-to-br from-success to-success/70 flex items-center justify-center text-success-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<Smile class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-xs font-medium uppercase opacity-50">
+							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
 								Mood
 							</p>
 							<div class="flex items-center gap-1.5">
@@ -732,22 +749,22 @@
 					</div>
 				</div>
 
-				<div class="divider my-2"></div>
+				<div class="divider my-3 opacity-50"></div>
 
 				<!-- Quick Log Row -->
 				<div class="flex items-center justify-between gap-4">
 					<div class="flex items-center gap-2.5">
 						<div
-							class="w-9 h-9 rounded-lg bg-gradient-to-br from-secondary to-secondary/70 flex items-center justify-center text-secondary-content shadow-sm"
+							class="w-9 h-9 rounded-lg bg-gradient-to-br from-secondary to-secondary/70 flex items-center justify-center text-secondary-content shadow-md"
 						>
 							<Zap class="w-4 h-4" />
 						</div>
-						<span class="font-semibold text-sm">Quick Log</span>
+						<span class="font-bold text-sm">Quick Log</span>
 					</div>
 					<div class="flex items-center gap-1.5 flex-wrap">
 						{#each quickLogs as log}
 							<button
-								class="btn btn-ghost btn-sm gap-1.5 px-2.5 hover:bg-base-200"
+								class="btn btn-ghost btn-sm gap-1.5 px-2.5 hover:bg-base-200/50 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 rounded-lg"
 								onclick={() => handleQuickLog(log)}
 								title={log.label}
 							>
@@ -767,7 +784,7 @@
 	<!-- Timeline Section -->
 	<div class="flex-1 min-h-0 flex flex-col">
 		<div
-			class="card bg-base-100 shadow-sm border border-base-200/50 h-full flex flex-col"
+			class="card bg-base-100 shadow-md border border-base-200/50 rounded-2xl h-full flex flex-col overflow-hidden"
 		>
 			<div class="card-body p-3 lg:p-4 flex flex-col h-full gap-3">
 				<!-- Timeline -->
@@ -828,7 +845,7 @@
 			<!-- Menu -->
 			<div class="absolute bottom-16 right-0 z-50 animate-fade-in">
 				<div
-					class="card bg-base-100 shadow-2xl border border-base-300 min-w-[280px]"
+					class="card bg-base-100 shadow-2xl border border-base-200/50 rounded-2xl min-w-[280px] overflow-hidden"
 				>
 					<div class="card-body p-3">
 						<!-- Create Task Option -->

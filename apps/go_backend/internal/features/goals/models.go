@@ -80,9 +80,10 @@ type Goal struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 
 	// Populated via graph queries (not stored on goal record)
-	Category *categories.Category `json:"category,omitempty"` // From in_category edge
-	Children []*Goal              `json:"children,omitempty"` // From goal_children (forward)
-	Parent   *Goal                `json:"parent,omitempty"`   // From goal_children (reverse)
+	Category      *categories.Category `json:"category,omitempty"`        // From in_category edge
+	Children      []*Goal              `json:"children,omitempty"`        // From goal_children (forward)
+	Parent        *Goal                `json:"parent,omitempty"`          // From goal_children (reverse)
+	LinkedTaskIDs []string             `json:"linked_task_ids,omitempty"` // From task_goals edge (for highlighting)
 }
 
 // Target defines what success looks like for a measurable goal.
@@ -324,8 +325,8 @@ type ChildGoalLink struct {
 //
 // @Description Tasks linked to a goal
 type GoalTasksResponse struct {
-	GoalID string          `json:"goal_id"`
-	Tasks  []GoalTaskLink  `json:"tasks"`
+	GoalID string         `json:"goal_id"`
+	Tasks  []GoalTaskLink `json:"tasks"`
 }
 
 // =============================================================================

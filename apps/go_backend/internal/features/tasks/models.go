@@ -70,9 +70,10 @@ type Task struct {
 	CreatedBy string     `json:"-"` // Hidden: ownership field
 
 	// Populated via graph queries (not stored on task)
-	Category *categories.Category    `json:"category,omitempty"` // From in_category edge
-	Template *templates.TaskTemplate `json:"template,omitempty"` // From created_from edge
-	Emotion  *emotions.EmotionDetail `json:"emotion,omitempty"`  // Full emotion details
+	Category    *categories.Category    `json:"category,omitempty"`     // From in_category edge
+	Template    *templates.TaskTemplate `json:"template,omitempty"`     // From created_from edge
+	Emotion     *emotions.EmotionDetail `json:"emotion,omitempty"`      // Full emotion details
+	LinkedGoals []LinkedGoalSummary     `json:"linked_goals,omitempty"` // From task_goals edge
 }
 
 // Quantity represents a measured value with unit for task contribution to goals.
@@ -92,6 +93,20 @@ type TaskItem struct {
 	EmotionID *string `json:"emotion_id,omitempty" example:"emotions:E16"` // Optional: emotions:E01-E100
 }
 
+// LinkedGoalSummary is a lightweight goal summary for task list responses.
+// Used for highlighting linked goals in the UI without full goal details.
+//
+// @Description Lightweight goal summary for task highlighting
+type LinkedGoalSummary struct {
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Icon          string   `json:"icon,omitempty"`
+	Color         string   `json:"color,omitempty"` // From goal's category
+	ImpactType    string   `json:"impact_type"`     // "positive", "negative", "neutral"
+	QuantityValue *float64 `json:"quantity_value,omitempty"`
+	UnitSymbol    string   `json:"unit_symbol,omitempty"` // e.g., "km", "min"
+}
+
 // TaskGoalLink represents a linked goal with impact metadata.
 // This is populated via SurrealDB query from the task_goals relation.
 //
@@ -108,12 +123,12 @@ type TaskGoalLink struct {
 	MilestoneLabel  string   `json:"milestone_label,omitempty"`
 
 	// Additional goal details for rich display
-	GoalDescription string  `json:"goal_description,omitempty"`
-	GoalStatus      string  `json:"goal_status,omitempty"`
-	GoalPriority    int     `json:"goal_priority,omitempty"`
+	GoalDescription string   `json:"goal_description,omitempty"`
+	GoalStatus      string   `json:"goal_status,omitempty"`
+	GoalPriority    int      `json:"goal_priority,omitempty"`
 	GoalTargetValue *float64 `json:"goal_target_value,omitempty"`
-	GoalTargetUnit  string  `json:"goal_target_unit,omitempty"`
-	GoalProgress    float64 `json:"goal_progress,omitempty"` // Current progress percentage
+	GoalTargetUnit  string   `json:"goal_target_unit,omitempty"`
+	GoalProgress    float64  `json:"goal_progress,omitempty"` // Current progress percentage
 	GoalCategory    *struct {
 		ID    string `json:"id"`
 		Name  string `json:"name"`
@@ -238,8 +253,8 @@ type TaskPageResponse struct {
 //
 // @Description Goals linked to a task
 type TaskGoalsResponse struct {
-	TaskID string          `json:"task_id"`
-	Goals  []TaskGoalLink  `json:"goals"`
+	TaskID string         `json:"task_id"`
+	Goals  []TaskGoalLink `json:"goals"`
 }
 
 // =============================================================================

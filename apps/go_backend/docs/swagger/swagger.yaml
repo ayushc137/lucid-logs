@@ -800,6 +800,11 @@ definitions:
         type: string
       id:
         type: string
+      linked_task_ids:
+        description: From task_goals edge (for highlighting)
+        items:
+          type: string
+        type: array
       parent:
         allOf:
         - $ref: '#/definitions/goals.Goal'
@@ -1617,6 +1622,27 @@ definitions:
     required:
     - goal_id
     type: object
+  tasks.LinkedGoalSummary:
+    description: Lightweight goal summary for task highlighting
+    properties:
+      color:
+        description: From goal's category
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      impact_type:
+        description: '"positive", "negative", "neutral"'
+        type: string
+      quantity_value:
+        type: number
+      title:
+        type: string
+      unit_symbol:
+        description: e.g., "km", "min"
+        type: string
+    type: object
   tasks.Quantity:
     description: Quantity measurement for task
     properties:
@@ -1670,6 +1696,11 @@ definitions:
         description: Computed on write
       journal:
         type: string
+      linked_goals:
+        description: From task_goals edge
+        items:
+          $ref: '#/definitions/tasks.LinkedGoalSummary'
+        type: array
       negatives:
         items:
           $ref: '#/definitions/tasks.TaskItem'

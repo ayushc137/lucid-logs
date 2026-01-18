@@ -24,9 +24,21 @@ export interface Task {
 	activity_key?: string;
 	template_id?: string;
 	quantity?: Quantity;
+	linked_goals?: LinkedGoalSummary[]; // Linked goals for highlighting
 	created_at: string;
 	updated_at: string;
 	deleted_at?: string;
+}
+
+// Lightweight goal summary for task list responses (used in highlighting)
+export interface LinkedGoalSummary {
+	id: string;
+	title: string;
+	icon?: string;
+	color?: string; // From goal's category
+	impact_type: 'positive' | 'negative' | 'neutral';
+	quantity_value?: number;
+	unit_symbol?: string;
 }
 
 export interface TaskItem {
