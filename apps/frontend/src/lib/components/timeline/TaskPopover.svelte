@@ -1,102 +1,103 @@
 <script lang="ts">
-    import {
-        QUADRANT_COLORS,
-        type Quadrant,
-    } from "$lib/components/emotions/emotionData";
-    import { OpenMoji } from "$lib/components/ui";
-    import { stripHtml } from "$lib/utils";
-    import { Check, Clock, FileText, Heart, Sparkles } from "lucide-svelte";
-    import { scale } from "svelte/transition";
-    import type { TimelineTask } from "./types";
+import {
+	QUADRANT_COLORS,
+	type Quadrant,
+} from '$lib/components/emotions/emotionData';
+import { OpenMoji } from '$lib/components/ui';
+import { stripHtml } from '$lib/utils';
+import { Check, Clock, FileText, Heart, Sparkles } from 'lucide-svelte';
+import { scale } from 'svelte/transition';
+import type { TimelineTask } from './types';
 
-    interface Props {
-        task: TimelineTask;
-        position: { x: number; y: number };
-    }
+interface Props {
+	task: TimelineTask;
+	position: { x: number; y: number };
+}
 
-    let { task, position }: Props = $props();
+let { task, position }: Props = $props();
 
-    // Calculate smart positioning to avoid edge overflow
-    const smartPosition = $derived.by(() => {
-        if (typeof window === "undefined") {
-            return {
-                x: position.x,
-                y: position.y,
-            };
-        }
+// Calculate smart positioning to avoid edge overflow
+const smartPosition = $derived.by(() => {
+	if (typeof window === 'undefined') {
+		return {
+			x: position.x,
+			y: position.y,
+		};
+	}
 
-        const POPOVER_WIDTH = 300;
-        const MAX_POPOVER_HEIGHT = 400; // Maximum possible height
-        const OFFSET = 12; // Distance from cursor
-        const PADDING = 8;
+	const POPOVER_WIDTH = 300;
+	const MAX_POPOVER_HEIGHT = 400; // Maximum possible height
+	const OFFSET = 12; // Distance from cursor
+	const PADDING = 8;
 
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
+	const viewportWidth = window.innerWidth;
+	const viewportHeight = window.innerHeight;
 
-        // Calculate available space
-        const spaceRight = viewportWidth - position.x;
-        const spaceLeft = position.x;
-        const spaceBelow = viewportHeight - position.y;
-        const spaceAbove = position.y;
+	// Calculate available space
+	const spaceRight = viewportWidth - position.x;
+	const spaceLeft = position.x;
+	const spaceBelow = viewportHeight - position.y;
+	const spaceAbove = position.y;
 
-        // Determine if we should flip horizontally
-        const shouldFlipX = spaceRight < POPOVER_WIDTH + OFFSET + PADDING;
+	// Determine if we should flip horizontally
+	const shouldFlipX = spaceRight < POPOVER_WIDTH + OFFSET + PADDING;
 
-        // Determine if we should flip vertically
-        // Only flip if there's more space above AND not enough space below
-        const shouldFlipY = spaceBelow < MAX_POPOVER_HEIGHT + OFFSET + PADDING && spaceAbove > spaceBelow;
+	// Determine if we should flip vertically
+	// Only flip if there's more space above AND not enough space below
+	const shouldFlipY =
+		spaceBelow < MAX_POPOVER_HEIGHT + OFFSET + PADDING &&
+		spaceAbove > spaceBelow;
 
-        // Calculate position
-        let x = shouldFlipX
-            ? Math.max(PADDING, position.x - POPOVER_WIDTH - OFFSET)
-            : position.x + OFFSET;
+	// Calculate position
+	let x = shouldFlipX
+		? Math.max(PADDING, position.x - POPOVER_WIDTH - OFFSET)
+		: position.x + OFFSET;
 
-        // For Y position, stay close to cursor
-        let y = position.y + (shouldFlipY ? -OFFSET : OFFSET);
+	// For Y position, stay close to cursor
+	let y = position.y + (shouldFlipY ? -OFFSET : OFFSET);
 
-        return { x, y, shouldFlipY };
-    });
+	return { x, y, shouldFlipY };
+});
 
-    // Check for emotions
-    const hasSelectedEmotion = $derived(
-        !!task?.emotionId &&
-            !!task?.emotionName &&
-            !!task?.emotionEmoji &&
-            !!task?.emotionQuadrant,
-    );
-    const hasInferredEmotion = $derived(
-        !!task?.inferredEmotionId &&
-            !!task?.inferredEmotionName &&
-            !!task?.inferredEmotionEmoji &&
-            !!task?.inferredEmotionQuadrant,
-    );
-    const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
+// Check for emotions
+const hasSelectedEmotion = $derived(
+	!!task?.emotionId &&
+		!!task?.emotionName &&
+		!!task?.emotionEmoji &&
+		!!task?.emotionQuadrant,
+);
+const hasInferredEmotion = $derived(
+	!!task?.inferredEmotionId &&
+		!!task?.inferredEmotionName &&
+		!!task?.inferredEmotionEmoji &&
+		!!task?.inferredEmotionQuadrant,
+);
+const hasAnyEmotion = $derived(hasSelectedEmotion || hasInferredEmotion);
 
-    function formatTime(d: Date): string {
-        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "--:--";
-        return d.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        });
-    }
+function formatTime(d: Date): string {
+	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
+	return d.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+	});
+}
 
-    function formatDuration(s: Date, e: Date): string {
-        if (!(s instanceof Date) || !(e instanceof Date)) return "";
-        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-        if (mins < 1)
-            return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
-        if (mins < 60) return `${mins}m`;
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
-        return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    }
+function formatDuration(s: Date, e: Date): string {
+	if (!(s instanceof Date) || !(e instanceof Date)) return '';
+	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+	if (mins < 1) return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
+	if (mins < 60) return `${mins}m`;
+	const h = Math.floor(mins / 60);
+	const m = mins % 60;
+	return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
-    const descriptionPreview = $derived(
-        task.description
-            ? stripHtml(task.description, { newlineSeparator: " · " })
-            : null,
-    );
+const descriptionPreview = $derived(
+	task.description
+		? stripHtml(task.description, { newlineSeparator: ' · ' })
+		: null,
+);
 </script>
 
 <div

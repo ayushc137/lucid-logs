@@ -1,176 +1,172 @@
 <script lang="ts">
-    import type {
-        GoalLog,
-        GoalLogEvent,
-        TriggeringTaskInfo,
-    } from "$lib/api/goals";
-    import { cn } from "$lib/utils";
-    import {
-        AlertCircle,
-        Archive,
-        ArrowDown,
-        ArrowUp,
-        CalendarDays,
-        CheckCircle2,
-        Clock,
-        FileText,
-        Flame,
-        Link2,
-        RotateCcw,
-        Sparkles,
-        Tag,
-        Target,
-        TrendingUp,
-        Trophy,
-        Unlink,
-    } from "lucide-svelte";
+import type { GoalLog, GoalLogEvent, TriggeringTaskInfo } from '$lib/api/goals';
+import { cn } from '$lib/utils';
+import {
+	AlertCircle,
+	Archive,
+	ArrowDown,
+	ArrowUp,
+	CalendarDays,
+	CheckCircle2,
+	Clock,
+	FileText,
+	Flame,
+	Link2,
+	RotateCcw,
+	Sparkles,
+	Tag,
+	Target,
+	TrendingUp,
+	Trophy,
+	Unlink,
+} from 'lucide-svelte';
 
-    interface Props {
-        logs: GoalLog[];
-        isLoading?: boolean;
-    }
+interface Props {
+	logs: GoalLog[];
+	isLoading?: boolean;
+}
 
-    let { logs = [], isLoading = false }: Props = $props();
+let { logs = [], isLoading = false }: Props = $props();
 
-    function formatTaskTime(dateStr?: string): string {
-        if (!dateStr) return "";
-        const date = new Date(dateStr);
-        return date.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    }
+function formatTaskTime(dateStr?: string): string {
+	if (!dateStr) return '';
+	const date = new Date(dateStr);
+	return date.toLocaleTimeString([], {
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+}
 
-    // Event display config
-    const eventConfig: Record<
-        GoalLogEvent,
-        { icon: typeof Sparkles; color: string; label: string }
-    > = {
-        created: {
-            icon: Sparkles,
-            color: "text-success",
-            label: "Goal created",
-        },
-        updated: { icon: RotateCcw, color: "text-info", label: "Goal updated" },
-        completed: {
-            icon: Trophy,
-            color: "text-success",
-            label: "Goal completed",
-        },
-        archived: {
-            icon: Archive,
-            color: "text-warning",
-            label: "Goal archived",
-        },
-        reactivated: {
-            icon: Sparkles,
-            color: "text-success",
-            label: "Goal reactivated",
-        },
-        deleted: {
-            icon: AlertCircle,
-            color: "text-error",
-            label: "Goal deleted",
-        },
-        streak_updated: {
-            icon: Flame,
-            color: "text-warning",
-            label: "Streak updated",
-        },
-        streak_broken: {
-            icon: AlertCircle,
-            color: "text-error",
-            label: "Streak broken",
-        },
-        target_met: {
-            icon: Target,
-            color: "text-success",
-            label: "Target reached!",
-        },
-        target_exceeded: {
-            icon: AlertCircle,
-            color: "text-error",
-            label: "Target exceeded",
-        },
-        period_end: {
-            icon: CalendarDays,
-            color: "text-info",
-            label: "Period ended",
-        },
-        task_linked: {
-            icon: Link2,
-            color: "text-primary",
-            label: "Task linked",
-        },
-        task_unlinked: {
-            icon: Unlink,
-            color: "text-warning",
-            label: "Task unlinked",
-        },
-        child_added: {
-            icon: ArrowDown,
-            color: "text-success",
-            label: "Child added",
-        },
-        child_removed: {
-            icon: ArrowUp,
-            color: "text-error",
-            label: "Child removed",
-        },
-    };
+// Event display config
+const eventConfig: Record<
+	GoalLogEvent,
+	{ icon: typeof Sparkles; color: string; label: string }
+> = {
+	created: {
+		icon: Sparkles,
+		color: 'text-success',
+		label: 'Goal created',
+	},
+	updated: { icon: RotateCcw, color: 'text-info', label: 'Goal updated' },
+	completed: {
+		icon: Trophy,
+		color: 'text-success',
+		label: 'Goal completed',
+	},
+	archived: {
+		icon: Archive,
+		color: 'text-warning',
+		label: 'Goal archived',
+	},
+	reactivated: {
+		icon: Sparkles,
+		color: 'text-success',
+		label: 'Goal reactivated',
+	},
+	deleted: {
+		icon: AlertCircle,
+		color: 'text-error',
+		label: 'Goal deleted',
+	},
+	streak_updated: {
+		icon: Flame,
+		color: 'text-warning',
+		label: 'Streak updated',
+	},
+	streak_broken: {
+		icon: AlertCircle,
+		color: 'text-error',
+		label: 'Streak broken',
+	},
+	target_met: {
+		icon: Target,
+		color: 'text-success',
+		label: 'Target reached!',
+	},
+	target_exceeded: {
+		icon: AlertCircle,
+		color: 'text-error',
+		label: 'Target exceeded',
+	},
+	period_end: {
+		icon: CalendarDays,
+		color: 'text-info',
+		label: 'Period ended',
+	},
+	task_linked: {
+		icon: Link2,
+		color: 'text-primary',
+		label: 'Task linked',
+	},
+	task_unlinked: {
+		icon: Unlink,
+		color: 'text-warning',
+		label: 'Task unlinked',
+	},
+	child_added: {
+		icon: ArrowDown,
+		color: 'text-success',
+		label: 'Child added',
+	},
+	child_removed: {
+		icon: ArrowUp,
+		color: 'text-error',
+		label: 'Child removed',
+	},
+};
 
-    function formatEventDate(dateStr: string): string {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+function formatEventDate(dateStr: string): string {
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diff = now.getTime() - date.getTime();
+	const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-        if (days === 0) {
-            return date.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        }
-        if (days === 1) {
-            return "Yesterday";
-        }
-        if (days < 7) {
-            return `${days} days ago`;
-        }
-        return date.toLocaleDateString([], {
-            month: "short",
-            day: "numeric",
-        });
-    }
+	if (days === 0) {
+		return date.toLocaleTimeString([], {
+			hour: '2-digit',
+			minute: '2-digit',
+		});
+	}
+	if (days === 1) {
+		return 'Yesterday';
+	}
+	if (days < 7) {
+		return `${days} days ago`;
+	}
+	return date.toLocaleDateString([], {
+		month: 'short',
+		day: 'numeric',
+	});
+}
 
-    function formatChanges(changes: Record<string, unknown>): Array<{
-        key: string;
-        value: string;
-    }> {
-        return Object.entries(changes).map(([key, value]) => {
-            const formattedKey = key
-                .replace(/_/g, " ")
-                .replace(/\b\w/g, (l) => l.toUpperCase());
+function formatChanges(changes: Record<string, unknown>): Array<{
+	key: string;
+	value: string;
+}> {
+	return Object.entries(changes).map(([key, value]) => {
+		const formattedKey = key
+			.replace(/_/g, ' ')
+			.replace(/\b\w/g, (l) => l.toUpperCase());
 
-            let formattedValue: string;
-            if (typeof value === "boolean") {
-                formattedValue = value ? "✓ Yes" : "✗ No";
-            } else if (typeof value === "object" && value !== null) {
-                // Handle objects more gracefully
-                if ("from" in value && "to" in value) {
-                    formattedValue = `${value.from} → ${value.to}`;
-                } else {
-                    formattedValue = JSON.stringify(value, null, 2);
-                }
-            } else if (value === null || value === undefined) {
-                formattedValue = "—";
-            } else {
-                formattedValue = String(value);
-            }
+		let formattedValue: string;
+		if (typeof value === 'boolean') {
+			formattedValue = value ? '✓ Yes' : '✗ No';
+		} else if (typeof value === 'object' && value !== null) {
+			// Handle objects more gracefully
+			if ('from' in value && 'to' in value) {
+				formattedValue = `${value.from} → ${value.to}`;
+			} else {
+				formattedValue = JSON.stringify(value, null, 2);
+			}
+		} else if (value === null || value === undefined) {
+			formattedValue = '—';
+		} else {
+			formattedValue = String(value);
+		}
 
-            return { key: formattedKey, value: formattedValue };
-        });
-    }
+		return { key: formattedKey, value: formattedValue };
+	});
+}
 </script>
 
 <div class="space-y-4">

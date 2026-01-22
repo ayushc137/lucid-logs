@@ -77,14 +77,15 @@ lucid-logs/
 │           │   │   ├── ui/         # Reusable UI primitives
 │           │   │   ├── tasks/      # Task-specific components
 │           │   │   ├── goals/      # Goal-specific components
-│           │   │   ├── timeline/   # Timeline/Gantt views
+│           │   │   ├── timeline/   # Timeline Gantt view
 │           │   │   ├── emotions/   # Emotion picker/display
-│           │   │   └── layout/     # Layout components
+│           │   │   ├── layout/     # Layout components
+│           │   │   └── graveyard/  # Deprecated components (do not use)
 │           │   ├── stores/         # Svelte stores (auth, theme, ui)
 │           │   ├── utils/          # Utility functions
 │           │   └── DESIGN_LANGUAGE.md  # UI component patterns
 │           └── routes/             # SvelteKit pages
-│               ├── +page.svelte    # Dashboard (main timeline view)
+│               ├── +page.svelte    # Dashboard (TimelineGantt view only)
 │               ├── tasks/          # Task list/detail
 │               ├── goals/          # Goals management
 │               ├── categories/     # Category management
@@ -463,3 +464,18 @@ VITE_API_URL=http://localhost:8080
 - Prefer composition over inheritance
 - Use graph edges for relationships, not embedded arrays
 - Log errors on server, show user-friendly messages on frontend
+
+---
+
+## Deprecated Components (Do Not Use)
+
+The following components have been deprecated and moved to `src/lib/components/graveyard/`:
+
+| Component | Reason | Alternative |
+|-----------|--------|-------------|
+| `TaskModal` | Replaced by page-based navigation | Use `/tasks/create` and `/tasks/[id]` pages |
+| `TimelineAgenda` | UI simplification - only timeline view used | Use `TimelineGantt` |
+| `AgendaTaskCard` | Dependent on TimelineAgenda | N/A |
+| `TimelineViewSwitcher` | No longer needed with single view | N/A |
+
+**Do not import from graveyard.** These components are preserved for reference only.

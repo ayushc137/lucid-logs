@@ -105,9 +105,7 @@ surreal.db
 # =========================
 # Coverage
 coverage/
-*.lcov
-
-# Debug
+*.lcov# Debug
 .debug/# Temporary files
 *.tmp
 *.temp

@@ -1,63 +1,80 @@
 <script lang="ts">
-    import { Check, Calendar, Flame, Repeat, Target, TrendingUp } from "lucide-svelte";
-    import { scale } from "svelte/transition";
-    import type { TimelineGoal } from "./types";
+import {
+	Check,
+	Calendar,
+	Flame,
+	Repeat,
+	Target,
+	TrendingUp,
+} from 'lucide-svelte';
+import { scale } from 'svelte/transition';
+import type { TimelineGoal } from './types';
 
-    interface Props {
-        goal: TimelineGoal;
-        position: { x: number; y: number };
-    }
+interface Props {
+	goal: TimelineGoal;
+	position: { x: number; y: number };
+}
 
-    let { goal, position }: Props = $props();
+let { goal, position }: Props = $props();
 
-    // Calculate smart positioning
-    const smartPosition = $derived.by(() => {
-        if (typeof window === "undefined") {
-            return { x: position.x, y: position.y, shouldFlipY: false };
-        }
+// Calculate smart positioning
+const smartPosition = $derived.by(() => {
+	if (typeof window === 'undefined') {
+		return { x: position.x, y: position.y, shouldFlipY: false };
+	}
 
-        const POPOVER_WIDTH = 280;
-        const MAX_POPOVER_HEIGHT = 300;
-        const OFFSET = 12;
-        const PADDING = 8;
+	const POPOVER_WIDTH = 280;
+	const MAX_POPOVER_HEIGHT = 300;
+	const OFFSET = 12;
+	const PADDING = 8;
 
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
+	const viewportWidth = window.innerWidth;
+	const viewportHeight = window.innerHeight;
 
-        const spaceRight = viewportWidth - position.x;
-        const spaceBelow = viewportHeight - position.y;
-        const spaceAbove = position.y;
+	const spaceRight = viewportWidth - position.x;
+	const spaceBelow = viewportHeight - position.y;
+	const spaceAbove = position.y;
 
-        const shouldFlipX = spaceRight < POPOVER_WIDTH + OFFSET + PADDING;
-        const shouldFlipY = spaceBelow < MAX_POPOVER_HEIGHT + OFFSET + PADDING && spaceAbove > spaceBelow;
+	const shouldFlipX = spaceRight < POPOVER_WIDTH + OFFSET + PADDING;
+	const shouldFlipY =
+		spaceBelow < MAX_POPOVER_HEIGHT + OFFSET + PADDING &&
+		spaceAbove > spaceBelow;
 
-        let x = shouldFlipX
-            ? Math.max(PADDING, position.x - POPOVER_WIDTH - OFFSET)
-            : position.x + OFFSET;
+	let x = shouldFlipX
+		? Math.max(PADDING, position.x - POPOVER_WIDTH - OFFSET)
+		: position.x + OFFSET;
 
-        let y = position.y + (shouldFlipY ? -OFFSET : OFFSET);
+	let y = position.y + (shouldFlipY ? -OFFSET : OFFSET);
 
-        return { x, y, shouldFlipY };
-    });
+	return { x, y, shouldFlipY };
+});
 
-    const isHabit = $derived(!!goal.recurrence);
-    const isMet = $derived(goal.todayStatus === "met" || goal.todayStatus === "exceeded");
+const isHabit = $derived(!!goal.recurrence);
+const isMet = $derived(
+	goal.todayStatus === 'met' || goal.todayStatus === 'exceeded',
+);
 
-    function formatRecurrence(rec: { frequency: number; period: string } | undefined): string {
-        if (!rec) return "";
-        const freq = rec.frequency === 1 ? "" : `${rec.frequency}x `;
-        const periodMap: Record<string, string> = {
-            day: "Daily",
-            week: "Weekly",
-            month: "Monthly",
-        };
-        return freq + (periodMap[rec.period] || `${rec.period}ly`);
-    }
+function formatRecurrence(
+	rec: { frequency: number; period: string } | undefined,
+): string {
+	if (!rec) return '';
+	const freq = rec.frequency === 1 ? '' : `${rec.frequency}x `;
+	const periodMap: Record<string, string> = {
+		day: 'Daily',
+		week: 'Weekly',
+		month: 'Monthly',
+	};
+	return freq + (periodMap[rec.period] || `${rec.period}ly`);
+}
 
-    function formatDate(date: Date | undefined): string {
-        if (!date) return "";
-        return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
-    }
+function formatDate(date: Date | undefined): string {
+	if (!date) return '';
+	return date.toLocaleDateString([], {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
+}
 </script>
 
 <div

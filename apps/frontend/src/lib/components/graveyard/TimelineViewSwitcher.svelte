@@ -1,3 +1,9 @@
+<!--
+  @deprecated UNUSED COMPONENT - Moved to graveyard on 2026-01-22
+
+  This component provided view switching between Timeline and Agenda views.
+  The agenda view was removed to simplify the UI, making this switcher unnecessary.
+-->
 <script lang="ts">
 import { AlignHorizontalJustifyStart, List } from 'lucide-svelte';
 

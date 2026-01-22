@@ -1,514 +1,503 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
-    import {
-        type CreateGoalRequest,
-        type Goal,
-        createCategory,
-        createGoal,
-        createUnit,
-        getCategories,
-        getGoalLogs,
-        getGoalTasks,
-        getUnits,
-        updateGoal,
-    } from "$lib/api";
-    import {
-        GoalHistoryTab,
-        GoalPrioritySlider,
-        GoalRecurrenceSettings,
-        GoalTargetSettings,
-        GoalTasksTab,
-    } from "$lib/components/goals";
-    import { CategoryDropdown, ColorPicker } from "$lib/components/ui";
-    import { cn } from "$lib/utils";
-    import {
-        createMutation,
-        createQuery,
-        useQueryClient,
-    } from "@tanstack/svelte-query";
-    import { onMount } from "svelte";
-    import { writable } from "svelte/store";
+import { browser } from '$app/environment';
+import {
+	type CreateGoalRequest,
+	type Goal,
+	createCategory,
+	createGoal,
+	createUnit,
+	getCategories,
+	getGoalLogs,
+	getGoalTasks,
+	getUnits,
+	updateGoal,
+} from '$lib/api';
+import {
+	GoalHistoryTab,
+	GoalPrioritySlider,
+	GoalRecurrenceSettings,
+	GoalTargetSettings,
+	GoalTasksTab,
+} from '$lib/components/goals';
+import { CategoryDropdown, ColorPicker } from '$lib/components/ui';
+import { cn } from '$lib/utils';
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from '@tanstack/svelte-query';
+import { onMount } from 'svelte';
+import { writable } from 'svelte/store';
 
-    import {
-        BarChart3,
-        Calendar,
-        Check,
-        CheckCircle2,
-        Circle,
-        Clock,
-        Flame,
-        History,
-        ListTodo,
-        Play,
-        Plus,
-        Repeat,
-        Save,
-        Tag,
-        Target,
-        X,
-    } from "lucide-svelte";
+import {
+	BarChart3,
+	Calendar,
+	Check,
+	CheckCircle2,
+	Circle,
+	Clock,
+	Flame,
+	History,
+	ListTodo,
+	Play,
+	Plus,
+	Repeat,
+	Save,
+	Tag,
+	Target,
+	X,
+} from 'lucide-svelte';
 
-    interface Props {
-        open?: boolean;
-        goal?: Goal | null;
-        onClose?: () => void;
-    }
+interface Props {
+	open?: boolean;
+	goal?: Goal | null;
+	onClose?: () => void;
+}
 
-    let { open = $bindable(false), goal = null, onClose }: Props = $props();
+let { open = $bindable(false), goal = null, onClose }: Props = $props();
 
-    const queryClient = useQueryClient();
+const queryClient = useQueryClient();
 
-    // Fetch categories
-    const categoriesQuery = createQuery({
-        queryKey: ["categories"],
-        queryFn: () => getCategories({ limit: 100 }),
-    });
+// Fetch categories
+const categoriesQuery = createQuery({
+	queryKey: ['categories'],
+	queryFn: () => getCategories({ limit: 100 }),
+});
 
-    const categories = $derived($categoriesQuery.data?.items || []);
+const categories = $derived($categoriesQuery.data?.items || []);
 
-    // Form state
-    let title = $state("");
-    let description = $state("");
-    let icon = $state("🎯");
-    let categoryId = $state<string | undefined>(undefined);
-    let priority = $state(2);
-    let startDate = $state("");
-    let deadline = $state("");
-    let status = $state("active");
+// Form state
+let title = $state('');
+let description = $state('');
+let icon = $state('🎯');
+let categoryId = $state<string | undefined>(undefined);
+let priority = $state(2);
+let startDate = $state('');
+let deadline = $state('');
+let status = $state('active');
 
-    // Habit settings
-    let isHabit = $state(false);
-    let frequency = $state(1);
-    let period = $state<"day" | "week" | "month">("day");
-    let activeDays = $state<number[]>([]);
-    let activeMonthDay = $state<number>(1); // Day of the month for monthly habits
+// Habit settings
+let isHabit = $state(false);
+let frequency = $state(1);
+let period = $state<'day' | 'week' | 'month'>('day');
+let activeDays = $state<number[]>([]);
+let activeMonthDay = $state<number>(1); // Day of the month for monthly habits
 
-    // Target settings
-    let isMeasurable = $state(false);
-    let targetOperator = $state<"gte" | "lte" | "eq">("gte");
-    let targetValue = $state(10);
-    let targetUnit = $state("");
-    let targetPerPeriod = $state(false);
+// Target settings
+let isMeasurable = $state(false);
+let targetOperator = $state<'gte' | 'lte' | 'eq'>('gte');
+let targetValue = $state(10);
+let targetUnit = $state('');
+let targetPerPeriod = $state(false);
 
-    // Tab state
-    let activeTab = $state<"details" | "tasks" | "history">("details");
+// Tab state
+let activeTab = $state<'details' | 'tasks' | 'history'>('details');
 
-    // Emoji picker state
-    let showEmojiPicker = $state(false);
+// Emoji picker state
+let showEmojiPicker = $state(false);
 
-    const isEditing = $derived(!!goal);
-    const goalId = $derived(goal?.id);
+const isEditing = $derived(!!goal);
+const goalId = $derived(goal?.id);
 
-    // Fetch goal logs when editing
-    // Fetch goal logs when editing
-    const logsOptions = writable({
-        queryKey: ["goal-logs", null as string | null | undefined],
-        queryFn: () =>
-            Promise.resolve({ goal_id: "", logs: [] as any[], total: 0 }),
-        enabled: false,
-    });
+// Fetch goal logs when editing
+// Fetch goal logs when editing
+const logsOptions = writable({
+	queryKey: ['goal-logs', null as string | null | undefined],
+	queryFn: () => Promise.resolve({ goal_id: '', logs: [] as any[], total: 0 }),
+	enabled: false,
+});
 
-    $effect(() => {
-        logsOptions.set({
-            queryKey: ["goal-logs", goalId],
-            queryFn: () =>
-                goalId
-                    ? getGoalLogs(goalId, { limit: 50 })
-                    : Promise.resolve({ goal_id: "", logs: [], total: 0 }),
-            enabled: !!goalId && open,
-        });
-    });
+$effect(() => {
+	logsOptions.set({
+		queryKey: ['goal-logs', goalId],
+		queryFn: () =>
+			goalId
+				? getGoalLogs(goalId, { limit: 50 })
+				: Promise.resolve({ goal_id: '', logs: [], total: 0 }),
+		enabled: !!goalId && open,
+	});
+});
 
-    const logsQuery = createQuery(logsOptions);
+const logsQuery = createQuery(logsOptions);
 
-    const logs = $derived($logsQuery.data?.logs || []);
+const logs = $derived($logsQuery.data?.logs || []);
 
-    // Fetch goal tasks when editing
-    const tasksOptions = writable({
-        queryKey: ["goal-tasks", null as string | null | undefined],
-        queryFn: () => Promise.resolve({ goal_id: "", tasks: [] as any[] }),
-        enabled: false,
-    });
+// Fetch goal tasks when editing
+const tasksOptions = writable({
+	queryKey: ['goal-tasks', null as string | null | undefined],
+	queryFn: () => Promise.resolve({ goal_id: '', tasks: [] as any[] }),
+	enabled: false,
+});
 
-    $effect(() => {
-        tasksOptions.set({
-            queryKey: ["goal-tasks", goalId],
-            queryFn: () =>
-                goalId
-                    ? getGoalTasks(goalId)
-                    : Promise.resolve({ goal_id: "", tasks: [] }),
-            enabled: !!goalId && open,
-        });
-    });
+$effect(() => {
+	tasksOptions.set({
+		queryKey: ['goal-tasks', goalId],
+		queryFn: () =>
+			goalId
+				? getGoalTasks(goalId)
+				: Promise.resolve({ goal_id: '', tasks: [] }),
+		enabled: !!goalId && open,
+	});
+});
 
-    const tasksQuery = createQuery(tasksOptions);
+const tasksQuery = createQuery(tasksOptions);
 
-    // Fetch units for summary
-    const unitsQuery = createQuery({
-        queryKey: ["units"],
-        queryFn: () => getUnits(),
-        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    });
-    const units = $derived($unitsQuery.data?.items || []);
-    const selectedUnit = $derived(units.find((u) => u.id === targetUnit));
+// Fetch units for summary
+const unitsQuery = createQuery({
+	queryKey: ['units'],
+	queryFn: () => getUnits(),
+	staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+});
+const units = $derived($unitsQuery.data?.items || []);
+const selectedUnit = $derived(units.find((u) => u.id === targetUnit));
 
-    // Category creation state
-    let showCreateCategory = $state(false);
-    let newCategoryName = $state("");
-    let newCategoryColor = $state("#6366f1");
-    let useCustomCategoryColor = $state(false);
+// Category creation state
+let showCreateCategory = $state(false);
+let newCategoryName = $state('');
+let newCategoryColor = $state('#6366f1');
+let useCustomCategoryColor = $state(false);
 
-    // Unit creation state
-    let showCreateUnit = $state(false);
+// Unit creation state
+let showCreateUnit = $state(false);
 
-    // Emoji picker
-    let emojiPickerRef = $state<HTMLDivElement | null>(null);
-    let emojiPickerReady = $state(false);
-    let showFullPicker = $state(false);
+// Emoji picker
+let emojiPickerRef = $state<HTMLDivElement | null>(null);
+let emojiPickerReady = $state(false);
+let showFullPicker = $state(false);
 
-    // Suggested emojis organized by goal categories
-    const suggestedEmojis = {
-        "Fitness & Health": [
-            "💪",
-            "🏃",
-            "🏋️",
-            "🧘",
-            "🚴",
-            "🏊",
-            "🥗",
-            "💊",
-            "😴",
-            "🧠",
-        ],
-        "Learning & Growth": [
-            "📚",
-            "✍️",
-            "🎓",
-            "💡",
-            "🔬",
-            "📝",
-            "🎯",
-            "📖",
-            "🧪",
-            "💭",
-        ],
-        "Finance & Career": [
-            "💰",
-            "📈",
-            "💼",
-            "🏆",
-            "⭐",
-            "🚀",
-            "💎",
-            "📊",
-            "🎖️",
-            "👔",
-        ],
-        "Lifestyle & Habits": [
-            "🌅",
-            "🧹",
-            "☕",
-            "🌱",
-            "⏰",
-            "📱",
-            "🎨",
-            "🎵",
-            "🏠",
-            "✨",
-        ],
-        Relationships: [
-            "❤️",
-            "👨‍👩‍👧",
-            "🤝",
-            "💬",
-            "📞",
-            "🎁",
-            "😊",
-            "🙏",
-            "💝",
-            "👥",
-        ],
-    };
+// Suggested emojis organized by goal categories
+const suggestedEmojis = {
+	'Fitness & Health': [
+		'💪',
+		'🏃',
+		'🏋️',
+		'🧘',
+		'🚴',
+		'🏊',
+		'🥗',
+		'💊',
+		'😴',
+		'🧠',
+	],
+	'Learning & Growth': [
+		'📚',
+		'✍️',
+		'🎓',
+		'💡',
+		'🔬',
+		'📝',
+		'🎯',
+		'📖',
+		'🧪',
+		'💭',
+	],
+	'Finance & Career': [
+		'💰',
+		'📈',
+		'💼',
+		'🏆',
+		'⭐',
+		'🚀',
+		'💎',
+		'📊',
+		'🎖️',
+		'👔',
+	],
+	'Lifestyle & Habits': [
+		'🌅',
+		'🧹',
+		'☕',
+		'🌱',
+		'⏰',
+		'📱',
+		'🎨',
+		'🎵',
+		'🏠',
+		'✨',
+	],
+	Relationships: [
+		'❤️',
+		'👨‍👩‍👧',
+		'🤝',
+		'💬',
+		'📞',
+		'🎁',
+		'😊',
+		'🙏',
+		'💝',
+		'👥',
+	],
+};
 
-    // Flatten for quick access row
-    const quickEmojis = [
-        "🎯",
-        "💪",
-        "📚",
-        "💰",
-        "❤️",
-        "🚀",
-        "⭐",
-        "🏆",
-        "🔥",
-        "✅",
-        "🌟",
-        "💡",
-    ];
+// Flatten for quick access row
+const quickEmojis = [
+	'🎯',
+	'💪',
+	'📚',
+	'💰',
+	'❤️',
+	'🚀',
+	'⭐',
+	'🏆',
+	'🔥',
+	'✅',
+	'🌟',
+	'💡',
+];
 
-    // Initialize emoji-picker-element
-    onMount(() => {
-        if (browser) {
-            import("emoji-picker-element").then(() => {
-                emojiPickerReady = true;
-            });
-        }
-    });
+// Initialize emoji-picker-element
+onMount(() => {
+	if (browser) {
+		import('emoji-picker-element').then(() => {
+			emojiPickerReady = true;
+		});
+	}
+});
 
-    // Handle emoji selection from picker
-    function handleEmojiSelect(event: CustomEvent) {
-        if (event.detail?.unicode) {
-            icon = event.detail.unicode;
-            showEmojiPicker = false;
-            showFullPicker = false;
-        }
-    }
+// Handle emoji selection from picker
+function handleEmojiSelect(event: CustomEvent) {
+	if (event.detail?.unicode) {
+		icon = event.detail.unicode;
+		showEmojiPicker = false;
+		showFullPicker = false;
+	}
+}
 
-    // Handle quick emoji selection
-    function selectQuickEmoji(emoji: string) {
-        icon = emoji;
-        showEmojiPicker = false;
-        showFullPicker = false;
-    }
+// Handle quick emoji selection
+function selectQuickEmoji(emoji: string) {
+	icon = emoji;
+	showEmojiPicker = false;
+	showFullPicker = false;
+}
 
-    // Days
-    const dayOptions = [
-        { value: "mon", label: "M", full: "Monday" },
-        { value: "tue", label: "T", full: "Tuesday" },
-        { value: "wed", label: "W", full: "Wednesday" },
-        { value: "thu", label: "T", full: "Thursday" },
-        { value: "fri", label: "F", full: "Friday" },
-        { value: "sat", label: "S", full: "Saturday" },
-        { value: "sun", label: "S", full: "Sunday" },
-    ];
+// Days
+const dayOptions = [
+	{ value: 'mon', label: 'M', full: 'Monday' },
+	{ value: 'tue', label: 'T', full: 'Tuesday' },
+	{ value: 'wed', label: 'W', full: 'Wednesday' },
+	{ value: 'thu', label: 'T', full: 'Thursday' },
+	{ value: 'fri', label: 'F', full: 'Friday' },
+	{ value: 'sat', label: 'S', full: 'Saturday' },
+	{ value: 'sun', label: 'S', full: 'Sunday' },
+];
 
-    const createMut = createMutation({
-        mutationFn: (data: CreateGoalRequest) => createGoal(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["goals"] });
-            queryClient.invalidateQueries({ queryKey: ["goals-list"] });
-            resetForm();
-            onClose?.();
-        },
-    });
+const createMut = createMutation({
+	mutationFn: (data: CreateGoalRequest) => createGoal(data),
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ['goals'] });
+		queryClient.invalidateQueries({ queryKey: ['goals-list'] });
+		resetForm();
+		onClose?.();
+	},
+});
 
-    const updateMut = createMutation({
-        mutationFn: ({
-            id,
-            data,
-        }: {
-            id: string;
-            data: Partial<CreateGoalRequest>;
-        }) => updateGoal(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["goals"] });
-            queryClient.invalidateQueries({ queryKey: ["goals-list"] });
-            queryClient.invalidateQueries({ queryKey: ["goal-logs"] });
-            resetForm();
-            onClose?.();
-        },
-    });
+const updateMut = createMutation({
+	mutationFn: ({
+		id,
+		data,
+	}: {
+		id: string;
+		data: Partial<CreateGoalRequest>;
+	}) => updateGoal(id, data),
+	onSuccess: () => {
+		queryClient.invalidateQueries({ queryKey: ['goals'] });
+		queryClient.invalidateQueries({ queryKey: ['goals-list'] });
+		queryClient.invalidateQueries({ queryKey: ['goal-logs'] });
+		resetForm();
+		onClose?.();
+	},
+});
 
-    const isPending = $derived($createMut.isPending || $updateMut.isPending);
+const isPending = $derived($createMut.isPending || $updateMut.isPending);
 
-    // Load goal data when editing
-    $effect(() => {
-        if (open && goal) {
-            title = goal.title;
-            description = goal.description || "";
-            icon = goal.icon || "🎯";
-            categoryId =
-                goal.category?.id && goal.category.id !== ":<nil>"
-                    ? goal.category.id
-                    : undefined;
-            priority = goal.priority || 5;
-            status = goal.status || "active";
+// Load goal data when editing
+$effect(() => {
+	if (open && goal) {
+		title = goal.title;
+		description = goal.description || '';
+		icon = goal.icon || '🎯';
+		categoryId =
+			goal.category?.id && goal.category.id !== ':<nil>'
+				? goal.category.id
+				: undefined;
+		priority = goal.priority || 5;
+		status = goal.status || 'active';
 
-            if (goal.start_date) {
-                startDate = new Date(goal.start_date)
-                    .toISOString()
-                    .split("T")[0];
-            }
-            if (goal.deadline) {
-                deadline = new Date(goal.deadline).toISOString().split("T")[0];
-            }
+		if (goal.start_date) {
+			startDate = new Date(goal.start_date).toISOString().split('T')[0];
+		}
+		if (goal.deadline) {
+			deadline = new Date(goal.deadline).toISOString().split('T')[0];
+		}
 
-            if (goal.recurrence) {
-                isHabit = true;
-                frequency = goal.recurrence.frequency || 1;
-                period =
-                    (goal.recurrence.period as "day" | "week" | "month") ||
-                    "day";
-                activeDays = (goal.recurrence.active_days || []).map((d) =>
-                    typeof d === "string" ? Number.parseInt(d, 10) : d,
-                );
-            } else {
-                isHabit = false;
-            }
+		if (goal.recurrence) {
+			isHabit = true;
+			frequency = goal.recurrence.frequency || 1;
+			period = (goal.recurrence.period as 'day' | 'week' | 'month') || 'day';
+			activeDays = (goal.recurrence.active_days || []).map((d) =>
+				typeof d === 'string' ? Number.parseInt(d, 10) : d,
+			);
+		} else {
+			isHabit = false;
+		}
 
-            if (goal.target && goal.target.value > 0) {
-                isMeasurable = true;
-                targetOperator =
-                    (goal.target.operator as "gte" | "lte" | "eq") || "gte";
-                targetValue = goal.target.value || 10;
-                targetUnit = goal.target.unit_id || "";
-                targetPerPeriod = goal.target.per_period || false;
-            } else {
-                isMeasurable = false;
-            }
-        } else if (open) {
-            resetForm();
-        }
-    });
+		if (goal.target && goal.target.value > 0) {
+			isMeasurable = true;
+			targetOperator = (goal.target.operator as 'gte' | 'lte' | 'eq') || 'gte';
+			targetValue = goal.target.value || 10;
+			targetUnit = goal.target.unit_id || '';
+			targetPerPeriod = goal.target.per_period || false;
+		} else {
+			isMeasurable = false;
+		}
+	} else if (open) {
+		resetForm();
+	}
+});
 
-    function resetForm() {
-        title = "";
-        description = "";
-        icon = "🎯";
-        categoryId = undefined;
-        priority = 5;
-        startDate = "";
-        deadline = "";
-        status = "active";
-        isHabit = false;
-        frequency = 1;
-        period = "day";
-        activeDays = [];
-        isMeasurable = false;
-        targetOperator = "gte";
-        targetValue = 10;
-        targetUnit = "";
-        targetPerPeriod = false;
-        activeTab = "details";
-        showEmojiPicker = false;
-    }
+function resetForm() {
+	title = '';
+	description = '';
+	icon = '🎯';
+	categoryId = undefined;
+	priority = 5;
+	startDate = '';
+	deadline = '';
+	status = 'active';
+	isHabit = false;
+	frequency = 1;
+	period = 'day';
+	activeDays = [];
+	isMeasurable = false;
+	targetOperator = 'gte';
+	targetValue = 10;
+	targetUnit = '';
+	targetPerPeriod = false;
+	activeTab = 'details';
+	showEmojiPicker = false;
+}
 
-    function handleSubmit() {
-        if (!title.trim()) return;
+function handleSubmit() {
+	if (!title.trim()) return;
 
-        const data: CreateGoalRequest = {
-            title: title.trim(),
-            description: description.trim() || undefined,
-            icon,
-            priority,
-            category_id: categoryId,
-            start_date: startDate || undefined,
-            deadline: deadline || undefined,
-        };
+	const data: CreateGoalRequest = {
+		title: title.trim(),
+		description: description.trim() || undefined,
+		icon,
+		priority,
+		category_id: categoryId,
+		start_date: startDate || undefined,
+		deadline: deadline || undefined,
+	};
 
-        if (isHabit) {
-            data.recurrence = {
-                frequency,
-                period,
-                active_days:
-                    period === "week" && activeDays.length > 0
-                        ? activeDays.map((d) => String(d))
-                        : undefined,
-            };
-        }
+	if (isHabit) {
+		data.recurrence = {
+			frequency,
+			period,
+			active_days:
+				period === 'week' && activeDays.length > 0
+					? activeDays.map((d) => String(d))
+					: undefined,
+		};
+	}
 
-        if (isMeasurable) {
-            data.target = {
-                value: targetValue,
-                operator: targetOperator,
-                unit_id: targetUnit || "count",
-                per_period: targetPerPeriod,
-            };
-        }
+	if (isMeasurable) {
+		data.target = {
+			value: targetValue,
+			operator: targetOperator,
+			unit_id: targetUnit || 'count',
+			per_period: targetPerPeriod,
+		};
+	}
 
-        if (isEditing && goal) {
-            $updateMut.mutate({
-                id: goal.id,
-                data: { ...data, status } as any,
-            });
-        } else {
-            $createMut.mutate(data);
-        }
-    }
+	if (isEditing && goal) {
+		$updateMut.mutate({
+			id: goal.id,
+			data: { ...data, status } as any,
+		});
+	} else {
+		$createMut.mutate(data);
+	}
+}
 
-    function handleClose() {
-        if (!isPending) {
-            open = false;
-            onClose?.();
-        }
-    }
+function handleClose() {
+	if (!isPending) {
+		open = false;
+		onClose?.();
+	}
+}
 
-    function toggleDay(day: number) {
-        if (activeDays.includes(day)) {
-            activeDays = activeDays.filter((d) => d !== day);
-        } else {
-            activeDays = [...activeDays, day];
-        }
-    }
+function toggleDay(day: number) {
+	if (activeDays.includes(day)) {
+		activeDays = activeDays.filter((d) => d !== day);
+	} else {
+		activeDays = [...activeDays, day];
+	}
+}
 
-    // Computed values for display
-    const currentStreak = $derived(goal?.stats?.current_streak || 0);
-    const longestStreak = $derived(goal?.stats?.longest_streak || 0);
-    const progressPercent = $derived(goal?.stats?.progress_percent || 0);
-    const currentValue = $derived(goal?.stats?.current_value || 0);
-    const totalContributions = $derived(goal?.stats?.total_contributions || 0);
+// Computed values for display
+const currentStreak = $derived(goal?.stats?.current_streak || 0);
+const longestStreak = $derived(goal?.stats?.longest_streak || 0);
+const progressPercent = $derived(goal?.stats?.progress_percent || 0);
+const currentValue = $derived(goal?.stats?.current_value || 0);
+const totalContributions = $derived(goal?.stats?.total_contributions || 0);
 
-    // Linked tasks (fetched from separate API)
-    const linkedTasks = $derived($tasksQuery.data?.tasks || []);
+// Linked tasks (fetched from separate API)
+const linkedTasks = $derived($tasksQuery.data?.tasks || []);
 
-    function getPeriodLabel(p: string): string {
-        const map: Record<string, string> = {
-            day: "Daily",
-            week: "Weekly",
-            month: "Monthly",
-        };
-        return map[p] || p;
-    }
+function getPeriodLabel(p: string): string {
+	const map: Record<string, string> = {
+		day: 'Daily',
+		week: 'Weekly',
+		month: 'Monthly',
+	};
+	return map[p] || p;
+}
 
-    // Create category mutation
-    const createCategoryMut = createMutation({
-        mutationFn: (data: { name: string; color: string }) =>
-            createCategory({ name: data.name, color: data.color }),
-        onSuccess: (newCat) => {
-            queryClient.invalidateQueries({ queryKey: ["categories"] });
-            categoryId = newCat.id;
-            showCreateCategory = false;
-            newCategoryName = "";
-            newCategoryColor = "#6366f1";
-            useCustomCategoryColor = false;
-        },
-    });
+// Create category mutation
+const createCategoryMut = createMutation({
+	mutationFn: (data: { name: string; color: string }) =>
+		createCategory({ name: data.name, color: data.color }),
+	onSuccess: (newCat) => {
+		queryClient.invalidateQueries({ queryKey: ['categories'] });
+		categoryId = newCat.id;
+		showCreateCategory = false;
+		newCategoryName = '';
+		newCategoryColor = '#6366f1';
+		useCustomCategoryColor = false;
+	},
+});
 
-    async function handleCreateCategory() {
-        if (!newCategoryName.trim()) return;
-        $createCategoryMut.mutate({
-            name: newCategoryName.trim(),
-            color: newCategoryColor,
-        });
-    }
+async function handleCreateCategory() {
+	if (!newCategoryName.trim()) return;
+	$createCategoryMut.mutate({
+		name: newCategoryName.trim(),
+		color: newCategoryColor,
+	});
+}
 
-    // Create unit mutation
-    const createUnitMut = createMutation({
-        mutationFn: (data: { name: string; symbol: string; type: string }) =>
-            createUnit({
-                name: data.name,
-                symbol: data.symbol,
-                type: data.type as
-                    | "count"
-                    | "time"
-                    | "distance"
-                    | "volume"
-                    | "custom",
-            }),
-        onSuccess: (newUnit) => {
-            queryClient.invalidateQueries({ queryKey: ["units"] });
-            targetUnit = newUnit.id;
-            showCreateUnit = false;
-        },
-    });
+// Create unit mutation
+const createUnitMut = createMutation({
+	mutationFn: (data: { name: string; symbol: string; type: string }) =>
+		createUnit({
+			name: data.name,
+			symbol: data.symbol,
+			type: data.type as 'count' | 'time' | 'distance' | 'volume' | 'custom',
+		}),
+	onSuccess: (newUnit) => {
+		queryClient.invalidateQueries({ queryKey: ['units'] });
+		targetUnit = newUnit.id;
+		showCreateUnit = false;
+	},
+});
 
-    function handleCreateUnit(data: {
-        name: string;
-        symbol: string;
-        type: string;
-    }) {
-        $createUnitMut.mutate(data);
-    }
+function handleCreateUnit(data: {
+	name: string;
+	symbol: string;
+	type: string;
+}) {
+	$createUnitMut.mutate(data);
+}
 </script>
 
 <!-- Modal -->

@@ -1,33 +1,27 @@
 <script lang="ts">
-    import type { Goal, GoalLog } from "$lib/api";
-    import { GoalTimeline } from "$lib/components/goals";
-    import {
-        Award,
-        BarChart3,
-        Flame,
-        History,
-        TrendingUp,
-    } from "lucide-svelte";
+import type { Goal, GoalLog } from '$lib/api';
+import { GoalTimeline } from '$lib/components/goals';
+import { Award, BarChart3, Flame, History, TrendingUp } from 'lucide-svelte';
 
-    interface Props {
-        goal: Goal | null;
-        logs: GoalLog[];
-        isLoading: boolean;
-        currentStreak: number;
-        longestStreak: number;
-        progressPercent: number;
-        currentValue: number;
-    }
+interface Props {
+	goal: Goal | null;
+	logs: GoalLog[];
+	isLoading: boolean;
+	currentStreak: number;
+	longestStreak: number;
+	progressPercent: number;
+	currentValue: number;
+}
 
-    let {
-        goal = null,
-        logs = [],
-        isLoading = false,
-        currentStreak = 0,
-        longestStreak = 0,
-        progressPercent = 0,
-        currentValue = 0,
-    }: Props = $props();
+let {
+	goal = null,
+	logs = [],
+	isLoading = false,
+	currentStreak = 0,
+	longestStreak = 0,
+	progressPercent = 0,
+	currentValue = 0,
+}: Props = $props();
 </script>
 
 <div class="p-6">

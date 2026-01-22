@@ -30,7 +30,10 @@ function formatDate(dateStr?: string): string {
 function formatTime(dateStr?: string): string {
 	if (!dateStr) return '';
 	const date = new Date(dateStr);
-	return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+	return date.toLocaleTimeString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit',
+	});
 }
 
 let taskFilter = $state<'all' | 'positive' | 'negative' | 'neutral'>('all');

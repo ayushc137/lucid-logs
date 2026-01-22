@@ -11,14 +11,11 @@ import {
 	getTasks,
 	updateTask,
 } from '$lib/api';
-import type { Emotion } from '$lib/api/emotions';
-import { EmotionModal } from '$lib/components/emotions';
 import {
 	QUADRANT_COLORS,
 	QUADRANT_META,
 	type Quadrant,
 } from '$lib/components/emotions/emotionData';
-import { type EmotionSelectionContext, TaskModal } from '$lib/components/tasks';
 import {
 	CategoryDropdown,
 	ConfirmDialog,
@@ -243,9 +240,7 @@ const toggleCompleteMut = createMutation({
 	},
 });
 
-// Modal states
-let modalOpen = $state(false);
-let editingTask = $state<Task | null>(null);
+// Delete confirmation state
 let deleteConfirmOpen = $state(false);
 let deleteTaskId = $state<string | null>(null);
 
@@ -273,38 +268,6 @@ function openEditModal(task: Task) {
 		);
 	}
 	goto(`/tasks/${task.id}`);
-}
-
-function handleModalClose() {
-	modalOpen = false;
-	editingTask = null;
-	pendingEmotion = null;
-	$tasksQuery.refetch(); // Refresh after modal closes
-}
-
-// Emotion modal state (for modal switching)
-let emotionModalOpen = $state(false);
-let pendingEmotion = $state<Emotion | null>(null);
-let emotionSelectionContext = $state<EmotionSelectionContext | null>(null);
-
-// Handle opening emotion modal from TaskModal
-function handleOpenEmotionModal(context: EmotionSelectionContext) {
-	emotionSelectionContext = context;
-	emotionModalOpen = true;
-}
-
-// Handle emotion selection from EmotionModal
-function handleEmotionSelect(emotion: Emotion) {
-	pendingEmotion = emotion;
-	emotionModalOpen = false;
-	modalOpen = true; // Reopen task modal
-}
-
-// Handle emotion modal close (cancelled)
-function handleEmotionModalClose() {
-	emotionModalOpen = false;
-	modalOpen = true; // Reopen task modal without selection
-	emotionSelectionContext = null;
 }
 
 function confirmDelete(id: string, e: Event) {
@@ -877,22 +840,6 @@ ${isInferred ? "(Inferred)" : ""}`}
     </DataTable>
   {/if}
 </div>
-
-<!-- Task Modal -->
-<TaskModal
-  bind:open={modalOpen}
-  task={editingTask}
-  onClose={handleModalClose}
-  onOpenEmotionModal={handleOpenEmotionModal}
-  {pendingEmotion}
-/>
-
-<!-- Emotion Modal (separate from task modal) -->
-<EmotionModal
-  bind:open={emotionModalOpen}
-  onSelect={handleEmotionSelect}
-  onClose={handleEmotionModalClose}
-/>
 
 <!-- Delete Dialog -->
 <ConfirmDialog

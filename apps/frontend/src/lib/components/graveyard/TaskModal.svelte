@@ -1,3 +1,14 @@
+<!--
+  @deprecated UNUSED COMPONENT - Moved to graveyard on 2026-01-22
+
+  This modal was previously used for inline task creation/editing.
+  The app now uses dedicated pages instead:
+    - /tasks/create - for creating new tasks
+    - /tasks/[id] - for editing existing tasks
+
+  This provides a better user experience with more space for the form
+  and proper URL-based navigation.
+-->
 <script lang="ts">
 import {
 	type CreateTaskRequest,

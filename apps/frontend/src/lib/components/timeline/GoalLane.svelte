@@ -1,189 +1,188 @@
 <script lang="ts">
-    import { cn } from "$lib/utils";
-    import {
-        Check,
-        ChevronDown,
-        ChevronRight,
-        Flame,
-        ListTodo,
-        Plus,
-        Repeat,
-        Target,
-        X,
-    } from "lucide-svelte";
-    import { slide } from "svelte/transition";
-    import type { TimelineGoal } from "./types";
-    import GoalPopover from "./GoalPopover.svelte";
+import { cn } from '$lib/utils';
+import {
+	Check,
+	ChevronDown,
+	ChevronRight,
+	Flame,
+	ListTodo,
+	Plus,
+	Repeat,
+	Target,
+	X,
+} from 'lucide-svelte';
+import { slide } from 'svelte/transition';
+import type { TimelineGoal } from './types';
+import GoalPopover from './GoalPopover.svelte';
 
-    interface Props {
-        goals: TimelineGoal[];
-        highlightedGoalIds?: string[];
-        taskSearchQuery?: string;
-        onTaskSearchChange?: (query: string) => void;
-        taskCount?: number;
-        onGoalClick?: (goalId: string) => void;
-        onGoalHover?: (goalId: string | null) => void;
-        onCreateTaskFromGoal?: (goalId: string) => void;
-    }
+interface Props {
+	goals: TimelineGoal[];
+	highlightedGoalIds?: string[];
+	taskSearchQuery?: string;
+	onTaskSearchChange?: (query: string) => void;
+	taskCount?: number;
+	onGoalClick?: (goalId: string) => void;
+	onGoalHover?: (goalId: string | null) => void;
+	onCreateTaskFromGoal?: (goalId: string) => void;
+}
 
-    let {
-        goals = [],
-        highlightedGoalIds = [],
-        taskSearchQuery = "",
-        onTaskSearchChange,
-        taskCount = 0,
-        onGoalClick,
-        onGoalHover,
-        onCreateTaskFromGoal,
-    }: Props = $props();
+let {
+	goals = [],
+	highlightedGoalIds = [],
+	taskSearchQuery = '',
+	onTaskSearchChange,
+	taskCount = 0,
+	onGoalClick,
+	onGoalHover,
+	onCreateTaskFromGoal,
+}: Props = $props();
 
-    // Expanded state
-    let isExpanded = $state(true);
+// Expanded state
+let isExpanded = $state(true);
 
-    // Search mode: unified (single search for both) or split (separate searches)
-    let isSplitMode = $state(false);
+// Search mode: unified (single search for both) or split (separate searches)
+let isSplitMode = $state(false);
 
-    // Internal search state for goals (used in split mode)
-    let goalSearchQuery = $state("");
+// Internal search state for goals (used in split mode)
+let goalSearchQuery = $state('');
 
-    // Unified search query (filters both tasks and goals)
-    let unifiedSearchQuery = $state("");
+// Unified search query (filters both tasks and goals)
+let unifiedSearchQuery = $state('');
 
-    // Get the effective goal search query based on mode
-    const effectiveGoalQuery = $derived(
-        isSplitMode ? goalSearchQuery : unifiedSearchQuery,
-    );
+// Get the effective goal search query based on mode
+const effectiveGoalQuery = $derived(
+	isSplitMode ? goalSearchQuery : unifiedSearchQuery,
+);
 
-    // Auto-expand when searching
-    $effect(() => {
-        if (
-            (effectiveGoalQuery || (!isSplitMode && unifiedSearchQuery)) &&
-            !isExpanded
-        ) {
-            isExpanded = true;
-        }
-    });
+// Auto-expand when searching
+$effect(() => {
+	if (
+		(effectiveGoalQuery || (!isSplitMode && unifiedSearchQuery)) &&
+		!isExpanded
+	) {
+		isExpanded = true;
+	}
+});
 
-    // Sync unified search to task search callback when in unified mode
-    $effect(() => {
-        if (!isSplitMode) {
-            onTaskSearchChange?.(unifiedSearchQuery);
-        }
-    });
+// Sync unified search to task search callback when in unified mode
+$effect(() => {
+	if (!isSplitMode) {
+		onTaskSearchChange?.(unifiedSearchQuery);
+	}
+});
 
-    // Clear searches when switching modes
-    function toggleSplitMode() {
-        if (isSplitMode) {
-            // Switching to unified - clear individual searches
-            goalSearchQuery = "";
-            onTaskSearchChange?.("");
-            unifiedSearchQuery = "";
-        } else {
-            // Switching to split - clear unified search
-            unifiedSearchQuery = "";
-            onTaskSearchChange?.("");
-        }
-        isSplitMode = !isSplitMode;
-    }
+// Clear searches when switching modes
+function toggleSplitMode() {
+	if (isSplitMode) {
+		// Switching to unified - clear individual searches
+		goalSearchQuery = '';
+		onTaskSearchChange?.('');
+		unifiedSearchQuery = '';
+	} else {
+		// Switching to split - clear unified search
+		unifiedSearchQuery = '';
+		onTaskSearchChange?.('');
+	}
+	isSplitMode = !isSplitMode;
+}
 
-    // Filtered goals based on search
-    const filteredGoals = $derived.by(() => {
-        if (!effectiveGoalQuery.trim()) return goals;
-        const query = effectiveGoalQuery.toLowerCase().trim();
-        return goals.filter((g) => g.title.toLowerCase().includes(query));
-    });
+// Filtered goals based on search
+const filteredGoals = $derived.by(() => {
+	if (!effectiveGoalQuery.trim()) return goals;
+	const query = effectiveGoalQuery.toLowerCase().trim();
+	return goals.filter((g) => g.title.toLowerCase().includes(query));
+});
 
-    // Scroll container ref for auto-scrolling
-    let scrollContainer = $state<HTMLDivElement | null>(null);
+// Scroll container ref for auto-scrolling
+let scrollContainer = $state<HTMLDivElement | null>(null);
 
-    // Hover state for popover
-    let hoveredGoalId = $state<string | null>(null);
-    let popoverPosition = $state<{ x: number; y: number } | null>(null);
-    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+// Hover state for popover
+let hoveredGoalId = $state<string | null>(null);
+let popoverPosition = $state<{ x: number; y: number } | null>(null);
+let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    // Auto-scroll to first highlighted goal
-    $effect(() => {
-        if (highlightedGoalIds.length > 0 && scrollContainer && isExpanded) {
-            const firstHighlightedId = highlightedGoalIds[0];
-            const goalElement = scrollContainer.querySelector(
-                `[data-goal-id="${firstHighlightedId}"]`,
-            );
-            if (goalElement) {
-                goalElement.scrollIntoView({
-                    behavior: "smooth",
-                    block: "nearest",
-                    inline: "center",
-                });
-            }
-        }
-    });
+// Auto-scroll to first highlighted goal
+$effect(() => {
+	if (highlightedGoalIds.length > 0 && scrollContainer && isExpanded) {
+		const firstHighlightedId = highlightedGoalIds[0];
+		const goalElement = scrollContainer.querySelector(
+			`[data-goal-id="${firstHighlightedId}"]`,
+		);
+		if (goalElement) {
+			goalElement.scrollIntoView({
+				behavior: 'smooth',
+				block: 'nearest',
+				inline: 'center',
+			});
+		}
+	}
+});
 
-    // Format recurrence properly
-    function formatRecurrence(
-        rec: { frequency: number; period: string } | undefined,
-    ): string {
-        if (!rec) return "";
-        const times = rec.frequency === 1 ? "" : `${rec.frequency}x/`;
-        const periodMap: Record<string, string> = {
-            day: "day",
-            week: "week",
-            month: "month",
-        };
-        return times + (periodMap[rec.period] || rec.period);
-    }
+// Format recurrence properly
+function formatRecurrence(
+	rec: { frequency: number; period: string } | undefined,
+): string {
+	if (!rec) return '';
+	const times = rec.frequency === 1 ? '' : `${rec.frequency}x/`;
+	const periodMap: Record<string, string> = {
+		day: 'day',
+		week: 'week',
+		month: 'month',
+	};
+	return times + (periodMap[rec.period] || rec.period);
+}
 
-    // Format numbers nicely
-    function formatNumber(value: number, max: number = 99): string {
-        if (value > max) return `${max}+`;
-        return String(value);
-    }
+// Format numbers nicely
+function formatNumber(value: number, max: number = 99): string {
+	if (value > max) return `${max}+`;
+	return String(value);
+}
 
-    // Stats
-    const doneCount = $derived(
-        goals.filter(
-            (g) => g.todayStatus === "met" || g.todayStatus === "exceeded",
-        ).length,
-    );
+// Stats
+const doneCount = $derived(
+	goals.filter((g) => g.todayStatus === 'met' || g.todayStatus === 'exceeded')
+		.length,
+);
 
-    const filteredDoneCount = $derived(
-        filteredGoals.filter(
-            (g) => g.todayStatus === "met" || g.todayStatus === "exceeded",
-        ).length,
-    );
+const filteredDoneCount = $derived(
+	filteredGoals.filter(
+		(g) => g.todayStatus === 'met' || g.todayStatus === 'exceeded',
+	).length,
+);
 
-    // Local hover state for dimming other goals
-    let localHoveredGoalId = $state<string | null>(null);
+// Local hover state for dimming other goals
+let localHoveredGoalId = $state<string | null>(null);
 
-    function handleLocalHover(goalId: string | null, e?: MouseEvent) {
-        // Clear any pending hover timeout
-        if (hoverTimeout) {
-            clearTimeout(hoverTimeout);
-            hoverTimeout = null;
-        }
+function handleLocalHover(goalId: string | null, e?: MouseEvent) {
+	// Clear any pending hover timeout
+	if (hoverTimeout) {
+		clearTimeout(hoverTimeout);
+		hoverTimeout = null;
+	}
 
-        localHoveredGoalId = goalId;
-        onGoalHover?.(goalId);
+	localHoveredGoalId = goalId;
+	onGoalHover?.(goalId);
 
-        if (goalId && e) {
-            hoveredGoalId = goalId;
-            updatePopoverPosition(e);
-        } else {
-            hoveredGoalId = null;
-            popoverPosition = null;
-        }
-    }
+	if (goalId && e) {
+		hoveredGoalId = goalId;
+		updatePopoverPosition(e);
+	} else {
+		hoveredGoalId = null;
+		popoverPosition = null;
+	}
+}
 
-    function updatePopoverPosition(e: MouseEvent) {
-        popoverPosition = { x: e.clientX, y: e.clientY };
-    }
+function updatePopoverPosition(e: MouseEvent) {
+	popoverPosition = { x: e.clientX, y: e.clientY };
+}
 
-    function onMouseMove(e: MouseEvent) {
-        if (hoveredGoalId) {
-            updatePopoverPosition(e);
-        }
-    }
+function onMouseMove(e: MouseEvent) {
+	if (hoveredGoalId) {
+		updatePopoverPosition(e);
+	}
+}
 
-    const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
+const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
 </script>
 
 {#if goals.length > 0}
