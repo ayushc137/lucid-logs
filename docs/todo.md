@@ -319,3 +319,4 @@ wrok on templates
 
 
 add empty stats for agenda tasks --------------------------------------
+goal timeline and agenda looks shit 
