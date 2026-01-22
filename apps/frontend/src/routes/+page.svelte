@@ -664,22 +664,30 @@
 		</div>
 
 		<!-- Stats & Quick Log Card -->
-		<div class="card bg-base-100 shadow-md border border-base-200/50 rounded-2xl overflow-hidden">
+		<div
+			class="card bg-base-100 shadow-md border border-base-200/50 rounded-2xl overflow-hidden"
+		>
 			<div class="card-body p-5">
 				<!-- Stats Row -->
 				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 					<!-- Streak -->
-					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
+					<div
+						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
+					>
 						<div
 							class="w-11 h-11 rounded-xl bg-gradient-to-br from-warning to-warning/70 flex items-center justify-center text-warning-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<Flame class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
+							<p
+								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
+							>
 								Streak
 							</p>
-							<p class="text-2xl font-bold text-warning leading-tight">
+							<p
+								class="text-2xl font-bold text-warning leading-tight"
+							>
 								7<span
 									class="text-xs font-medium opacity-60 ml-0.5"
 									>d</span
@@ -689,17 +697,23 @@
 					</div>
 
 					<!-- Tasks -->
-					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
+					<div
+						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
+					>
 						<div
 							class="w-11 h-11 rounded-xl bg-gradient-to-br from-info to-info/70 flex items-center justify-center text-info-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<ListTodo class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
+							<p
+								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
+							>
 								Tasks
 							</p>
-							<p class="text-2xl font-bold text-info leading-tight">
+							<p
+								class="text-2xl font-bold text-info leading-tight"
+							>
 								{completedCount}<span
 									class="text-xs font-medium opacity-60 ml-0.5"
 									>/{totalCount}</span
@@ -709,17 +723,23 @@
 					</div>
 
 					<!-- Goals -->
-					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
+					<div
+						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
+					>
 						<div
 							class="w-11 h-11 rounded-xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center text-accent-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<Target class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
+							<p
+								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
+							>
 								Goals
 							</p>
-							<p class="text-2xl font-bold text-accent leading-tight">
+							<p
+								class="text-2xl font-bold text-accent leading-tight"
+							>
 								3<span
 									class="text-xs font-medium opacity-60 ml-0.5"
 									>active</span
@@ -729,14 +749,18 @@
 					</div>
 
 					<!-- Mood -->
-					<div class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
+					<div
+						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
+					>
 						<div
 							class="w-11 h-11 rounded-xl bg-gradient-to-br from-success to-success/70 flex items-center justify-center text-success-content shadow-md transition-transform duration-300 group-hover:scale-110"
 						>
 							<Smile class="w-5 h-5" />
 						</div>
 						<div>
-							<p class="text-[10px] font-semibold uppercase tracking-wide opacity-50">
+							<p
+								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
+							>
 								Mood
 							</p>
 							<div class="flex items-center gap-1.5">
@@ -819,11 +843,15 @@
 					{:else}
 						<TimelineAgenda
 							tasks={timelineTasks}
+							goals={timelineGoals}
 							{selectedDate}
+							showGoals={true}
 							onTaskClick={handleTaskClick}
 							onCategoryClick={handleCategoryClick}
 							onToggleComplete={handleToggleComplete}
 							onDateChange={handleDateChange}
+							onGoalClick={handleGoalClick}
+							onCreateTaskFromGoal={handleCreateTaskFromGoal}
 						/>
 					{/if}
 				</div>

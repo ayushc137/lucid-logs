@@ -1,79 +1,106 @@
 <script lang="ts">
-import {
-	QUADRANT_COLORS,
-	type Quadrant,
-} from '$lib/components/emotions/emotionData';
-import { OpenMoji } from '$lib/components/ui';
-import { stripHtml } from '$lib/utils';
-import { ArrowRight, Check, Sparkles } from 'lucide-svelte';
-import { cubicOut } from 'svelte/easing';
-import { fly } from 'svelte/transition';
-import type { TimelineTask } from './types';
+    import {
+        QUADRANT_COLORS,
+        type Quadrant,
+    } from "$lib/components/emotions/emotionData";
+    import { OpenMoji } from "$lib/components/ui";
+    import { stripHtml } from "$lib/utils";
+    import { ArrowRight, Check, Sparkles } from "lucide-svelte";
+    import { cubicOut } from "svelte/easing";
+    import { fly } from "svelte/transition";
+    import type { TimelineTask } from "./types";
 
-interface Props {
-	task: TimelineTask;
-	status: 'past' | 'current' | 'future';
-	transitionDelay?: number;
-	onTaskClick?: (taskId: string) => void;
-}
+    interface Props {
+        task: TimelineTask;
+        status: "past" | "current" | "future";
+        transitionDelay?: number;
+        onTaskClick?: (taskId: string) => void;
+        isHighlighted?: boolean;
+        isDimmed?: boolean;
+        isGoalHoverMode?: boolean;
+        onMouseEnter?: () => void;
+        onMouseLeave?: () => void;
+    }
 
-let { task, status, transitionDelay = 0, onTaskClick }: Props = $props();
+    let {
+        task,
+        status,
+        transitionDelay = 0,
+        onTaskClick,
+        isHighlighted = false,
+        isDimmed = false,
+        isGoalHoverMode = false,
+        onMouseEnter,
+        onMouseLeave,
+    }: Props = $props();
 
-const bg = $derived(task.categoryColor || '#6b7280');
-const isCompleted = $derived(task.completed);
+    const bg = $derived(task.categoryColor || "#6b7280");
+    const isCompleted = $derived(task.completed);
 
-// Determine emotion to display (actual or inferred)
-const hasActualEmotion = $derived(
-	!!task.emotionId &&
-		!!task.emotionName &&
-		!!task.emotionEmoji &&
-		!!task.emotionQuadrant,
-);
-const hasInferredEmotion = $derived(
-	!hasActualEmotion &&
-		!!task.inferredEmotionId &&
-		!!task.inferredEmotionName &&
-		!!task.inferredEmotionEmoji &&
-		!!task.inferredEmotionQuadrant,
-);
+    // Determine emotion to display (actual or inferred)
+    const hasActualEmotion = $derived(
+        !!task.emotionId &&
+            !!task.emotionName &&
+            !!task.emotionEmoji &&
+            !!task.emotionQuadrant,
+    );
+    const hasInferredEmotion = $derived(
+        !hasActualEmotion &&
+            !!task.inferredEmotionId &&
+            !!task.inferredEmotionName &&
+            !!task.inferredEmotionEmoji &&
+            !!task.inferredEmotionQuadrant,
+    );
 
-function formatTime(d: Date): string {
-	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
-	return d.toLocaleTimeString([], {
-		hour: 'numeric',
-		minute: '2-digit',
-		hour12: true,
-	});
-}
+    function formatTime(d: Date): string {
+        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "--:--";
+        return d.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        });
+    }
 
-function formatDuration(s: Date, e: Date): string {
-	if (!(s instanceof Date) || !(e instanceof Date)) return '';
-	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
-	if (mins < 1) return '<1m';
-	if (mins < 60) return `${mins}m`;
-	const h = Math.floor(mins / 60);
-	const m = mins % 60;
-	return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
+    function formatDuration(s: Date, e: Date): string {
+        if (!(s instanceof Date) || !(e instanceof Date)) return "";
+        const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+        if (mins < 1) return "<1m";
+        if (mins < 60) return `${mins}m`;
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
 
-const descriptionPreview = $derived(
-	task.description
-		? stripHtml(task.description, { newlineSeparator: ' · ' })
-		: null,
-);
+    const descriptionPreview = $derived(
+        task.description
+            ? stripHtml(task.description, { newlineSeparator: " · " })
+            : null,
+    );
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div
-    class="group relative flex items-stretch rounded-xl border-2 transition-all duration-200 overflow-hidden cursor-pointer shadow-sm
+    class="group relative flex items-stretch rounded-xl border-2 transition-all duration-300 overflow-hidden cursor-pointer shadow-sm
+        {isDimmed
+        ? 'opacity-0 scale-95 max-h-0 py-0 my-0 border-0 invisible pointer-events-none'
+        : 'max-h-40'} 
+        {isHighlighted
+        ? 'ring-2 ring-primary/50 shadow-lg shadow-primary/15 scale-[1.01] z-10'
+        : ''}
         {isCompleted
-        ? 'bg-base-100/80 border-base-200/80 hover:border-base-300'
+        ? isGoalHoverMode
+            ? 'bg-base-100/80 border-base-200/80'
+            : 'bg-base-100/80 border-base-200/80 hover:border-base-300'
         : status === 'current'
           ? 'bg-base-100 border-primary/40 shadow-lg shadow-primary/10 ring-1 ring-primary/20'
-          : 'bg-base-100 border-base-200/80 hover:border-base-300 hover:shadow-md'}"
+          : isGoalHoverMode
+            ? 'bg-base-100 border-base-200/80'
+            : 'bg-base-100 border-base-200/80 hover:border-base-300 hover:shadow-md'}"
     role="button"
     onclick={() => onTaskClick?.(task.id)}
+    onmouseenter={onMouseEnter}
+    onmouseleave={onMouseLeave}
     in:fly={{
         x: -8,
         duration: 250,

@@ -9,6 +9,7 @@
 		MoveHorizontal,
 		Pencil,
 		Plus,
+		X,
 	} from "lucide-svelte";
 	import { onDestroy, onMount } from "svelte";
 	import { fade, scale, slide } from "svelte/transition";
@@ -103,6 +104,9 @@
 
 	// Category filter state
 	let selectedCategoryFilter = $state<string | null>(null);
+
+	// Task search state
+	let taskSearchQuery = $state("");
 
 	function toggleEditMode() {
 		internalEditMode = !internalEditMode;
@@ -571,14 +575,32 @@
 		tasks.filter((t) => !t.categoryName).length,
 	);
 
-	// Filtered tasks - handle "__uncategorized__" special filter
-	const filteredTasks = $derived(
-		selectedCategoryFilter === "__uncategorized__"
-			? tasks.filter((t) => !t.categoryName)
-			: selectedCategoryFilter
-				? tasks.filter((t) => t.categoryName === selectedCategoryFilter)
-				: tasks,
-	);
+	// Filtered tasks - handle "__uncategorized__" special filter AND search query
+	const filteredTasks = $derived.by(() => {
+		let result = tasks;
+
+		// Apply category filter
+		if (selectedCategoryFilter === "__uncategorized__") {
+			result = result.filter((t) => !t.categoryName);
+		} else if (selectedCategoryFilter) {
+			result = result.filter(
+				(t) => t.categoryName === selectedCategoryFilter,
+			);
+		}
+
+		// Apply task search filter
+		if (taskSearchQuery.trim()) {
+			const query = taskSearchQuery.toLowerCase().trim();
+			result = result.filter(
+				(t) =>
+					t.title.toLowerCase().includes(query) ||
+					(t.categoryName &&
+						t.categoryName.toLowerCase().includes(query)),
+			);
+		}
+
+		return result;
+	});
 
 	// Check if viewing today
 	const isToday = $derived(() => {
@@ -971,16 +993,14 @@
 		<div
 			class="w-full md:flex-1 flex justify-center order-last md:order-none"
 		>
-			<div class="w-full md:w-auto flex justify-center">
-				<CategoryFilter
-					{categories}
-					totalTaskCount={tasks.length}
-					filteredTaskCount={filteredTasks.length}
-					{uncategorizedCount}
-					selectedCategory={selectedCategoryFilter}
-					onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
-				/>
-			</div>
+			<CategoryFilter
+				{categories}
+				totalTaskCount={tasks.length}
+				filteredTaskCount={filteredTasks.length}
+				{uncategorizedCount}
+				selectedCategory={selectedCategoryFilter}
+				onCategoryChange={(cat) => (selectedCategoryFilter = cat)}
+			/>
 		</div>
 
 		<!-- Right: Controls (Desktop) -->
@@ -1019,6 +1039,9 @@
 		<GoalLane
 			{goals}
 			{highlightedGoalIds}
+			{taskSearchQuery}
+			onTaskSearchChange={(q) => (taskSearchQuery = q)}
+			taskCount={tasks.length}
 			{onGoalClick}
 			onGoalHover={handleGoalHover}
 			{onCreateTaskFromGoal}
@@ -1115,7 +1138,8 @@
 							(hoveredGoalId && !isGoalLinked)}
 
 						<!-- Check if this task should have the hover effect (direct hover OR linked to hovered goal) -->
-						{@const shouldShowHoverEffect = (isHov || isGoalLinked) && !isDragging}
+						{@const shouldShowHoverEffect =
+							(isHov || isGoalLinked) && !isDragging}
 
 						<!-- Calculate times & Dragging Logic -->
 						{@const previewTimes =

@@ -301,3 +301,21 @@ on goal update only add to logs if somethign changes and mention what updated , 
 
 
 Current Streak Current Value all too bug in history 
+
+
+
+
+Add goasl in agenda view 
+
+fix goals in tasks 
+
+fix goals filter 
+
+check al lgoal modal items 
+
+wrok on templates 
+
+
+
+
+add empty stats for agenda tasks --------------------------------------
