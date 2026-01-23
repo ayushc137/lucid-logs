@@ -90,11 +90,6 @@
         return goals.filter((g) => g.title.toLowerCase().includes(query));
     });
 
-    // Hover state for popover
-    let hoveredGoalId = $state<string | null>(null);
-    let popoverPosition = $state<{ x: number; y: number } | null>(null);
-    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
-
     // Scroll container and scroll state for affordance indicators
     let scrollContainer = $state<HTMLDivElement | null>(null);
     let canScrollLeft = $state(false);
@@ -110,10 +105,13 @@
     $effect(() => {
         if (scrollContainer && isExpanded) {
             updateScrollIndicators();
-            // Check again after a brief delay for layout settling
             setTimeout(updateScrollIndicators, 100);
         }
     });
+
+    // Hover state for popover
+    let hoveredGoalId = $state<string | null>(null);
+    let popoverPosition = $state<{ x: number; y: number } | null>(null);
 
     // Format numbers nicely
     function formatNumber(value: number, max: number = 99): string {
@@ -137,30 +135,25 @@
     // Local hover state for dimming other goals
     let localHoveredGoalId = $state<string | null>(null);
 
-    function handleLocalHover(goalId: string | null, e?: MouseEvent) {
-        // Clear any pending hover timeout
-        if (hoverTimeout) {
-            clearTimeout(hoverTimeout);
-            hoverTimeout = null;
-        }
-
+    function handleMouseEnter(goalId: string, e: MouseEvent) {
         localHoveredGoalId = goalId;
+        hoveredGoalId = goalId;
         onGoalHover?.(goalId);
+        updatePopoverPosition(e);
+    }
 
-        if (goalId && e) {
-            hoveredGoalId = goalId;
-            updatePopoverPosition(e);
-        } else {
-            hoveredGoalId = null;
-            popoverPosition = null;
-        }
+    function handleMouseLeave() {
+        localHoveredGoalId = null;
+        hoveredGoalId = null;
+        popoverPosition = null;
+        onGoalHover?.(null);
     }
 
     function updatePopoverPosition(e: MouseEvent) {
         popoverPosition = { x: e.clientX, y: e.clientY };
     }
 
-    function onMouseMove(e: MouseEvent) {
+    function handleMouseMove(e: MouseEvent) {
         if (hoveredGoalId) {
             updatePopoverPosition(e);
         }
@@ -401,20 +394,20 @@
             <div class="relative" transition:slide={{ duration: 150 }}>
                 <!-- Left scroll indicator -->
                 {#if canScrollLeft}
-                    <div class="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-base-100 to-transparent z-10 pointer-events-none"></div>
+                    <div class="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-base-100 to-transparent z-10 pointer-events-none"></div>
                 {/if}
 
                 <!-- Right scroll indicator -->
                 {#if canScrollRight}
-                    <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-base-100 to-transparent z-10 pointer-events-none"></div>
+                    <div class="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-base-100 to-transparent z-10 pointer-events-none"></div>
                 {/if}
 
                 <div
-                    class="px-4 pb-3 overflow-x-auto goal-scroll"
+                    class="px-4 pb-2.5 overflow-x-auto goal-scroll"
                     bind:this={scrollContainer}
                     onscroll={updateScrollIndicators}
                 >
-                    <div class="flex gap-3 py-2">
+                    <div class="flex gap-2 py-1">
                         {#each filteredGoals as goal (goal.id)}
                             {@const isMet =
                                 goal.todayStatus === "met" ||
@@ -423,121 +416,62 @@
                             {@const isDimmed =
                                 localHoveredGoalId &&
                                 localHoveredGoalId !== goal.id}
-                            {@const isHabit = !!goal.recurrence}
 
                             <button
                                 type="button"
                                 data-goal-id={goal.id}
                                 class={cn(
-                                    "goal-card flex flex-col w-48 shrink-0 rounded-xl transition-all duration-200 group overflow-hidden relative",
-                                    "bg-base-100 border-2 shadow-md",
+                                    "goal-card flex items-center gap-2.5 px-3 py-2 shrink-0 rounded-lg transition-all duration-150 group",
+                                    "bg-base-100 border shadow-sm",
                                     isDimmed && "opacity-40",
-                                    isHovered && "shadow-xl scale-[1.02] -translate-y-0.5",
+                                    isHovered && "shadow-md -translate-y-px",
                                     isMet
-                                        ? "border-success/30 bg-success/5"
+                                        ? "border-success/40"
                                         : "border-base-200 hover:border-base-300",
                                 )}
-                                onclick={() => onGoalClick?.(goal.id)}
-                                onmouseenter={(e) => handleLocalHover(goal.id, e)}
-                                onmousemove={onMouseMove}
-                                onmouseleave={() => handleLocalHover(null)}
+                                onclick={() => onCreateTaskFromGoal?.(goal.id)}
+                                onmouseenter={(e) => handleMouseEnter(goal.id, e)}
+                                onmousemove={handleMouseMove}
+                                onmouseleave={handleMouseLeave}
                             >
-                                <!-- Color accent bar at top -->
+                                <!-- Icon with color indicator -->
                                 <div
-                                    class="h-1.5 w-full"
-                                    style="background-color: {goal.color};"
-                                ></div>
+                                    class="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 transition-all duration-150 relative"
+                                    style="background-color: {goal.color}15; border-left: 3px solid {goal.color};"
+                                >
+                                    <span class="transition-all duration-150 group-hover:opacity-0 group-hover:scale-75">
+                                        {goal.icon}
+                                    </span>
+                                    <span
+                                        class="absolute inset-0 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100"
+                                        style="color: {goal.color};"
+                                    >
+                                        <Plus class="w-4 h-4" strokeWidth={2.5} />
+                                    </span>
+                                </div>
 
-                                <!-- Completed badge -->
+                                <!-- Title -->
+                                <span class="font-medium text-sm truncate max-w-28 text-left">
+                                    {goal.title}
+                                </span>
+
+                                <!-- Status indicator -->
                                 {#if isMet}
-                                    <div class="absolute top-3 right-2 w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-sm">
-                                        <Check class="w-3 h-3 text-success-content" strokeWidth={3} />
+                                    <div class="w-5 h-5 rounded-full bg-success/20 flex items-center justify-center shrink-0">
+                                        <Check class="w-3 h-3 text-success" strokeWidth={3} />
+                                    </div>
+                                {:else if goal.target}
+                                    <span class="text-xs font-bold tabular-nums shrink-0" style="color: {goal.color};">
+                                        {Math.round(goal.progress)}%
+                                    </span>
+                                {:else if goal.currentStreak > 0}
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <Flame class="w-3.5 h-3.5 text-warning" />
+                                        <span class="text-xs font-bold text-warning tabular-nums">
+                                            {goal.currentStreak}
+                                        </span>
                                     </div>
                                 {/if}
-
-                                <!-- Card content -->
-                                <div class="p-3.5 flex flex-col gap-3 flex-1">
-                                    <!-- Header: Icon + Title -->
-                                    <div class="flex items-start gap-3">
-                                        <!-- Icon - shows goal icon normally, plus icon on hover -->
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                        <div
-                                            class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 transition-all duration-200 relative cursor-pointer shadow-sm"
-                                            style="background-color: {goal.color}20; border: 1px solid {goal.color}30;"
-                                            onclick={(e) => {
-                                                e.stopPropagation();
-                                                onCreateTaskFromGoal?.(goal.id);
-                                            }}
-                                        >
-                                            <span
-                                                class="absolute inset-0 flex items-center justify-center transition-all duration-150 group-hover:opacity-0 group-hover:scale-75"
-                                            >
-                                                {goal.icon}
-                                            </span>
-                                            <span
-                                                class="absolute inset-0 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100"
-                                                style="color: {goal.color};"
-                                            >
-                                                <Plus class="w-5 h-5" strokeWidth={2.5} />
-                                            </span>
-                                        </div>
-
-                                        <div class="flex flex-col min-w-0 flex-1 pr-4">
-                                            <h3 class="font-bold text-sm leading-tight truncate text-left">
-                                                {goal.title}
-                                            </h3>
-                                            <span class="text-[10px] text-base-content/40 uppercase tracking-wider font-medium mt-0.5">
-                                                {isHabit ? "Habit" : "Goal"}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Divider -->
-                                    <div class="h-px bg-base-200/80"></div>
-
-                                    <!-- Progress or Status -->
-                                    <div class="mt-auto">
-                                        {#if goal.target}
-                                            <div class="flex flex-col gap-2">
-                                                <div class="h-2 bg-base-200 rounded-full overflow-hidden">
-                                                    <div
-                                                        class="h-full rounded-full transition-all duration-300"
-                                                        style="width: {Math.min(goal.progress, 100)}%; background-color: {goal.color};"
-                                                    ></div>
-                                                </div>
-                                                <div class="flex items-center justify-between">
-                                                    <span class="text-xs text-base-content/50 tabular-nums">
-                                                        {Math.round(goal.target.currentValue * 100) / 100} / {formatNumber(goal.target.value)}
-                                                    </span>
-                                                    <span
-                                                        class="text-xs font-bold tabular-nums"
-                                                        style="color: {goal.color};"
-                                                    >
-                                                        {Math.round(goal.progress)}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        {:else if isMet}
-                                            <div class="flex items-center gap-2 text-success bg-success/10 px-2.5 py-1.5 rounded-lg">
-                                                <Check class="w-4 h-4" strokeWidth={2.5} />
-                                                <span class="text-xs font-bold">Completed today</span>
-                                            </div>
-                                        {:else if goal.currentStreak > 0}
-                                            <div class="flex items-center gap-2 bg-warning/10 px-2.5 py-1.5 rounded-lg">
-                                                <Flame class="w-4 h-4 text-warning" />
-                                                <span class="text-xs font-bold text-warning tabular-nums">
-                                                    {formatNumber(goal.currentStreak)} day streak
-                                                </span>
-                                            </div>
-                                        {:else}
-                                            <div class="flex items-center gap-2 text-base-content/40 bg-base-200/50 px-2.5 py-1.5 rounded-lg">
-                                                <Target class="w-4 h-4" />
-                                                <span class="text-xs font-medium">Not started today</span>
-                                            </div>
-                                        {/if}
-                                    </div>
-                                </div>
                             </button>
                         {/each}
                     </div>
