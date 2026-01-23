@@ -320,3 +320,12 @@ wrok on templates
 
 add empty stats for agenda tasks --------------------------------------
 goal timeline and agenda looks shit 
+
+
+
+
+
+
+When hoveron g over task dont auto scroll and move to linked goal , also dont hrighlight the goal 
+The goal cards can low way better more like cards  and uniform 
+the scroll belkow cards looks llike shit 

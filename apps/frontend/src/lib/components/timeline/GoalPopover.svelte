@@ -17,36 +17,30 @@ interface Props {
 
 let { goal, position }: Props = $props();
 
-// Calculate smart positioning
+// Calculate smart positioning - always open upward to not hide timeline
 const smartPosition = $derived.by(() => {
 	if (typeof window === 'undefined') {
-		return { x: position.x, y: position.y, shouldFlipY: false };
+		return { x: position.x, y: position.y };
 	}
 
 	const POPOVER_WIDTH = 280;
-	const MAX_POPOVER_HEIGHT = 300;
-	const OFFSET = 12;
+	const OFFSET = 16;
 	const PADDING = 8;
 
 	const viewportWidth = window.innerWidth;
-	const viewportHeight = window.innerHeight;
 
 	const spaceRight = viewportWidth - position.x;
-	const spaceBelow = viewportHeight - position.y;
-	const spaceAbove = position.y;
 
 	const shouldFlipX = spaceRight < POPOVER_WIDTH + OFFSET + PADDING;
-	const shouldFlipY =
-		spaceBelow < MAX_POPOVER_HEIGHT + OFFSET + PADDING &&
-		spaceAbove > spaceBelow;
 
 	let x = shouldFlipX
 		? Math.max(PADDING, position.x - POPOVER_WIDTH - OFFSET)
 		: position.x + OFFSET;
 
-	let y = position.y + (shouldFlipY ? -OFFSET : OFFSET);
+	// Always position above the cursor
+	let y = position.y - OFFSET;
 
-	return { x, y, shouldFlipY };
+	return { x, y };
 });
 
 const isHabit = $derived(!!goal.recurrence);
@@ -78,8 +72,8 @@ function formatDate(date: Date | undefined): string {
 </script>
 
 <div
-    class="fixed z-[9999] pointer-events-none transition-all duration-150 ease-out {smartPosition.shouldFlipY ? 'origin-bottom' : 'origin-top'}"
-    style="top: {smartPosition.y}px; left: {smartPosition.x}px; {smartPosition.shouldFlipY ? 'transform: translateY(-100%);' : ''}"
+    class="fixed z-[9999] pointer-events-none transition-all duration-150 ease-out origin-bottom"
+    style="top: {smartPosition.y}px; left: {smartPosition.x}px; transform: translateY(-100%);"
     in:scale={{ duration: 200, start: 0.9, opacity: 0, easing: (t) => t * (2 - t) }}
     out:scale={{ duration: 150, start: 1, opacity: 0, easing: (t) => t * t }}
 >

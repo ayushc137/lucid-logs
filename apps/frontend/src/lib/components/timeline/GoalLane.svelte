@@ -1,188 +1,172 @@
 <script lang="ts">
-import { cn } from '$lib/utils';
-import {
-	Check,
-	ChevronDown,
-	ChevronRight,
-	Flame,
-	ListTodo,
-	Plus,
-	Repeat,
-	Target,
-	X,
-} from 'lucide-svelte';
-import { slide } from 'svelte/transition';
-import type { TimelineGoal } from './types';
-import GoalPopover from './GoalPopover.svelte';
+    import { cn } from "$lib/utils";
+    import {
+        Check,
+        ChevronDown,
+        ChevronRight,
+        Flame,
+        ListTodo,
+        Plus,
+        Target,
+        X,
+    } from "lucide-svelte";
+    import { slide } from "svelte/transition";
+    import type { TimelineGoal } from "./types";
+    import GoalPopover from "./GoalPopover.svelte";
 
-interface Props {
-	goals: TimelineGoal[];
-	highlightedGoalIds?: string[];
-	taskSearchQuery?: string;
-	onTaskSearchChange?: (query: string) => void;
-	taskCount?: number;
-	onGoalClick?: (goalId: string) => void;
-	onGoalHover?: (goalId: string | null) => void;
-	onCreateTaskFromGoal?: (goalId: string) => void;
-}
+    interface Props {
+        goals: TimelineGoal[];
+        taskSearchQuery?: string;
+        onTaskSearchChange?: (query: string) => void;
+        taskCount?: number;
+        onGoalClick?: (goalId: string) => void;
+        onGoalHover?: (goalId: string | null) => void;
+        onCreateTaskFromGoal?: (goalId: string) => void;
+    }
 
-let {
-	goals = [],
-	highlightedGoalIds = [],
-	taskSearchQuery = '',
-	onTaskSearchChange,
-	taskCount = 0,
-	onGoalClick,
-	onGoalHover,
-	onCreateTaskFromGoal,
-}: Props = $props();
+    let {
+        goals = [],
+        taskSearchQuery = "",
+        onTaskSearchChange,
+        taskCount = 0,
+        onGoalClick,
+        onGoalHover,
+        onCreateTaskFromGoal,
+    }: Props = $props();
 
-// Expanded state
-let isExpanded = $state(true);
+    // Expanded state
+    let isExpanded = $state(true);
 
-// Search mode: unified (single search for both) or split (separate searches)
-let isSplitMode = $state(false);
+    // Search mode: unified (single search for both) or split (separate searches)
+    let isSplitMode = $state(false);
 
-// Internal search state for goals (used in split mode)
-let goalSearchQuery = $state('');
+    // Internal search state for goals (used in split mode)
+    let goalSearchQuery = $state("");
 
-// Unified search query (filters both tasks and goals)
-let unifiedSearchQuery = $state('');
+    // Unified search query (filters both tasks and goals)
+    let unifiedSearchQuery = $state("");
 
-// Get the effective goal search query based on mode
-const effectiveGoalQuery = $derived(
-	isSplitMode ? goalSearchQuery : unifiedSearchQuery,
-);
+    // Get the effective goal search query based on mode
+    const effectiveGoalQuery = $derived(
+        isSplitMode ? goalSearchQuery : unifiedSearchQuery,
+    );
 
-// Auto-expand when searching
-$effect(() => {
-	if (
-		(effectiveGoalQuery || (!isSplitMode && unifiedSearchQuery)) &&
-		!isExpanded
-	) {
-		isExpanded = true;
-	}
-});
+    // Auto-expand when searching
+    $effect(() => {
+        if (
+            (effectiveGoalQuery || (!isSplitMode && unifiedSearchQuery)) &&
+            !isExpanded
+        ) {
+            isExpanded = true;
+        }
+    });
 
-// Sync unified search to task search callback when in unified mode
-$effect(() => {
-	if (!isSplitMode) {
-		onTaskSearchChange?.(unifiedSearchQuery);
-	}
-});
+    // Sync unified search to task search callback when in unified mode
+    $effect(() => {
+        if (!isSplitMode) {
+            onTaskSearchChange?.(unifiedSearchQuery);
+        }
+    });
 
-// Clear searches when switching modes
-function toggleSplitMode() {
-	if (isSplitMode) {
-		// Switching to unified - clear individual searches
-		goalSearchQuery = '';
-		onTaskSearchChange?.('');
-		unifiedSearchQuery = '';
-	} else {
-		// Switching to split - clear unified search
-		unifiedSearchQuery = '';
-		onTaskSearchChange?.('');
-	}
-	isSplitMode = !isSplitMode;
-}
+    // Clear searches when switching modes
+    function toggleSplitMode() {
+        if (isSplitMode) {
+            // Switching to unified - clear individual searches
+            goalSearchQuery = "";
+            onTaskSearchChange?.("");
+            unifiedSearchQuery = "";
+        } else {
+            // Switching to split - clear unified search
+            unifiedSearchQuery = "";
+            onTaskSearchChange?.("");
+        }
+        isSplitMode = !isSplitMode;
+    }
 
-// Filtered goals based on search
-const filteredGoals = $derived.by(() => {
-	if (!effectiveGoalQuery.trim()) return goals;
-	const query = effectiveGoalQuery.toLowerCase().trim();
-	return goals.filter((g) => g.title.toLowerCase().includes(query));
-});
+    // Filtered goals based on search
+    const filteredGoals = $derived.by(() => {
+        if (!effectiveGoalQuery.trim()) return goals;
+        const query = effectiveGoalQuery.toLowerCase().trim();
+        return goals.filter((g) => g.title.toLowerCase().includes(query));
+    });
 
-// Scroll container ref for auto-scrolling
-let scrollContainer = $state<HTMLDivElement | null>(null);
+    // Hover state for popover
+    let hoveredGoalId = $state<string | null>(null);
+    let popoverPosition = $state<{ x: number; y: number } | null>(null);
+    let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// Hover state for popover
-let hoveredGoalId = $state<string | null>(null);
-let popoverPosition = $state<{ x: number; y: number } | null>(null);
-let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+    // Scroll container and scroll state for affordance indicators
+    let scrollContainer = $state<HTMLDivElement | null>(null);
+    let canScrollLeft = $state(false);
+    let canScrollRight = $state(false);
 
-// Auto-scroll to first highlighted goal
-$effect(() => {
-	if (highlightedGoalIds.length > 0 && scrollContainer && isExpanded) {
-		const firstHighlightedId = highlightedGoalIds[0];
-		const goalElement = scrollContainer.querySelector(
-			`[data-goal-id="${firstHighlightedId}"]`,
-		);
-		if (goalElement) {
-			goalElement.scrollIntoView({
-				behavior: 'smooth',
-				block: 'nearest',
-				inline: 'center',
-			});
-		}
-	}
-});
+    function updateScrollIndicators() {
+        if (!scrollContainer) return;
+        const { scrollLeft, scrollWidth, clientWidth } = scrollContainer;
+        canScrollLeft = scrollLeft > 5;
+        canScrollRight = scrollLeft < scrollWidth - clientWidth - 5;
+    }
 
-// Format recurrence properly
-function formatRecurrence(
-	rec: { frequency: number; period: string } | undefined,
-): string {
-	if (!rec) return '';
-	const times = rec.frequency === 1 ? '' : `${rec.frequency}x/`;
-	const periodMap: Record<string, string> = {
-		day: 'day',
-		week: 'week',
-		month: 'month',
-	};
-	return times + (periodMap[rec.period] || rec.period);
-}
+    $effect(() => {
+        if (scrollContainer && isExpanded) {
+            updateScrollIndicators();
+            // Check again after a brief delay for layout settling
+            setTimeout(updateScrollIndicators, 100);
+        }
+    });
 
-// Format numbers nicely
-function formatNumber(value: number, max: number = 99): string {
-	if (value > max) return `${max}+`;
-	return String(value);
-}
+    // Format numbers nicely
+    function formatNumber(value: number, max: number = 99): string {
+        if (value > max) return `${max}+`;
+        return String(value);
+    }
 
-// Stats
-const doneCount = $derived(
-	goals.filter((g) => g.todayStatus === 'met' || g.todayStatus === 'exceeded')
-		.length,
-);
+    // Stats
+    const doneCount = $derived(
+        goals.filter(
+            (g) => g.todayStatus === "met" || g.todayStatus === "exceeded",
+        ).length,
+    );
 
-const filteredDoneCount = $derived(
-	filteredGoals.filter(
-		(g) => g.todayStatus === 'met' || g.todayStatus === 'exceeded',
-	).length,
-);
+    const filteredDoneCount = $derived(
+        filteredGoals.filter(
+            (g) => g.todayStatus === "met" || g.todayStatus === "exceeded",
+        ).length,
+    );
 
-// Local hover state for dimming other goals
-let localHoveredGoalId = $state<string | null>(null);
+    // Local hover state for dimming other goals
+    let localHoveredGoalId = $state<string | null>(null);
 
-function handleLocalHover(goalId: string | null, e?: MouseEvent) {
-	// Clear any pending hover timeout
-	if (hoverTimeout) {
-		clearTimeout(hoverTimeout);
-		hoverTimeout = null;
-	}
+    function handleLocalHover(goalId: string | null, e?: MouseEvent) {
+        // Clear any pending hover timeout
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
 
-	localHoveredGoalId = goalId;
-	onGoalHover?.(goalId);
+        localHoveredGoalId = goalId;
+        onGoalHover?.(goalId);
 
-	if (goalId && e) {
-		hoveredGoalId = goalId;
-		updatePopoverPosition(e);
-	} else {
-		hoveredGoalId = null;
-		popoverPosition = null;
-	}
-}
+        if (goalId && e) {
+            hoveredGoalId = goalId;
+            updatePopoverPosition(e);
+        } else {
+            hoveredGoalId = null;
+            popoverPosition = null;
+        }
+    }
 
-function updatePopoverPosition(e: MouseEvent) {
-	popoverPosition = { x: e.clientX, y: e.clientY };
-}
+    function updatePopoverPosition(e: MouseEvent) {
+        popoverPosition = { x: e.clientX, y: e.clientY };
+    }
 
-function onMouseMove(e: MouseEvent) {
-	if (hoveredGoalId) {
-		updatePopoverPosition(e);
-	}
-}
+    function onMouseMove(e: MouseEvent) {
+        if (hoveredGoalId) {
+            updatePopoverPosition(e);
+        }
+    }
 
-const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
+    const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
 </script>
 
 {#if goals.length > 0}
@@ -414,166 +398,149 @@ const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
 
         <!-- Goal Cards -->
         {#if isExpanded}
-            <div
-                class="px-4 overflow-x-auto overflow-visible scrollbar-thin"
-                transition:slide={{ duration: 150 }}
-                bind:this={scrollContainer}
-            >
-                <div class="flex gap-2.5 py-3">
-                    {#each filteredGoals as goal (goal.id)}
-                        {@const isMet =
-                            goal.todayStatus === "met" ||
-                            goal.todayStatus === "exceeded"}
-                        {@const isHighlighted = highlightedGoalIds.includes(
-                            goal.id,
-                        )}
-                        {@const isHovered = localHoveredGoalId === goal.id}
-                        {@const isDimmed =
-                            (localHoveredGoalId &&
-                                localHoveredGoalId !== goal.id &&
-                                !isHighlighted) ||
-                            (highlightedGoalIds.length > 0 && !isHighlighted)}
-                        {@const shouldShowHoverEffect =
-                            isHovered || isHighlighted}
-                        {@const isHabit = !!goal.recurrence}
+            <div class="relative" transition:slide={{ duration: 150 }}>
+                <!-- Left scroll indicator -->
+                {#if canScrollLeft}
+                    <div class="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-base-100 to-transparent z-10 pointer-events-none"></div>
+                {/if}
 
-                        <button
-                            type="button"
-                            data-goal-id={goal.id}
-                            class={cn(
-                                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 group border-2 bg-base-100 relative",
-                                isDimmed
-                                    ? "opacity-30 grayscale border-base-300"
-                                    : "opacity-100 border-transparent",
-                                shouldShowHoverEffect
-                                    ? "shadow-xl z-20 ring-2"
-                                    : "hover:shadow-md hover:border-base-300",
-                            )}
-                            style={shouldShowHoverEffect
-                                ? `border-color: ${goal.color}; --tw-ring-color: ${goal.color}40;`
-                                : ""}
-                            onclick={() => onGoalClick?.(goal.id)}
-                            onmouseenter={(e) => handleLocalHover(goal.id, e)}
-                            onmousemove={onMouseMove}
-                            onmouseleave={() => handleLocalHover(null)}
-                        >
-                            <!-- Icon - shows goal icon normally, plus icon on hover -->
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                            <div
-                                class="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 transition-all duration-200 relative cursor-pointer"
-                                style="background: linear-gradient(135deg, {goal.color}15 0%, {goal.color}08 100%); border: 1.5px solid {goal.color}30;"
-                                onclick={(e) => {
-                                    e.stopPropagation();
-                                    onCreateTaskFromGoal?.(goal.id);
-                                }}
+                <!-- Right scroll indicator -->
+                {#if canScrollRight}
+                    <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-base-100 to-transparent z-10 pointer-events-none"></div>
+                {/if}
+
+                <div
+                    class="px-4 pb-3 overflow-x-auto goal-scroll"
+                    bind:this={scrollContainer}
+                    onscroll={updateScrollIndicators}
+                >
+                    <div class="flex gap-3 py-2">
+                        {#each filteredGoals as goal (goal.id)}
+                            {@const isMet =
+                                goal.todayStatus === "met" ||
+                                goal.todayStatus === "exceeded"}
+                            {@const isHovered = localHoveredGoalId === goal.id}
+                            {@const isDimmed =
+                                localHoveredGoalId &&
+                                localHoveredGoalId !== goal.id}
+                            {@const isHabit = !!goal.recurrence}
+
+                            <button
+                                type="button"
+                                data-goal-id={goal.id}
+                                class={cn(
+                                    "goal-card flex flex-col w-48 shrink-0 rounded-xl transition-all duration-200 group overflow-hidden relative",
+                                    "bg-base-100 border-2 shadow-md",
+                                    isDimmed && "opacity-40",
+                                    isHovered && "shadow-xl scale-[1.02] -translate-y-0.5",
+                                    isMet
+                                        ? "border-success/30 bg-success/5"
+                                        : "border-base-200 hover:border-base-300",
+                                )}
+                                onclick={() => onGoalClick?.(goal.id)}
+                                onmouseenter={(e) => handleLocalHover(goal.id, e)}
+                                onmousemove={onMouseMove}
+                                onmouseleave={() => handleLocalHover(null)}
                             >
-                                <span
-                                    class="absolute inset-0 flex items-center justify-center transition-all duration-200 group-hover:opacity-0 group-hover:scale-75"
-                                >
-                                    {goal.icon}
-                                </span>
-                                <span
-                                    class="absolute inset-0 flex items-center justify-center opacity-0 scale-75 transition-all duration-200 group-hover:opacity-100 group-hover:scale-100"
-                                    style="color: {goal.color};"
-                                >
-                                    <Plus
-                                        class="w-4.5 h-4.5"
-                                        strokeWidth={2.5}
-                                    />
-                                </span>
-                            </div>
+                                <!-- Color accent bar at top -->
+                                <div
+                                    class="h-1.5 w-full"
+                                    style="background-color: {goal.color};"
+                                ></div>
 
-                            <!-- Content -->
-                            <div class="flex flex-col gap-1.5 min-w-0 flex-1">
-                                <!-- Title and type -->
-                                <div class="flex items-center gap-2">
-                                    <h3
-                                        class="font-semibold text-sm leading-tight truncate max-w-[140px]"
-                                    >
-                                        {goal.title}
-                                    </h3>
-                                    {#if isHabit}
-                                        <div
-                                            class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-base-200/50"
-                                        >
-                                            <Repeat
-                                                class="w-2.5 h-2.5 text-base-content/50 shrink-0"
-                                            />
-                                            <span
-                                                class="text-[9px] font-semibold text-base-content/60 uppercase"
-                                                >Habit</span
-                                            >
-                                        </div>
-                                    {:else}
-                                        <div
-                                            class="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-base-200/50"
-                                        >
-                                            <Target
-                                                class="w-2.5 h-2.5 text-base-content/50 shrink-0"
-                                            />
-                                            <span
-                                                class="text-[9px] font-semibold text-base-content/60 uppercase"
-                                                >Goal</span
-                                            >
-                                        </div>
-                                    {/if}
-                                </div>
-
-                                <!-- Progress or Status -->
-                                {#if goal.target}
-                                    <div class="flex items-center gap-2.5">
-                                        <div
-                                            class="flex-1 h-1.5 bg-base-200/60 rounded-full overflow-hidden min-w-[70px]"
-                                        >
-                                            <div
-                                                class="h-full rounded-full transition-all duration-300"
-                                                style="width: {Math.min(
-                                                    goal.progress,
-                                                    100,
-                                                )}%; background-color: {goal.color};"
-                                            ></div>
-                                        </div>
-                                        <span
-                                            class="text-[10px] font-bold shrink-0 tabular-nums"
-                                            style="color: {goal.color};"
-                                        >
-                                            {Math.round(
-                                                goal.target.currentValue * 100,
-                                            ) / 100}/{formatNumber(
-                                                goal.target.value,
-                                            )}
-                                        </span>
-                                    </div>
-                                {:else if isMet}
-                                    <div
-                                        class="flex items-center gap-1.5 text-success"
-                                    >
-                                        <Check
-                                            class="w-3 h-3"
-                                            strokeWidth={3}
-                                        />
-                                        <span
-                                            class="text-[10px] font-bold uppercase tracking-wide"
-                                            >Completed</span
-                                        >
-                                    </div>
-                                {:else if goal.currentStreak > 0}
-                                    <div class="flex items-center gap-1.5">
-                                        <Flame class="w-3 h-3 text-warning" />
-                                        <span
-                                            class="text-[10px] font-bold text-warning tabular-nums"
-                                        >
-                                            {formatNumber(goal.currentStreak)} day{goal.currentStreak !==
-                                            1
-                                                ? "s"
-                                                : ""}
-                                        </span>
+                                <!-- Completed badge -->
+                                {#if isMet}
+                                    <div class="absolute top-3 right-2 w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-sm">
+                                        <Check class="w-3 h-3 text-success-content" strokeWidth={3} />
                                     </div>
                                 {/if}
-                            </div>
-                        </button>
-                    {/each}
+
+                                <!-- Card content -->
+                                <div class="p-3.5 flex flex-col gap-3 flex-1">
+                                    <!-- Header: Icon + Title -->
+                                    <div class="flex items-start gap-3">
+                                        <!-- Icon - shows goal icon normally, plus icon on hover -->
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                        <div
+                                            class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 transition-all duration-200 relative cursor-pointer shadow-sm"
+                                            style="background-color: {goal.color}20; border: 1px solid {goal.color}30;"
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                onCreateTaskFromGoal?.(goal.id);
+                                            }}
+                                        >
+                                            <span
+                                                class="absolute inset-0 flex items-center justify-center transition-all duration-150 group-hover:opacity-0 group-hover:scale-75"
+                                            >
+                                                {goal.icon}
+                                            </span>
+                                            <span
+                                                class="absolute inset-0 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100"
+                                                style="color: {goal.color};"
+                                            >
+                                                <Plus class="w-5 h-5" strokeWidth={2.5} />
+                                            </span>
+                                        </div>
+
+                                        <div class="flex flex-col min-w-0 flex-1 pr-4">
+                                            <h3 class="font-bold text-sm leading-tight truncate text-left">
+                                                {goal.title}
+                                            </h3>
+                                            <span class="text-[10px] text-base-content/40 uppercase tracking-wider font-medium mt-0.5">
+                                                {isHabit ? "Habit" : "Goal"}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Divider -->
+                                    <div class="h-px bg-base-200/80"></div>
+
+                                    <!-- Progress or Status -->
+                                    <div class="mt-auto">
+                                        {#if goal.target}
+                                            <div class="flex flex-col gap-2">
+                                                <div class="h-2 bg-base-200 rounded-full overflow-hidden">
+                                                    <div
+                                                        class="h-full rounded-full transition-all duration-300"
+                                                        style="width: {Math.min(goal.progress, 100)}%; background-color: {goal.color};"
+                                                    ></div>
+                                                </div>
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs text-base-content/50 tabular-nums">
+                                                        {Math.round(goal.target.currentValue * 100) / 100} / {formatNumber(goal.target.value)}
+                                                    </span>
+                                                    <span
+                                                        class="text-xs font-bold tabular-nums"
+                                                        style="color: {goal.color};"
+                                                    >
+                                                        {Math.round(goal.progress)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        {:else if isMet}
+                                            <div class="flex items-center gap-2 text-success bg-success/10 px-2.5 py-1.5 rounded-lg">
+                                                <Check class="w-4 h-4" strokeWidth={2.5} />
+                                                <span class="text-xs font-bold">Completed today</span>
+                                            </div>
+                                        {:else if goal.currentStreak > 0}
+                                            <div class="flex items-center gap-2 bg-warning/10 px-2.5 py-1.5 rounded-lg">
+                                                <Flame class="w-4 h-4 text-warning" />
+                                                <span class="text-xs font-bold text-warning tabular-nums">
+                                                    {formatNumber(goal.currentStreak)} day streak
+                                                </span>
+                                            </div>
+                                        {:else}
+                                            <div class="flex items-center gap-2 text-base-content/40 bg-base-200/50 px-2.5 py-1.5 rounded-lg">
+                                                <Target class="w-4 h-4" />
+                                                <span class="text-xs font-medium">Not started today</span>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+                            </button>
+                        {/each}
+                    </div>
                 </div>
             </div>
         {/if}
@@ -586,17 +553,11 @@ const hoveredGoal = $derived(goals.find((g) => g.id === hoveredGoalId));
 {/if}
 
 <style>
-    .scrollbar-thin::-webkit-scrollbar {
-        height: 4px;
+    .goal-scroll {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
     }
-    .scrollbar-thin::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .scrollbar-thin::-webkit-scrollbar-thumb {
-        background: oklch(var(--bc) / 0.15);
-        border-radius: 4px;
-    }
-    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-        background: oklch(var(--bc) / 0.25);
+    .goal-scroll::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
     }
 </style>
