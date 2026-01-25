@@ -21,7 +21,6 @@ import (
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
-	"github.com/lucid-logs/go-backend/internal/features/templates"
 )
 
 // =============================================================================
@@ -71,7 +70,6 @@ type Task struct {
 
 	// Populated via graph queries (not stored on task)
 	Category    *categories.Category    `json:"category,omitempty"`     // From in_category edge
-	Template    *templates.TaskTemplate `json:"template,omitempty"`     // From created_from edge
 	Emotion     *emotions.EmotionDetail `json:"emotion,omitempty"`      // Full emotion details
 	LinkedGoals []LinkedGoalSummary     `json:"linked_goals,omitempty"` // From task_goals edge
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
-import { type Goal, type TaskTemplate, getGoals } from '$lib/api';
+import { type Goal, getGoals } from '$lib/api';
 import { cn } from '$lib/utils';
 import { createQuery } from '@tanstack/svelte-query';
 import {

@@ -16,6 +16,7 @@
 
     interface Props {
         goals: TimelineGoal[];
+        highlightedGoalIds?: string[];
         taskSearchQuery?: string;
         onTaskSearchChange?: (query: string) => void;
         taskCount?: number;
@@ -26,6 +27,7 @@
 
     let {
         goals = [],
+        highlightedGoalIds = [],
         taskSearchQuery = "",
         onTaskSearchChange,
         taskCount = 0,

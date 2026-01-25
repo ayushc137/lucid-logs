@@ -15,6 +15,7 @@ import (
 
 	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
 	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/features/activities"
 	"github.com/lucid-logs/go-backend/internal/features/activitylogs"
 	"github.com/lucid-logs/go-backend/internal/features/analytics"
 	"github.com/lucid-logs/go-backend/internal/features/auth"
@@ -26,7 +27,6 @@ import (
 	"github.com/lucid-logs/go-backend/internal/features/retrospectives"
 	"github.com/lucid-logs/go-backend/internal/features/taskgoals"
 	"github.com/lucid-logs/go-backend/internal/features/tasks"
-	"github.com/lucid-logs/go-backend/internal/features/templates"
 	"github.com/lucid-logs/go-backend/internal/features/units"
 	"github.com/lucid-logs/go-backend/internal/features/users"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
@@ -166,19 +166,20 @@ func NewRouter(cfg Config) *gin.Engine {
 			userService := users.NewService(userRepo)
 			users.RegisterRoutes(protected.Group("/users"), userService, cfg.Validator)
 
-			// Template routes
-			templateRepo := templates.NewRepository(cfg.DB)
-			templateService := templates.NewService(templateRepo)
-			templates.RegisterRoutes(protected.Group("/templates"), templateService, cfg.Validator)
+			// Activity routes
+			activitiesRepo := activities.NewRepository(cfg.DB)
+			activitiesService := activities.NewService(activitiesRepo, taskService, nil)
+			activitiesHandler := activities.NewHandler(activitiesService)
+			activitiesHandler.RegisterRoutes(protected)
 
 			// Goal Logs routes (nested under goals)
 			goalLogsRepo := goallogs.NewRepository(cfg.DB)
 			goalLogger := goallogs.NewGoalLoggerAdapter(goalLogsRepo)
 
-			// Goal routes (with linked template auto-creation and auto-logging)
+			// Goal routes (with activity auto-creation and auto-logging)
 			goalRepo := goals.NewRepository(cfg.DB)
-			templateCreator := templates.NewGoalTemplateCreator(templateRepo)
-			goalService := goals.NewService(goalRepo, templateCreator, goalLogger)
+			activityCreator := activities.NewGoalActivityCreator(activitiesRepo)
+			goalService := goals.NewServiceWithActivity(goalRepo, nil, activityCreator, goalLogger)
 			goals.RegisterRoutes(protected.Group("/goals"), goalService, cfg.Validator)
 
 			// Goal Logs API routes (for fetching history)

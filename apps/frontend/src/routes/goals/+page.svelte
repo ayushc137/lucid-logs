@@ -1,5 +1,10 @@
 <script lang="ts">
-import { type Goal, deleteGoal, getGoals, updateGoal } from '$lib/api';
+import {
+	type Goal,
+	deleteGoal,
+	getGoals,
+	updateGoal,
+} from '$lib/api';
 import { GoalModal } from '$lib/components/goals';
 import { ConfirmDialog, ErrorAlert } from '$lib/components/ui';
 import { cn } from '$lib/utils';

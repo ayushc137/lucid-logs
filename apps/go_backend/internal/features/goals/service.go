@@ -70,6 +70,12 @@ type TemplateCreator interface {
 	CreateForGoal(ctx context.Context, goal *Goal, userID string) (templateID string, err error)
 }
 
+// ActivityCreator is an interface for creating activities.
+// This allows the goals service to create linked activities without circular imports.
+type ActivityCreator interface {
+	CreateForGoal(ctx context.Context, goal *Goal, pinned bool, defaultDuration int, userID string) (activityID string, err error)
+}
+
 // GoalLogger is an interface for logging goal events.
 // This allows the goals service to log events without circular imports with goallogs.
 type GoalLogger interface {
@@ -85,16 +91,28 @@ type GoalLogger interface {
 type service struct {
 	repo            Repository
 	templateCreator TemplateCreator
+	activityCreator ActivityCreator
 	goalLogger      GoalLogger
 	logger          zerolog.Logger
 }
 
 // NewService creates a new goal Service.
-// templateCreator and goalLogger can be nil if not needed.
+// templateCreator, activityCreator, and goalLogger can be nil if not needed.
 func NewService(repo Repository, templateCreator TemplateCreator, goalLogger GoalLogger) Service {
 	return &service{
 		repo:            repo,
 		templateCreator: templateCreator,
+		goalLogger:      goalLogger,
+		logger:          log.With().Str("service", "goals").Logger(),
+	}
+}
+
+// NewServiceWithActivity creates a new goal Service with activity auto-creation support.
+func NewServiceWithActivity(repo Repository, templateCreator TemplateCreator, activityCreator ActivityCreator, goalLogger GoalLogger) Service {
+	return &service{
+		repo:            repo,
+		templateCreator: templateCreator,
+		activityCreator: activityCreator,
 		goalLogger:      goalLogger,
 		logger:          log.With().Str("service", "goals").Logger(),
 	}
@@ -193,12 +211,22 @@ func (s *service) Create(ctx context.Context, req *CreateRequest, userID string)
 		Bool("is_measurable", goal.Target != nil).
 		Msg("goal created")
 
-	// Auto-create linked template for recurring goals
+	// Auto-create linked template for recurring goals (deprecated - use activities)
 	if goal.Recurrence != nil && s.templateCreator != nil {
 		_, err := s.templateCreator.CreateForGoal(ctx, goal, userID)
 		if err != nil {
 			s.logger.Warn().Err(err).Str("goal_id", goal.ID).Msg("failed to auto-create template")
 			// Don't fail goal creation for template creation failure
+		}
+	}
+
+	// Auto-create linked activity for recurring goals (new system)
+	if goal.Recurrence != nil && s.activityCreator != nil {
+		// Pin the activity by default for recurring goals, with 30 min default duration
+		_, err := s.activityCreator.CreateForGoal(ctx, goal, true, 1800, userID)
+		if err != nil {
+			s.logger.Warn().Err(err).Str("goal_id", goal.ID).Msg("failed to auto-create activity")
+			// Don't fail goal creation for activity creation failure
 		}
 	}
 

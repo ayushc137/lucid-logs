@@ -56,11 +56,55 @@ DEFINE FIELD IF NOT EXISTS created_by ON goal_snapshots TYPE record<users>;
 DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_goal ON TABLE goal_snapshots COLUMNS goal_id;
 DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_user ON TABLE goal_snapshots COLUMNS created_by;
 
--- TEMPLATES
+-- TEMPLATES (deprecated - use activities)
 DEFINE TABLE IF NOT EXISTS templates PERMISSIONS FULL;
 DEFINE INDEX IF NOT EXISTS idx_templates_user ON TABLE templates COLUMNS created_by;
 DEFINE INDEX IF NOT EXISTS idx_templates_quick_log ON TABLE templates COLUMNS created_by, is_quick_log;
 DEFINE INDEX IF NOT EXISTS idx_templates_deleted ON TABLE templates COLUMNS created_by, deleted_at;
+
+-- ACTIVITIES (replaces templates with enhanced functionality)
+DEFINE TABLE IF NOT EXISTS activities SCHEMAFULL PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS title ON activities TYPE string ASSERT $value != NONE AND string::len($value) >= 1;
+DEFINE FIELD IF NOT EXISTS icon ON activities TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS description ON activities TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS default_duration ON activities TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS default_emotion_id ON activities TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS default_priority ON activities TYPE int DEFAULT 3;
+DEFINE FIELD IF NOT EXISTS default_completed ON activities TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS quantity_enabled ON activities TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS quantity_default ON activities TYPE option<float>;
+DEFINE FIELD IF NOT EXISTS quantity_step ON activities TYPE option<float>;
+DEFINE FIELD IF NOT EXISTS quantity_unit_id ON activities TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS default_impact ON activities TYPE string DEFAULT "positive";
+DEFINE FIELD IF NOT EXISTS category_id ON activities TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS pinned ON activities TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS sort_order ON activities TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS use_count ON activities TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS last_used_at ON activities TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS active_session ON activities TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS created_by ON activities TYPE record<users>;
+DEFINE FIELD IF NOT EXISTS created_at ON activities TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON activities TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS deleted_at ON activities TYPE option<datetime>;
+DEFINE INDEX IF NOT EXISTS idx_activities_user ON activities FIELDS created_by;
+DEFINE INDEX IF NOT EXISTS idx_activities_user_active ON activities FIELDS created_by, deleted_at;
+DEFINE INDEX IF NOT EXISTS idx_activities_pinned ON activities FIELDS created_by, pinned, sort_order;
+
+-- TIMER_SESSIONS (Flowmodoro tracking)
+DEFINE TABLE IF NOT EXISTS timer_sessions SCHEMAFULL PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS activity_id ON timer_sessions TYPE record<activities>;
+DEFINE FIELD IF NOT EXISTS task_id ON timer_sessions TYPE record<tasks>;
+DEFINE FIELD IF NOT EXISTS created_by ON timer_sessions TYPE record<users>;
+DEFINE FIELD IF NOT EXISTS status ON timer_sessions TYPE string DEFAULT "active";
+DEFINE FIELD IF NOT EXISTS started_at ON timer_sessions TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS ended_at ON timer_sessions TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS total_work_seconds ON timer_sessions TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS total_break_seconds ON timer_sessions TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS breaks ON timer_sessions TYPE option<array>;
+DEFINE FIELD IF NOT EXISTS is_on_break ON timer_sessions TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS created_at ON timer_sessions TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON timer_sessions TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_timer_sessions_user_active ON timer_sessions FIELDS created_by, status;
 
 -- UNITS (measurement units)
 DEFINE TABLE IF NOT EXISTS units PERMISSIONS FULL;
@@ -101,7 +145,6 @@ DEFINE INDEX idx_task_emotions_type ON TABLE task_emotions COLUMNS type;
 -- TASK_GOALS (tasks -> goals) with impact and milestone tracking
 DEFINE TABLE IF NOT EXISTS task_goals TYPE RELATION IN tasks OUT goals PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS impact_type ON task_goals TYPE string ASSERT $value IN ["positive", "negative", "neutral"];
-DEFINE FIELD IF NOT EXISTS impact_magnitude ON task_goals TYPE int ASSERT $value >= 1 AND $value <= 5;
 DEFINE FIELD IF NOT EXISTS quantity_value ON task_goals TYPE option<float>;
 DEFINE FIELD IF NOT EXISTS unit_id ON task_goals TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS is_milestone ON task_goals TYPE bool DEFAULT false;
@@ -132,8 +175,8 @@ DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_
 -- =============================================================================
 
 -- IN_CATEGORY (Universal category linking)
--- Maps: tasks/goals/templates -> categories
-DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | templates OUT categories PERMISSIONS FULL;
+-- Maps: tasks/goals/activities -> categories
+DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | activities OUT categories PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS created_at ON in_category TYPE datetime DEFAULT time::now();
 -- Index for finding all items in a category (e.g. "Values" page)
 DEFINE INDEX IF NOT EXISTS idx_in_category_out ON TABLE in_category COLUMNS out;
@@ -153,10 +196,25 @@ DEFINE FIELD IF NOT EXISTS created_at ON created_from TYPE datetime DEFAULT time
 -- Index for template usage stats (how many tasks created from this template?)
 DEFINE INDEX IF NOT EXISTS idx_created_from_template ON TABLE created_from COLUMNS out;
 
--- TEMPLATE_GOALS (Template -> Goal auto-linking)
+-- TEMPLATE_GOALS (Template -> Goal auto-linking) - deprecated
 DEFINE TABLE IF NOT EXISTS template_goals TYPE RELATION IN templates OUT goals PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS auto_link_tasks ON template_goals TYPE bool DEFAULT true;
 DEFINE FIELD IF NOT EXISTS created_at ON template_goals TYPE datetime DEFAULT time::now();
+
+-- ACTIVITY_GOALS (Activity -> Goal linking with config)
+DEFINE TABLE IF NOT EXISTS activity_goals TYPE RELATION IN activities OUT goals PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS auto_link_tasks ON activity_goals TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS quantity_multiplier ON activity_goals TYPE float DEFAULT 1.0;
+DEFINE FIELD IF NOT EXISTS default_impact ON activity_goals TYPE string DEFAULT "positive";
+DEFINE FIELD IF NOT EXISTS created_at ON activity_goals TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_activity_goals_out ON activity_goals FIELDS out;
+DEFINE INDEX IF NOT EXISTS idx_activity_goals_in ON activity_goals FIELDS in;
+
+-- CREATED_FROM_ACTIVITY (Task -> Activity origin tracking)
+DEFINE TABLE IF NOT EXISTS created_from_activity TYPE RELATION IN tasks OUT activities PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS mode ON created_from_activity TYPE string DEFAULT "instant";
+DEFINE FIELD IF NOT EXISTS created_at ON created_from_activity TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_created_from_activity_out ON created_from_activity FIELDS out;
 
 -- =============================================================================
 -- END SCHEMA

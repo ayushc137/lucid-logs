@@ -16,7 +16,6 @@ import {
 	Palette,
 	Settings,
 	Target,
-	Zap,
 } from 'lucide-svelte';
 
 interface Props {
@@ -31,7 +30,6 @@ const navItems = [
 	{ href: '/tasks', icon: ListTodo, label: 'Tasks' },
 	{ href: '/categories', icon: Palette, label: 'Categories' },
 	{ href: '/goals', icon: Target, label: 'Goals' },
-	{ href: '/templates', icon: Zap, label: 'Templates' },
 	{ href: '/retrospectives', icon: Calendar, label: 'Retrospectives' },
 	{ href: '/analytics', icon: BarChart3, label: 'Analytics' },
 ] as const;

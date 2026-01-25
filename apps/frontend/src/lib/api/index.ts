@@ -84,20 +84,6 @@ export {
 	type CategoryPageResponse,
 } from './categories';
 
-// Templates
-export {
-	getTemplates,
-	getTemplate,
-	createTemplate,
-	updateTemplate,
-	deleteTemplate,
-	getQuickLogTemplates,
-	type TaskTemplate,
-	type CreateTemplateRequest,
-	type UpdateTemplateRequest,
-	type InstantiateTemplateRequest,
-} from './templates';
-
 // Task-Goal Links
 export {
 	getGoalsForTask,
@@ -142,3 +128,33 @@ export {
 	type CreateUnitRequest,
 	type UpdateUnitRequest,
 } from './units';
+
+// Activities
+export {
+	getActivities,
+	getPinnedActivities,
+	getActivity,
+	createActivity,
+	updateActivity,
+	deleteActivity,
+	instantLog,
+	scheduleActivity,
+	getActivityLinkedGoals,
+	linkGoalToActivity,
+	unlinkGoalFromActivity,
+	type Activity,
+	type ActivityGoalLink,
+	type TimerSession,
+	type TimerBreak,
+	type CreateActivityRequest,
+	type UpdateActivityRequest,
+	type GoalLinkInput as ActivityGoalLinkInput,
+	type InstantLogRequest,
+	type InstantLogResponse,
+	type GoalUpdateSummary,
+	type ScheduleRequest,
+	type ScheduleResponse,
+	type TaskDefaults,
+	type GoalLinkDefault,
+	type ActivityGoalLinkDetail,
+} from './activities';

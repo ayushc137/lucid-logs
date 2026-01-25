@@ -15,6 +15,638 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/activities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of user's activities",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "List activities",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activities.ActivityPageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new activity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Create activity",
+                "parameters": [
+                    {
+                        "description": "Activity data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/activities.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/activities.Activity"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activities/pinned": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get activities pinned to quick access bar",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Get pinned activities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/activities.Activity"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activities/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a single activity by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Get activity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activities.Activity"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing activity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Update activity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/activities.UpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activities.Activity"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft delete an activity",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Delete activity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activities/{id}/goals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all goals linked to an activity",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Get linked goals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/activities.ActivityGoalLinkDetail"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Link a goal to an activity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Link goal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Goal link config",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/activities.GoalLinkInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activities/{id}/goals/{goalId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove a goal link from an activity",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Unlink goal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Goal ID",
+                        "name": "goalId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activities/{id}/instant": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a completed task from an activity immediately",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Instant log",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Log options",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/activities.InstantLogRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activities.InstantLogResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/activities/{id}/schedule": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get pre-filled task data for the task form",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "activities"
+                ],
+                "summary": "Schedule task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Activity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Schedule options",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/activities.ScheduleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/activities.ScheduleResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/activity": {
             "get": {
                 "security": [
@@ -2502,322 +3134,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/templates": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get paginated list of templates for the authenticated user",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "templates"
-                ],
-                "summary": "List templates",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Items per page (default 20, max 100)",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Items to skip (default 0)",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/templates.TemplatePageResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create a new task template",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "templates"
-                ],
-                "summary": "Create template",
-                "parameters": [
-                    {
-                        "description": "Template data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/templates.CreateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/templates.TaskTemplate"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/templates/quick-log": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get templates configured for quick logging",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "templates"
-                ],
-                "summary": "Get quick-log templates",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/templates.TaskTemplate"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/templates/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a single template by its ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "templates"
-                ],
-                "summary": "Get template by ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/templates.TaskTemplate"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update an existing template",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "templates"
-                ],
-                "summary": "Update template",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/templates.UpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/templates.TaskTemplate"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Soft delete a template",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "templates"
-                ],
-                "summary": "Delete template",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.OperationMessage"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/units": {
             "get": {
                 "security": [
@@ -3122,6 +3438,560 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "activities.Activity": {
+            "description": "Reusable task blueprint for quick logging",
+            "type": "object",
+            "properties": {
+                "active_session": {
+                    "description": "Active Timer Session (if any)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/activities.TimerSession"
+                        }
+                    ]
+                },
+                "category": {
+                    "description": "From in_category edge",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/categories.Category"
+                        }
+                    ]
+                },
+                "created_at": {
+                    "description": "Metadata",
+                    "type": "string"
+                },
+                "default_completed": {
+                    "description": "true = instant log creates completed task",
+                    "type": "boolean"
+                },
+                "default_duration": {
+                    "description": "Task Defaults (pre-fill when creating task)",
+                    "type": "integer"
+                },
+                "default_emotion_id": {
+                    "description": "emotions:xxx",
+                    "type": "string"
+                },
+                "default_impact": {
+                    "description": "Goal Link Defaults",
+                    "type": "string"
+                },
+                "default_priority": {
+                    "description": "1-5",
+                    "type": "integer"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Template for task journal",
+                    "type": "string"
+                },
+                "goals": {
+                    "description": "Populated via graph queries (not stored on activity)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activities.ActivityGoalLink"
+                    }
+                },
+                "icon": {
+                    "description": "Emoji",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "pinned": {
+                    "description": "Display \u0026 Organization",
+                    "type": "boolean"
+                },
+                "quantity_default": {
+                    "type": "number"
+                },
+                "quantity_enabled": {
+                    "description": "Quantity Settings",
+                    "type": "boolean"
+                },
+                "quantity_step": {
+                    "type": "number"
+                },
+                "quantity_unit_id": {
+                    "description": "Fallback unit if no goal",
+                    "type": "string"
+                },
+                "sort_order": {
+                    "description": "Order in quick bar",
+                    "type": "integer"
+                },
+                "title": {
+                    "description": "Identity",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "use_count": {
+                    "description": "Usage Statistics",
+                    "type": "integer"
+                }
+            }
+        },
+        "activities.ActivityGoalLink": {
+            "description": "Link configuration for activity-goal relationship",
+            "type": "object",
+            "properties": {
+                "auto_link_tasks": {
+                    "description": "Auto-link tasks to this goal",
+                    "type": "boolean"
+                },
+                "default_impact": {
+                    "description": "Override impact type",
+                    "type": "string"
+                },
+                "goal": {
+                    "description": "Populated goal details (for display)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/goals.Goal"
+                        }
+                    ]
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "quantity_multiplier": {
+                    "description": "Multiply quantity when linking",
+                    "type": "number"
+                }
+            }
+        },
+        "activities.ActivityGoalLinkDetail": {
+            "description": "Goal linked to activity with full details",
+            "type": "object",
+            "properties": {
+                "auto_link_tasks": {
+                    "type": "boolean"
+                },
+                "default_impact": {
+                    "type": "string"
+                },
+                "goal_color": {
+                    "type": "string"
+                },
+                "goal_icon": {
+                    "type": "string"
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "goal_title": {
+                    "type": "string"
+                },
+                "quantity_multiplier": {
+                    "type": "number"
+                },
+                "target_unit_id": {
+                    "type": "string"
+                },
+                "target_unit_symbol": {
+                    "type": "string"
+                }
+            }
+        },
+        "activities.ActivityPageResponse": {
+            "description": "Paginated list of activities",
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activities.Activity"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "activities.CreateRequest": {
+            "description": "Request payload for creating an activity",
+            "type": "object",
+            "required": [
+                "title"
+            ],
+            "properties": {
+                "category_id": {
+                    "description": "Category assignment",
+                    "type": "string",
+                    "example": "categories:health"
+                },
+                "default_completed": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "default_duration": {
+                    "description": "Task Defaults",
+                    "type": "integer",
+                    "example": 1800
+                },
+                "default_emotion_id": {
+                    "type": "string",
+                    "example": "emotions:E16"
+                },
+                "default_impact": {
+                    "description": "Goal Link Defaults",
+                    "type": "string",
+                    "enum": [
+                        "positive",
+                        "negative",
+                        "neutral"
+                    ],
+                    "example": "positive"
+                },
+                "default_priority": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1,
+                    "example": 3
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "example": "Quick morning jog"
+                },
+                "goal_links": {
+                    "description": "Goal linking",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activities.GoalLinkInput"
+                    }
+                },
+                "icon": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "example": "🏃"
+                },
+                "pinned": {
+                    "description": "Display",
+                    "type": "boolean",
+                    "example": true
+                },
+                "quantity_default": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 1
+                },
+                "quantity_enabled": {
+                    "description": "Quantity Settings",
+                    "type": "boolean",
+                    "example": true
+                },
+                "quantity_step": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 0.5
+                },
+                "quantity_unit_id": {
+                    "type": "string",
+                    "example": "units:km"
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "example": "Morning Run"
+                }
+            }
+        },
+        "activities.GoalLinkDefault": {
+            "description": "Pre-configured goal link",
+            "type": "object",
+            "properties": {
+                "goal_icon": {
+                    "type": "string"
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "goal_title": {
+                    "type": "string"
+                },
+                "impact_type": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "quantity_unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "activities.GoalLinkInput": {
+            "description": "Input for activity-goal link configuration",
+            "type": "object",
+            "required": [
+                "goal_id"
+            ],
+            "properties": {
+                "auto_link_tasks": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "default_impact": {
+                    "type": "string",
+                    "enum": [
+                        "positive",
+                        "negative",
+                        "neutral"
+                    ],
+                    "example": "positive"
+                },
+                "goal_id": {
+                    "type": "string",
+                    "example": "goals:hydration"
+                },
+                "quantity_multiplier": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 1
+                }
+            }
+        },
+        "activities.GoalUpdateSummary": {
+            "description": "Goal progress update summary",
+            "type": "object",
+            "properties": {
+                "goal_icon": {
+                    "type": "string"
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "goal_title": {
+                    "type": "string"
+                },
+                "is_completed": {
+                    "type": "boolean"
+                },
+                "new_total": {
+                    "type": "number"
+                },
+                "target_value": {
+                    "type": "number"
+                },
+                "value_added": {
+                    "type": "number"
+                }
+            }
+        },
+        "activities.InstantLogRequest": {
+            "description": "Request for instant task logging",
+            "type": "object",
+            "properties": {
+                "notes": {
+                    "type": "string",
+                    "example": "Felt great today"
+                },
+                "quantity": {
+                    "type": "number",
+                    "example": 2.5
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2025-01-25T10:00:00Z"
+                }
+            }
+        },
+        "activities.InstantLogResponse": {
+            "description": "Response for instant logging",
+            "type": "object",
+            "properties": {
+                "goals_updated": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activities.GoalUpdateSummary"
+                    }
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "task_title": {
+                    "type": "string"
+                }
+            }
+        },
+        "activities.ScheduleRequest": {
+            "description": "Request for scheduling a task from activity",
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "example": "2025-01-25T14:00:00Z"
+                }
+            }
+        },
+        "activities.ScheduleResponse": {
+            "description": "Response with pre-filled task defaults",
+            "type": "object",
+            "properties": {
+                "activity": {
+                    "$ref": "#/definitions/activities.Activity"
+                },
+                "goal_links": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activities.GoalLinkDefault"
+                    }
+                },
+                "task_defaults": {
+                    "$ref": "#/definitions/activities.TaskDefaults"
+                }
+            }
+        },
+        "activities.TaskDefaults": {
+            "description": "Pre-filled task form values",
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "emotion_id": {
+                    "type": "string"
+                },
+                "journal": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "quantity_unit": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "activities.TimerBreak": {
+            "description": "Break period during timer session",
+            "type": "object",
+            "properties": {
+                "duration": {
+                    "description": "seconds",
+                    "type": "integer"
+                },
+                "ended_at": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "activities.TimerSession": {
+            "description": "Active Flowmodoro timer session",
+            "type": "object",
+            "properties": {
+                "breaks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/activities.TimerBreak"
+                    }
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "activities.UpdateRequest": {
+            "description": "Request payload for updating an activity",
+            "type": "object",
+            "properties": {
+                "default_completed": {
+                    "type": "boolean"
+                },
+                "default_duration": {
+                    "type": "integer"
+                },
+                "default_emotion_id": {
+                    "type": "string"
+                },
+                "default_impact": {
+                    "type": "string",
+                    "enum": [
+                        "positive",
+                        "negative",
+                        "neutral"
+                    ]
+                },
+                "default_priority": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                },
+                "icon": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "pinned": {
+                    "type": "boolean"
+                },
+                "quantity_default": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "quantity_enabled": {
+                    "type": "boolean"
+                },
+                "quantity_step": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "quantity_unit_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "minLength": 1
+                }
+            }
+        },
         "activitylogs.ActivityLog": {
             "description": "Activity log entry for any entity",
             "type": "object",
@@ -5582,14 +6452,6 @@ const docTemplate = `{
                 "start_date": {
                     "type": "string"
                 },
-                "template": {
-                    "description": "From created_from edge",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/templates.TaskTemplate"
-                        }
-                    ]
-                },
                 "title": {
                     "type": "string"
                 },
@@ -5773,271 +6635,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 500,
                     "minLength": 1
-                }
-            }
-        },
-        "templates.CreateRequest": {
-            "description": "Request payload for creating a template",
-            "type": "object",
-            "required": [
-                "title"
-            ],
-            "properties": {
-                "category_id": {
-                    "description": "Category assignment (creates in_category edge)",
-                    "type": "string",
-                    "example": "categories:health123"
-                },
-                "default_duration": {
-                    "description": "seconds (30 min)",
-                    "type": "integer",
-                    "example": 1800
-                },
-                "default_emotion_id": {
-                    "type": "string",
-                    "example": "emotions:E16"
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 2000,
-                    "example": "Quick morning jog before work"
-                },
-                "expected_quadrant": {
-                    "type": "string",
-                    "enum": [
-                        "green",
-                        "yellow",
-                        "red",
-                        "blue"
-                    ],
-                    "example": "yellow"
-                },
-                "goal_links": {
-                    "description": "Goal linking (creates template_goals edge)",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/templates.GoalLinkInput"
-                    }
-                },
-                "icon": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "🏃"
-                },
-                "is_quick_log": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "quantity_default": {
-                    "type": "number",
-                    "minimum": 0,
-                    "example": 5
-                },
-                "quantity_enabled": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "quantity_step": {
-                    "type": "number",
-                    "minimum": 0,
-                    "example": 0.5
-                },
-                "quick_log_order": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "title": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 1,
-                    "example": "Morning Run"
-                }
-            }
-        },
-        "templates.GoalLinkInput": {
-            "type": "object",
-            "required": [
-                "goal_id"
-            ],
-            "properties": {
-                "auto_link_tasks": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "goal_id": {
-                    "type": "string",
-                    "example": "goals:hydration123"
-                },
-                "quantity_multiplier": {
-                    "type": "number",
-                    "minimum": 0,
-                    "example": 1
-                }
-            }
-        },
-        "templates.TaskTemplate": {
-            "description": "Reusable task blueprint",
-            "type": "object",
-            "properties": {
-                "category": {
-                    "description": "From in_category edge (or inherited)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/categories.Category"
-                        }
-                    ]
-                },
-                "created_at": {
-                    "description": "Metadata",
-                    "type": "string"
-                },
-                "default_duration": {
-                    "description": "Defaults for tasks created from this template",
-                    "type": "integer"
-                },
-                "default_emotion_id": {
-                    "type": "string"
-                },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "expected_quadrant": {
-                    "description": "Emotion defaults",
-                    "type": "string"
-                },
-                "goals": {
-                    "description": "Populated via graph queries (not stored on template)",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/goals.Goal"
-                    }
-                },
-                "icon": {
-                    "description": "Emoji",
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_quick_log": {
-                    "description": "Quick log settings",
-                    "type": "boolean"
-                },
-                "last_used_at": {
-                    "type": "string"
-                },
-                "quantity_default": {
-                    "type": "number"
-                },
-                "quantity_enabled": {
-                    "description": "Quantity settings",
-                    "type": "boolean"
-                },
-                "quantity_step": {
-                    "type": "number"
-                },
-                "quick_log_order": {
-                    "type": "integer"
-                },
-                "title": {
-                    "description": "Core fields",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "use_count": {
-                    "description": "Usage stats (auto-updated)",
-                    "type": "integer"
-                }
-            }
-        },
-        "templates.TemplatePageResponse": {
-            "description": "Paginated list of templates",
-            "type": "object",
-            "properties": {
-                "has_more": {
-                    "type": "boolean"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/templates.TaskTemplate"
-                    }
-                },
-                "limit": {
-                    "type": "integer"
-                },
-                "offset": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "templates.UpdateRequest": {
-            "description": "Request payload for updating a template",
-            "type": "object",
-            "properties": {
-                "default_duration": {
-                    "type": "integer",
-                    "example": 2700
-                },
-                "default_emotion_id": {
-                    "type": "string",
-                    "example": "emotions:E25"
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 2000,
-                    "example": "Post-work stress relief run"
-                },
-                "expected_quadrant": {
-                    "type": "string",
-                    "enum": [
-                        "green",
-                        "yellow",
-                        "red",
-                        "blue"
-                    ],
-                    "example": "green"
-                },
-                "icon": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "🌙"
-                },
-                "is_quick_log": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "quantity_default": {
-                    "type": "number",
-                    "minimum": 0,
-                    "example": 7
-                },
-                "quantity_enabled": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "quantity_step": {
-                    "type": "number",
-                    "minimum": 0,
-                    "example": 1
-                },
-                "quick_log_order": {
-                    "type": "integer",
-                    "example": 2
-                },
-                "title": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 1,
-                    "example": "Evening Run"
                 }
             }
         },

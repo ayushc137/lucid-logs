@@ -5,7 +5,6 @@
 		type CreateTaskRequest,
 		type Task,
 		type TaskItem,
-		type TaskTemplate,
 		type UpdateTaskRequest,
 		createTask,
 		deleteTask,
@@ -263,59 +262,6 @@
 			endDate = today;
 			if (initialCategoryId) {
 				categoryId = initialCategoryId;
-			}
-
-			// Check for template
-			if (browser) {
-				const templateJson = sessionStorage.getItem("task-template");
-				if (templateJson) {
-					try {
-						const tmpl = JSON.parse(templateJson) as TaskTemplate;
-						title = tmpl.title;
-						if (tmpl.description) journal = tmpl.description;
-						if (tmpl.icon) title = `${tmpl.icon} ${title}`; // Optional: prepend icon?
-
-						if (tmpl.category) categoryId = tmpl.category.id;
-
-						// Calculate end time based on default duration
-						if (tmpl.default_duration) {
-							const start = new Date(); // Or whatever start time is set to (now by default)
-							// Actually start time is set to 'now' implicitly by user interaction or default state?
-							// Default state for startTime/endTime is set to 09:00/10:00 in declarations...
-							// If we want "Now" + duration:
-							const now = new Date();
-							const end = new Date(
-								now.getTime() + tmpl.default_duration * 1000,
-							);
-
-							// Update start/end strings
-							startDate = now.toISOString().split("T")[0];
-							startTime = now.toTimeString().slice(0, 8);
-							endDate = end.toISOString().split("T")[0];
-							endTime = end.toTimeString().slice(0, 8);
-						}
-
-						if (tmpl.default_emotion_id) {
-							const e = emotionStore.get(tmpl.default_emotion_id);
-							if (e) selectedEmotion = e;
-						}
-
-						if (tmpl.goals) {
-							goalLinks = tmpl.goals.map((g) => ({
-								goal_id: g.id,
-								impact_type: "positive",
-								quantity_value: tmpl.quantity_enabled
-									? tmpl.quantity_default
-									: undefined,
-								quantity_unit: g.target?.unit_id,
-							}));
-						}
-
-						sessionStorage.removeItem("task-template");
-					} catch (e) {
-						console.error("Failed to parse task template", e);
-					}
-				}
 			}
 
 			// Initialize hash for empty arrays in create mode

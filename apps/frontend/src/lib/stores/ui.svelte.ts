@@ -7,9 +7,9 @@ class UIStore {
 	commandPaletteOpen = $state(false);
 	activeModal = $state<string | null>(null);
 
-	// Quick log panel
+	// Quick log panel (for activities)
 	quickLogOpen = $state(false);
-	selectedTemplateId = $state<string | null>(null);
+	selectedActivityId = $state<string | null>(null);
 
 	toggleSidebar() {
 		this.sidebarOpen = !this.sidebarOpen;
@@ -27,14 +27,14 @@ class UIStore {
 		this.activeModal = null;
 	}
 
-	openQuickLog(templateId?: string) {
-		this.selectedTemplateId = templateId ?? null;
+	openQuickLog(activityId?: string) {
+		this.selectedActivityId = activityId ?? null;
 		this.quickLogOpen = true;
 	}
 
 	closeQuickLog() {
 		this.quickLogOpen = false;
-		this.selectedTemplateId = null;
+		this.selectedActivityId = null;
 	}
 }
 

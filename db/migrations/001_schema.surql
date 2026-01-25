@@ -101,7 +101,6 @@ DEFINE INDEX idx_task_emotions_type ON TABLE task_emotions COLUMNS type;
 -- TASK_GOALS (tasks -> goals) with impact and milestone tracking
 DEFINE TABLE IF NOT EXISTS task_goals TYPE RELATION IN tasks OUT goals PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS impact_type ON task_goals TYPE string ASSERT $value IN ["positive", "negative", "neutral"];
-DEFINE FIELD IF NOT EXISTS impact_magnitude ON task_goals TYPE int ASSERT $value >= 1 AND $value <= 5;
 DEFINE FIELD IF NOT EXISTS quantity_value ON task_goals TYPE option<float>;
 DEFINE FIELD IF NOT EXISTS unit_id ON task_goals TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS is_milestone ON task_goals TYPE bool DEFAULT false;
@@ -132,8 +131,8 @@ DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_
 -- =============================================================================
 
 -- IN_CATEGORY (Universal category linking)
--- Maps: tasks/goals/templates -> categories
-DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | templates OUT categories PERMISSIONS FULL;
+-- Maps: tasks/goals/activities -> categories
+DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | activities OUT categories PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS created_at ON in_category TYPE datetime DEFAULT time::now();
 -- Index for finding all items in a category (e.g. "Values" page)
 DEFINE INDEX IF NOT EXISTS idx_in_category_out ON TABLE in_category COLUMNS out;

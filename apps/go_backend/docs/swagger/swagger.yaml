@@ -1,5 +1,394 @@
 basePath: /
 definitions:
+  activities.Activity:
+    description: Reusable task blueprint for quick logging
+    properties:
+      active_session:
+        allOf:
+        - $ref: '#/definitions/activities.TimerSession'
+        description: Active Timer Session (if any)
+      category:
+        allOf:
+        - $ref: '#/definitions/categories.Category'
+        description: From in_category edge
+      created_at:
+        description: Metadata
+        type: string
+      default_completed:
+        description: true = instant log creates completed task
+        type: boolean
+      default_duration:
+        description: Task Defaults (pre-fill when creating task)
+        type: integer
+      default_emotion_id:
+        description: emotions:xxx
+        type: string
+      default_impact:
+        description: Goal Link Defaults
+        type: string
+      default_priority:
+        description: 1-5
+        type: integer
+      deleted_at:
+        type: string
+      description:
+        description: Template for task journal
+        type: string
+      goals:
+        description: Populated via graph queries (not stored on activity)
+        items:
+          $ref: '#/definitions/activities.ActivityGoalLink'
+        type: array
+      icon:
+        description: Emoji
+        type: string
+      id:
+        type: string
+      last_used_at:
+        type: string
+      pinned:
+        description: Display & Organization
+        type: boolean
+      quantity_default:
+        type: number
+      quantity_enabled:
+        description: Quantity Settings
+        type: boolean
+      quantity_step:
+        type: number
+      quantity_unit_id:
+        description: Fallback unit if no goal
+        type: string
+      sort_order:
+        description: Order in quick bar
+        type: integer
+      title:
+        description: Identity
+        type: string
+      updated_at:
+        type: string
+      use_count:
+        description: Usage Statistics
+        type: integer
+    type: object
+  activities.ActivityGoalLink:
+    description: Link configuration for activity-goal relationship
+    properties:
+      auto_link_tasks:
+        description: Auto-link tasks to this goal
+        type: boolean
+      default_impact:
+        description: Override impact type
+        type: string
+      goal:
+        allOf:
+        - $ref: '#/definitions/goals.Goal'
+        description: Populated goal details (for display)
+      goal_id:
+        type: string
+      quantity_multiplier:
+        description: Multiply quantity when linking
+        type: number
+    type: object
+  activities.ActivityGoalLinkDetail:
+    description: Goal linked to activity with full details
+    properties:
+      auto_link_tasks:
+        type: boolean
+      default_impact:
+        type: string
+      goal_color:
+        type: string
+      goal_icon:
+        type: string
+      goal_id:
+        type: string
+      goal_title:
+        type: string
+      quantity_multiplier:
+        type: number
+      target_unit_id:
+        type: string
+      target_unit_symbol:
+        type: string
+    type: object
+  activities.ActivityPageResponse:
+    description: Paginated list of activities
+    properties:
+      has_more:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/activities.Activity'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  activities.CreateRequest:
+    description: Request payload for creating an activity
+    properties:
+      category_id:
+        description: Category assignment
+        example: categories:health
+        type: string
+      default_completed:
+        example: true
+        type: boolean
+      default_duration:
+        description: Task Defaults
+        example: 1800
+        type: integer
+      default_emotion_id:
+        example: emotions:E16
+        type: string
+      default_impact:
+        description: Goal Link Defaults
+        enum:
+        - positive
+        - negative
+        - neutral
+        example: positive
+        type: string
+      default_priority:
+        example: 3
+        maximum: 5
+        minimum: 1
+        type: integer
+      description:
+        example: Quick morning jog
+        maxLength: 2000
+        type: string
+      goal_links:
+        description: Goal linking
+        items:
+          $ref: '#/definitions/activities.GoalLinkInput'
+        type: array
+      icon:
+        example: "\U0001F3C3"
+        maxLength: 50
+        type: string
+      pinned:
+        description: Display
+        example: true
+        type: boolean
+      quantity_default:
+        example: 1
+        minimum: 0
+        type: number
+      quantity_enabled:
+        description: Quantity Settings
+        example: true
+        type: boolean
+      quantity_step:
+        example: 0.5
+        minimum: 0
+        type: number
+      quantity_unit_id:
+        example: units:km
+        type: string
+      sort_order:
+        example: 1
+        type: integer
+      title:
+        example: Morning Run
+        maxLength: 500
+        minLength: 1
+        type: string
+    required:
+    - title
+    type: object
+  activities.GoalLinkDefault:
+    description: Pre-configured goal link
+    properties:
+      goal_icon:
+        type: string
+      goal_id:
+        type: string
+      goal_title:
+        type: string
+      impact_type:
+        type: string
+      quantity:
+        type: number
+      quantity_unit:
+        type: string
+    type: object
+  activities.GoalLinkInput:
+    description: Input for activity-goal link configuration
+    properties:
+      auto_link_tasks:
+        example: true
+        type: boolean
+      default_impact:
+        enum:
+        - positive
+        - negative
+        - neutral
+        example: positive
+        type: string
+      goal_id:
+        example: goals:hydration
+        type: string
+      quantity_multiplier:
+        example: 1
+        minimum: 0
+        type: number
+    required:
+    - goal_id
+    type: object
+  activities.GoalUpdateSummary:
+    description: Goal progress update summary
+    properties:
+      goal_icon:
+        type: string
+      goal_id:
+        type: string
+      goal_title:
+        type: string
+      is_completed:
+        type: boolean
+      new_total:
+        type: number
+      target_value:
+        type: number
+      value_added:
+        type: number
+    type: object
+  activities.InstantLogRequest:
+    description: Request for instant task logging
+    properties:
+      notes:
+        example: Felt great today
+        type: string
+      quantity:
+        example: 2.5
+        type: number
+      timestamp:
+        example: "2025-01-25T10:00:00Z"
+        type: string
+    type: object
+  activities.InstantLogResponse:
+    description: Response for instant logging
+    properties:
+      goals_updated:
+        items:
+          $ref: '#/definitions/activities.GoalUpdateSummary'
+        type: array
+      task_id:
+        type: string
+      task_title:
+        type: string
+    type: object
+  activities.ScheduleRequest:
+    description: Request for scheduling a task from activity
+    properties:
+      start_date:
+        example: "2025-01-25T14:00:00Z"
+        type: string
+    type: object
+  activities.ScheduleResponse:
+    description: Response with pre-filled task defaults
+    properties:
+      activity:
+        $ref: '#/definitions/activities.Activity'
+      goal_links:
+        items:
+          $ref: '#/definitions/activities.GoalLinkDefault'
+        type: array
+      task_defaults:
+        $ref: '#/definitions/activities.TaskDefaults'
+    type: object
+  activities.TaskDefaults:
+    description: Pre-filled task form values
+    properties:
+      category_id:
+        type: string
+      duration:
+        type: integer
+      emotion_id:
+        type: string
+      journal:
+        type: string
+      priority:
+        type: integer
+      quantity:
+        type: number
+      quantity_unit:
+        type: string
+      title:
+        type: string
+    type: object
+  activities.TimerBreak:
+    description: Break period during timer session
+    properties:
+      duration:
+        description: seconds
+        type: integer
+      ended_at:
+        type: string
+      started_at:
+        type: string
+    type: object
+  activities.TimerSession:
+    description: Active Flowmodoro timer session
+    properties:
+      breaks:
+        items:
+          $ref: '#/definitions/activities.TimerBreak'
+        type: array
+      started_at:
+        type: string
+      task_id:
+        type: string
+    type: object
+  activities.UpdateRequest:
+    description: Request payload for updating an activity
+    properties:
+      default_completed:
+        type: boolean
+      default_duration:
+        type: integer
+      default_emotion_id:
+        type: string
+      default_impact:
+        enum:
+        - positive
+        - negative
+        - neutral
+        type: string
+      default_priority:
+        maximum: 5
+        minimum: 1
+        type: integer
+      description:
+        maxLength: 2000
+        type: string
+      icon:
+        maxLength: 50
+        type: string
+      pinned:
+        type: boolean
+      quantity_default:
+        minimum: 0
+        type: number
+      quantity_enabled:
+        type: boolean
+      quantity_step:
+        minimum: 0
+        type: number
+      quantity_unit_id:
+        type: string
+      sort_order:
+        type: integer
+      title:
+        maxLength: 500
+        minLength: 1
+        type: string
+    type: object
   activitylogs.ActivityLog:
     description: Activity log entry for any entity
     properties:
@@ -1704,10 +2093,6 @@ definitions:
         type: string
       start_date:
         type: string
-      template:
-        allOf:
-        - $ref: '#/definitions/templates.TaskTemplate'
-        description: From created_from edge
       title:
         type: string
       updated_at:
@@ -1835,200 +2220,6 @@ definitions:
         minLength: 1
         type: string
     type: object
-  templates.CreateRequest:
-    description: Request payload for creating a template
-    properties:
-      category_id:
-        description: Category assignment (creates in_category edge)
-        example: categories:health123
-        type: string
-      default_duration:
-        description: seconds (30 min)
-        example: 1800
-        type: integer
-      default_emotion_id:
-        example: emotions:E16
-        type: string
-      description:
-        example: Quick morning jog before work
-        maxLength: 2000
-        type: string
-      expected_quadrant:
-        enum:
-        - green
-        - yellow
-        - red
-        - blue
-        example: yellow
-        type: string
-      goal_links:
-        description: Goal linking (creates template_goals edge)
-        items:
-          $ref: '#/definitions/templates.GoalLinkInput'
-        type: array
-      icon:
-        example: "\U0001F3C3"
-        maxLength: 50
-        type: string
-      is_quick_log:
-        example: true
-        type: boolean
-      quantity_default:
-        example: 5
-        minimum: 0
-        type: number
-      quantity_enabled:
-        example: true
-        type: boolean
-      quantity_step:
-        example: 0.5
-        minimum: 0
-        type: number
-      quick_log_order:
-        example: 1
-        type: integer
-      title:
-        example: Morning Run
-        maxLength: 500
-        minLength: 1
-        type: string
-    required:
-    - title
-    type: object
-  templates.GoalLinkInput:
-    properties:
-      auto_link_tasks:
-        example: true
-        type: boolean
-      goal_id:
-        example: goals:hydration123
-        type: string
-      quantity_multiplier:
-        example: 1
-        minimum: 0
-        type: number
-    required:
-    - goal_id
-    type: object
-  templates.TaskTemplate:
-    description: Reusable task blueprint
-    properties:
-      category:
-        allOf:
-        - $ref: '#/definitions/categories.Category'
-        description: From in_category edge (or inherited)
-      created_at:
-        description: Metadata
-        type: string
-      default_duration:
-        description: Defaults for tasks created from this template
-        type: integer
-      default_emotion_id:
-        type: string
-      deleted_at:
-        type: string
-      description:
-        type: string
-      expected_quadrant:
-        description: Emotion defaults
-        type: string
-      goals:
-        description: Populated via graph queries (not stored on template)
-        items:
-          $ref: '#/definitions/goals.Goal'
-        type: array
-      icon:
-        description: Emoji
-        type: string
-      id:
-        type: string
-      is_quick_log:
-        description: Quick log settings
-        type: boolean
-      last_used_at:
-        type: string
-      quantity_default:
-        type: number
-      quantity_enabled:
-        description: Quantity settings
-        type: boolean
-      quantity_step:
-        type: number
-      quick_log_order:
-        type: integer
-      title:
-        description: Core fields
-        type: string
-      updated_at:
-        type: string
-      use_count:
-        description: Usage stats (auto-updated)
-        type: integer
-    type: object
-  templates.TemplatePageResponse:
-    description: Paginated list of templates
-    properties:
-      has_more:
-        type: boolean
-      items:
-        items:
-          $ref: '#/definitions/templates.TaskTemplate'
-        type: array
-      limit:
-        type: integer
-      offset:
-        type: integer
-      total:
-        type: integer
-    type: object
-  templates.UpdateRequest:
-    description: Request payload for updating a template
-    properties:
-      default_duration:
-        example: 2700
-        type: integer
-      default_emotion_id:
-        example: emotions:E25
-        type: string
-      description:
-        example: Post-work stress relief run
-        maxLength: 2000
-        type: string
-      expected_quadrant:
-        enum:
-        - green
-        - yellow
-        - red
-        - blue
-        example: green
-        type: string
-      icon:
-        example: "\U0001F319"
-        maxLength: 50
-        type: string
-      is_quick_log:
-        example: true
-        type: boolean
-      quantity_default:
-        example: 7
-        minimum: 0
-        type: number
-      quantity_enabled:
-        example: true
-        type: boolean
-      quantity_step:
-        example: 1
-        minimum: 0
-        type: number
-      quick_log_order:
-        example: 2
-        type: integer
-      title:
-        example: Evening Run
-        maxLength: 500
-        minLength: 1
-        type: string
-    type: object
   units.CreateRequest:
     description: Request payload for creating a custom unit
     properties:
@@ -2110,6 +2301,410 @@ info:
   title: Lucid Logs API
   version: "1.0"
 paths:
+  /api/v1/activities:
+    get:
+      description: Get paginated list of user's activities
+      parameters:
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activities.ActivityPageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List activities
+      tags:
+      - activities
+    post:
+      consumes:
+      - application/json
+      description: Create a new activity
+      parameters:
+      - description: Activity data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/activities.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/activities.Activity'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create activity
+      tags:
+      - activities
+  /api/v1/activities/{id}:
+    delete:
+      description: Soft delete an activity
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete activity
+      tags:
+      - activities
+    get:
+      description: Get a single activity by ID
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activities.Activity'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get activity
+      tags:
+      - activities
+    put:
+      consumes:
+      - application/json
+      description: Update an existing activity
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/activities.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activities.Activity'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update activity
+      tags:
+      - activities
+  /api/v1/activities/{id}/goals:
+    get:
+      description: Get all goals linked to an activity
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/activities.ActivityGoalLinkDetail'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get linked goals
+      tags:
+      - activities
+    post:
+      consumes:
+      - application/json
+      description: Link a goal to an activity
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Goal link config
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/activities.GoalLinkInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Link goal
+      tags:
+      - activities
+  /api/v1/activities/{id}/goals/{goalId}:
+    delete:
+      description: Remove a goal link from an activity
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Goal ID
+        in: path
+        name: goalId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OperationMessage'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Unlink goal
+      tags:
+      - activities
+  /api/v1/activities/{id}/instant:
+    post:
+      consumes:
+      - application/json
+      description: Create a completed task from an activity immediately
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Log options
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/activities.InstantLogRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activities.InstantLogResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Instant log
+      tags:
+      - activities
+  /api/v1/activities/{id}/schedule:
+    post:
+      consumes:
+      - application/json
+      description: Get pre-filled task data for the task form
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Schedule options
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/activities.ScheduleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/activities.ScheduleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Schedule task
+      tags:
+      - activities
+  /api/v1/activities/pinned:
+    get:
+      description: Get activities pinned to quick access bar
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/activities.Activity'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get pinned activities
+      tags:
+      - activities
   /api/v1/activity:
     get:
       description: Get paginated list of all activity for the authenticated user
@@ -3702,207 +4297,6 @@ paths:
       summary: Get last task end time
       tags:
       - tasks
-  /api/v1/templates:
-    get:
-      description: Get paginated list of templates for the authenticated user
-      parameters:
-      - description: Items per page (default 20, max 100)
-        in: query
-        name: limit
-        type: integer
-      - description: Items to skip (default 0)
-        in: query
-        name: offset
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/templates.TemplatePageResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: List templates
-      tags:
-      - templates
-    post:
-      consumes:
-      - application/json
-      description: Create a new task template
-      parameters:
-      - description: Template data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/templates.CreateRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/templates.TaskTemplate'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Create template
-      tags:
-      - templates
-  /api/v1/templates/{id}:
-    delete:
-      description: Soft delete a template
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.OperationMessage'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete template
-      tags:
-      - templates
-    get:
-      description: Get a single template by its ID
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/templates.TaskTemplate'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Get template by ID
-      tags:
-      - templates
-    put:
-      consumes:
-      - application/json
-      description: Update an existing template
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/templates.UpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/templates.TaskTemplate'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Update template
-      tags:
-      - templates
-  /api/v1/templates/quick-log:
-    get:
-      description: Get templates configured for quick logging
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/templates.TaskTemplate'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Get quick-log templates
-      tags:
-      - templates
   /api/v1/units:
     get:
       description: Get all available units (system + user's custom units)

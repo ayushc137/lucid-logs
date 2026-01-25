@@ -1,33 +1,4 @@
 #V2
-CREATE emotions:E04 CONTENT { name: "Thrilled", emoji: "1F3A2", quadrant: "yellow", x: 4, y: 5, valence: 0.88, arousal: 0.92, dominance: 0.60, intensity: 0.92, certainty: 0.35, social: 0.20, description: "Heart racing with anticipation" }; -- 🎢
-CREATE emotions:E05 CONTENT { name: "Energized", emoji: "26A1", quadrant: "yellow", x: 5, y: 5, valence: 0.75, arousal: 0.90, dominance: 0.72, intensity: 0.85, certainty: 0.55, social: 0.00, description: "Buzzing with energy" }; -- ⚡
-CREATE emotions:E06 CONTENT { name: "Joyful", emoji: "1F601", quadrant: "yellow", x: 1, y: 4, valence: 0.90, arousal: 0.75, dominance: 0.70, intensity: 0.85, certainty: 0.50, social: 0.30, description: "Warm, deep happiness from within" }; -- 😁
-CREATE emotions:E07 CONTENT { name: "Delighted", emoji: "1F60D", quadrant: "yellow", x: 2, y: 4, valence: 0.88, arousal: 0.72, dominance: 0.68, intensity: 0.82, certainty: 0.55, social: 0.35, description: "Pleasantly surprised and pleased" }; -- 😍
-CREATE emotions:E08 CONTENT { name: "Passionate", emoji: "2764-FE0F-200D-1F525", quadrant: "yellow", x: 3, y: 4, valence: 0.85, arousal: 0.88, dominance: 0.75, intensity: 0.90, certainty: 0.60, social: 0.30, description: "Deeply invested and engaged" }; -- ❤️‍🔥
-CREATE emotions:E09 CONTENT { name: "Enthusiastic", emoji: "1F64C", quadrant: "yellow", x: 4, y: 4, valence: 0.82, arousal: 0.82, dominance: 0.68, intensity: 0.80, certainty: 0.50, social: 0.35, description: "Eager and ready to dive in" }; -- 🙌
-CREATE emotions:E10 CONTENT { name: "Amazed", emoji: "1F632", quadrant: "yellow", x: 5, y: 4, valence: 0.82, arousal: 0.80, dominance: 0.40, intensity: 0.85, certainty: -0.45, social: 0.40, description: "Blown away by something incredible" }; -- 😲
-CREATE emotions:E11 CONTENT { name: "Proud", emoji: "1F3C6", quadrant: "yellow", x: 1, y: 3, valence: 0.85, arousal: 0.70, dominance: 0.90, intensity: 0.80, certainty: 0.75, social: -0.20, description: "Accomplished something meaningful" }; -- 🏆
-CREATE emotions:E12 CONTENT { name: "Confident", emoji: "1F60E", quadrant: "yellow", x: 2, y: 3, valence: 0.80, arousal: 0.65, dominance: 0.92, intensity: 0.75, certainty: 0.85, social: -0.15, description: "Sure of yourself and your abilities" }; -- 😎
-CREATE emotions:E13 CONTENT { name: "Triumphant", emoji: "1F947", quadrant: "yellow", x: 3, y: 3, valence: 0.88, arousal: 0.78, dominance: 0.95, intensity: 0.88, certainty: 0.90, social: -0.10, description: "Won! Achieved a victory" }; -- 🥇
-CREATE emotions:E14 CONTENT { name: "Determined", emoji: "1F4AA", quadrant: "yellow", x: 4, y: 3, valence: 0.70, arousal: 0.85, dominance: 0.90, intensity: 0.85, certainty: 0.80, social: -0.20, description: "Nothing will stop you" }; -- 💪
-CREATE emotions:E15 CONTENT { name: "Motivated", emoji: "1F525", quadrant: "yellow", x: 5, y: 3, valence: 0.75, arousal: 0.80, dominance: 0.78, intensity: 0.78, certainty: 0.65, social: -0.10, description: "Driven to take action now" }; -- 🔥
-CREATE emotions:E16 CONTENT { name: "Happy", emoji: "1F60A", quadrant: "yellow", x: 1, y: 2, valence: 0.80, arousal: 0.60, dominance: 0.65, intensity: 0.70, certainty: 0.60, social: 0.25, description: "Simply feeling good right now" }; -- 😊
-CREATE emotions:E17 CONTENT { name: "Cheerful", emoji: "1F603", quadrant: "yellow", x: 2, y: 2, valence: 0.78, arousal: 0.65, dominance: 0.62, intensity: 0.68, certainty: 0.55, social: 0.40, description: "Upbeat and positive mood" }; -- 😃
-CREATE emotions:E18 CONTENT { name: "Inspired", emoji: "1F4A1", quadrant: "yellow", x: 3, y: 2, valence: 0.85, arousal: 0.75, dominance: 0.72, intensity: 0.82, certainty: 0.45, social: 0.40, description: "Full of new ideas and motivation" }; -- 💡
-CREATE emotions:E19 CONTENT { name: "Accomplished", emoji: "1F3AF", quadrant: "yellow", x: 4, y: 2, valence: 0.82, arousal: 0.55, dominance: 0.88, intensity: 0.72, certainty: 0.80, social: -0.15, description: "Finished something you worked hard on" }; -- 🎯
-CREATE emotions:E20 CONTENT { name: "Playful", emoji: "1F61C", quadrant: "yellow", x: 5, y: 2, valence: 0.78, arousal: 0.75, dominance: 0.55, intensity: 0.70, certainty: 0.40, social: 0.50, description: "In a fun, silly mood" }; -- 😜
-CREATE emotions:E21 CONTENT { name: "Optimistic", emoji: "1F31F", quadrant: "yellow", x: 1, y: 1, valence: 0.78, arousal: 0.58, dominance: 0.65, intensity: 0.62, certainty: 0.55, social: 0.15, description: "Expecting things to work out well" }; -- 🌟
-CREATE emotions:E22 CONTENT { name: "Hopeful", emoji: "1F305", quadrant: "yellow", x: 2, y: 1, valence: 0.75, arousal: 0.55, dominance: 0.50, intensity: 0.65, certainty: -0.35, social: 0.20, description: "Believing good things are coming" }; -- 🌅
-CREATE emotions:E23 CONTENT { name: "Curious", emoji: "1F9D0", quadrant: "yellow", x: 3, y: 1, valence: 0.70, arousal: 0.65, dominance: 0.55, intensity: 0.65, certainty: -0.30, social: 0.25, description: "Want to explore and learn more" }; -- 🧐
-CREATE emotions:E24 CONTENT { name: "Fascinated", emoji: "1F50D", quadrant: "yellow", x: 4, y: 1, valence: 0.78, arousal: 0.72, dominance: 0.50, intensity: 0.75, certainty: -0.25, social: 0.35, description: "Captivated by something interesting" }; -- 🔍
-CREATE emotions:E25 CONTENT { name: "Amused", emoji: "1F606", quadrant: "yellow", x: 5, y: 1, valence: 0.75, arousal: 0.65, dominance: 0.60, intensity: 0.68, certainty: 0.50, social: 0.45, description: "Something made you smile or laugh" }; -- 😆
--- Green Quadrant (E26-E50): Low Energy + Pleasant
-CREATE emotions:E26 CONTENT { name: "Content", emoji: "263A", quadrant: "green", x: 1, y: -1, valence: 0.82, arousal: -0.50, dominance: 0.72, intensity: 0.60, certainty: 0.70, social: 0.10, description: "Satisfied with how things are" }; -- ☺️
-CREATE emotions:E27 CONTENT { name: "Satisfied", emoji: "1F44C", quadrant: "green", x: 2, y: -1, valence: 0.85, arousal: -0.45, dominance: 0.75, intensity: 0.65, certainty: 0.75, social: 0.10, description: "Got what you needed" }; -- 👌
-CREATE emotions:E28 CONTENT { name: "Fulfilled", emoji: "1F4AF", quadrant: "green", x: 3, y: -1, valence: 0.90, arousal: -0.40, dominance: 0.82, intensity: 0.78, certainty: 0.80, social: 0.15, description: "Life feels complete and meaningful" }; -- 💯
-CREATE emotions:E29 CONTENT { name: "Relieved", emoji: "1F62E-200D-1F4A8", quadrant: "green", x: 4, y: -1, valence: 0.75, arousal: -0.40, dominance: 0.62, intensity: 0.70, certainty: 0.65, social: 0.10, description: "A weight has been lifted" }; -- 😮‍💨
-CREATE emotions:E30 CONTENT { name: "Refreshed", emoji: "1F33F", quadrant: "green", x: 5, y: -1, valence: 0.78, arousal: -0.35, dominance: 0.70, intensity: 0.65, certainty: 0.68, social: 0.05, description: "Renewed and ready again" }; -- 🌿
-CREATE emotions:E31 CONTENT { name: "Grateful", emoji: "1F64F", quadrant: "green", x: 1, y: -2, valence: 0.88, arousal: -0.35, dominance: 0.55, intensity: 0.75, certainty: 0.70, social: 0.80, description: "Thankful for what you have" }; -- 🙏
 CREATE emotions:E32 CONTENT { name: "Thankful", emoji: "1F49D", quadrant: "green", x: 2, y: -2, valence: 0.85, arousal: -0.38, dominance: 0.52, intensity: 0.72, certainty: 0.68, social: 0.82, description: "Appreciating someone or something" }; -- 💝
 CREATE emotions:E33 CONTENT { name: "Blessed", emoji: "1F607", quadrant: "green", x: 3, y: -2, valence: 0.82, arousal: -0.40, dominance: 0.50, intensity: 0.68, certainty: 0.65, social: 0.78, description: "Feeling fortunate and lucky" }; -- 😇
 CREATE emotions:E34 CONTENT { name: "Connected", emoji: "1F91D", quadrant: "green", x: 4, y: -2, valence: 0.85, arousal: -0.32, dominance: 0.55, intensity: 0.72, certainty: 0.55, social: 0.88, description: "Feeling close to others" }; -- 🤝
@@ -99,3 +70,32 @@ CREATE emotions:E97 CONTENT { name: "Hopeless", emoji: "1F573", quadrant: "blue"
 CREATE emotions:E98 CONTENT { name: "Despairing", emoji: "1F62D", quadrant: "blue", x: -3, y: -5, valence: -0.95, arousal: -0.85, dominance: -0.92, intensity: 0.98, certainty: -0.85, social: -0.45, description: "No hope left, in deep pain" }; -- 😭
 CREATE emotions:E99 CONTENT { name: "Numb", emoji: "1F636-200D-1F32B-FE0F", quadrant: "blue", x: -2, y: -5, valence: -0.50, arousal: -0.85, dominance: -0.68, intensity: 0.35, certainty: -0.50, social: -0.55, description: "Can't feel anything at all" }; -- 😶‍🌫️
 CREATE emotions:E100 CONTENT { name: "Apathetic", emoji: "1F610", quadrant: "blue", x: -1, y: -5, valence: -0.45, arousal: -0.75, dominance: -0.30, intensity: 0.40, certainty: 0.25, social: -0.40, description: "Don't care about anything" }; -- 😐
+-- =============================================================================
+-- ACTIVITIES MIGRATION
+-- =============================================================================
+-- 
+-- Creates the activities system to replace templates with enhanced functionality.
+-- Supports: instant logging, scheduling, and timer/Flowmodoro modes.
+--
+-- Run: surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/003_activities.surql
+--
+-- =============================================================================
+-- ACTIVITIES TABLE
+-- =============================================================================
+DEFINE TABLE IF NOT EXISTS activities SCHEMAFULL PERMISSIONS FULL;
+-- Identity
+DEFINE FIELD IF NOT EXISTS title ON activities TYPE string ASSERT $value != NONE AND string::len($value) >= 1;
+DEFINE FIELD IF NOT EXISTS icon ON activities TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS description ON activities TYPE option<string>;
+-- Task Defaults (pre-fill when creating task)
+DEFINE FIELD IF NOT EXISTS default_duration ON activities TYPE option<int>;  -- seconds
+DEFINE FIELD IF NOT EXISTS default_emotion_id ON activities TYPE option<string>;  -- record ID as string
+DEFINE FIELD IF NOT EXISTS default_priority ON activities TYPE int DEFAULT 3;
+DEFINE FIELD IF NOT EXISTS default_completed ON activities TYPE bool DEFAULT true;  -- true for instant log
+-- Quantity Settings
+DEFINE FIELD IF NOT EXISTS quantity_enabled ON activities TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS quantity_default ON activities TYPE option<float>;
+DEFINE FIELD IF NOT EXISTS quantity_step ON activities TYPE option<float>;
+DEFINE FIELD IF NOT EXISTS quantity_unit_id ON activities TYPE option<string>;  -- fallback unit if no goal
+-- Goal Link Defaults
+DEFINE FIELD IF NOT EXISTS default_impact ON activities TYPE string DEFAULT "positive" 

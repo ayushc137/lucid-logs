@@ -53,7 +53,8 @@ lucid-logs/
 │   │   │   │   ├── goals/          # Goal/habit tracking
 │   │   │   │   ├── categories/     # Organization
 │   │   │   │   ├── emotions/       # Mood tracking
-│   │   │   │   ├── templates/      # Task templates
+│   │   │   │   ├── activities/     # Quick-log activities (instant, scheduled, timer)
+│   │   │   │   ├── activitylogs/   # Activity event history
 │   │   │   │   ├── retrospectives/ # Daily/weekly reflections
 │   │   │   │   ├── taskgoals/      # Task-goal linking
 │   │   │   │   ├── goallogs/       # Goal history/changelog
@@ -89,7 +90,6 @@ lucid-logs/
 │               ├── tasks/          # Task list/detail
 │               ├── goals/          # Goals management
 │               ├── categories/     # Category management
-│               ├── templates/      # Task templates
 │               ├── retrospectives/ # Reflections
 │               ├── analytics/      # Insights
 │               └── settings/       # User settings
@@ -267,7 +267,7 @@ See `apps/frontend/src/lib/DESIGN_LANGUAGE.md` for complete component patterns.
 | `goals` | Goals, habits, projects |
 | `categories` | Organization/tagging |
 | `emotions` | Mood meter emotions (seeded) |
-| `templates` | Reusable task templates |
+| `activities` | Quick-log activities (replacing templates) |
 | `retrospectives` | Daily/weekly reflections |
 | `units` | Measurement units |
 
@@ -277,10 +277,10 @@ See `apps/frontend/src/lib/DESIGN_LANGUAGE.md` for complete component patterns.
 |----------|-------------|
 | `task_emotions` | tasks → emotions (primary, positive, negative) |
 | `task_goals` | tasks → goals (with impact_type, quantity) |
-| `in_category` | tasks/goals/templates → categories |
+| `in_category` | tasks/goals/activities → categories |
 | `goal_children` | goals → goals (parent-child hierarchy) |
 | `goal_logs` | Goal event history |
-| `created_from` | tasks → templates (origin tracking) |
+| `created_from_activity` | tasks → activities (origin tracking) |
 
 ### Record ID Format
 
@@ -418,7 +418,6 @@ Tasks can link to goals with impact metadata:
 interface TaskGoalLink {
     goal_id: string;           // "goals:hydration"
     impact_type: "positive" | "negative" | "neutral";
-    impact_magnitude: 1-5;
     quantity_value?: number;   // For measurable goals
     unit_id?: string;          // "units:glasses"
     is_milestone?: boolean;

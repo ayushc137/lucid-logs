@@ -6,9 +6,8 @@
 // Features:
 //   - Units: System units seeding
 //   - Goals: Measurable, habits, grouped, avoidance (via operators)
-//   - Templates: Quick-log templates linked to goals via template_goals
 //   - Tasks: With quantities, goal links, emotions, reflections
-//   - Relations: in_category, task_goals, template_goals, goal_children
+//   - Relations: in_category, task_goals, goal_children
 //   - Real-world scenarios: Hydration streak, running progress, project milestones
 //
 // Usage:
@@ -261,9 +260,9 @@ func findAdminUser(ctx context.Context, db *database.DB, email string) (string, 
 func resetSeededData(ctx context.Context, db *database.DB, userID string) error {
 	// Delete all relations and entities in correct order
 	tables := []string{
-		"task_goals", "task_emotions", "template_goals", "created_from",
+		"task_goals", "task_emotions", "created_from", "created_from_activity",
 		"in_category", "goal_children", "goal_logs", "goal_snapshots",
-		"tasks", "templates", "goals", "categories",
+		"tasks", "activities", "goals", "categories",
 	}
 
 	for _, table := range tables {
@@ -343,15 +342,8 @@ func seedAll(ctx context.Context, db *database.DB, userID string) error {
 	}
 	log.Info().Int("count", len(goals)).Msg("✅ Goals created")
 
-	// 3. Create Templates (linked to goals via template_goals)
-	templates, err := seedTemplates(categories, goals)
-	if err != nil {
-		return fmt.Errorf("failed to seed templates: %w", err)
-	}
-	log.Info().Int("count", len(templates)).Msg("✅ Templates created")
-
-	// 4. Seed 60 days of tasks with realistic patterns
-	totalTasks, totalLinks := seedTasksMultiDay(ctx, db, categories, goals, templates, userID)
+	// 3. Seed 60 days of tasks with realistic patterns
+	totalTasks, totalLinks := seedTasksMultiDay(ctx, db, categories, goals, userID)
 	log.Info().Int("tasks", totalTasks).Int("links", totalLinks).Msg("✅ Tasks and goal links created")
 
 	// 5. Update goal streaks and create goal history
@@ -817,218 +809,10 @@ func seedGoals(categories map[string]string) (map[string]string, error) {
 }
 
 // =============================================================================
-// TEMPLATE SEEDING (New Model)
-// =============================================================================
-
-type templateDef struct {
-	title           string
-	description     string
-	icon            string
-	category        string
-	defaultDuration int // seconds
-	isQuickLog      bool
-	quickLogOrder   int
-	quantityEnabled bool
-	quantityDefault float64
-	quantityStep    float64
-	goalTitle       string // Goal to link via template_goals
-}
-
-func seedTemplates(categories, goals map[string]string) (map[string]string, error) {
-	result := make(map[string]string)
-
-	templates := []templateDef{
-		{
-			title:           "Log Water",
-			description:     "Quick log water intake",
-			icon:            "💧",
-			category:        "Health",
-			defaultDuration: 60,
-			isQuickLog:      true,
-			quickLogOrder:   1,
-			quantityEnabled: true,
-			quantityDefault: 0.5,
-			quantityStep:    0.25,
-			goalTitle:       "Drink 3L Water Daily",
-		},
-		{
-			title:           "Morning Run",
-			description:     "Quick log running",
-			icon:            "🏃",
-			category:        "Health",
-			defaultDuration: 1800,
-			isQuickLog:      true,
-			quickLogOrder:   2,
-			quantityEnabled: true,
-			quantityDefault: 5.0,
-			quantityStep:    0.5,
-			goalTitle:       "Run 100km This Month",
-		},
-		{
-			title:           "Gym Workout",
-			description:     "Log gym session",
-			icon:            "💪",
-			category:        "Health",
-			defaultDuration: 3600,
-			isQuickLog:      true,
-			quickLogOrder:   3,
-			quantityEnabled: true,
-			quantityDefault: 60,
-			quantityStep:    15,
-			goalTitle:       "Exercise 30 min Daily",
-		},
-		{
-			title:           "Reading Session",
-			description:     "Book reading time",
-			icon:            "📚",
-			category:        "Learning",
-			defaultDuration: 1800,
-			isQuickLog:      true,
-			quickLogOrder:   4,
-			quantityEnabled: true,
-			quantityDefault: 30,
-			quantityStep:    10,
-			goalTitle:       "Read 30 Minutes Daily",
-		},
-		{
-			title:           "Coffee",
-			description:     "Log coffee consumption",
-			icon:            "☕",
-			category:        "Health",
-			defaultDuration: 300,
-			isQuickLog:      true,
-			quickLogOrder:   5,
-			quantityEnabled: true,
-			quantityDefault: 1,
-			quantityStep:    1,
-			goalTitle:       "Max 3 Coffees Per Day",
-		},
-		{
-			title:           "Deep Work",
-			description:     "Focused work session",
-			icon:            "🎯",
-			category:        "Work",
-			defaultDuration: 5400,
-			isQuickLog:      true,
-			quickLogOrder:   6,
-			quantityEnabled: true,
-			quantityDefault: 90,
-			quantityStep:    30,
-			goalTitle:       "20 Hours Deep Work Weekly",
-		},
-		{
-			title:           "Sleep",
-			description:     "Log sleep duration",
-			icon:            "😴",
-			category:        "Health",
-			defaultDuration: 28800, // 8 hours
-			isQuickLog:      true,
-			quickLogOrder:   7,
-			quantityEnabled: true,
-			quantityDefault: 8,
-			quantityStep:    0.5,
-			goalTitle:       "Sleep 7-8 Hours",
-		},
-		{
-			title:           "Meditation",
-			description:     "Mindfulness practice",
-			icon:            "🧘",
-			category:        "Personal",
-			defaultDuration: 600, // 10 min
-			isQuickLog:      true,
-			quickLogOrder:   8,
-			quantityEnabled: true,
-			quantityDefault: 10,
-			quantityStep:    5,
-			goalTitle:       "Meditate 10 Min Daily",
-		},
-		{
-			title:           "Walk/Steps",
-			description:     "Log daily steps",
-			icon:            "🚶",
-			category:        "Health",
-			defaultDuration: 3600,
-			isQuickLog:      true,
-			quickLogOrder:   9,
-			quantityEnabled: true,
-			quantityDefault: 5000,
-			quantityStep:    1000,
-			goalTitle:       "Walk 10,000 Steps Daily",
-		},
-		{
-			title:           "Healthy Meal",
-			description:     "Log home-cooked meal",
-			icon:            "🥗",
-			category:        "Health",
-			defaultDuration: 3600,
-			isQuickLog:      true,
-			quickLogOrder:   10,
-			quantityEnabled: true,
-			quantityDefault: 1,
-			quantityStep:    1,
-			goalTitle:       "Cook Healthy Meals",
-		},
-		{
-			title:           "Social Media",
-			description:     "Track screen time",
-			icon:            "📱",
-			category:        "Personal",
-			defaultDuration: 1800,
-			isQuickLog:      true,
-			quickLogOrder:   11,
-			quantityEnabled: true,
-			quantityDefault: 30,
-			quantityStep:    15,
-			goalTitle:       "Limit Social Media",
-		},
-	}
-
-	for _, t := range templates {
-		payload := map[string]any{
-			"title":            t.title,
-			"description":      t.description,
-			"icon":             t.icon,
-			"default_duration": t.defaultDuration,
-			"is_quick_log":     t.isQuickLog,
-			"quick_log_order":  t.quickLogOrder,
-		}
-
-		if t.category != "" && categories[t.category] != "" {
-			payload["category_id"] = categories[t.category]
-		}
-		if t.quantityEnabled {
-			payload["quantity_enabled"] = true
-			payload["quantity_default"] = t.quantityDefault
-			payload["quantity_step"] = t.quantityStep
-		}
-
-		// Link to goal via goal_links
-		if t.goalTitle != "" && goals[t.goalTitle] != "" {
-			payload["goal_links"] = []map[string]any{{
-				"goal_id":         goals[t.goalTitle],
-				"auto_link_tasks": true,
-			}}
-		}
-
-		resp, err := apiRequest("POST", "/templates", payload)
-		if err != nil {
-			log.Warn().Err(err).Str("template", t.title).Msg("Failed to create template")
-			continue
-		}
-
-		if id, ok := resp["id"].(string); ok {
-			result[t.title] = id
-		}
-	}
-
-	return result, nil
-}
-
-// =============================================================================
 // TASK SEEDING (30 Days of Realistic Data)
 // =============================================================================
 
-func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, templates map[string]string, userID string) (totalTasks, totalLinks int) {
+func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals map[string]string, userID string) (totalTasks, totalLinks int) {
 	now := time.Now()
 	// Normalize "now" to midnight local time to ensure day.Add(hour) works as expected
 	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -1039,7 +823,7 @@ func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, 
 	// Seed past 20 days + today + 7 future days (focus on density per day, not length)
 	for dayOffset := -20; dayOffset <= 7; dayOffset++ {
 		day := now.AddDate(0, 0, dayOffset)
-		tasks, links := seedTasksForDay(ctx, db, day, dayOffset, categories, goals, templates, streaks, userID)
+		tasks, links := seedTasksForDay(ctx, db, day, dayOffset, categories, goals, streaks, userID)
 		totalTasks += tasks
 		totalLinks += links
 	}
@@ -1047,7 +831,7 @@ func seedTasksMultiDay(ctx context.Context, db *database.DB, categories, goals, 
 	return totalTasks, totalLinks
 }
 
-func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOffset int, categories, goals, templates map[string]string, streaks map[string]int, userID string) (tasks, links int) {
+func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOffset int, categories, goals map[string]string, streaks map[string]int, userID string) (tasks, links int) {
 	isPast := dayOffset < 0
 	isWeekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
 	dayOfMonth := day.Day()
@@ -1070,7 +854,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			"start_date":  sleepStart.Format(time.RFC3339),
 			"end_date":    sleepEnd.Format(time.RFC3339),
 			"category_id": categories["Health"],
-			"source":      "template",
+			"source":      "manual",
 			"goal_links": []map[string]any{{
 				"goal_id":        goals[sleepGoalTitle],
 				"impact_type":    "positive",
@@ -1107,7 +891,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		if rand.Float32() < 0.7 {
 			minutes := float64(10 + rand.Intn(10))
 			if createTaskWithDetails(day, 6, 30, int(minutes*60), "Morning Meditation", "🧘",
-				categories["Personal"], &minutes, "units:min", meditationGoalTitle, goals, isPast, nil, nil, "template") {
+				categories["Personal"], &minutes, "units:min", meditationGoalTitle, goals, isPast, nil, nil, "manual") {
 				tasks++
 				links++
 				dailyTotals[meditationGoalTitle] += minutes
@@ -1222,7 +1006,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		minutes := 30.0 + float64(rand.Intn(30))
 
 		if createTaskWithDetails(day, hour, 0, int(minutes*60), "Evening Reading", "📚", categories["Learning"],
-			&minutes, "units:min", readingGoalTitle, goals, isPast, nil, nil, "template") {
+			&minutes, "units:min", readingGoalTitle, goals, isPast, nil, nil, "manual") {
 			tasks++
 			links++
 			dailyTotals[readingGoalTitle] += minutes
@@ -1300,7 +1084,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			"start_date":  day.Add(time.Duration(hour) * time.Hour).Format(time.RFC3339),
 			"end_date":    day.Add(time.Duration(hour)*time.Hour + time.Duration(durationMin)*time.Minute).Format(time.RFC3339),
 			"category_id": categories["Health"],
-			"source":      "template",
+			"source":      "manual",
 			"goal_links":  goalLinks,
 		}
 
@@ -1412,7 +1196,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		}
 
 		if createTaskWithDetails(day, hour, 0, int(minutes), "Gym Workout", "💪", categories["Health"],
-			&minutes, "units:min", "Exercise 30 min Daily", goals, isPast, positives, nil, "template") {
+			&minutes, "units:min", "Exercise 30 min Daily", goals, isPast, positives, nil, "manual") {
 			tasks++
 			links++
 		}
@@ -1454,7 +1238,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		}
 
 		if createTaskWithDetails(day, hour, 0, int(minutes), "Reading Session", "📚", categories["Learning"],
-			&minutes, "units:min", "Read 30 Minutes Daily", goals, isPast, positives, nil, "template") {
+			&minutes, "units:min", "Read 30 Minutes Daily", goals, isPast, positives, nil, "manual") {
 			tasks++
 			links++
 		}
@@ -1544,7 +1328,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			}
 
 			if createTaskWithDetailsAndJournal(day, startHour, 0, int(minutes), "Deep Work Session", "🎯",
-				categories["Work"], &minutes, "units:min", "20 Hours Deep Work Weekly", goals, isPast, positives, negatives, journal, "template") {
+				categories["Work"], &minutes, "units:min", "20 Hours Deep Work Weekly", goals, isPast, positives, negatives, journal, "manual") {
 				tasks++
 				links++
 			}
@@ -1757,7 +1541,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 			"start_date":  day.Add(6 * time.Hour).Format(time.RFC3339),
 			"end_date":    day.Add(22 * time.Hour).Format(time.RFC3339),
 			"category_id": categories["Health"],
-			"source":      "template",
+			"source":      "manual",
 			"goal_links": []map[string]any{{
 				"goal_id":        goals[stepsGoalTitle],
 				"impact_type":    "positive",
@@ -1789,7 +1573,7 @@ func seedTasksForDay(ctx context.Context, db *database.DB, day time.Time, dayOff
 		}
 
 		if createTaskWithDetails(day, hour, 0, int(minutes), "Social Media", "📱",
-			categories["Personal"], &minutes, "units:min", socialMediaGoalTitle, goals, isPast, nil, negatives, "template") {
+			categories["Personal"], &minutes, "units:min", socialMediaGoalTitle, goals, isPast, nil, negatives, "manual") {
 			tasks++
 			links++
 		}

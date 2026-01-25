@@ -22,7 +22,6 @@ export interface Task {
 	emotion?: Emotion;
 	inferred_emotion?: InferredEmotion;
 	activity_key?: string;
-	template_id?: string;
 	quantity?: Quantity;
 	linked_goals?: LinkedGoalSummary[]; // Linked goals for highlighting
 	created_at: string;
