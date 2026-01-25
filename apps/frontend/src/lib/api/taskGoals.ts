@@ -11,7 +11,6 @@ export interface TaskGoalLink {
 	task_id: string;
 	goal_id: string;
 	impact_type: 'positive' | 'negative' | 'neutral';
-	impact_magnitude: number; // 1-5
 	quantity_value?: number;
 	quantity_unit?: string;
 	notes?: string;
@@ -30,7 +29,6 @@ export interface TaskGoalWithTask extends TaskGoalLink {
 export interface LinkTaskToGoalRequest {
 	goal_id: string;
 	impact_type: 'positive' | 'negative' | 'neutral';
-	impact_magnitude?: number;
 	quantity_value?: number;
 	quantity_unit?: string;
 	notes?: string;
@@ -42,7 +40,6 @@ export interface BatchLinkRequest {
 
 export interface UpdateLinkRequest {
 	impact_type?: 'positive' | 'negative' | 'neutral';
-	impact_magnitude?: number;
 	quantity_value?: number;
 	quantity_unit?: string;
 	notes?: string;

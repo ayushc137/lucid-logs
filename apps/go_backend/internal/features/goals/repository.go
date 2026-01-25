@@ -927,20 +927,19 @@ func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string
 	}
 
 	type taskLinkDB struct {
-		TaskID          string                `json:"task_id"`
-		TaskTitle       string                `json:"task_title"`
-		ImpactType      string                `json:"impact_type"`
-		ImpactMagnitude int                   `json:"impact_magnitude"`
-		QuantityValue   *float64              `json:"quantity_value,omitempty"`
-		UnitID          *string               `json:"unit_id,omitempty"`
-		TaskJournal     string                `json:"task_journal,omitempty"`
-		TaskStartDate   *database.SurrealTime `json:"task_start_date,omitempty"`
-		TaskEndDate     *database.SurrealTime `json:"task_end_date,omitempty"`
-		TaskCompleted   bool                  `json:"task_completed"`
-		TaskEmotionID   *string               `json:"task_emotion_id,omitempty"`
-		TaskCategory    *taskCategoryDB       `json:"task_category,omitempty"`
-		LinkedAt        *database.SurrealTime `json:"linked_at,omitempty"`
-		Notes           string                `json:"notes,omitempty"`
+		TaskID        string                `json:"task_id"`
+		TaskTitle     string                `json:"task_title"`
+		ImpactType    string                `json:"impact_type"`
+		QuantityValue *float64              `json:"quantity_value,omitempty"`
+		UnitID        *string               `json:"unit_id,omitempty"`
+		TaskJournal   string                `json:"task_journal,omitempty"`
+		TaskStartDate *database.SurrealTime `json:"task_start_date,omitempty"`
+		TaskEndDate   *database.SurrealTime `json:"task_end_date,omitempty"`
+		TaskCompleted bool                  `json:"task_completed"`
+		TaskEmotionID *string               `json:"task_emotion_id,omitempty"`
+		TaskCategory  *taskCategoryDB       `json:"task_category,omitempty"`
+		LinkedAt      *database.SurrealTime `json:"linked_at,omitempty"`
+		Notes         string                `json:"notes,omitempty"`
 	}
 
 	tasksDB, err := database.QueryAll[taskLinkDB](ctx, r.db, `
@@ -948,7 +947,6 @@ func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string
 			type::string(in) as task_id,
 			in.title as task_title,
 			impact_type,
-			impact_magnitude,
 			quantity_value,
 			unit_id,
 			in.journal as task_journal,
@@ -972,16 +970,15 @@ func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string
 	tasks := make([]GoalTaskLink, len(tasksDB))
 	for i, t := range tasksDB {
 		link := GoalTaskLink{
-			TaskID:          t.TaskID,
-			TaskTitle:       t.TaskTitle,
-			ImpactType:      t.ImpactType,
-			ImpactMagnitude: t.ImpactMagnitude,
-			QuantityValue:   t.QuantityValue,
-			UnitID:          t.UnitID,
-			TaskJournal:     t.TaskJournal,
-			TaskCompleted:   t.TaskCompleted,
-			TaskEmotionID:   t.TaskEmotionID,
-			Notes:           t.Notes,
+			TaskID:        t.TaskID,
+			TaskTitle:     t.TaskTitle,
+			ImpactType:    t.ImpactType,
+			QuantityValue: t.QuantityValue,
+			UnitID:        t.UnitID,
+			TaskJournal:   t.TaskJournal,
+			TaskCompleted: t.TaskCompleted,
+			TaskEmotionID: t.TaskEmotionID,
+			Notes:         t.Notes,
 		}
 
 		if t.TaskStartDate != nil {

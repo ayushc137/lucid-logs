@@ -75,7 +75,6 @@ export interface GoalTaskLink {
 	task_id: string;
 	task_title: string;
 	impact_type: 'positive' | 'negative' | 'neutral';
-	impact_magnitude: number;
 	quantity_value?: number;
 	unit_id?: string;
 	// Additional task details

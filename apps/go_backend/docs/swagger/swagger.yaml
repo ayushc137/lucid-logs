@@ -885,9 +885,6 @@ definitions:
   goals.GoalTaskLink:
     description: Task linked to goal with impact data
     properties:
-      impact_magnitude:
-        description: 1-5
-        type: integer
       impact_type:
         description: '"positive", "negative", "neutral"'
         type: string
@@ -1444,11 +1441,6 @@ definitions:
       goal_id:
         example: goals:abc123
         type: string
-      impact_magnitude:
-        example: 3
-        maximum: 5
-        minimum: 1
-        type: integer
       impact_type:
         enum:
         - positive
@@ -1492,9 +1484,6 @@ definitions:
       id:
         description: 'Edge ID: "task_goals:xyz"'
         type: string
-      impact_magnitude:
-        description: 1-5
-        type: integer
       impact_type:
         description: Impact tracking
         type: string
@@ -1592,11 +1581,6 @@ definitions:
       goal_id:
         example: goals:hydration123
         type: string
-      impact_magnitude:
-        example: 3
-        maximum: 5
-        minimum: 1
-        type: integer
       impact_type:
         enum:
         - positive
@@ -1761,9 +1745,6 @@ definitions:
         type: number
       goal_title:
         type: string
-      impact_magnitude:
-        description: 1-5
-        type: integer
       impact_type:
         description: '"positive", "negative", "neutral"'
         type: string

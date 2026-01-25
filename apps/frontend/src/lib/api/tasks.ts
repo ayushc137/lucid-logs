@@ -56,7 +56,6 @@ export interface TaskGoalLink {
 	goal_title: string;
 	goal_icon?: string;
 	impact_type: string;
-	impact_magnitude: number;
 	quantity_value?: number;
 	unit_id?: string;
 	is_milestone?: boolean;
@@ -120,7 +119,6 @@ export interface UpdateTaskRequest {
 export interface TaskGoalLinkInput {
 	goal_id: string;
 	impact_type: 'positive' | 'negative' | 'neutral';
-	impact_magnitude: number;
 	quantity_value?: number;
 	quantity_unit?: string;
 }

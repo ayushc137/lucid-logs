@@ -116,9 +116,6 @@ func (s *service) Link(ctx context.Context, taskID string, req *LinkRequest, use
 		if req.ImpactType != "" {
 			changes["impact_type"] = req.ImpactType
 		}
-		if req.ImpactMagnitude > 0 {
-			changes["impact_magnitude"] = req.ImpactMagnitude
-		}
 
 		// Use LogTaskEvent to include the task ID for proper filtering
 		var valueContributed *float64

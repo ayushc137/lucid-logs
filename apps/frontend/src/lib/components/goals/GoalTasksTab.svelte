@@ -1,80 +1,88 @@
 <script lang="ts">
-import type { Goal, GoalTaskLink } from '$lib/api';
-import { cn } from '$lib/utils';
-import {
-	ArrowUp,
-	ArrowUpDown,
-	Calendar,
-	Check,
-	ListTodo,
-	Minus,
-	Search,
-	Tag,
-	TrendingUp,
-	X as XIcon,
-} from 'lucide-svelte';
+    import type { Goal, GoalTaskLink } from "$lib/api";
+    import { cn } from "$lib/utils";
+    import {
+        ArrowUp,
+        ArrowUpDown,
+        Calendar,
+        Check,
+        ListTodo,
+        Minus,
+        Search,
+        Tag,
+        TrendingUp,
+        X as XIcon,
+    } from "lucide-svelte";
 
-interface Props {
-	linkedTasks: GoalTaskLink[];
-	totalContributions: number;
-}
+    interface Props {
+        linkedTasks: GoalTaskLink[];
+        totalContributions: number;
+    }
 
-let { linkedTasks = [], totalContributions = 0 }: Props = $props();
+    let { linkedTasks = [], totalContributions = 0 }: Props = $props();
 
-function formatDate(dateStr?: string): string {
-	if (!dateStr) return '';
-	const date = new Date(dateStr);
-	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+    function formatDate(dateStr?: string): string {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        return date.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+        });
+    }
 
-function formatTime(dateStr?: string): string {
-	if (!dateStr) return '';
-	const date = new Date(dateStr);
-	return date.toLocaleTimeString('en-US', {
-		hour: 'numeric',
-		minute: '2-digit',
-	});
-}
+    function formatTime(dateStr?: string): string {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        return date.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    }
 
-let taskFilter = $state<'all' | 'positive' | 'negative' | 'neutral'>('all');
-let taskSearch = $state('');
-let taskSortBy = $state<'date' | 'impact'>('date');
+    let taskFilter = $state<"all" | "positive" | "negative" | "neutral">("all");
+    let taskSearch = $state("");
+    let taskSortBy = $state<"date" | "impact">("date");
 
-const filteredTasks = $derived.by(() => {
-	let tasks = linkedTasks;
+    const filteredTasks = $derived.by(() => {
+        let tasks = linkedTasks;
 
-	if (taskFilter !== 'all') {
-		tasks = tasks.filter((t) => t.impact_type === taskFilter);
-	}
+        if (taskFilter !== "all") {
+            tasks = tasks.filter((t) => t.impact_type === taskFilter);
+        }
 
-	if (taskSearch.trim()) {
-		const search = taskSearch.toLowerCase();
-		tasks = tasks.filter((t) => t.task_title.toLowerCase().includes(search));
-	}
+        if (taskSearch.trim()) {
+            const search = taskSearch.toLowerCase();
+            tasks = tasks.filter((t) =>
+                t.task_title.toLowerCase().includes(search),
+            );
+        }
 
-	// Sort by selected criteria
-	if (taskSortBy === 'impact') {
-		tasks = [...tasks].sort(
-			(a, b) => (b.impact_magnitude || 0) - (a.impact_magnitude || 0),
-		);
-	} else if (taskSortBy === 'date') {
-		// Sort by task start date (most recent first), then by linked_at
-		tasks = [...tasks].sort((a, b) => {
-			const dateA = a.task_start_date || a.linked_at || '';
-			const dateB = b.task_start_date || b.linked_at || '';
-			return new Date(dateB).getTime() - new Date(dateA).getTime();
-		});
-	}
+        // Sort by selected criteria
+        if (taskSortBy === "impact") {
+            // Sort by quantity value when impact sort is selected
+            tasks = [...tasks].sort(
+                (a, b) => (b.quantity_value || 0) - (a.quantity_value || 0),
+            );
+        } else if (taskSortBy === "date") {
+            // Sort by task start date (most recent first), then by linked_at
+            tasks = [...tasks].sort((a, b) => {
+                const dateA = a.task_start_date || a.linked_at || "";
+                const dateB = b.task_start_date || b.linked_at || "";
+                return new Date(dateB).getTime() - new Date(dateA).getTime();
+            });
+        }
 
-	return tasks;
-});
+        return tasks;
+    });
 
-const taskCounts = $derived({
-	all: linkedTasks.length,
-	positive: linkedTasks.filter((t) => t.impact_type === 'positive').length,
-	negative: linkedTasks.filter((t) => t.impact_type === 'negative').length,
-	neutral: linkedTasks.filter((t) => t.impact_type === 'neutral').length,
-});
+    const taskCounts = $derived({
+        all: linkedTasks.length,
+        positive: linkedTasks.filter((t) => t.impact_type === "positive")
+            .length,
+        negative: linkedTasks.filter((t) => t.impact_type === "negative")
+            .length,
+        neutral: linkedTasks.filter((t) => t.impact_type === "neutral").length,
+    });
 </script>
 
 <div class="p-6">
@@ -160,14 +168,17 @@ const taskCounts = $derived({
             <div class="dropdown dropdown-end">
                 <button class="btn btn-sm btn-ghost gap-1">
                     <ArrowUpDown class="w-3 h-3" />
-                    {taskSortBy === 'date' ? 'Date' : 'Impact'}
+                    {taskSortBy === "date" ? "Date" : "Impact"}
                 </button>
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-40">
+                <ul
+                    tabindex="0"
+                    class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-40"
+                >
                     <li>
                         <button
-                            class={cn(taskSortBy === 'date' && 'active')}
-                            onclick={() => (taskSortBy = 'date')}
+                            class={cn(taskSortBy === "date" && "active")}
+                            onclick={() => (taskSortBy = "date")}
                         >
                             <Calendar class="w-4 h-4" />
                             By Date
@@ -175,8 +186,8 @@ const taskCounts = $derived({
                     </li>
                     <li>
                         <button
-                            class={cn(taskSortBy === 'impact' && 'active')}
-                            onclick={() => (taskSortBy = 'impact')}
+                            class={cn(taskSortBy === "impact" && "active")}
+                            onclick={() => (taskSortBy = "impact")}
                         >
                             <TrendingUp class="w-4 h-4" />
                             By Impact
@@ -215,19 +226,29 @@ const taskCounts = $derived({
                     <!-- Task info -->
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
-                            <p class="font-medium truncate">{task.task_title}</p>
+                            <p class="font-medium truncate">
+                                {task.task_title}
+                            </p>
                             {#if task.task_completed}
-                                <span class="badge badge-xs badge-success">Done</span>
+                                <span class="badge badge-xs badge-success"
+                                    >Done</span
+                                >
                             {/if}
                         </div>
 
                         <!-- Date and time info -->
                         {#if task.task_start_date}
-                            <div class="flex items-center gap-1 mt-1 text-xs text-base-content/50">
+                            <div
+                                class="flex items-center gap-1 mt-1 text-xs text-base-content/50"
+                            >
                                 <Calendar class="w-3 h-3" />
                                 <span>{formatDate(task.task_start_date)}</span>
                                 {#if task.task_start_date && task.task_end_date}
-                                    <span>{formatTime(task.task_start_date)} - {formatTime(task.task_end_date)}</span>
+                                    <span
+                                        >{formatTime(task.task_start_date)} - {formatTime(
+                                            task.task_end_date,
+                                        )}</span
+                                    >
                                 {/if}
                             </div>
                         {/if}
@@ -243,21 +264,23 @@ const taskCounts = $derived({
                             {#if task.task_category}
                                 <span
                                     class="badge badge-sm gap-1"
-                                    style="background-color: {task.task_category.color}20; color: {task.task_category.color}; border-color: {task.task_category.color}40"
+                                    style="background-color: {task.task_category
+                                        .color}20; color: {task.task_category
+                                        .color}; border-color: {task
+                                        .task_category.color}40"
                                 >
                                     <Tag class="w-3 h-3" />
                                     {task.task_category.name}
                                 </span>
                             {/if}
-                            {#if task.impact_magnitude && task.impact_magnitude > 0}
-                                <span class="text-xs text-base-content/50">
-                                    Impact: {task.impact_magnitude}/5
-                                </span>
-                            {/if}
                         </div>
 
                         {#if task.notes}
-                            <p class="text-xs text-base-content/60 mt-2 line-clamp-2">{task.notes}</p>
+                            <p
+                                class="text-xs text-base-content/60 mt-2 line-clamp-2"
+                            >
+                                {task.notes}
+                            </p>
                         {/if}
                     </div>
 

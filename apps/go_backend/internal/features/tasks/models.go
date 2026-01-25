@@ -112,15 +112,14 @@ type LinkedGoalSummary struct {
 //
 // @Description Goal linked to task with impact data
 type TaskGoalLink struct {
-	GoalID          string   `json:"goal_id"`
-	GoalTitle       string   `json:"goal_title"`
-	GoalIcon        string   `json:"goal_icon,omitempty"`
-	ImpactType      string   `json:"impact_type"`      // "positive", "negative", "neutral"
-	ImpactMagnitude int      `json:"impact_magnitude"` // 1-5
-	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	UnitID          *string  `json:"unit_id,omitempty"`
-	IsMilestone     bool     `json:"is_milestone,omitempty"`
-	MilestoneLabel  string   `json:"milestone_label,omitempty"`
+	GoalID         string   `json:"goal_id"`
+	GoalTitle      string   `json:"goal_title"`
+	GoalIcon       string   `json:"goal_icon,omitempty"`
+	ImpactType     string   `json:"impact_type"` // "positive", "negative", "neutral"
+	QuantityValue  *float64 `json:"quantity_value,omitempty"`
+	UnitID         *string  `json:"unit_id,omitempty"`
+	IsMilestone    bool     `json:"is_milestone,omitempty"`
+	MilestoneLabel string   `json:"milestone_label,omitempty"`
 
 	// Additional goal details for rich display
 	GoalDescription string   `json:"goal_description,omitempty"`
@@ -189,14 +188,13 @@ type QuantityInput struct {
 
 // GoalLinkInput is the input for linking a task to a goal.
 type GoalLinkInput struct {
-	GoalID          string  `json:"goal_id" validate:"required" example:"goals:hydration123"`
-	ImpactType      string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
-	ImpactMagnitude int     `json:"impact_magnitude,omitempty" validate:"min=1,max=5" example:"3"`
-	QuantityValue   float64 `json:"quantity_value,omitempty" example:"5.0"`
-	IsMilestone     bool    `json:"is_milestone,omitempty" example:"false"`
-	MilestoneLabel  string  `json:"milestone_label,omitempty" example:"Module 3 Complete"`
-	MilestoneOrder  int     `json:"milestone_order,omitempty" example:"3"`
-	Notes           string  `json:"notes,omitempty" example:"Morning session"`
+	GoalID         string  `json:"goal_id" validate:"required" example:"goals:hydration123"`
+	ImpactType     string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
+	QuantityValue  float64 `json:"quantity_value,omitempty" example:"5.0"`
+	IsMilestone    bool    `json:"is_milestone,omitempty" example:"false"`
+	MilestoneLabel string  `json:"milestone_label,omitempty" example:"Module 3 Complete"`
+	MilestoneOrder int     `json:"milestone_order,omitempty" example:"3"`
+	Notes          string  `json:"notes,omitempty" example:"Morning session"`
 }
 
 // UpdateRequest is the request payload for updating a task.
@@ -224,14 +222,13 @@ type UpdateRequest struct {
 //
 // @Description Request for linking task to goal
 type LinkGoalRequest struct {
-	GoalID          string  `json:"goal_id" validate:"required" example:"goals:hydration123"`
-	ImpactType      string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
-	ImpactMagnitude int     `json:"impact_magnitude,omitempty" validate:"min=1,max=5" example:"3"`
-	QuantityValue   float64 `json:"quantity_value,omitempty" example:"5.0"`
-	IsMilestone     bool    `json:"is_milestone,omitempty" example:"false"`
-	MilestoneLabel  string  `json:"milestone_label,omitempty" example:"Module 3 Complete"`
-	MilestoneOrder  int     `json:"milestone_order,omitempty" example:"3"`
-	Notes           string  `json:"notes,omitempty" example:"Morning session"`
+	GoalID         string  `json:"goal_id" validate:"required" example:"goals:hydration123"`
+	ImpactType     string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
+	QuantityValue  float64 `json:"quantity_value,omitempty" example:"5.0"`
+	IsMilestone    bool    `json:"is_milestone,omitempty" example:"false"`
+	MilestoneLabel string  `json:"milestone_label,omitempty" example:"Module 3 Complete"`
+	MilestoneOrder int     `json:"milestone_order,omitempty" example:"3"`
+	Notes          string  `json:"notes,omitempty" example:"Morning session"`
 }
 
 // =============================================================================

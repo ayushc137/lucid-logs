@@ -4397,10 +4397,6 @@ const docTemplate = `{
             "description": "Task linked to goal with impact data",
             "type": "object",
             "properties": {
-                "impact_magnitude": {
-                    "description": "1-5",
-                    "type": "integer"
-                },
                 "impact_type": {
                     "description": "\"positive\", \"negative\", \"neutral\"",
                     "type": "string"
@@ -5218,12 +5214,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "goals:abc123"
                 },
-                "impact_magnitude": {
-                    "type": "integer",
-                    "maximum": 5,
-                    "minimum": 1,
-                    "example": 3
-                },
                 "impact_type": {
                     "type": "string",
                     "enum": [
@@ -5276,10 +5266,6 @@ const docTemplate = `{
                 "id": {
                     "description": "Edge ID: \"task_goals:xyz\"",
                     "type": "string"
-                },
-                "impact_magnitude": {
-                    "description": "1-5",
-                    "type": "integer"
                 },
                 "impact_type": {
                     "description": "Impact tracking",
@@ -5415,12 +5401,6 @@ const docTemplate = `{
                 "goal_id": {
                     "type": "string",
                     "example": "goals:hydration123"
-                },
-                "impact_magnitude": {
-                    "type": "integer",
-                    "maximum": 5,
-                    "minimum": 1,
-                    "example": 3
                 },
                 "impact_type": {
                     "type": "string",
@@ -5664,10 +5644,6 @@ const docTemplate = `{
                 },
                 "goal_title": {
                     "type": "string"
-                },
-                "impact_magnitude": {
-                    "description": "1-5",
-                    "type": "integer"
                 },
                 "impact_type": {
                     "description": "\"positive\", \"negative\", \"neutral\"",

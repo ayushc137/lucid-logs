@@ -130,12 +130,11 @@ type GoalStats struct {
 //
 // @Description Task linked to goal with impact data
 type GoalTaskLink struct {
-	TaskID          string   `json:"task_id"`
-	TaskTitle       string   `json:"task_title"`
-	ImpactType      string   `json:"impact_type"`      // "positive", "negative", "neutral"
-	ImpactMagnitude int      `json:"impact_magnitude"` // 1-5
-	QuantityValue   *float64 `json:"quantity_value,omitempty"`
-	UnitID          *string  `json:"unit_id,omitempty"`
+	TaskID        string   `json:"task_id"`
+	TaskTitle     string   `json:"task_title"`
+	ImpactType    string   `json:"impact_type"` // "positive", "negative", "neutral"
+	QuantityValue *float64 `json:"quantity_value,omitempty"`
+	UnitID        *string  `json:"unit_id,omitempty"`
 
 	// Additional task details for rich display
 	TaskJournal   string     `json:"task_journal,omitempty"`

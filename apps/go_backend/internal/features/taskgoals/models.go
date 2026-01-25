@@ -19,7 +19,6 @@
 //
 // The task_goals table stores:
 //   - impact_type: "positive", "negative", "neutral"
-//   - impact_magnitude: 1-5 (how much impact)
 //   - quantity_value/unit_id: for measurable goals
 //   - is_milestone: marks significant progress points
 //   - notes: optional context
@@ -52,8 +51,7 @@ type TaskGoal struct {
 	GoalID string `json:"goal_id"` // "goals:xyz"
 
 	// Impact tracking
-	ImpactType      string `json:"impact_type"`      // "positive", "negative", "neutral"
-	ImpactMagnitude int    `json:"impact_magnitude"` // 1-5
+	ImpactType string `json:"impact_type"` // "positive", "negative", "neutral"
 
 	// Quantity (for measurable goals)
 	QuantityValue *float64 `json:"quantity_value,omitempty"` // e.g., 5.0
@@ -98,7 +96,6 @@ type TaskGoalWithTask struct {
 type LinkRequest struct {
 	GoalID          string   `json:"goal_id" validate:"required" example:"goals:abc123"`
 	ImpactType      string   `json:"impact_type" validate:"required,oneof=positive negative neutral" example:"positive"`
-	ImpactMagnitude int      `json:"impact_magnitude,omitempty" validate:"min=1,max=5" example:"3"`
 	QuantityValue   *float64 `json:"quantity_value,omitempty" example:"5.0"`
 	UnitID          *string  `json:"unit_id,omitempty" example:"units:km"`
 
@@ -123,9 +120,8 @@ type BatchLinkRequest struct {
 //
 // @Description Request payload for updating a task-goal link
 type UpdateLinkRequest struct {
-	ImpactType      *string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
-	ImpactMagnitude *int     `json:"impact_magnitude,omitempty" validate:"omitempty,min=1,max=5" example:"4"`
-	QuantityValue   *float64 `json:"quantity_value,omitempty" example:"8.0"`
+	ImpactType     *string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
+	QuantityValue  *float64 `json:"quantity_value,omitempty" example:"8.0"`
 	UnitID          *string  `json:"unit_id,omitempty" example:"units:km"`
 	IsMilestone     *bool    `json:"is_milestone,omitempty" example:"true"`
 	MilestoneLabel  *string  `json:"milestone_label,omitempty" validate:"omitempty,max=200" example:"Updated milestone"`

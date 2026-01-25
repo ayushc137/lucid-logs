@@ -939,15 +939,14 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 	}
 
 	type goalLinkDB struct {
-		GoalID          string   `json:"goal_id"`
-		GoalTitle       string   `json:"goal_title"`
-		GoalIcon        string   `json:"goal_icon,omitempty"`
-		ImpactType      string   `json:"impact_type"`
-		ImpactMagnitude int      `json:"impact_magnitude"`
-		QuantityValue   *float64 `json:"quantity_value,omitempty"`
-		UnitID          *string  `json:"unit_id,omitempty"`
-		IsMilestone     bool     `json:"is_milestone"`
-		MilestoneLabel  string   `json:"milestone_label,omitempty"`
+		GoalID         string   `json:"goal_id"`
+		GoalTitle      string   `json:"goal_title"`
+		GoalIcon       string   `json:"goal_icon,omitempty"`
+		ImpactType     string   `json:"impact_type"`
+		QuantityValue  *float64 `json:"quantity_value,omitempty"`
+		UnitID         *string  `json:"unit_id,omitempty"`
+		IsMilestone    bool     `json:"is_milestone"`
+		MilestoneLabel string   `json:"milestone_label,omitempty"`
 		// Additional goal details
 		GoalDescription string                `json:"goal_description,omitempty"`
 		GoalStatus      string                `json:"goal_status,omitempty"`
@@ -965,7 +964,6 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 			out.title as goal_title,
 			out.icon as goal_icon,
 			impact_type,
-			impact_magnitude,
 			quantity_value,
 			unit_id,
 			is_milestone,
@@ -995,7 +993,6 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 			GoalTitle:       g.GoalTitle,
 			GoalIcon:        g.GoalIcon,
 			ImpactType:      g.ImpactType,
-			ImpactMagnitude: g.ImpactMagnitude,
 			QuantityValue:   g.QuantityValue,
 			UnitID:          g.UnitID,
 			IsMilestone:     g.IsMilestone,
@@ -1187,14 +1184,13 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 
 	// Prepare batch data
 	type edgeData struct {
-		GoalID          string   `json:"goal_id"`
-		ImpactType      string   `json:"impact_type"`
-		ImpactMagnitude int      `json:"impact_magnitude"`
-		IsMilestone     bool     `json:"is_milestone"`
-		QuantityValue   *float64 `json:"quantity_value,omitempty"`
-		MilestoneLabel  string   `json:"milestone_label,omitempty"`
-		MilestoneOrder  int      `json:"milestone_order,omitempty"`
-		Notes           string   `json:"notes,omitempty"`
+		GoalID         string   `json:"goal_id"`
+		ImpactType     string   `json:"impact_type"`
+		IsMilestone    bool     `json:"is_milestone"`
+		QuantityValue  *float64 `json:"quantity_value,omitempty"`
+		MilestoneLabel string   `json:"milestone_label,omitempty"`
+		MilestoneOrder int      `json:"milestone_order,omitempty"`
+		Notes          string   `json:"notes,omitempty"`
 	}
 
 	edges := make([]edgeData, len(links))
@@ -1204,20 +1200,15 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 		if impactType == "" {
 			impactType = "neutral"
 		}
-		magnitude := link.ImpactMagnitude
-		if magnitude < 1 {
-			magnitude = 3
-		}
 
 		edges[i] = edgeData{
-			GoalID:          link.GoalID,
-			ImpactType:      impactType,
-			ImpactMagnitude: magnitude,
-			IsMilestone:     link.IsMilestone,
-			QuantityValue:   nil, // Set below if > 0
-			MilestoneLabel:  link.MilestoneLabel,
-			MilestoneOrder:  link.MilestoneOrder,
-			Notes:           link.Notes,
+			GoalID:         link.GoalID,
+			ImpactType:     impactType,
+			IsMilestone:    link.IsMilestone,
+			QuantityValue:  nil, // Set below if > 0
+			MilestoneLabel: link.MilestoneLabel,
+			MilestoneOrder: link.MilestoneOrder,
+			Notes:          link.Notes,
 		}
 		if link.QuantityValue > 0 {
 			edges[i].QuantityValue = &link.QuantityValue
@@ -1230,7 +1221,6 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 			LET $goal = type::record($edge.goal_id);
 			RELATE $task_id -> task_goals -> $goal SET
 				impact_type = $edge.impact_type,
-				impact_magnitude = $edge.impact_magnitude,
 				is_milestone = $edge.is_milestone,
 				quantity_value = $edge.quantity_value,
 				milestone_label = $edge.milestone_label,

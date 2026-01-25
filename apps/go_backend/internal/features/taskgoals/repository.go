@@ -75,36 +75,34 @@ func NewRepository(db *database.DB) Repository {
 
 // taskGoalDB is the internal database representation.
 type taskGoalDB struct {
-	ID              models.RecordID      `json:"id,omitempty"`
-	In              models.RecordID      `json:"in"`  // Task ID
-	Out             models.RecordID      `json:"out"` // Goal ID
-	ImpactType      string               `json:"impact_type"`
-	ImpactMagnitude int                  `json:"impact_magnitude"`
-	QuantityValue   *float64             `json:"quantity_value,omitempty"`
-	UnitID          *string              `json:"unit_id,omitempty"`
-	Notes           string               `json:"notes,omitempty"`
-	Source          string               `json:"source"`
-	IsMilestone     bool                 `json:"is_milestone"`
-	MilestoneLabel  string               `json:"milestone_label,omitempty"`
-	MilestoneOrder  int                  `json:"milestone_order"`
-	CreatedAt       database.SurrealTime `json:"created_at"`
+	ID             models.RecordID      `json:"id,omitempty"`
+	In             models.RecordID      `json:"in"`  // Task ID
+	Out            models.RecordID      `json:"out"` // Goal ID
+	ImpactType     string               `json:"impact_type"`
+	QuantityValue  *float64             `json:"quantity_value,omitempty"`
+	UnitID         *string              `json:"unit_id,omitempty"`
+	Notes          string               `json:"notes,omitempty"`
+	Source         string               `json:"source"`
+	IsMilestone    bool                 `json:"is_milestone"`
+	MilestoneLabel string               `json:"milestone_label,omitempty"`
+	MilestoneOrder int                  `json:"milestone_order"`
+	CreatedAt      database.SurrealTime `json:"created_at"`
 }
 
 func (t *taskGoalDB) toTaskGoal() *TaskGoal {
 	return &TaskGoal{
-		ID:              database.ToStringID(t.ID),
-		TaskID:          database.ToStringID(t.In),
-		GoalID:          database.ToStringID(t.Out),
-		ImpactType:      t.ImpactType,
-		ImpactMagnitude: t.ImpactMagnitude,
-		QuantityValue:   t.QuantityValue,
-		UnitID:          t.UnitID,
-		Notes:           t.Notes,
-		Source:          t.Source,
-		IsMilestone:     t.IsMilestone,
-		MilestoneLabel:  t.MilestoneLabel,
-		MilestoneOrder:  t.MilestoneOrder,
-		CreatedAt:       t.CreatedAt.Time,
+		ID:             database.ToStringID(t.ID),
+		TaskID:         database.ToStringID(t.In),
+		GoalID:         database.ToStringID(t.Out),
+		ImpactType:     t.ImpactType,
+		QuantityValue:  t.QuantityValue,
+		UnitID:         t.UnitID,
+		Notes:          t.Notes,
+		Source:         t.Source,
+		IsMilestone:    t.IsMilestone,
+		MilestoneLabel: t.MilestoneLabel,
+		MilestoneOrder: t.MilestoneOrder,
+		CreatedAt:      t.CreatedAt.Time,
 	}
 }
 
@@ -119,16 +117,11 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 
 	// Set defaults
 	source := SourceManual
-	impactMagnitude := req.ImpactMagnitude
-	if impactMagnitude == 0 {
-		impactMagnitude = 1
-	}
 
 	// Use RELATE to create the edge
 	result, err := database.QueryFirst[taskGoalDB](ctx, r.db, `
 		RELATE $task -> task_goals -> $goal SET
 			impact_type = $impact_type,
-			impact_magnitude = $impact_magnitude,
 			quantity_value = $quantity_value,
 			unit_id = $unit_id,
 			notes = $notes,
@@ -138,18 +131,17 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 			milestone_order = $milestone_order,
 			created_at = $created_at
 	`, map[string]any{
-		"task":             taskRecordID,
-		"goal":             goalRecordID,
-		"impact_type":      req.ImpactType,
-		"impact_magnitude": impactMagnitude,
-		"quantity_value":   req.QuantityValue,
-		"unit_id":          req.UnitID,
-		"notes":            req.Notes,
-		"source":           source,
-		"is_milestone":     req.IsMilestone,
-		"milestone_label":  req.MilestoneLabel,
-		"milestone_order":  req.MilestoneOrder,
-		"created_at":       now,
+		"task":            taskRecordID,
+		"goal":            goalRecordID,
+		"impact_type":     req.ImpactType,
+		"quantity_value":  req.QuantityValue,
+		"unit_id":         req.UnitID,
+		"notes":           req.Notes,
+		"source":          source,
+		"is_milestone":    req.IsMilestone,
+		"milestone_label": req.MilestoneLabel,
+		"milestone_order": req.MilestoneOrder,
+		"created_at":      now,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).
@@ -189,21 +181,15 @@ func (r *repository) CreateBatch(ctx context.Context, taskID string, links []Lin
 	// Build array of link data for batch insertion
 	linkData := make([]map[string]any, len(links))
 	for i, link := range links {
-		impactMagnitude := link.ImpactMagnitude
-		if impactMagnitude == 0 {
-			impactMagnitude = 1
-		}
-
 		linkData[i] = map[string]any{
-			"goal_id":          link.GoalID,
-			"impact_type":      link.ImpactType,
-			"impact_magnitude": impactMagnitude,
-			"quantity_value":   link.QuantityValue,
-			"unit_id":          link.UnitID,
-			"notes":            link.Notes,
-			"is_milestone":     link.IsMilestone,
-			"milestone_label":  link.MilestoneLabel,
-			"milestone_order":  link.MilestoneOrder,
+			"goal_id":         link.GoalID,
+			"impact_type":     link.ImpactType,
+			"quantity_value":  link.QuantityValue,
+			"unit_id":         link.UnitID,
+			"notes":           link.Notes,
+			"is_milestone":    link.IsMilestone,
+			"milestone_label": link.MilestoneLabel,
+			"milestone_order": link.MilestoneOrder,
 		}
 	}
 
@@ -213,7 +199,6 @@ func (r *repository) CreateBatch(ctx context.Context, taskID string, links []Lin
 			LET $goal = type::thing("goals", string::split($link.goal_id, ":")[1]);
 			RELATE $task -> task_goals -> $goal SET
 				impact_type = $link.impact_type,
-				impact_magnitude = $link.impact_magnitude,
 				quantity_value = $link.quantity_value,
 				unit_id = $link.unit_id,
 				notes = $link.notes,
