@@ -223,7 +223,18 @@ func (s *service) InstantLog(ctx context.Context, id string, req *InstantLogRequ
 	for _, gl := range activity.Goals {
 		if gl.AutoLinkTasks {
 			// Calculate quantity for this goal
-			goalQuantity := quantity * gl.QuantityMultiplier
+			// Priority: request quantity > goal-link default_quantity > activity default * multiplier
+			var goalQuantity float64
+			if req.Quantity != nil {
+				// User specified quantity in request - apply multiplier
+				goalQuantity = *req.Quantity * gl.QuantityMultiplier
+			} else if gl.DefaultQuantity != nil {
+				// Use per-goal default quantity
+				goalQuantity = *gl.DefaultQuantity
+			} else {
+				// Fall back to activity default * multiplier
+				goalQuantity = activity.QuantityDefault * gl.QuantityMultiplier
+			}
 
 			impact := gl.DefaultImpact
 			if impact == "" {
@@ -285,7 +296,15 @@ func (s *service) InstantLog(ctx context.Context, id string, req *InstantLogRequ
 	var goalsUpdated []GoalUpdateSummary
 	for _, gl := range activity.Goals {
 		if gl.AutoLinkTasks && gl.Goal != nil {
-			goalQuantity := quantity * gl.QuantityMultiplier
+			// Calculate quantity the same way as for goal links
+			var goalQuantity float64
+			if req.Quantity != nil {
+				goalQuantity = *req.Quantity * gl.QuantityMultiplier
+			} else if gl.DefaultQuantity != nil {
+				goalQuantity = *gl.DefaultQuantity
+			} else {
+				goalQuantity = activity.QuantityDefault * gl.QuantityMultiplier
+			}
 			summary := GoalUpdateSummary{
 				GoalID:     gl.GoalID,
 				GoalTitle:  gl.Goal.Title,
@@ -345,14 +364,20 @@ func (s *service) Schedule(ctx context.Context, id string, req *ScheduleRequest,
 	for _, gl := range activity.Goals {
 		if gl.AutoLinkTasks && gl.Goal != nil {
 			link := GoalLinkDefault{
-				GoalID:     gl.GoalID,
-				GoalTitle:  gl.Goal.Title,
-				GoalIcon:   gl.Goal.Icon,
-				ImpactType: gl.DefaultImpact,
+				GoalID:       gl.GoalID,
+				GoalTitle:    gl.Goal.Title,
+				GoalIcon:     gl.Goal.Icon,
+				ImpactType:   gl.DefaultImpact,
+				QuantityStep: activity.QuantityStep,
 			}
-			if activity.QuantityEnabled {
-				link.Quantity = activity.QuantityDefault * gl.QuantityMultiplier
+			// Use per-goal default quantity if set, otherwise fall back to activity default * multiplier
+			if gl.DefaultQuantity != nil {
+				link.DefaultQuantity = gl.DefaultQuantity
+			} else if activity.QuantityEnabled {
+				qty := activity.QuantityDefault * gl.QuantityMultiplier
+				link.DefaultQuantity = &qty
 			}
+			// Unit always comes from goal's target
 			if gl.Goal.Target != nil {
 				link.QuantityUnit = gl.Goal.Target.UnitID
 			}
@@ -477,21 +502,24 @@ func (c *GoalActivityCreator) CreateForGoal(ctx context.Context, goal *goals.Goa
 		Pinned:           pinned,
 	}
 
-	// Set quantity from goal target
+	// Set quantity from goal target if available
+	var defaultQuantity *float64
 	if goal.Target != nil {
 		req.QuantityEnabled = true
-		req.QuantityDefault = 1 // Default to 1 unit
 		req.QuantityStep = 1
-		req.QuantityUnitID = goal.Target.UnitID
-
-		// Link to the goal
-		req.GoalLinks = []GoalLinkInput{{
-			GoalID:             goal.ID,
-			AutoLinkTasks:      true,
-			QuantityMultiplier: 1.0,
-			DefaultImpact:      ImpactPositive,
-		}}
+		// Set per-goal default quantity (not activity-level)
+		qty := 1.0
+		defaultQuantity = &qty
 	}
+
+	// Always link to the goal with per-goal default quantity
+	req.GoalLinks = []GoalLinkInput{{
+		GoalID:             goal.ID,
+		AutoLinkTasks:      true,
+		QuantityMultiplier: 1.0,
+		DefaultQuantity:    defaultQuantity,
+		DefaultImpact:      ImpactPositive,
+	}}
 
 	// Set category from goal if available
 	if goal.Category != nil {

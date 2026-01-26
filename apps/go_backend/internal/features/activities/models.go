@@ -47,9 +47,9 @@ type Activity struct {
 
 	// Quantity Settings
 	QuantityEnabled bool    `json:"quantity_enabled"`
-	QuantityDefault float64 `json:"quantity_default,omitempty"`
+	QuantityDefault float64 `json:"quantity_default,omitempty"` // Deprecated: use goal-link default_quantity
 	QuantityStep    float64 `json:"quantity_step,omitempty"`
-	QuantityUnitID  string  `json:"quantity_unit_id,omitempty"` // Fallback unit if no goal
+	QuantityUnitID  string  `json:"quantity_unit_id,omitempty"` // Deprecated: unit comes from goal's target
 
 	// Goal Link Defaults
 	DefaultImpact string `json:"default_impact"` // positive, negative, neutral
@@ -79,10 +79,11 @@ type Activity struct {
 //
 // @Description Link configuration for activity-goal relationship
 type ActivityGoalLink struct {
-	GoalID             string  `json:"goal_id"`
-	AutoLinkTasks      bool    `json:"auto_link_tasks"`      // Auto-link tasks to this goal
-	QuantityMultiplier float64 `json:"quantity_multiplier"`  // Multiply quantity when linking
-	DefaultImpact      string  `json:"default_impact"`       // Override impact type
+	GoalID             string   `json:"goal_id"`
+	AutoLinkTasks      bool     `json:"auto_link_tasks"`                // Auto-link tasks to this goal
+	QuantityMultiplier float64  `json:"quantity_multiplier"`            // Multiply quantity when linking
+	DefaultQuantity    *float64 `json:"default_quantity,omitempty"`     // Default quantity for this goal (unit from goal's target)
+	DefaultImpact      string   `json:"default_impact"`                 // Override impact type
 
 	// Populated goal details (for display)
 	Goal *goals.Goal `json:"goal,omitempty"`
@@ -148,10 +149,11 @@ type CreateRequest struct {
 //
 // @Description Input for activity-goal link configuration
 type GoalLinkInput struct {
-	GoalID             string  `json:"goal_id" validate:"required" example:"goals:hydration"`
-	AutoLinkTasks      bool    `json:"auto_link_tasks,omitempty" example:"true"`
-	QuantityMultiplier float64 `json:"quantity_multiplier,omitempty" validate:"min=0" example:"1.0"`
-	DefaultImpact      string  `json:"default_impact,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
+	GoalID             string   `json:"goal_id" validate:"required" example:"goals:hydration"`
+	AutoLinkTasks      bool     `json:"auto_link_tasks,omitempty" example:"true"`
+	QuantityMultiplier float64  `json:"quantity_multiplier,omitempty" validate:"min=0" example:"1.0"`
+	DefaultQuantity    *float64 `json:"default_quantity,omitempty" validate:"omitempty,min=0" example:"1.0"`
+	DefaultImpact      string   `json:"default_impact,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
 }
 
 // UpdateRequest is the request payload for updating an activity.
@@ -279,12 +281,13 @@ type TaskDefaults struct {
 //
 // @Description Pre-configured goal link
 type GoalLinkDefault struct {
-	GoalID       string  `json:"goal_id"`
-	GoalTitle    string  `json:"goal_title"`
-	GoalIcon     string  `json:"goal_icon,omitempty"`
-	ImpactType   string  `json:"impact_type"`
-	Quantity     float64 `json:"quantity,omitempty"`
-	QuantityUnit string  `json:"quantity_unit,omitempty"`
+	GoalID          string   `json:"goal_id"`
+	GoalTitle       string   `json:"goal_title"`
+	GoalIcon        string   `json:"goal_icon,omitempty"`
+	ImpactType      string   `json:"impact_type"`
+	DefaultQuantity *float64 `json:"default_quantity,omitempty"` // Per-goal default quantity
+	QuantityUnit    string   `json:"quantity_unit,omitempty"`    // From goal's target.unit_id
+	QuantityStep    float64  `json:"quantity_step,omitempty"`    // From activity (shared)
 }
 
 // TimerStartResponse returns the in-progress task.
@@ -313,15 +316,16 @@ type TimerStopResponse struct {
 //
 // @Description Goal linked to activity with full details
 type ActivityGoalLinkDetail struct {
-	GoalID             string  `json:"goal_id"`
-	GoalTitle          string  `json:"goal_title"`
-	GoalIcon           string  `json:"goal_icon,omitempty"`
-	GoalColor          string  `json:"goal_color,omitempty"`
-	AutoLinkTasks      bool    `json:"auto_link_tasks"`
-	QuantityMultiplier float64 `json:"quantity_multiplier"`
-	DefaultImpact      string  `json:"default_impact"`
-	TargetUnitID       string  `json:"target_unit_id,omitempty"`
-	TargetUnitSymbol   string  `json:"target_unit_symbol,omitempty"`
+	GoalID             string   `json:"goal_id"`
+	GoalTitle          string   `json:"goal_title"`
+	GoalIcon           string   `json:"goal_icon,omitempty"`
+	GoalColor          string   `json:"goal_color,omitempty"`
+	AutoLinkTasks      bool     `json:"auto_link_tasks"`
+	QuantityMultiplier float64  `json:"quantity_multiplier"`
+	DefaultQuantity    *float64 `json:"default_quantity,omitempty"`
+	DefaultImpact      string   `json:"default_impact"`
+	TargetUnitID       string   `json:"target_unit_id,omitempty"`
+	TargetUnitSymbol   string   `json:"target_unit_symbol,omitempty"`
 }
 
 // =============================================================================

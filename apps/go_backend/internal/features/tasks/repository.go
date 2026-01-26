@@ -428,10 +428,10 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 		queryVars["goal_id"] = database.MustRecordID("goals", filters.GoalID)
 	}
 
-	// Template ID filter (via created_from edge)
-	if filters.TemplateID != "" {
-		conditions = append(conditions, "id IN (SELECT in FROM created_from WHERE out = $template_id)")
-		queryVars["template_id"] = database.MustRecordID("templates", filters.TemplateID)
+	// Activity ID filter (via created_from_activity edge)
+	if filters.ActivityID != "" {
+		conditions = append(conditions, "id IN (SELECT in FROM created_from_activity WHERE out = $activity_id)")
+		queryVars["activity_id"] = database.MustRecordID("activities", filters.ActivityID)
 	}
 
 	// Has quantity filter

@@ -58,7 +58,7 @@
 			{#each $pinnedActivitiesQuery.data as activity (activity.id)}
 				<button
 					type="button"
-					class="activity-pill group"
+					class="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-gray-200 transition-all hover:bg-gray-50 hover:shadow-md hover:ring-emerald-300 active:scale-95 dark:bg-gray-800 dark:ring-gray-700 dark:hover:bg-gray-750 dark:hover:ring-emerald-600"
 					on:click={() => openModal(activity)}
 					title={activity.title}
 				>
@@ -78,9 +78,9 @@
 
 			<!-- Add Activity Button -->
 			<a
-				href="/activities/new"
-				class="activity-pill-add"
-				title="Create new activity"
+				href="/activities"
+				class="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400 transition-colors hover:border-emerald-400 hover:text-emerald-500 dark:border-gray-600 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
+				title="Manage activities"
 			>
 				<Plus class="h-4 w-4" />
 			</a>
@@ -89,7 +89,7 @@
 			<div class="flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 py-6 dark:border-gray-700">
 				<p class="mb-2 text-sm text-gray-500 dark:text-gray-400">No pinned activities</p>
 				<a
-					href="/activities/new"
+					href="/activities"
 					class="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
 				>
 					<Plus class="h-4 w-4" />
@@ -109,18 +109,3 @@
 		onSuccess={handleSuccess}
 	/>
 {/if}
-
-<style>
-	.activity-pill {
-		@apply flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-gray-200 transition-all;
-		@apply hover:bg-gray-50 hover:shadow-md hover:ring-emerald-300;
-		@apply active:scale-95;
-		@apply dark:bg-gray-800 dark:ring-gray-700 dark:hover:bg-gray-750 dark:hover:ring-emerald-600;
-	}
-
-	.activity-pill-add {
-		@apply flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400 transition-colors;
-		@apply hover:border-emerald-400 hover:text-emerald-500;
-		@apply dark:border-gray-600 dark:hover:border-emerald-500 dark:hover:text-emerald-400;
-	}
-</style>

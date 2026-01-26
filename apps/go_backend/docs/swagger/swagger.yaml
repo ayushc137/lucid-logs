@@ -50,6 +50,7 @@ definitions:
         description: Display & Organization
         type: boolean
       quantity_default:
+        description: 'Deprecated: use goal-link default_quantity'
         type: number
       quantity_enabled:
         description: Quantity Settings
@@ -57,7 +58,7 @@ definitions:
       quantity_step:
         type: number
       quantity_unit_id:
-        description: Fallback unit if no goal
+        description: 'Deprecated: unit comes from goal''s target'
         type: string
       sort_order:
         description: Order in quick bar
@@ -80,6 +81,9 @@ definitions:
       default_impact:
         description: Override impact type
         type: string
+      default_quantity:
+        description: Default quantity for this goal (unit from goal's target)
+        type: number
       goal:
         allOf:
         - $ref: '#/definitions/goals.Goal'
@@ -97,6 +101,8 @@ definitions:
         type: boolean
       default_impact:
         type: string
+      default_quantity:
+        type: number
       goal_color:
         type: string
       goal_icon:
@@ -204,6 +210,9 @@ definitions:
   activities.GoalLinkDefault:
     description: Pre-configured goal link
     properties:
+      default_quantity:
+        description: Per-goal default quantity
+        type: number
       goal_icon:
         type: string
       goal_id:
@@ -212,9 +221,11 @@ definitions:
         type: string
       impact_type:
         type: string
-      quantity:
+      quantity_step:
+        description: From activity (shared)
         type: number
       quantity_unit:
+        description: From goal's target.unit_id
         type: string
     type: object
   activities.GoalLinkInput:
@@ -230,6 +241,10 @@ definitions:
         - neutral
         example: positive
         type: string
+      default_quantity:
+        example: 1
+        minimum: 0
+        type: number
       goal_id:
         example: goals:hydration
         type: string
@@ -1904,6 +1919,10 @@ definitions:
   tasks.CreateRequest:
     description: Request payload for creating a task
     properties:
+      activity_id:
+        description: Activity source (creates created_from_activity edge)
+        example: activities:morning_run
+        type: string
       category_id:
         description: Category (creates in_category edge)
         example: categories:work123
@@ -1950,10 +1969,6 @@ definitions:
         type: string
       start_date:
         example: "2025-12-06T09:00:00Z"
-        type: string
-      template_id:
-        description: Template source (creates created_from edge)
-        example: templates:morning_run
         type: string
       title:
         example: Morning standup

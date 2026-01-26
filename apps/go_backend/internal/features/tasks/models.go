@@ -6,13 +6,13 @@
 //   - Emotion tracking (emotion_id on task, structured positives/negatives)
 //   - Inferred emotion calculation (computed on write using emotion default intensities)
 //   - Goal linking via task_goals relation
-//   - Template tracking via created_from relation
+//   - Activity tracking via created_from_activity relation
 //   - Soft delete support
 //
 // Database Architecture:
 //   - in_category: RELATE table for category assignment
 //   - task_goals: RELATE table for goal-task links with impact metadata
-//   - created_from: RELATE table tracking task origin from template
+//   - created_from_activity: RELATE table tracking task origin from activity
 //   - task_emotions: RELATE table for emotion analytics
 package tasks
 
@@ -39,7 +39,7 @@ import (
 //
 // Relationships (via graph edges, not stored on task):
 //   - Category: via in_category relation
-//   - Template: via created_from relation
+//   - Activity: via created_from_activity relation
 //   - Goals: via task_goals relation
 //
 // @Description Task/journal entry entity
@@ -171,8 +171,8 @@ type CreateRequest struct {
 	// Quantity (for measurable contributions)
 	Quantity *QuantityInput `json:"quantity,omitempty"`
 
-	// Template source (creates created_from edge)
-	TemplateID string `json:"template_id,omitempty" example:"templates:morning_run"`
+	// Activity source (creates created_from_activity edge)
+	ActivityID string `json:"activity_id,omitempty" example:"activities:morning_run"`
 
 	// Goal linking (creates task_goals edges)
 	GoalLinks []GoalLinkInput `json:"goal_links,omitempty"`
@@ -282,8 +282,8 @@ type TaskFilterParams struct {
 	// Goal filter (via task_goals edge)
 	GoalID string `json:"goal_id,omitempty"`
 
-	// Template filter (via created_from edge)
-	TemplateID string `json:"template_id,omitempty"`
+	// Activity filter (via created_from_activity edge)
+	ActivityID string `json:"activity_id,omitempty"`
 
 	// HasQuantity filters for tasks with quantity set
 	HasQuantity *bool `json:"has_quantity,omitempty"`
@@ -303,7 +303,7 @@ const (
 
 	// Source types
 	SourceManual   = "manual"
-	SourceTemplate = "template"
+	SourceActivity = "activity"
 	SourceQuick    = "quick"
 
 	// Status filter constants
@@ -321,8 +321,8 @@ const (
 	SortDesc = "desc"
 
 	// Relation table names
-	TaskGoalsTable   = "task_goals"
-	CreatedFromTable = "created_from"
+	TaskGoalsTable           = "task_goals"
+	CreatedFromActivityTable = "created_from_activity"
 )
 
 // Impact types for task-goal links

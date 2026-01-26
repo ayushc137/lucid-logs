@@ -3511,6 +3511,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "quantity_default": {
+                    "description": "Deprecated: use goal-link default_quantity",
                     "type": "number"
                 },
                 "quantity_enabled": {
@@ -3521,7 +3522,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "quantity_unit_id": {
-                    "description": "Fallback unit if no goal",
+                    "description": "Deprecated: unit comes from goal's target",
                     "type": "string"
                 },
                 "sort_order": {
@@ -3553,6 +3554,10 @@ const docTemplate = `{
                     "description": "Override impact type",
                     "type": "string"
                 },
+                "default_quantity": {
+                    "description": "Default quantity for this goal (unit from goal's target)",
+                    "type": "number"
+                },
                 "goal": {
                     "description": "Populated goal details (for display)",
                     "allOf": [
@@ -3579,6 +3584,9 @@ const docTemplate = `{
                 },
                 "default_impact": {
                     "type": "string"
+                },
+                "default_quantity": {
+                    "type": "number"
                 },
                 "goal_color": {
                     "type": "string"
@@ -3725,6 +3733,10 @@ const docTemplate = `{
             "description": "Pre-configured goal link",
             "type": "object",
             "properties": {
+                "default_quantity": {
+                    "description": "Per-goal default quantity",
+                    "type": "number"
+                },
                 "goal_icon": {
                     "type": "string"
                 },
@@ -3737,10 +3749,12 @@ const docTemplate = `{
                 "impact_type": {
                     "type": "string"
                 },
-                "quantity": {
+                "quantity_step": {
+                    "description": "From activity (shared)",
                     "type": "number"
                 },
                 "quantity_unit": {
+                    "description": "From goal's target.unit_id",
                     "type": "string"
                 }
             }
@@ -3764,6 +3778,11 @@ const docTemplate = `{
                         "neutral"
                     ],
                     "example": "positive"
+                },
+                "default_quantity": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 1
                 },
                 "goal_id": {
                     "type": "string",
@@ -6184,6 +6203,11 @@ const docTemplate = `{
                 "title"
             ],
             "properties": {
+                "activity_id": {
+                    "description": "Activity source (creates created_from_activity edge)",
+                    "type": "string",
+                    "example": "activities:morning_run"
+                },
                 "category_id": {
                     "description": "Category (creates in_category edge)",
                     "type": "string",
@@ -6248,11 +6272,6 @@ const docTemplate = `{
                 "start_date": {
                     "type": "string",
                     "example": "2025-12-06T09:00:00Z"
-                },
-                "template_id": {
-                    "description": "Template source (creates created_from edge)",
-                    "type": "string",
-                    "example": "templates:morning_run"
                 },
                 "title": {
                     "type": "string",

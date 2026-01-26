@@ -1,19 +1,4 @@
 #V2
-CREATE emotions:E32 CONTENT { name: "Thankful", emoji: "1F49D", quadrant: "green", x: 2, y: -2, valence: 0.85, arousal: -0.38, dominance: 0.52, intensity: 0.72, certainty: 0.68, social: 0.82, description: "Appreciating someone or something" }; -- 💝
-CREATE emotions:E33 CONTENT { name: "Blessed", emoji: "1F607", quadrant: "green", x: 3, y: -2, valence: 0.82, arousal: -0.40, dominance: 0.50, intensity: 0.68, certainty: 0.65, social: 0.78, description: "Feeling fortunate and lucky" }; -- 😇
-CREATE emotions:E34 CONTENT { name: "Connected", emoji: "1F91D", quadrant: "green", x: 4, y: -2, valence: 0.85, arousal: -0.32, dominance: 0.55, intensity: 0.72, certainty: 0.55, social: 0.88, description: "Feeling close to others" }; -- 🤝
-CREATE emotions:E35 CONTENT { name: "Belonging", emoji: "1FAF6", quadrant: "green", x: 5, y: -2, valence: 0.88, arousal: -0.35, dominance: 0.58, intensity: 0.75, certainty: 0.60, social: 0.90, description: "Part of something bigger than yourself" }; -- 🫶
-CREATE emotions:E36 CONTENT { name: "Loving", emoji: "1F970", quadrant: "green", x: 1, y: -3, valence: 0.95, arousal: -0.30, dominance: 0.55, intensity: 0.85, certainty: 0.60, social: 0.95, description: "Heart full of love for someone" }; -- 🥰
-CREATE emotions:E37 CONTENT { name: "Affectionate", emoji: "1F495", quadrant: "green", x: 2, y: -3, valence: 0.88, arousal: -0.35, dominance: 0.52, intensity: 0.78, certainty: 0.58, social: 0.90, description: "Wanting to show warmth and care" }; -- 💕
-CREATE emotions:E38 CONTENT { name: "Tender", emoji: "1F979", quadrant: "green", x: 3, y: -3, valence: 0.82, arousal: -0.42, dominance: 0.48, intensity: 0.72, certainty: 0.55, social: 0.85, description: "Soft, gentle feelings for someone" }; -- 🥹
-CREATE emotions:E39 CONTENT { name: "Compassionate", emoji: "1F932", quadrant: "green", x: 4, y: -3, valence: 0.80, arousal: -0.30, dominance: 0.45, intensity: 0.70, certainty: 0.50, social: 0.92, description: "Caring deeply about others' wellbeing" }; -- 🤲
-CREATE emotions:E40 CONTENT { name: "Thoughtful", emoji: "1F914", quadrant: "green", x: 5, y: -3, valence: 0.65, arousal: -0.40, dominance: 0.62, intensity: 0.55, certainty: 0.45, social: 0.35, description: "Reflecting and considering things" }; -- 🤔
-CREATE emotions:E41 CONTENT { name: "Safe", emoji: "1F512", quadrant: "green", x: 1, y: -4, valence: 0.80, arousal: -0.55, dominance: 0.85, intensity: 0.62, certainty: 0.82, social: 0.15, description: "Protected and out of harm's way" }; -- 🔒
-CREATE emotions:E42 CONTENT { name: "Secure", emoji: "1F6E1", quadrant: "green", x: 2, y: -4, valence: 0.82, arousal: -0.52, dominance: 0.88, intensity: 0.65, certainty: 0.85, social: 0.12, description: "Stable and confident in your situation" }; -- 🛡️
-CREATE emotions:E43 CONTENT { name: "Comfortable", emoji: "1F3E0", quadrant: "green", x: 3, y: -4, valence: 0.78, arousal: -0.58, dominance: 0.72, intensity: 0.58, certainty: 0.72, social: 0.08, description: "At home and at ease" }; -- 🏠
-CREATE emotions:E44 CONTENT { name: "Calm", emoji: "1F60C", quadrant: "green", x: 4, y: -4, valence: 0.80, arousal: -0.65, dominance: 0.72, intensity: 0.60, certainty: 0.72, social: 0.00, description: "Relaxed and in control" }; -- 😌
-CREATE emotions:E45 CONTENT { name: "Relaxed", emoji: "1F6CB", quadrant: "green", x: 5, y: -4, valence: 0.78, arousal: -0.70, dominance: 0.68, intensity: 0.58, certainty: 0.68, social: 0.05, description: "Body and mind at ease" }; -- 🛋️
-CREATE emotions:E46 CONTENT { name: "Serene", emoji: "1F9D8", quadrant: "green", x: 1, y: -5, valence: 0.90, arousal: -0.80, dominance: 0.75, intensity: 0.70, certainty: 0.80, social: 0.00, description: "Deep inner peace and stillness" }; -- 🧘
 CREATE emotions:E47 CONTENT { name: "Tranquil", emoji: "1F54A", quadrant: "green", x: 2, y: -5, valence: 0.88, arousal: -0.82, dominance: 0.72, intensity: 0.65, certainty: 0.78, social: 0.00, description: "Like still water, completely calm" }; -- 🕊️
 CREATE emotions:E48 CONTENT { name: "Peaceful", emoji: "262E", quadrant: "green", x: 3, y: -5, valence: 0.85, arousal: -0.75, dominance: 0.70, intensity: 0.65, certainty: 0.75, social: 0.05, description: "No worries, everything feels okay" }; -- ☮️
 CREATE emotions:E49 CONTENT { name: "Rested", emoji: "1F4A4", quadrant: "green", x: 4, y: -5, valence: 0.75, arousal: -0.45, dominance: 0.72, intensity: 0.62, certainty: 0.70, social: 0.05, description: "Recovered and recharged" }; -- 	💤
@@ -71,31 +56,46 @@ CREATE emotions:E98 CONTENT { name: "Despairing", emoji: "1F62D", quadrant: "blu
 CREATE emotions:E99 CONTENT { name: "Numb", emoji: "1F636-200D-1F32B-FE0F", quadrant: "blue", x: -2, y: -5, valence: -0.50, arousal: -0.85, dominance: -0.68, intensity: 0.35, certainty: -0.50, social: -0.55, description: "Can't feel anything at all" }; -- 😶‍🌫️
 CREATE emotions:E100 CONTENT { name: "Apathetic", emoji: "1F610", quadrant: "blue", x: -1, y: -5, valence: -0.45, arousal: -0.75, dominance: -0.30, intensity: 0.40, certainty: 0.25, social: -0.40, description: "Don't care about anything" }; -- 😐
 -- =============================================================================
--- ACTIVITIES MIGRATION
+-- ACTIVITIES MIGRATION (Reference Only)
 -- =============================================================================
--- 
--- Creates the activities system to replace templates with enhanced functionality.
--- Supports: instant logging, scheduling, and timer/Flowmodoro modes.
 --
--- Run: surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/003_activities.surql
+-- NOTE: Activity tables are now consolidated in 001_schema.surql.
+-- This file is kept for reference and data migration examples.
+--
+-- Tables included in 001_schema.surql:
+--   - activities
+--   - activity_goals (relation: activities -> goals)
+--   - created_from_activity (relation: tasks -> activities)
+--   - timer_sessions
 --
 -- =============================================================================
--- ACTIVITIES TABLE
+-- DATA MIGRATION: TEMPLATES -> ACTIVITIES (if needed)
 -- =============================================================================
-DEFINE TABLE IF NOT EXISTS activities SCHEMAFULL PERMISSIONS FULL;
--- Identity
-DEFINE FIELD IF NOT EXISTS title ON activities TYPE string ASSERT $value != NONE AND string::len($value) >= 1;
-DEFINE FIELD IF NOT EXISTS icon ON activities TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS description ON activities TYPE option<string>;
--- Task Defaults (pre-fill when creating task)
-DEFINE FIELD IF NOT EXISTS default_duration ON activities TYPE option<int>;  -- seconds
-DEFINE FIELD IF NOT EXISTS default_emotion_id ON activities TYPE option<string>;  -- record ID as string
-DEFINE FIELD IF NOT EXISTS default_priority ON activities TYPE int DEFAULT 3;
-DEFINE FIELD IF NOT EXISTS default_completed ON activities TYPE bool DEFAULT true;  -- true for instant log
--- Quantity Settings
-DEFINE FIELD IF NOT EXISTS quantity_enabled ON activities TYPE bool DEFAULT false;
-DEFINE FIELD IF NOT EXISTS quantity_default ON activities TYPE option<float>;
-DEFINE FIELD IF NOT EXISTS quantity_step ON activities TYPE option<float>;
-DEFINE FIELD IF NOT EXISTS quantity_unit_id ON activities TYPE option<string>;  -- fallback unit if no goal
--- Goal Link Defaults
-DEFINE FIELD IF NOT EXISTS default_impact ON activities TYPE string DEFAULT "positive" 
+-- Run these manually if migrating from the old template system.
+-- Step 1: Insert activities from templates
+/*INSERT INTO activities (    title,    icon,    description,    default_duration,    default_emotion_id,    default_priority,    default_completed,    quantity_enabled,    quantity_default,    quantity_step,    pinned,    sort_order,    use_count,    last_used_at,    created_by,    created_at,    updated_at) SELECT    title,    icon,    description,    default_duration,    default_emotion_id,    3,    is_quick_log,    quantity_enabled,    quantity_default,    quantity_step,    is_quick_log,    quick_log_order,    use_count,    last_used_at,    created_by,    created_at,    updated_atFROM templatesWHERE deleted_at IS NONE;*/
+-- Step 2: Migrate template_goals to activity_goals
+/*FOR $link IN (SELECT * FROM template_goals) {    LET $template_id = record::id($link.in);    LET $activity = (SELECT id FROM activities WHERE title = (SELECT title FROM templates WHERE id = $link.in)[0].title LIMIT 1)[0];    IF $activity {        RELATE $activity.id -> activity_goals -> $link.out        SET            auto_link_tasks = $link.auto_link_tasks,            quantity_multiplier = 1.0,            default_impact = "positive",            created_at = $link.created_at;    }};*/
+-- =============================================================================
+-- USEFUL QUERIES
+-- =============================================================================
+-- Get pinned activities with their linked goals
+/*SELECT    *,    (SELECT        out.id AS goal_id,        out.title AS goal_title,        out.icon AS goal_icon,        out.target AS goal_target,        auto_link_tasks,        quantity_multiplier,        default_impact     FROM ->activity_goals     WHERE out.deleted_at IS NONE    ) AS goals,    (SELECT out.* FROM ->in_category LIMIT 1)[0] AS categoryFROM activitiesWHERE created_by = $user_id  AND deleted_at IS NONE  AND pinned = trueORDER BY sort_order ASC;*/
+-- Get activity with full goal details for instant log
+/*SELECT    *,    (SELECT        out.id AS goal_id,        out.title AS goal_title,        out.icon AS goal_icon,        out.target.value AS target_value,        out.target.unit_id AS target_unit_id,        auto_link_tasks,        quantity_multiplier,        default_impact     FROM ->activity_goals     WHERE out.deleted_at IS NONE AND out.status = "active"    ) AS goalsFROM activities:$activity_idWHERE created_by = $user_id AND deleted_at IS NONE;*/
+-- =============================================================================
+-- END MIGRATION
+-- =============================================================================
+-- MIGRATION: Activity Goal Default Quantity
+-- =============================================================================
+-- Adds default_quantity to activity_goals relation for per-goal quantity defaults.
+-- Unit comes from the goal's target.unit_id - no override at activity level.
+--
+-- Run: surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/005_activity_goal_quantity.surql
+-- =============================================================================
+-- Add default_quantity to activity_goals relation
+-- This is the default quantity to log for THIS specific goal when the activity is used
+DEFINE FIELD IF NOT EXISTS default_quantity ON activity_goals TYPE option<float>;
+-- =============================================================================
+-- END MIGRATION
+-- =============================================================================

@@ -146,7 +146,7 @@ func (h *Handler) List(c *gin.Context) {
 		filters.StartDateFrom != "" ||
 		filters.StartDateTo != "" ||
 		filters.GoalID != "" ||
-		filters.TemplateID != "" ||
+		filters.ActivityID != "" ||
 		filters.SortField != ""
 
 	log.Debug().
@@ -188,7 +188,7 @@ func parseFilterParams(c *gin.Context) TaskFilterParams {
 		StartDateFrom:    c.Query("start_date_from"),
 		StartDateTo:      c.Query("start_date_to"),
 		GoalID:           c.Query("goal_id"),
-		TemplateID:       c.Query("template_id"),
+		ActivityID:       c.Query("activity_id"),
 		SortField:        c.Query("sort_field"),
 		SortOrder:        c.Query("sort_order"),
 	}

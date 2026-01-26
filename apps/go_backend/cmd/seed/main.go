@@ -259,10 +259,13 @@ func findAdminUser(ctx context.Context, db *database.DB, email string) (string, 
 
 func resetSeededData(ctx context.Context, db *database.DB, userID string) error {
 	// Delete all relations and entities in correct order
+	// Note: created_from (templates) is deprecated, use created_from_activity
 	tables := []string{
-		"task_goals", "task_emotions", "created_from", "created_from_activity",
+		"task_goals", "task_emotions", "created_from_activity", "activity_goals",
 		"in_category", "goal_children", "goal_logs", "goal_snapshots",
 		"tasks", "activities", "goals", "categories",
+		// Deprecated tables (clean up if they exist)
+		"created_from", "template_goals", "templates",
 	}
 
 	for _, table := range tables {

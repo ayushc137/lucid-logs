@@ -52,6 +52,7 @@ export interface ActivityGoalLink {
 	goal_id: string;
 	auto_link_tasks: boolean;
 	quantity_multiplier: number;
+	default_quantity?: number; // Per-goal default quantity (unit from goal's target)
 	default_impact: string;
 	goal?: Goal;
 }
@@ -121,6 +122,7 @@ export interface GoalLinkInput {
 	goal_id: string;
 	auto_link_tasks?: boolean;
 	quantity_multiplier?: number;
+	default_quantity?: number; // Per-goal default quantity (unit from goal's target)
 	default_impact?: 'positive' | 'negative' | 'neutral';
 }
 
@@ -176,8 +178,9 @@ export interface GoalLinkDefault {
 	goal_title: string;
 	goal_icon?: string;
 	impact_type: string;
-	quantity?: number;
-	quantity_unit?: string;
+	default_quantity?: number; // Per-goal default quantity
+	quantity_unit?: string; // From goal's target.unit_id
+	quantity_step?: number; // From activity (shared)
 }
 
 export interface ActivityGoalLinkDetail {
@@ -187,6 +190,7 @@ export interface ActivityGoalLinkDetail {
 	goal_color?: string;
 	auto_link_tasks: boolean;
 	quantity_multiplier: number;
+	default_quantity?: number; // Per-goal default quantity
 	default_impact: string;
 	target_unit_id?: string;
 	target_unit_symbol?: string;

@@ -113,12 +113,15 @@ type categoryDB struct {
 }
 
 type goalLinkDB struct {
-	GoalID             string  `json:"goal_id"`
-	GoalTitle          string  `json:"goal_title"`
-	GoalIcon           string  `json:"goal_icon,omitempty"`
-	AutoLinkTasks      bool    `json:"auto_link_tasks"`
-	QuantityMultiplier float64 `json:"quantity_multiplier"`
-	DefaultImpact      string  `json:"default_impact"`
+	GoalID             string   `json:"goal_id"`
+	GoalTitle          string   `json:"goal_title"`
+	GoalIcon           string   `json:"goal_icon,omitempty"`
+	AutoLinkTasks      bool     `json:"auto_link_tasks"`
+	QuantityMultiplier float64  `json:"quantity_multiplier"`
+	DefaultQuantity    *float64 `json:"default_quantity,omitempty"`
+	DefaultImpact      string   `json:"default_impact"`
+	// Goal's target info for unit
+	TargetUnitID string `json:"target_unit_id,omitempty"`
 }
 
 func (c *categoryDB) toCategory() *categories.Category {
@@ -182,6 +185,7 @@ func (a *activityDB) toActivity() *Activity {
 			GoalID:             gl.GoalID,
 			AutoLinkTasks:      gl.AutoLinkTasks,
 			QuantityMultiplier: gl.QuantityMultiplier,
+			DefaultQuantity:    gl.DefaultQuantity,
 			DefaultImpact:      gl.DefaultImpact,
 		})
 	}
@@ -222,13 +226,15 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Activity
 
 	result, err := database.QueryFirst[activityDB](ctx, r.db, `
 		SELECT *,
-			(SELECT 
+			(SELECT
 				out.id AS goal_id,
 				out.title AS goal_title,
 				out.icon AS goal_icon,
 				auto_link_tasks,
 				quantity_multiplier,
-				default_impact
+				default_quantity,
+				default_impact,
+				out.target.unit_id AS target_unit_id
 			FROM ->activity_goals
 			WHERE out.deleted_at IS NONE
 			) AS goals,
@@ -275,21 +281,23 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	// List with goals and category
 	dataQuery := `
 		SELECT *,
-			(SELECT 
+			(SELECT
 				out.id AS goal_id,
 				out.title AS goal_title,
 				out.icon AS goal_icon,
 				auto_link_tasks,
 				quantity_multiplier,
-				default_impact
+				default_quantity,
+				default_impact,
+				out.target.unit_id AS target_unit_id
 			FROM ->activity_goals
 			WHERE out.deleted_at IS NONE
 			) AS goals,
 			(SELECT out AS category FROM ->in_category LIMIT 1)[0].category AS category
-		FROM activities 
-		WHERE created_by = $user 
+		FROM activities
+		WHERE created_by = $user
 		  AND deleted_at IS NONE
-		ORDER BY pinned DESC, sort_order ASC, last_used_at DESC NULLS LAST
+		ORDER BY pinned DESC, sort_order ASC, last_used_at DESC
 		LIMIT $limit START $offset
 	`
 	activitiesDB, err := database.QueryAll[activityDB](ctx, r.db, dataQuery, map[string]any{
@@ -320,13 +328,15 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 func (r *repository) FindPinned(ctx context.Context, userID string) ([]*Activity, error) {
 	query := `
 		SELECT *,
-			(SELECT 
+			(SELECT
 				out.id AS goal_id,
 				out.title AS goal_title,
 				out.icon AS goal_icon,
 				auto_link_tasks,
 				quantity_multiplier,
-				default_impact
+				default_quantity,
+				default_impact,
+				out.target.unit_id AS target_unit_id
 			FROM ->activity_goals
 			WHERE out.deleted_at IS NONE AND out.status = "active"
 			) AS goals,
@@ -384,7 +394,7 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 			pinned: $pinned,
 			sort_order: $sort_order,
 			use_count: 0,
-			created_by: type::thing("users", $user_id),
+			created_by: $user_id,
 			created_at: time::now(),
 			updated_at: time::now()
 		};
@@ -406,7 +416,7 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		"category_id":        req.CategoryID,
 		"pinned":             req.Pinned,
 		"sort_order":         req.SortOrder,
-		"user_id":            database.ExtractID(userID),
+		"user_id":            userID,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Msg("create query failed")
@@ -580,14 +590,16 @@ func (r *repository) LinkGoal(ctx context.Context, activityID string, link *Goal
 		SET
 			auto_link_tasks = $auto_link,
 			quantity_multiplier = $multiplier,
+			default_quantity = $default_quantity,
 			default_impact = $impact,
 			created_at = time::now()
 	`, map[string]any{
-		"activity_id": actID,
-		"goal_id":     goalID,
-		"auto_link":   link.AutoLinkTasks,
-		"multiplier":  multiplier,
-		"impact":      impact,
+		"activity_id":      actID,
+		"goal_id":          goalID,
+		"auto_link":        link.AutoLinkTasks,
+		"multiplier":       multiplier,
+		"default_quantity": link.DefaultQuantity,
+		"impact":           impact,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("activity_id", activityID).Str("goal_id", link.GoalID).Msg("link goal failed")
@@ -623,13 +635,14 @@ func (r *repository) FindLinkedGoals(ctx context.Context, activityID, userID str
 	actID := database.MustRecordID(Table, activityID)
 
 	results, err := database.QueryAll[ActivityGoalLinkDetail](ctx, r.db, `
-		SELECT 
+		SELECT
 			out.id AS goal_id,
 			out.title AS goal_title,
 			out.icon AS goal_icon,
 			(SELECT out.color FROM out->in_category LIMIT 1)[0] AS goal_color,
 			auto_link_tasks,
 			quantity_multiplier,
+			default_quantity,
 			default_impact,
 			out.target.unit_id AS target_unit_id,
 			(SELECT symbol FROM units WHERE id = out.target.unit_id)[0].symbol AS target_unit_symbol

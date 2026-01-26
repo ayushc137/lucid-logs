@@ -179,7 +179,7 @@ func NewRouter(cfg Config) *gin.Engine {
 			// Goal routes (with activity auto-creation and auto-logging)
 			goalRepo := goals.NewRepository(cfg.DB)
 			activityCreator := activities.NewGoalActivityCreator(activitiesRepo)
-			goalService := goals.NewServiceWithActivity(goalRepo, nil, activityCreator, goalLogger)
+			goalService := goals.NewService(goalRepo, activityCreator, goalLogger)
 			goals.RegisterRoutes(protected.Group("/goals"), goalService, cfg.Validator)
 
 			// Goal Logs API routes (for fetching history)

@@ -1,7 +1,7 @@
 -- =============================================================================
 -- LUCID LOGS - COMPLETE DATABASE SCHEMA
 -- =============================================================================
--- 
+--
 -- Single consolidated migration with all tables, indexes, and relations.
 -- This is the ONLY migration file needed (besides seed data).
 --
@@ -43,24 +43,17 @@ DEFINE INDEX IF NOT EXISTS idx_tasks_journal_fts ON TABLE tasks COLUMNS journal 
 DEFINE INDEX IF NOT EXISTS idx_tasks_note_fts ON TABLE tasks COLUMNS note SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
 
 -- GOALS (with denormalized streaks)
--- Key fields: current_streak, longest_streak, last_completed_date (updated on completion)
 DEFINE TABLE IF NOT EXISTS goals PERMISSIONS FULL;
 DEFINE INDEX IF NOT EXISTS idx_goals_user ON TABLE goals COLUMNS created_by;
 DEFINE INDEX IF NOT EXISTS idx_goals_status ON TABLE goals COLUMNS created_by, status;
 DEFINE INDEX IF NOT EXISTS idx_goals_deleted ON TABLE goals COLUMNS created_by, deleted_at;
 DEFINE INDEX IF NOT EXISTS idx_goals_priority ON TABLE goals COLUMNS created_by, priority;
 
--- GOAL_SNAPSHOTS (point-in-time state for history)
-DEFINE TABLE IF NOT EXISTS goal_snapshots PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS created_by ON goal_snapshots TYPE record<users>;
-DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_goal ON TABLE goal_snapshots COLUMNS goal_id;
-DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_user ON TABLE goal_snapshots COLUMNS created_by;
-
--- TEMPLATES
-DEFINE TABLE IF NOT EXISTS templates PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_templates_user ON TABLE templates COLUMNS created_by;
-DEFINE INDEX IF NOT EXISTS idx_templates_quick_log ON TABLE templates COLUMNS created_by, is_quick_log;
-DEFINE INDEX IF NOT EXISTS idx_templates_deleted ON TABLE templates COLUMNS created_by, deleted_at;
+-- ACTIVITIES (quick-log, scheduling, timer/flowmodoro)
+DEFINE TABLE IF NOT EXISTS activities PERMISSIONS FULL;
+DEFINE INDEX IF NOT EXISTS idx_activities_user ON TABLE activities COLUMNS created_by;
+DEFINE INDEX IF NOT EXISTS idx_activities_pinned ON TABLE activities COLUMNS created_by, pinned;
+DEFINE INDEX IF NOT EXISTS idx_activities_deleted ON TABLE activities COLUMNS created_by, deleted_at;
 
 -- UNITS (measurement units)
 DEFINE TABLE IF NOT EXISTS units PERMISSIONS FULL;
@@ -73,32 +66,62 @@ DEFINE INDEX IF NOT EXISTS idx_retros_user_date ON TABLE retrospectives COLUMNS 
 DEFINE INDEX IF NOT EXISTS idx_retros_type ON TABLE retrospectives COLUMNS created_by, retro_type;
 DEFINE INDEX IF NOT EXISTS idx_retros_deleted ON TABLE retrospectives COLUMNS created_by, deleted_at;
 
--- AGG_DAILY (pre-computed daily metrics - materialized view pattern)
+-- TIMER_SESSIONS (Flowmodoro tracking)
+DEFINE TABLE IF NOT EXISTS timer_sessions PERMISSIONS FULL;
+DEFINE INDEX IF NOT EXISTS idx_timer_sessions_user ON TABLE timer_sessions COLUMNS created_by;
+DEFINE INDEX IF NOT EXISTS idx_timer_sessions_active ON TABLE timer_sessions COLUMNS created_by, status;
+
+-- EMOTIONS (seeded separately in 002_seed_emotions.surql)
+DEFINE TABLE IF NOT EXISTS emotions SCHEMALESS PERMISSIONS FULL;
+
+-- GOAL_SNAPSHOTS (point-in-time state for history)
+DEFINE TABLE IF NOT EXISTS goal_snapshots PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_snapshots TYPE record<users>;
+DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_goal ON TABLE goal_snapshots COLUMNS goal_id;
+DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_user ON TABLE goal_snapshots COLUMNS created_by;
+
+-- GOAL_LOGS (event history for goals)
+DEFINE TABLE IF NOT EXISTS goal_logs PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_logs TYPE record<users>;
+DEFINE FIELD IF NOT EXISTS event_type ON goal_logs TYPE string;
+DEFINE FIELD IF NOT EXISTS changes ON goal_logs TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS triggered_by_task_id ON goal_logs TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS created_at ON goal_logs TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_goal_logs_goal ON TABLE goal_logs COLUMNS in, created_at;
+DEFINE INDEX IF NOT EXISTS idx_goal_logs_user ON TABLE goal_logs COLUMNS created_by;
+DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_type;
+
+-- AGG_DAILY (pre-computed daily metrics)
 DEFINE TABLE IF NOT EXISTS agg_daily PERMISSIONS FULL;
 DEFINE INDEX IF NOT EXISTS idx_agg_daily ON TABLE agg_daily COLUMNS user_id, date UNIQUE;
 
 
 -- =============================================================================
--- REFERENCE DATA
--- =============================================================================
-
--- EMOTIONS (seeded separately in 002_seed_emotions.surql)
-DEFINE TABLE IF NOT EXISTS emotions SCHEMALESS PERMISSIONS FULL;
-
-
--- =============================================================================
 -- RELATION TABLES (Graph Edges)
 -- =============================================================================
+-- These define the links between tables for the entity relationship diagram.
+-- Format: DEFINE TABLE name TYPE RELATION IN source_table OUT target_table
+--
+-- Relation Summary:
+--   tasks ──────────────────► emotions      (task_emotions)
+--   tasks ──────────────────► goals         (task_goals)
+--   tasks ──────────────────► activities    (created_from_activity)
+--   tasks ──────────────────► categories    (in_category)
+--   goals ──────────────────► goals         (goal_children)
+--   goals ──────────────────► categories    (in_category)
+--   activities ─────────────► goals         (activity_goals)
+--   activities ─────────────► categories    (in_category)
+
 
 -- TASK_EMOTIONS (tasks -> emotions)
 DEFINE TABLE IF NOT EXISTS task_emotions TYPE RELATION IN tasks OUT emotions PERMISSIONS FULL;
-DEFINE FIELD type ON task_emotions TYPE string ASSERT $value IN ["primary", "positive", "negative"];
-DEFINE FIELD text ON task_emotions TYPE option<string>;
-DEFINE FIELD created_at ON task_emotions TYPE datetime DEFAULT time::now();
-DEFINE INDEX idx_task_emotions_out ON TABLE task_emotions COLUMNS out;
-DEFINE INDEX idx_task_emotions_type ON TABLE task_emotions COLUMNS type;
+DEFINE FIELD IF NOT EXISTS type ON task_emotions TYPE string ASSERT $value IN ["primary", "positive", "negative"];
+DEFINE FIELD IF NOT EXISTS text ON task_emotions TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS created_at ON task_emotions TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_task_emotions_out ON TABLE task_emotions COLUMNS out;
+DEFINE INDEX IF NOT EXISTS idx_task_emotions_type ON TABLE task_emotions COLUMNS type;
 
--- TASK_GOALS (tasks -> goals) with impact and milestone tracking
+-- TASK_GOALS (tasks -> goals)
 DEFINE TABLE IF NOT EXISTS task_goals TYPE RELATION IN tasks OUT goals PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS impact_type ON task_goals TYPE string ASSERT $value IN ["positive", "negative", "neutral"];
 DEFINE FIELD IF NOT EXISTS quantity_value ON task_goals TYPE option<float>;
@@ -109,53 +132,39 @@ DEFINE FIELD IF NOT EXISTS milestone_order ON task_goals TYPE option<int>;
 DEFINE FIELD IF NOT EXISTS notes ON task_goals TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS source ON task_goals TYPE string DEFAULT "manual";
 DEFINE FIELD IF NOT EXISTS created_at ON task_goals TYPE datetime DEFAULT time::now();
-DEFINE INDEX IF NOT EXISTS idx_task_goals_goal ON TABLE task_goals COLUMNS out;
-DEFINE INDEX IF NOT EXISTS idx_task_goals_impact ON TABLE task_goals COLUMNS out, impact_type;
-DEFINE INDEX IF NOT EXISTS idx_task_goals_milestone ON TABLE task_goals COLUMNS out, is_milestone;
+DEFINE INDEX IF NOT EXISTS idx_task_goals_out ON TABLE task_goals COLUMNS out;
+DEFINE INDEX IF NOT EXISTS idx_task_goals_in ON TABLE task_goals COLUMNS in;
 
--- GOAL_LOGS (goals -> goal_snapshots) event history
-DEFINE TABLE goal_logs PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS created_by ON goal_logs TYPE record<users>;
-DEFINE FIELD IF NOT EXISTS event_type ON goal_logs TYPE string;
-DEFINE FIELD IF NOT EXISTS changes ON goal_logs TYPE option<object>;
-DEFINE FIELD IF NOT EXISTS triggered_by_task_id ON goal_logs TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS created_at ON goal_logs TYPE datetime DEFAULT time::now();
-DEFINE INDEX IF NOT EXISTS idx_goal_logs_goal ON TABLE goal_logs COLUMNS in, created_at;
-DEFINE INDEX IF NOT EXISTS idx_goal_logs_user ON TABLE goal_logs COLUMNS created_by;
-DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_type;
+-- CREATED_FROM_ACTIVITY (tasks -> activities)
+DEFINE TABLE IF NOT EXISTS created_from_activity TYPE RELATION IN tasks OUT activities PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS mode ON created_from_activity TYPE string DEFAULT "instant";
+DEFINE FIELD IF NOT EXISTS created_at ON created_from_activity TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_created_from_activity_out ON TABLE created_from_activity COLUMNS out;
+DEFINE INDEX IF NOT EXISTS idx_created_from_activity_in ON TABLE created_from_activity COLUMNS in;
 
+-- ACTIVITY_GOALS (activities -> goals)
+DEFINE TABLE IF NOT EXISTS activity_goals TYPE RELATION IN activities OUT goals PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS auto_link_tasks ON activity_goals TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS quantity_multiplier ON activity_goals TYPE float DEFAULT 1.0;
+DEFINE FIELD IF NOT EXISTS default_impact ON activity_goals TYPE string DEFAULT "positive";
+DEFINE FIELD IF NOT EXISTS created_at ON activity_goals TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_activity_goals_out ON TABLE activity_goals COLUMNS out;
+DEFINE INDEX IF NOT EXISTS idx_activity_goals_in ON TABLE activity_goals COLUMNS in;
 
--- =============================================================================
--- =============================================================================
--- EXPLICIT RELATION TABLES (Optimized)
--- =============================================================================
-
--- IN_CATEGORY (Universal category linking)
--- Maps: tasks/goals/activities -> categories
-DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | activities OUT categories PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS created_at ON in_category TYPE datetime DEFAULT time::now();
--- Index for finding all items in a category (e.g. "Values" page)
-DEFINE INDEX IF NOT EXISTS idx_in_category_out ON TABLE in_category COLUMNS out;
--- Index for checking category of an item quickly (if not traversing)
-DEFINE INDEX IF NOT EXISTS idx_in_category_in ON TABLE in_category COLUMNS in;
-
--- GOAL_CHILDREN (Parent -> Child hierarchy)
+-- GOAL_CHILDREN (goals -> goals, parent-child hierarchy)
 DEFINE TABLE IF NOT EXISTS goal_children TYPE RELATION IN goals OUT goals PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS order ON goal_children TYPE int DEFAULT 0;
 DEFINE FIELD IF NOT EXISTS required ON goal_children TYPE bool DEFAULT true;
 DEFINE FIELD IF NOT EXISTS created_at ON goal_children TYPE datetime DEFAULT time::now();
-DEFINE INDEX IF NOT EXISTS idx_goal_children_parent ON TABLE goal_children COLUMNS in, order;
+DEFINE INDEX IF NOT EXISTS idx_goal_children_in ON TABLE goal_children COLUMNS in;
+DEFINE INDEX IF NOT EXISTS idx_goal_children_out ON TABLE goal_children COLUMNS out;
 
--- CREATED_FROM (Task -> Template origin)
-DEFINE TABLE IF NOT EXISTS created_from TYPE RELATION IN tasks OUT templates PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS created_at ON created_from TYPE datetime DEFAULT time::now();
--- Index for template usage stats (how many tasks created from this template?)
-DEFINE INDEX IF NOT EXISTS idx_created_from_template ON TABLE created_from COLUMNS out;
+-- IN_CATEGORY (tasks | goals | activities -> categories)
+DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | activities OUT categories PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS created_at ON in_category TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS idx_in_category_out ON TABLE in_category COLUMNS out;
+DEFINE INDEX IF NOT EXISTS idx_in_category_in ON TABLE in_category COLUMNS in;
 
--- TEMPLATE_GOALS (Template -> Goal auto-linking)
-DEFINE TABLE IF NOT EXISTS template_goals TYPE RELATION IN templates OUT goals PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS auto_link_tasks ON template_goals TYPE bool DEFAULT true;
-DEFINE FIELD IF NOT EXISTS created_at ON template_goals TYPE datetime DEFAULT time::now();
 
 -- =============================================================================
 -- END SCHEMA

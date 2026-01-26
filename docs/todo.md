@@ -329,3 +329,23 @@ goal timeline and agenda looks shit
 When hoveron g over task dont auto scroll and move to linked goal , also dont hrighlight the goal 
 The goal cards can low way better more like cards  and uniform 
 the scroll belkow cards looks llike shit 
+
+
+
+
+
+
+activity logging needs to be optimised there are a lot of backed features missing in loggin , like flomodoro , schedule, quick etc, thate re a lot of logging type 
+
+after goal is created user should be able to configure acityity created byt the goal creation 
+
+
+
+
+
+
+thnk if how to setup categorya and priority, where its modt sensable considring retrospective and whole app, show are all managed and linked and updated as 
+
+
+
+Auto-pick category and priority from linked goal
