@@ -69,7 +69,7 @@ tasks:
   dev:go:
     desc: Start Go backend (hot reload + lint + format on save)
     dir: "{{.GO_BACKEND}}"
-    deps: [db:up]
+    deps: [db:schema]
     cmds:
       - lsof -ti :8080 | xargs kill -9 2>/dev/null || true
       - echo "✅ Port 8080 cleared"
@@ -109,14 +109,14 @@ tasks:
   seed:
     desc: Populate database with test data (tasks for yesterday, today, tomorrow)
     dir: "{{.GO_BACKEND}}"
-    deps: [db:up]
+    deps: [db:schema]
     cmds:
       - go run ./cmd/seed
 
   seed:reset:
     desc: Reset and repopulate seed data (deletes existing seeded data first)
     dir: "{{.GO_BACKEND}}"
-    deps: [db:up]
+    deps: [db:schema]
     cmds:
       - go run ./cmd/seed --reset
 
@@ -215,6 +215,26 @@ tasks:
       - docker compose -f deploy/docker-compose.yml up -d surrealdb
       - sleep 2
 
+  db:schema:
+    desc: Apply database schema and seed emotions (SurrealDB v3 requires tables to exist)
+    deps: [db:up]
+    cmds:
+      - |
+        curl -sf -X POST http://localhost:${DB_PORT}/sql \
+          -H "surreal-ns: ${DB_NAMESPACE}" \
+          -H "surreal-db: ${DB_DATABASE}" \
+          -H "Accept: application/json" \
+          -u "${DB_USER}:${DB_PASS}" \
+          --data-binary @db/schema.surql > /dev/null
+      - |
+        curl -sf -X POST http://localhost:${DB_PORT}/sql \
+          -H "surreal-ns: ${DB_NAMESPACE}" \
+          -H "surreal-db: ${DB_DATABASE}" \
+          -H "Accept: application/json" \
+          -u "${DB_USER}:${DB_PASS}" \
+          --data-binary @db/migrations/002_seed_emotions.surql > /dev/null
+      - echo "✅ Schema applied"
+
   db:down:
     desc: Stop SurrealDB
     cmds:
@@ -226,6 +246,7 @@ tasks:
       - docker compose -f deploy/docker-compose.yml down -v
       - docker compose -f deploy/docker-compose.yml up -d surrealdb
       - sleep 2
+      - task: db:schema
       - echo "✅ Database reset"
 
   # =============================================================================

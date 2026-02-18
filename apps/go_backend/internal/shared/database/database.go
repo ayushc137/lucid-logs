@@ -102,8 +102,12 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		fmt.Sprintf("DEFINE NAMESPACE IF NOT EXISTS %s", cfg.Namespace), nil); err != nil {
 		logger.Warn().Err(err).Str("namespace", cfg.Namespace).Msg("failed to define namespace (may already exist)")
 	}
+	// Use the namespace first, then define the database within it
+	if err := client.Use(ctx, cfg.Namespace, ""); err != nil {
+		logger.Warn().Err(err).Str("namespace", cfg.Namespace).Msg("failed to use namespace for DB definition")
+	}
 	if _, err := surrealdb.Query[any](ctx, client,
-		fmt.Sprintf("DEFINE DATABASE IF NOT EXISTS %s ON NAMESPACE %s", cfg.Database, cfg.Namespace), nil); err != nil {
+		fmt.Sprintf("DEFINE DATABASE IF NOT EXISTS %s", cfg.Database), nil); err != nil {
 		logger.Warn().Err(err).Str("database", cfg.Database).Msg("failed to define database (may already exist)")
 	}
 

@@ -16,7 +16,7 @@
 
 -- USERS (SCHEMAFULL - only table with strict schema)
 DEFINE TABLE IF NOT EXISTS users SCHEMAFULL PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS email ON users TYPE string ASSERT string::is::email($value);
+DEFINE FIELD IF NOT EXISTS email ON users TYPE string ASSERT string::is_email($value);
 DEFINE FIELD IF NOT EXISTS pass ON users TYPE string;
 DEFINE FIELD IF NOT EXISTS is_admin ON users TYPE bool DEFAULT false;
 DEFINE FIELD IF NOT EXISTS created_at ON users TYPE datetime DEFAULT time::now();
@@ -36,11 +36,11 @@ DEFINE INDEX IF NOT EXISTS idx_tasks_user_completed ON TABLE tasks COLUMNS creat
 DEFINE INDEX IF NOT EXISTS idx_tasks_user_end_date ON TABLE tasks COLUMNS created_by, end_date;
 DEFINE INDEX IF NOT EXISTS idx_tasks_user_priority ON TABLE tasks COLUMNS created_by, priority;
 
--- Full-text search for tasks
-DEFINE ANALYZER IF NOT EXISTS task_search_analyzer TOKENIZERS class FILTERS lowercase, ascii, snowball(english);
-DEFINE INDEX IF NOT EXISTS idx_tasks_title_fts ON TABLE tasks COLUMNS title SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
-DEFINE INDEX IF NOT EXISTS idx_tasks_journal_fts ON TABLE tasks COLUMNS journal SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
-DEFINE INDEX IF NOT EXISTS idx_tasks_note_fts ON TABLE tasks COLUMNS note SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
+-- Full-text search for tasks (disabled: BM25 SEARCH ANALYZER syntax removed in SurrealDB v3)
+-- DEFINE ANALYZER IF NOT EXISTS task_search_analyzer TOKENIZERS class FILTERS lowercase, ascii, snowball(english);
+-- DEFINE INDEX IF NOT EXISTS idx_tasks_title_fts ON TABLE tasks COLUMNS title SEARCH ANALYZER task_search_analyzer BM25;
+-- DEFINE INDEX IF NOT EXISTS idx_tasks_journal_fts ON TABLE tasks COLUMNS journal SEARCH ANALYZER task_search_analyzer BM25;
+-- DEFINE INDEX IF NOT EXISTS idx_tasks_note_fts ON TABLE tasks COLUMNS note SEARCH ANALYZER task_search_analyzer BM25;
 
 -- GOALS (with denormalized streaks)
 DEFINE TABLE IF NOT EXISTS goals PERMISSIONS FULL;

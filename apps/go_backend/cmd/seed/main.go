@@ -264,14 +264,12 @@ func resetSeededData(ctx context.Context, db *database.DB, userID string) error 
 		"task_goals", "task_emotions", "created_from_activity", "activity_goals",
 		"in_category", "goal_children", "goal_logs", "goal_snapshots",
 		"tasks", "activities", "goals", "categories",
-		// Deprecated tables (clean up if they exist)
-		"created_from", "template_goals", "templates",
 	}
 
 	for _, table := range tables {
 		//nolint:errcheck // ignore delete errors in reset
 		_, _ = database.QueryAll[any](ctx, db, fmt.Sprintf(`
-			DELETE %s WHERE created_by = $user OR true
+			DELETE FROM %s WHERE created_by = $user OR true
 		`, table), map[string]any{"user": userID})
 	}
 
@@ -314,7 +312,7 @@ func seedUnits(ctx context.Context, db *database.DB) error {
 				updated_at: $now
 			}
 		`, map[string]any{
-			"id":     u.id,
+			"id":     database.MustRecordID("units", u.id),
 			"name":   u.name,
 			"symbol": u.symbol,
 			"type":   u.unitType,
