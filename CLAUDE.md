@@ -263,13 +263,22 @@ See `apps/frontend/src/lib/DESIGN_LANGUAGE.md` for complete component patterns.
 | Table | Purpose |
 |-------|---------|
 | `users` | User accounts (schemafull) |
-| `tasks` | Task/journal entries |
-| `goals` | Goals, habits, projects |
+| `tasks` | Task/journal entries (with category, priority) |
+| `goals` | Goals, habits, projects (with category, priority) |
 | `categories` | Organization/tagging |
 | `emotions` | Mood meter emotions (seeded) |
-| `activities` | Quick-log activities (replacing templates) |
+| `activities` | Quick-log activities (with inherited category, priority) |
 | `retrospectives` | Daily/weekly reflections |
 | `units` | Measurement units |
+
+### Category & Priority Fields
+
+Tasks, Goals, and Activities have `category_id` and `priority` fields:
+- **Goals**: User sets these explicitly (source of truth)
+- **Activities**: Inherit from linked Goal on creation
+- **Tasks**: Inherit from Activity or Goal on creation
+
+Priority values: `high`, `medium`, `low`
 
 ### Relation Tables (Graph Edges)
 
@@ -392,6 +401,7 @@ task seed:reset       # Reset and repopulate test data
 | UI component patterns | `src/lib/DESIGN_LANGUAGE.md` |
 | Frontend API index | `src/lib/api/index.ts` |
 | All task commands | `Taskfile.yml` |
+| Category & Priority design | `docs/CATEGORY_AND_PRIORITY_DESIGN.md` |
 
 ---
 
@@ -424,6 +434,50 @@ interface TaskGoalLink {
     notes?: string;
 }
 ```
+
+---
+
+## Category & Priority
+
+Category and Priority are two dimensions for organizing and analyzing work. They flow down through the hierarchy automatically.
+
+### Concepts
+
+| Dimension | Question | Purpose | Examples |
+|-----------|----------|---------|----------|
+| **Category** | "Which area of my life?" | Balance tracking | Work, Health, Family, Learning |
+| **Priority** | "How critical is this?" | Focus tracking | 🔴 High, 🟡 Medium, 🟢 Low |
+
+### Inheritance Flow
+
+```
+Goal (Source) → Activity (Habit/Method) → Task (Execution)
+```
+
+1. **Goals**: User sets Category & Priority explicitly
+2. **Activities**: Linked to Goal, inherits traits automatically
+3. **Tasks**: Created from Activity or linked to Goal, inherits traits
+
+### Edge Case: Multiple Goals
+
+When a task links to multiple goals:
+- **Category**: First-linked goal wins (user can override)
+- **Priority**: Highest priority wins (if linked to High + Low → task is High)
+
+### Update Propagation Rules
+
+| Rule | Behavior |
+|------|----------|
+| **Forward-Only** | Goal/Activity changes only affect *future* tasks, not existing ones |
+| **Manual Override Sticky** | User's manual changes are never overwritten by inheritance |
+| **Re-Link Triggers Update** | Changing the linked goal re-evaluates inheritance (unless manually overridden) |
+
+### Analytics Value
+
+- **Category Chart**: "Where did my time go?" (Balance across life areas)
+- **Priority Matrix**: "Did I do important things?" (High-Priority Focus Score)
+
+See `docs/CATEGORY_AND_PRIORITY_DESIGN.md` for full design rationale.
 
 ---
 

@@ -121,7 +121,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Retrospe
 	retroID := database.MustRecordID(Table, id)
 
 	result, err := database.QueryFirst[retroDB](ctx, r.db, `
-		SELECT * FROM type::thing($id)
+		SELECT * FROM $id
 	`, map[string]any{
 		"id": retroID,
 	})
@@ -229,7 +229,7 @@ func (r *repository) Create(ctx context.Context, retro *Retrospective) (*Retrosp
 	}
 
 	_, err := database.QueryAll[retroDB](ctx, r.db, `
-		CREATE type::thing($id) CONTENT $data
+		CREATE $id CONTENT $data
 	`, map[string]any{
 		"id":   retroID,
 		"data": createData,
@@ -272,7 +272,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	_, err = database.QueryAll[retroDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data
+		UPDATE $id MERGE $data
 	`, map[string]any{
 		"id":   retroID,
 		"data": updateData,
@@ -299,7 +299,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	now := time.Now().UTC()
 
 	_, err = database.QueryAll[retroDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE {
+		UPDATE $id MERGE {
 			deleted_at: $now,
 			updated_at: $now
 		}

@@ -115,7 +115,7 @@ func (r *repository) UpdateEmail(ctx context.Context, id, email string) (*User, 
 func (r *repository) UpdatePassword(ctx context.Context, id, password string) error {
 	userID := database.MustRecordID(userTable, id)
 	_, err := database.QueryAll[userDB](ctx, r.db, `
-		UPDATE type::thing($id) SET pass = crypto::argon2::generate($password)
+		UPDATE $id SET pass = crypto::argon2::generate($password)
 	`, map[string]any{
 		"id":       userID,
 		"password": password,
@@ -153,7 +153,7 @@ func (r *repository) UpdatePreferences(ctx context.Context, id string, req *Upda
 	}
 
 	_, err := database.QueryAll[userDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE {
+		UPDATE $id MERGE {
 			updated_at: $updated_at,
 			preferences: $preferences
 		}

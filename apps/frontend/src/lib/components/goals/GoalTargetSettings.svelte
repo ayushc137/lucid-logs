@@ -1,74 +1,70 @@
 <script lang="ts">
-import type { Unit } from '$lib/api';
-import { UnitDropdown } from '$lib/components/ui';
-import { cn } from '$lib/utils';
-import { Check, Target } from 'lucide-svelte';
+    import type { Unit } from "$lib/api";
+    import { UnitDropdown } from "$lib/components/ui";
+    import { cn } from "$lib/utils";
+    import { Check, Target } from "lucide-svelte";
 
-interface Props {
-	isMeasurable: boolean;
-	targetOperator: 'gte' | 'lte' | 'eq';
-	targetValue: number;
-	targetUnit: string;
-	targetPerPeriod: boolean;
-	isHabit: boolean;
-	period: 'day' | 'week' | 'month';
-	units: Unit[];
-	selectedUnit: Unit | undefined;
-	showCreateUnit: boolean;
-	onIsMeasurableChange: (value: boolean) => void;
-	onTargetOperatorChange: (value: 'gte' | 'lte' | 'eq') => void;
-	onTargetValueChange: (value: number) => void;
-	onTargetUnitChange: (value: string) => void;
-	onTargetPerPeriodChange: (value: boolean) => void;
-	onShowCreateUnit: () => void;
-	onCreateUnit?: (data: {
-		name: string;
-		symbol: string;
-		type: string;
-	}) => void;
-	onCancelCreateUnit?: () => void;
-	isCreatingUnit?: boolean;
-}
+    interface Props {
+        isMeasurable: boolean;
+        targetOperator: "gte" | "lte" | "eq";
+        targetValue: number;
+        targetUnit: string;
+        isHabit: boolean;
+        period: "day" | "week" | "month";
+        units: Unit[];
+        selectedUnit: Unit | undefined;
+        showCreateUnit: boolean;
+        onIsMeasurableChange: (value: boolean) => void;
+        onTargetOperatorChange: (value: "gte" | "lte" | "eq") => void;
+        onTargetValueChange: (value: number) => void;
+        onTargetUnitChange: (value: string) => void;
+        onShowCreateUnit: () => void;
+        onCreateUnit?: (data: {
+            name: string;
+            symbol: string;
+            type: string;
+        }) => void;
+        onCancelCreateUnit?: () => void;
+        isCreatingUnit?: boolean;
+    }
 
-let {
-	isMeasurable = $bindable(false),
-	targetOperator = $bindable('gte'),
-	targetValue = $bindable(10),
-	targetUnit = $bindable(''),
-	targetPerPeriod = $bindable(false),
-	isHabit = false,
-	period = 'day',
-	units = [],
-	selectedUnit,
-	showCreateUnit = $bindable(false),
-	onIsMeasurableChange,
-	onTargetOperatorChange,
-	onTargetValueChange,
-	onTargetUnitChange,
-	onTargetPerPeriodChange,
-	onShowCreateUnit,
-	onCreateUnit,
-	onCancelCreateUnit,
-	isCreatingUnit = false,
-}: Props = $props();
+    let {
+        isMeasurable = $bindable(false),
+        targetOperator = $bindable("gte"),
+        targetValue = $bindable(10),
+        targetUnit = $bindable(""),
+        isHabit = false,
+        period = "day",
+        units = [],
+        selectedUnit,
+        showCreateUnit = $bindable(false),
+        onIsMeasurableChange,
+        onTargetOperatorChange,
+        onTargetValueChange,
+        onTargetUnitChange,
+        onShowCreateUnit,
+        onCreateUnit,
+        onCancelCreateUnit,
+        isCreatingUnit = false,
+    }: Props = $props();
 
-let newUnitName = $state('');
-let newUnitSymbol = $state('');
-let newUnitType = $state<'count' | 'time' | 'distance' | 'volume' | 'custom'>(
-	'count',
-);
+    let newUnitName = $state("");
+    let newUnitSymbol = $state("");
+    let newUnitType = $state<
+        "count" | "time" | "distance" | "volume" | "custom"
+    >("count");
 
-function handleCreateUnit() {
-	if (!newUnitName.trim() || !onCreateUnit) return;
-	onCreateUnit({
-		name: newUnitName.trim(),
-		symbol: newUnitSymbol.trim() || newUnitName.trim().substring(0, 3),
-		type: newUnitType,
-	});
-	newUnitName = '';
-	newUnitSymbol = '';
-	newUnitType = 'count';
-}
+    function handleCreateUnit() {
+        if (!newUnitName.trim() || !onCreateUnit) return;
+        onCreateUnit({
+            name: newUnitName.trim(),
+            symbol: newUnitSymbol.trim() || newUnitName.trim().substring(0, 3),
+            type: newUnitType,
+        });
+        newUnitName = "";
+        newUnitSymbol = "";
+        newUnitType = "count";
+    }
 </script>
 
 <div
@@ -213,19 +209,6 @@ function handleCreateUnit() {
                 </div>
             </div>
 
-            {#if isHabit}
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm checkbox-secondary"
-                        bind:checked={targetPerPeriod}
-                        onchange={(e) =>
-                            onTargetPerPeriodChange(e.currentTarget.checked)}
-                    />
-                    <span class="text-sm">Reset per {period}</span>
-                </label>
-            {/if}
-
             <!-- Target Summary -->
             <div
                 class="pt-3 mt-3 border-t border-secondary/20 flex items-center gap-2"
@@ -246,7 +229,7 @@ function handleCreateUnit() {
                             ? ` ${selectedUnit.symbol}`
                             : ""}
                     </span>
-                    {#if isHabit && targetPerPeriod}
+                    {#if isHabit}
                         <span class="opacity-70">per {period}</span>
                     {/if}
                 </p>

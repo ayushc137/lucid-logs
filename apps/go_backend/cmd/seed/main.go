@@ -304,7 +304,7 @@ func seedUnits(ctx context.Context, db *database.DB) error {
 	for _, u := range units {
 		//nolint:errcheck // ignore upsert errors for idempotent seeding
 		_, _ = database.QueryAll[any](ctx, db, `
-			UPSERT type::thing($id) CONTENT {
+			UPSERT $id CONTENT {
 				name: $name,
 				symbol: $symbol,
 				type: $type,
@@ -2604,7 +2604,7 @@ func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[s
 		// Update goal with current progress value
 		progress := (data.current / data.target) * 100
 		_, err := database.QueryAll[any](ctx, db, `
-			UPDATE type::thing($id) MERGE {
+			UPDATE $id MERGE {
 				current_value: $current,
 				updated_at: $now
 			}
@@ -2703,7 +2703,7 @@ func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, c
 // updateGoalStreak updates the goal stats in DB
 func updateGoalStreak(ctx context.Context, db *database.DB, goalID string, streak int, lastCompleted time.Time) error {
 	_, err := database.QueryAll[any](ctx, db, `
-		UPDATE type::thing($id) MERGE {
+		UPDATE $id MERGE {
 			current_streak: $streak,
 			last_completed_date: $date,
 			updated_at: $date

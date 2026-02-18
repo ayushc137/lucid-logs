@@ -1661,6 +1661,12 @@ const docTemplate = `{
                         "description": "Sort by field (created_at, title, streak, priority) with optional -desc suffix",
                         "name": "sort_by",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Calculate progress as of this date (RFC3339, for timeline views)",
+                        "name": "progress_date",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2106,6 +2112,70 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.OperationMessage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/goals/{id}/daily-progress": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get pre-computed daily progress stats for a goal within a date range",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Get daily progress history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Goal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date (RFC3339, defaults to 30 days ago)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date (RFC3339, defaults to today)",
+                        "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/goals.DailyProgressResponse"
                         }
                     },
                     "401": {
@@ -5117,6 +5187,61 @@ const docTemplate = `{
                 }
             }
         },
+        "goals.DailyProgressResponse": {
+            "description": "Daily progress data for a goal over a date range",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/goals.DailyStats"
+                    }
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "target_per_period": {
+                    "type": "number"
+                }
+            }
+        },
+        "goals.DailyStats": {
+            "description": "Daily progress statistics for a goal",
+            "type": "object",
+            "properties": {
+                "contribution_count": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "cumulative_value": {
+                    "type": "number"
+                },
+                "daily_value": {
+                    "type": "number"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "\"pending\", \"met\", \"missed\", \"exceeded\"",
+                    "type": "string"
+                },
+                "streak_at_date": {
+                    "type": "integer"
+                },
+                "target_value": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "goals.Goal": {
             "description": "Goal entity with graph-inferred nature",
             "type": "object",
@@ -5442,10 +5567,6 @@ const docTemplate = `{
                     "description": "\"gte\", \"lte\", \"eq\"",
                     "type": "string"
                 },
-                "per_period": {
-                    "description": "true = per recurrence period",
-                    "type": "boolean"
-                },
                 "track_completed_only": {
                     "description": "true = only count completed tasks",
                     "type": "boolean"
@@ -5475,10 +5596,6 @@ const docTemplate = `{
                         "eq"
                     ],
                     "example": "gte"
-                },
-                "per_period": {
-                    "type": "boolean",
-                    "example": true
                 },
                 "track_completed_only": {
                     "type": "boolean",

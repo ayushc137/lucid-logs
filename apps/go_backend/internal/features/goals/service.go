@@ -62,6 +62,13 @@ type Service interface {
 	// RecordCompletion updates the denormalized streak fields when a goal/habit is completed.
 	// This should be called when a goal entry is marked as met or when a task contributes to a goal.
 	RecordCompletion(ctx context.Context, goalID, userID string, completedDate time.Time) error
+
+	// ==========================================================================
+	// ANALYTICS METHODS (Pre-Aggregated Data)
+	// ==========================================================================
+
+	// GetDailyProgress retrieves daily progress stats for a goal within a date range.
+	GetDailyProgress(ctx context.Context, goalID, userID string, startDate, endDate time.Time) ([]DailyStats, error)
 }
 
 // ActivityCreator is an interface for creating activities.
@@ -690,4 +697,25 @@ func (s *service) RecordCompletion(ctx context.Context, goalID, userID string, c
 	}
 
 	return nil
+}
+
+// =============================================================================
+// ANALYTICS METHODS
+// =============================================================================
+
+// GetDailyProgress retrieves daily progress stats from pre-aggregated table.
+func (s *service) GetDailyProgress(ctx context.Context, goalID, userID string, startDate, endDate time.Time) ([]DailyStats, error) {
+	// Verify goal exists and user has access
+	_, err := s.repo.FindByID(ctx, goalID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := s.repo.GetDailyProgress(ctx, goalID, userID, startDate, endDate)
+	if err != nil {
+		s.logger.Error().Err(err).Str("goal_id", goalID).Msg("failed to get daily progress")
+		return nil, err
+	}
+
+	return stats, nil
 }

@@ -3,6 +3,7 @@
 	import { goto } from "$app/navigation";
 	import {
 		type CreateTaskRequest,
+		type Goal,
 		type Task,
 		type TaskItem,
 		type UpdateTaskRequest,
@@ -12,6 +13,7 @@
 		getTaskGoals,
 		updateTask,
 	} from "$lib/api";
+	import { mapGoalPriorityToTask } from "$lib/utils/priority";
 	import { createCategory, getCategories } from "$lib/api/categories";
 	import {
 		type Emotion,
@@ -198,6 +200,68 @@
 
 	// Track if form is initialized
 	let formInitialized = $state(false);
+
+	// Category & Priority inheritance tracking
+	let categoryInheritedFrom = $state<{ id: string; title: string } | null>(
+		null,
+	);
+	let priorityInheritedFrom = $state<{ id: string; title: string } | null>(
+		null,
+	);
+	let categoryManuallySet = $state(false);
+	let priorityManuallySet = $state(false);
+
+	/**
+	 * Handle goals being added - apply category/priority inheritance
+	 * Per design: First goal sets category, highest priority wins
+	 */
+	function handleGoalsAdded(addedGoals: Goal[]) {
+		if (addedGoals.length === 0) return;
+
+		// First goal sets category (if not manually set and no category yet)
+		if (!categoryManuallySet && !categoryId && addedGoals[0]?.category) {
+			categoryId = addedGoals[0].category.id;
+			categoryInheritedFrom = {
+				id: addedGoals[0].id,
+				title: addedGoals[0].title,
+			};
+		}
+
+		// Priority: highest wins (lowest number = highest priority)
+		if (!priorityManuallySet) {
+			// Find the goal with highest priority among newly added goals
+			const goalsWithPriority = addedGoals.filter(
+				(g) => g.priority !== undefined && g.priority !== null,
+			);
+
+			if (goalsWithPriority.length > 0) {
+				const highestGoal = goalsWithPriority.reduce((a, b) =>
+					a.priority < b.priority ? a : b,
+				);
+
+				const mappedPriority = mapGoalPriorityToTask(highestGoal.priority);
+				priority = mappedPriority;
+				priorityInheritedFrom = {
+					id: highestGoal.id,
+					title: highestGoal.title,
+				};
+			}
+		}
+	}
+
+	/** Mark category as manually set and clear inheritance indicator */
+	function handleCategoryManualChange(newCategoryId: string | undefined) {
+		categoryId = newCategoryId;
+		categoryManuallySet = true;
+		categoryInheritedFrom = null;
+	}
+
+	/** Mark priority as manually set and clear inheritance indicator */
+	function handlePriorityManualChange(newPriority: number) {
+		priority = newPriority;
+		priorityManuallySet = true;
+		priorityInheritedFrom = null;
+	}
 
 	function getTodayString() {
 		return new Date().toISOString().split("T")[0];
@@ -822,6 +886,12 @@
 						<span class="text-xs font-semibold uppercase opacity-50"
 							>Category</span
 						>
+						{#if categoryInheritedFrom}
+							<span class="badge badge-xs badge-ghost gap-1">
+								<Target class="w-2.5 h-2.5" />
+								from {categoryInheritedFrom.title}
+							</span>
+						{/if}
 					</div>
 					{#if showNewCategory}
 						<div class="space-y-3">
@@ -883,6 +953,7 @@
 						<CategoryDropdown
 							{categories}
 							bind:value={categoryId}
+							onchange={handleCategoryManualChange}
 							placeholder="Select category..."
 							showCreateButton={true}
 							onCreate={() => (showNewCategory = true)}
@@ -927,11 +998,16 @@
 					<GoalSelector
 						value={goalLinks}
 						onChange={(links) => (goalLinks = links)}
+						onGoalsAdded={handleGoalsAdded}
 					/>
 				</Card>
 
 				<!-- Priority -->
-				<TaskPrioritySlider bind:value={priority} />
+				<TaskPrioritySlider
+					bind:value={priority}
+					onChange={handlePriorityManualChange}
+					inheritedFrom={priorityInheritedFrom?.title}
+				/>
 			</div>
 		</div>
 	</div>

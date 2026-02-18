@@ -74,18 +74,33 @@ type Repository interface {
 	// UpdateStreaks updates the denormalized streak fields on a goal.
 	// Called when a task is completed or a habit entry is logged.
 	UpdateStreaks(ctx context.Context, goalID string, currentStreak, longestStreak int, lastCompleted *time.Time) error
+
+	// ==========================================================================
+	// ANALYTICS METHODS (Pre-Aggregated Tables)
+	// ==========================================================================
+
+	// GetDailyProgress retrieves daily progress stats for a goal within a date range.
+	// Reads from pre-computed goal_daily_stats table for O(1) lookups.
+	GetDailyProgress(ctx context.Context, goalID, userID string, startDate, endDate time.Time) ([]DailyStats, error)
+
+	// BackfillDailyStats populates goal_daily_stats from existing task_goals data.
+	BackfillDailyStats(ctx context.Context, userID string) error
+
+	// RecalculateDailyStats recalculates stats for a specific goal and date.
+	RecalculateDailyStats(ctx context.Context, goalID string, date time.Time) error
 }
 
 // GoalFilters contains optional filters for listing goals.
 type GoalFilters struct {
-	Status      string     // Filter by status (active, completed, archived)
-	IsRecurring *bool      // Filter recurring (true) vs one-time (false)
-	HasTarget   *bool      // Filter measurable goals
-	HasChildren *bool      // Filter grouped goals
-	Search      string     // Search in title and description
-	SortBy      string     // Sort field with optional -desc suffix
-	DateFrom    *time.Time // Filter stats from this date
-	DateTo      *time.Time // Filter stats to this date
+	Status       string     // Filter by status (active, completed, archived)
+	IsRecurring  *bool      // Filter recurring (true) vs one-time (false)
+	HasTarget    *bool      // Filter measurable goals
+	HasChildren  *bool      // Filter grouped goals
+	Search       string     // Search in title and description
+	SortBy       string     // Sort field with optional -desc suffix
+	DateFrom     *time.Time // Filter stats from this date
+	DateTo       *time.Time // Filter stats to this date
+	ProgressDate *time.Time // Calculate progress as of this specific date (for timeline views)
 }
 
 // =============================================================================
@@ -461,9 +476,6 @@ func mapToTarget(m map[string]any) *Target {
 	if v, ok := m["operator"].(string); ok {
 		t.Operator = v
 	}
-	if v, ok := m["per_period"].(bool); ok {
-		t.PerPeriod = v
-	}
 	if v, ok := m["track_completed_only"].(bool); ok {
 		t.TrackCompletedOnly = v
 	}
@@ -486,13 +498,14 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 			 FROM <-task_goals
 				WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
 				AND (
-					$parent.target.per_period IS NOT TRUE
-					OR $parent.recurrence IS NONE
+					-- Non-recurring goals: include all contributions
+					$parent.recurrence IS NONE
+					-- Recurring goals: filter by current period
 					OR (
-						$parent.recurrence.period = 'day' AND time::day(in.completed_at) = time::day()
+						$parent.recurrence.period = 'day' AND time::floor(in.completed_at, 1d) = time::floor(time::now(), 1d)
 					)
 					OR (
-						$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week()
+						$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week() AND time::year(in.completed_at) = time::year()
 					)
 					OR (
 						$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
@@ -503,7 +516,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 				count() AS total,
 				count(out.status = 'completed') AS completed
 			 FROM ->goal_children GROUP ALL)[0] as children_stats
-		FROM type::thing($id)
+		FROM $id
 	`, map[string]any{
 		"id": goalID,
 	})
@@ -591,32 +604,60 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		return nil, 0, err
 	}
 
+	// Build the time reference for progress filtering
+	// Default is now(), but for timeline views we use progress_date
+	timeRef := "time::now()"
+	if filters.ProgressDate != nil {
+		queryVars["progress_date"] = *filters.ProgressDate
+		timeRef = "$progress_date"
+	}
+
 	// Main query with computed stats and linked task IDs
-	// Use period-based filtering for per_period goals (day/week/month)
-	// This ensures stats show only current period data
+	// Uses pre-computed goal_daily_stats for O(1) period progress lookup (preferred)
+	// Falls back to computing from task_goals with period filter if no pre-computed data
+	// Non-recurring goals: sum all contributions from task_goals
 	// linked_task_ids enables bi-directional highlighting in the UI
+	// Note: SurrealDB 2.6 doesn't allow LET inside IF expressions, so we use inline time::floor()
 	dataQuery := `SELECT *,
 		(->in_category.out.*)[0] as category,
 		(SELECT VALUE type::string(in.id) FROM <-task_goals) as linked_task_ids,
-		(SELECT
-			math::sum(quantity_value) AS total,
-			count() AS count
-		 FROM <-task_goals
-			WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
-			AND (
-				$parent.target.per_period IS NOT TRUE
-				OR $parent.recurrence IS NONE
-				OR (
-					$parent.recurrence.period = 'day' AND time::day(in.completed_at) = time::day()
-				)
-				OR (
-					$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week()
-				)
-				OR (
-					$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
-				)
-			)
-			GROUP ALL)[0] as filtered_stats,
+		-- For recurring goals: prefer pre-computed stats, fallback to computed
+		-- For non-recurring: sum all contributions
+		(
+			IF recurrence IS NOT NONE THEN
+				-- Recurring goal: try pre-computed stats first
+				(SELECT daily_value AS total, contribution_count AS count 
+				 FROM goal_daily_stats 
+				 WHERE goal_id = $parent.id AND date = time::floor(` + timeRef + `, 1d))[0]
+				??
+				-- Fallback: compute from task_goals with period filter
+				(SELECT
+					math::sum(quantity_value) AS total,
+					count() AS count
+				FROM <-task_goals
+					WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
+					AND (
+						($parent.recurrence.period = 'day' 
+							AND time::floor(IF in.completed THEN in.completed_at ELSE in.start_date END, 1d) = time::floor(` + timeRef + `, 1d))
+						OR ($parent.recurrence.period = 'week' 
+							AND time::week(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::week(` + timeRef + `)
+							AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year(` + timeRef + `))
+						OR ($parent.recurrence.period = 'month' 
+							AND time::month(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::month(` + timeRef + `)
+							AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year(` + timeRef + `))
+					)
+					GROUP ALL)[0]
+				?? { total: 0, count: 0 }
+			ELSE
+				-- Non-recurring goal: sum all contributions
+				(SELECT
+					math::sum(quantity_value) AS total,
+					count() AS count
+				FROM <-task_goals
+					WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
+					GROUP ALL)[0] ?? { total: 0, count: 0 }
+			END
+		) as filtered_stats,
 		(SELECT
 			count() AS total,
 			count(out.status = 'completed') AS completed
@@ -638,26 +679,12 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 
 func (r *repository) FindRecurringForDate(ctx context.Context, userID string, date time.Time) ([]*Goal, error) {
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
+		LET $today = time::floor(time::now(), 1d);
 		SELECT *,
-		(SELECT 
-			math::sum(quantity_value) AS total,
-			count() AS count
-		 FROM <-task_goals 
-			WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
-			AND (
-				$parent.target.per_period IS NOT TRUE
-				OR $parent.recurrence IS NONE
-				OR (
-					$parent.recurrence.period = 'day' AND time::day(in.completed_at) = time::day()
-				)
-				OR (
-					$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week()
-				)
-				OR (
-					$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
-				)
-			)
-			GROUP ALL)[0] as filtered_stats
+		-- Lookup pre-computed daily stats for O(1) performance
+		(SELECT daily_value AS total, contribution_count AS count 
+		 FROM goal_daily_stats 
+		 WHERE goal_id = $parent.id AND date = $today)[0] ?? { total: 0, count: 0 } as filtered_stats
 		FROM goals
 		WHERE created_by = $user
 		  AND deleted_at IS NONE
@@ -719,7 +746,6 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 			"value":                req.Target.Value,
 			"unit_id":              req.Target.UnitID,
 			"operator":             operator,
-			"per_period":           req.Target.PerPeriod,
 			"track_completed_only": req.Target.TrackCompletedOnly,
 		}
 	}
@@ -829,13 +855,12 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 			"value":                req.Target.Value,
 			"unit_id":              req.Target.UnitID,
 			"operator":             operator,
-			"per_period":           req.Target.PerPeriod,
 			"track_completed_only": req.Target.TrackCompletedOnly,
 		}
 	}
 
 	_, err = database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data
+		UPDATE $id MERGE $data
 	`, map[string]any{
 		"id":   goalID,
 		"data": updateData,
@@ -872,7 +897,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	now := time.Now().UTC()
 
 	_, err = database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE {
+		UPDATE $id MERGE {
 			deleted_at: $now,
 			updated_at: $now
 		}
@@ -1119,47 +1144,87 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		stats.LastCompletedDate = goal.Stats.LastCompletedDate
 	}
 
-	// Build filter condition for tasks with period-based filtering
-	// Build filter condition for tasks
-	conditions := []string{}
-	if goal.Target != nil && goal.Target.TrackCompletedOnly {
-		conditions = append(conditions, "in.completed = true")
-	}
+	// For recurring goals: try pre-computed goal_daily_stats, fallback to computing
+	// For non-recurring goals: aggregate from task_goals edges
+	if goal.Recurrence != nil {
+		// Recurring goal: try pre-computed daily stats first (O(1))
+		dailyStats, err := database.QueryFirst[struct {
+			DailyValue        float64 `json:"daily_value"`
+			ContributionCount int     `json:"contribution_count"`
+		}](ctx, r.db, `
+			SELECT daily_value, contribution_count
+			FROM goal_daily_stats
+			WHERE goal_id = $goal_id AND date = time::floor(time::now(), 1d)
+		`, map[string]any{
+			"goal_id": gID,
+		})
+		if err == nil && dailyStats != nil && (dailyStats.DailyValue > 0 || dailyStats.ContributionCount > 0) {
+			stats.CurrentValue = dailyStats.DailyValue
+			stats.TotalContributions = dailyStats.ContributionCount
+		} else {
+			// Fallback: compute from task_goals with period filter
+			var periodCondition string
+			switch goal.Recurrence.Period {
+			case PeriodDay:
+				periodCondition = "time::floor(IF in.completed THEN in.completed_at ELSE in.start_date END, 1d) = time::floor(time::now(), 1d)"
+			case PeriodWeek:
+				periodCondition = "time::week(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::week() AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year()"
+			case PeriodMonth:
+				periodCondition = "time::month(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::month() AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year()"
+			}
 
-	// Add period filtering if target is per_period
-	if goal.Target != nil && goal.Target.PerPeriod && goal.Recurrence != nil {
-		switch goal.Recurrence.Period {
-		case PeriodDay:
-			conditions = append(conditions, "time::day(in.completed_at) = time::day()")
-		case PeriodWeek:
-			conditions = append(conditions, "time::week(in.completed_at) = time::week()")
-		case PeriodMonth:
-			conditions = append(conditions, "time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()")
+			conditions := []string{periodCondition}
+			if goal.Target != nil && goal.Target.TrackCompletedOnly {
+				conditions = append(conditions, "in.completed = true")
+			}
+
+			computed, err := database.QueryFirst[struct {
+				Total float64 `json:"total"`
+				Count int     `json:"count"`
+			}](ctx, r.db, `
+				SELECT
+					math::sum(quantity_value) as total,
+					count() as count
+				FROM $goal_id<-task_goals
+				WHERE `+strings.Join(conditions, " AND ")+`
+				GROUP ALL
+			`, map[string]any{
+				"goal_id": gID,
+			})
+			if err == nil && computed != nil {
+				stats.CurrentValue = computed.Total
+				stats.TotalContributions = computed.Count
+			}
 		}
-	}
+	} else {
+		// Non-recurring goal: aggregate all contributions
+		conditions := []string{}
+		if goal.Target != nil && goal.Target.TrackCompletedOnly {
+			conditions = append(conditions, "in.completed = true")
+		}
 
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = "WHERE " + strings.Join(conditions, " AND ")
-	}
+		whereClause := ""
+		if len(conditions) > 0 {
+			whereClause = "WHERE " + strings.Join(conditions, " AND ")
+		}
 
-	// Sum quantity values from task_goals
-	sumResult, err := database.QueryFirst[struct {
-		Total float64 `json:"total"`
-		Count int     `json:"count"`
-	}](ctx, r.db, `
-		SELECT
-			math::sum(quantity_value) as total,
-			count() as count
-		FROM $goal_id<-task_goals
-		`+whereClause+`
-		GROUP ALL
-	`, map[string]any{
-		"goal_id": gID,
-	})
-	if err == nil && sumResult != nil {
-		stats.CurrentValue = sumResult.Total
-		stats.TotalContributions = sumResult.Count
+		sumResult, err := database.QueryFirst[struct {
+			Total float64 `json:"total"`
+			Count int     `json:"count"`
+		}](ctx, r.db, `
+			SELECT
+				math::sum(quantity_value) as total,
+				count() as count
+			FROM $goal_id<-task_goals
+			`+whereClause+`
+			GROUP ALL
+		`, map[string]any{
+			"goal_id": gID,
+		})
+		if err == nil && sumResult != nil {
+			stats.CurrentValue = sumResult.Total
+			stats.TotalContributions = sumResult.Count
+		}
 	}
 
 	// Calculate progress percentage and today status
@@ -1234,7 +1299,7 @@ func (r *repository) UpdateStreaks(ctx context.Context, goalID string, currentSt
 	}
 
 	_, err := database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data
+		UPDATE $id MERGE $data
 	`, map[string]any{
 		"id":   gID,
 		"data": updateData,

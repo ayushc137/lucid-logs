@@ -267,7 +267,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*{{.NameT
 	recordID := formatID(id)
 
 	entity, err := database.QueryFirst[{{.Name}}DB](ctx, r.db, ` + "`" + `
-		SELECT * FROM type::thing($id) WHERE deleted_at = NONE
+		SELECT * FROM $id WHERE deleted_at = NONE
 	` + "`" + `, map[string]any{
 		"id": recordID,
 	})

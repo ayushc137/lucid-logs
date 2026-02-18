@@ -51,6 +51,9 @@ export {
 	getGoalLogs,
 	getGoalLogsSummary,
 	getGoalTasks,
+	getGoalDailyProgress,
+	getGoalPeriodStats,
+	getGoalStreakHistory,
 	type Goal,
 	type Recurrence,
 	type Target,
@@ -62,6 +65,11 @@ export {
 	type GoalLogsSummary,
 	type GoalTasksResponse,
 	type TriggeringTaskInfo,
+	type DailyStats,
+	type PeriodSnapshot,
+	type StreakEvent,
+	type DailyProgressResponse,
+	type StreakAnalytics,
 } from './goals';
 
 // Emotions

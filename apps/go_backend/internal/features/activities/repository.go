@@ -239,7 +239,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Activity
 			WHERE out.deleted_at IS NONE
 			) AS goals,
 			(SELECT out AS category FROM ->in_category LIMIT 1)[0].category AS category
-		FROM type::thing($id)
+		FROM $id
 	`, map[string]any{
 		"id": activityID,
 	})
@@ -514,7 +514,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	params["id"] = activityID
 
 	query := fmt.Sprintf(`
-		UPDATE type::thing($id) SET %s
+		UPDATE $id SET %s
 		WHERE created_by = $user_id
 		  AND deleted_at IS NONE
 	`, strings.Join(updates, ", "))
@@ -533,7 +533,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	activityID := database.MustRecordID(Table, id)
 
 	_, err := database.QueryFirst[activityDB](ctx, r.db, `
-		UPDATE type::thing($id) SET 
+		UPDATE $id SET 
 			deleted_at = time::now(),
 			updated_at = time::now()
 		WHERE created_by = $user_id
@@ -555,7 +555,7 @@ func (r *repository) IncrementUseCount(ctx context.Context, id string) error {
 	activityID := database.MustRecordID(Table, id)
 
 	_, err := database.QueryFirst[activityDB](ctx, r.db, `
-		UPDATE type::thing($id) SET 
+		UPDATE $id SET 
 			use_count = use_count + 1,
 			last_used_at = time::now(),
 			updated_at = time::now()

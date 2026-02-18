@@ -6,7 +6,7 @@ services:
     user: "0:0"  # Run as root to ensure write access to data volume
     ports:
       - "${HOST_DB_PORT:-8000}:8000"
-    command: start --log debug --user ${DB_USER:-root} --pass ${DB_PASS:-root} file:/data/database.db
+    command: start --log debug --user ${DB_USER:-root} --pass ${DB_PASS:-root} surrealkv:///data/database.db
     volumes:
       - ../db:/schema:ro
       - surrealdb_data:/data

@@ -96,6 +96,17 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("authentication failed: %w", err))
 	}
 
+	// SurrealDB v3 requires namespace/database to exist before USE.
+	// Define them as root before switching context.
+	if _, err := surrealdb.Query[any](ctx, client,
+		fmt.Sprintf("DEFINE NAMESPACE IF NOT EXISTS %s", cfg.Namespace), nil); err != nil {
+		logger.Warn().Err(err).Str("namespace", cfg.Namespace).Msg("failed to define namespace (may already exist)")
+	}
+	if _, err := surrealdb.Query[any](ctx, client,
+		fmt.Sprintf("DEFINE DATABASE IF NOT EXISTS %s ON NAMESPACE %s", cfg.Database, cfg.Namespace), nil); err != nil {
+		logger.Warn().Err(err).Str("database", cfg.Database).Msg("failed to define database (may already exist)")
+	}
+
 	// Select namespace and database using SDK's Use method
 	// See: https://surrealdb.com/docs/sdk/golang/methods/use
 	if err := client.Use(ctx, cfg.Namespace, cfg.Database); err != nil {

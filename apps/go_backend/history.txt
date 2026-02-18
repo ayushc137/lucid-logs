@@ -1,6 +1,4 @@
 #V2
-CREATE emotions:E47 CONTENT { name: "Tranquil", emoji: "1F54A", quadrant: "green", x: 2, y: -5, valence: 0.88, arousal: -0.82, dominance: 0.72, intensity: 0.65, certainty: 0.78, social: 0.00, description: "Like still water, completely calm" }; -- 🕊️
-CREATE emotions:E48 CONTENT { name: "Peaceful", emoji: "262E", quadrant: "green", x: 3, y: -5, valence: 0.85, arousal: -0.75, dominance: 0.70, intensity: 0.65, certainty: 0.75, social: 0.05, description: "No worries, everything feels okay" }; -- ☮️
 CREATE emotions:E49 CONTENT { name: "Rested", emoji: "1F4A4", quadrant: "green", x: 4, y: -5, valence: 0.75, arousal: -0.45, dominance: 0.72, intensity: 0.62, certainty: 0.70, social: 0.05, description: "Recovered and recharged" }; -- 	💤
 CREATE emotions:E50 CONTENT { name: "Mellow", emoji: "1F343", quadrant: "green", x: 5, y: -5, valence: 0.72, arousal: -0.68, dominance: 0.62, intensity: 0.52, certainty: 0.62, social: 0.10, description: "Easygoing and laid-back" }; -- 🍃
 -- Red Quadrant (E51-E75): High Energy + Unpleasant
@@ -86,16 +84,18 @@ CREATE emotions:E100 CONTENT { name: "Apathetic", emoji: "1F610", quadrant: "blu
 -- =============================================================================
 -- END MIGRATION
 -- =============================================================================
--- MIGRATION: Activity Goal Default Quantity
+-- GOAL ANALYTICS OPTIMIZATION MIGRATION - SIMPLIFIED
 -- =============================================================================
--- Adds default_quantity to activity_goals relation for per-goal quantity defaults.
--- Unit comes from the goal's target.unit_id - no override at activity level.
+-- Creates goal_daily_stats table for O(1) progress lookups.
+-- Table is SCHEMALESS for maximum compatibility with SurrealDB 2.6.
 --
--- Run: surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/005_activity_goal_quantity.surql
+-- Note: Stats are updated via Go code in tasks/repository.go when task_goals
+-- edges are created/updated. Database events were removed due to instability.
 -- =============================================================================
--- Add default_quantity to activity_goals relation
--- This is the default quantity to log for THIS specific goal when the activity is used
-DEFINE FIELD IF NOT EXISTS default_quantity ON activity_goals TYPE option<float>;
--- =============================================================================
--- END MIGRATION
--- =============================================================================
+-- Simple SCHEMALESS table for goal daily stats
+DEFINE TABLE IF NOT EXISTS goal_daily_stats SCHEMALESS PERMISSIONS FULL;
+-- Indexes for efficient queries
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_unique ON goal_daily_stats COLUMNS goal_id, date UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_user_date ON goal_daily_stats COLUMNS created_by, date;
+-- Enhanced index for task_goals lookups
+DEFINE INDEX IF NOT EXISTS idx_task_goals_goal_completed ON task_goals COLUMNS out, in;

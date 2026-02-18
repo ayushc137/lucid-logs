@@ -57,7 +57,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*Emotion, error) {
 	}
 
 	emotion, err := database.QueryFirst[emotionDB](ctx, r.db, `
-		SELECT * FROM type::thing($id)
+		SELECT * FROM $id
 	`, map[string]any{
 		"id": database.MustRecordID("emotions", cleanID),
 	})

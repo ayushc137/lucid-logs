@@ -1176,6 +1176,43 @@ definitions:
     required:
     - title
     type: object
+  goals.DailyProgressResponse:
+    description: Daily progress data for a goal over a date range
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/goals.DailyStats'
+        type: array
+      goal_id:
+        type: string
+      target_per_period:
+        type: number
+    type: object
+  goals.DailyStats:
+    description: Daily progress statistics for a goal
+    properties:
+      contribution_count:
+        type: integer
+      created_at:
+        type: string
+      cumulative_value:
+        type: number
+      daily_value:
+        type: number
+      date:
+        type: string
+      goal_id:
+        type: string
+      status:
+        description: '"pending", "met", "missed", "exceeded"'
+        type: string
+      streak_at_date:
+        type: integer
+      target_value:
+        type: number
+      updated_at:
+        type: string
+    type: object
   goals.Goal:
     description: Goal entity with graph-inferred nature
     properties:
@@ -1400,9 +1437,6 @@ definitions:
       operator:
         description: '"gte", "lte", "eq"'
         type: string
-      per_period:
-        description: true = per recurrence period
-        type: boolean
       track_completed_only:
         description: true = only count completed tasks
         type: boolean
@@ -1423,9 +1457,6 @@ definitions:
         - eq
         example: gte
         type: string
-      per_period:
-        example: true
-        type: boolean
       track_completed_only:
         example: true
         type: boolean
@@ -3364,6 +3395,10 @@ paths:
         in: query
         name: sort_by
         type: string
+      - description: Calculate progress as of this date (RFC3339, for timeline views)
+        in: query
+        name: progress_date
+        type: string
       produces:
       - application/json
       responses:
@@ -3643,6 +3678,48 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove child goal
+      tags:
+      - goals
+  /api/v1/goals/{id}/daily-progress:
+    get:
+      description: Get pre-computed daily progress stats for a goal within a date
+        range
+      parameters:
+      - description: Goal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Start date (RFC3339, defaults to 30 days ago)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (RFC3339, defaults to today)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/goals.DailyProgressResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get daily progress history
       tags:
       - goals
   /api/v1/goals/{id}/logs:

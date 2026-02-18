@@ -1,101 +1,101 @@
 #V2
-DEFINE INDEX IF NOT EXISTS idx_tasks_user_priority ON TABLE tasks COLUMNS created_by, priority;
--- Full-text search for tasks
-DEFINE ANALYZER IF NOT EXISTS task_search_analyzer TOKENIZERS class FILTERS lowercase, ascii, snowball(english);
-DEFINE INDEX IF NOT EXISTS idx_tasks_title_fts ON TABLE tasks COLUMNS title SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
-DEFINE INDEX IF NOT EXISTS idx_tasks_journal_fts ON TABLE tasks COLUMNS journal SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
-DEFINE INDEX IF NOT EXISTS idx_tasks_note_fts ON TABLE tasks COLUMNS note SEARCH ANALYZER task_search_analyzer BM25 HIGHLIGHTS;
--- GOALS (with denormalized streaks)
--- Key fields: current_streak, longest_streak, last_completed_date (updated on completion)
-DEFINE TABLE IF NOT EXISTS goals PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_goals_user ON TABLE goals COLUMNS created_by;
-DEFINE INDEX IF NOT EXISTS idx_goals_status ON TABLE goals COLUMNS created_by, status;
-DEFINE INDEX IF NOT EXISTS idx_goals_deleted ON TABLE goals COLUMNS created_by, deleted_at;
-DEFINE INDEX IF NOT EXISTS idx_goals_priority ON TABLE goals COLUMNS created_by, priority;
--- GOAL_SNAPSHOTS (point-in-time state for history)
-DEFINE TABLE IF NOT EXISTS goal_snapshots PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_goal_snapshots_goal ON TABLE goal_snapshots COLUMNS goal_id;
--- TEMPLATES
-DEFINE TABLE IF NOT EXISTS templates PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_templates_user ON TABLE templates COLUMNS created_by;
-DEFINE INDEX IF NOT EXISTS idx_templates_quick_log ON TABLE templates COLUMNS created_by, is_quick_log;
-DEFINE INDEX IF NOT EXISTS idx_templates_deleted ON TABLE templates COLUMNS created_by, deleted_at;
--- UNITS (measurement units)
-DEFINE TABLE IF NOT EXISTS units PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_units_system ON TABLE units COLUMNS is_system;
-DEFINE INDEX IF NOT EXISTS idx_units_user ON TABLE units COLUMNS created_by;
--- RETROSPECTIVES
-DEFINE TABLE IF NOT EXISTS retrospectives PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_retros_user_date ON TABLE retrospectives COLUMNS created_by, start_date;
-DEFINE INDEX IF NOT EXISTS idx_retros_type ON TABLE retrospectives COLUMNS created_by, retro_type;
-DEFINE INDEX IF NOT EXISTS idx_retros_deleted ON TABLE retrospectives COLUMNS created_by, deleted_at;
--- AGG_DAILY (pre-computed daily metrics - materialized view pattern)
-DEFINE TABLE IF NOT EXISTS agg_daily PERMISSIONS FULL;
-DEFINE INDEX IF NOT EXISTS idx_agg_daily ON TABLE agg_daily COLUMNS user_id, date UNIQUE;
+SELECT count() AS total_records FROM goal_daily_stats GROUP ALL;
+-- Backfill goal_daily_stats from existing task_goals
+-- Run: surreal sql --endpoint http://localhost:8000 --username root --password root --namespace lucid --database logs < db/scripts/backfill_daily_stats.surql
+DELETE goal_daily_stats;
+LET $aggregated = (SELECT out AS goal_id, out.created_by AS created_by, time::floor(IF in.completed_at IS NOT NONE THEN in.completed_at ELSE in.start_date END, 1d) AS date, math::sum(quantity_value) AS daily_value, count() AS contribution_count, out.target.value AS target_value FROM task_goals WHERE out.deleted_at IS NONE GROUP BY goal_id, date);
+FOR $row IN $aggregated { UPSERT goal_daily_stats SET goal_id = $row.goal_id, date = $row.date, created_by = $row.created_by, daily_value = $row.daily_value ?? 0, contribution_count = $row.contribution_count ?? 0, target_value = $row.target_value, status = IF $row.target_value IS NOT NONE AND ($row.daily_value ?? 0) >= $row.target_value THEN "met" ELSE "pending" END, updated_at = time::now() WHERE goal_id = $row.goal_id AND date = $row.date; };
+SELECT count() AS total_records FROM goal_daily_stats GROUP ALL;
+SELECT count() FROM task_goals GROUP ALL;
+SELECT count() FROM goal_daily_stats GROUP ALL; SELECT count() FROM task_goals GROUP ALL; SELECT count() FROM goal_period_snapshots GROUP ALL; SELECT count() FROM streak_history GROUP ALL;
+INFO FOR TABLE task_goals;
+SELECT count() FROM tasks GROUP ALL; SELECT count() FROM goals GROUP ALL;
+SELECT count() FROM tasks GROUP ALL; SELECT count() FROM goals GROUP ALL; SELECT count() FROM task_goals GROUP ALL;
+INFO FOR TABLE task_goals;
 -- =============================================================================
--- REFERENCE DATA
+-- GOAL ANALYTICS OPTIMIZATION MIGRATION
 -- =============================================================================
--- EMOTIONS (seeded separately in 002_seed_emotions.surql)
-DEFINE TABLE IF NOT EXISTS emotions SCHEMALESS PERMISSIONS FULL;
+--
+-- Adds pre-aggregated table for goal progress tracking.
+-- This migration creates:
+--   1. goal_daily_stats: Pre-computed daily progress snapshots
+--   2. Events: Automatic updates when task_goals change
+--   3. Enhanced indexes for performance
+--
+-- Run: surreal sql --endpoint http://localhost:8000 --username root --password root --namespace lucid --database logs < db/migrations/004_goal_analytics.surql
+--
 -- =============================================================================
--- RELATION TABLES (Graph Edges)
+-- GOAL_DAILY_STATS TABLE (Pre-Aggregated Daily Progress)
 -- =============================================================================
--- TASK_EMOTIONS (tasks -> emotions)
-DEFINE TABLE IF NOT EXISTS task_emotions TYPE RELATION IN tasks OUT emotions PERMISSIONS FULL;
-DEFINE FIELD type ON task_emotions TYPE string ASSERT $value IN ["primary", "positive", "negative"];
-DEFINE FIELD text ON task_emotions TYPE option<string>;
-DEFINE FIELD created_at ON task_emotions TYPE datetime DEFAULT time::now();
-DEFINE INDEX idx_task_emotions_out ON TABLE task_emotions COLUMNS out;
-DEFINE INDEX idx_task_emotions_type ON TABLE task_emotions COLUMNS type;
--- TASK_GOALS (tasks -> goals) with impact and milestone tracking
-DEFINE TABLE IF NOT EXISTS task_goals TYPE RELATION IN tasks OUT goals PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS impact_type ON task_goals TYPE string ASSERT $value IN ["positive", "negative", "neutral"];
-DEFINE FIELD IF NOT EXISTS impact_magnitude ON task_goals TYPE int ASSERT $value >= 1 AND $value <= 5;
-DEFINE FIELD IF NOT EXISTS quantity_value ON task_goals TYPE option<float>;
-DEFINE FIELD IF NOT EXISTS unit_id ON task_goals TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS is_milestone ON task_goals TYPE bool DEFAULT false;
-DEFINE FIELD IF NOT EXISTS milestone_label ON task_goals TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS milestone_order ON task_goals TYPE option<int>;
-DEFINE FIELD IF NOT EXISTS notes ON task_goals TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS source ON task_goals TYPE string DEFAULT "manual";
-DEFINE FIELD IF NOT EXISTS created_at ON task_goals TYPE datetime DEFAULT time::now();
-DEFINE INDEX IF NOT EXISTS idx_task_goals_goal ON TABLE task_goals COLUMNS out;
-DEFINE INDEX IF NOT EXISTS idx_task_goals_impact ON TABLE task_goals COLUMNS out, impact_type;
-DEFINE INDEX IF NOT EXISTS idx_task_goals_milestone ON TABLE task_goals COLUMNS out, is_milestone;
--- GOAL_LOGS (goals -> goal_snapshots) event history
-DEFINE TABLE goal_logs PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS event_type ON goal_logs TYPE string;
-DEFINE FIELD IF NOT EXISTS changes ON goal_logs TYPE option<object>;
-DEFINE FIELD IF NOT EXISTS triggered_by_task_id ON goal_logs TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS created_at ON goal_logs TYPE datetime DEFAULT time::now();
-DEFINE INDEX IF NOT EXISTS idx_goal_logs_goal ON TABLE goal_logs COLUMNS in, created_at;
-DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_type;
+-- This table stores pre-computed daily goal statistics for O(1) lookups
+-- and enables historical progress charts without expensive recalculations.
+--
+-- Benefits:
+--   - O(1) lookup for any date's progress
+--   - Enables historical charts and trends
+--   - Supports time-range queries efficiently
+DEFINE TABLE IF NOT EXISTS goal_daily_stats SCHEMAFULL PERMISSIONS FULL;
+-- Core fields
+DEFINE FIELD IF NOT EXISTS goal_id ON goal_daily_stats TYPE record<goals>;
+DEFINE FIELD IF NOT EXISTS date ON goal_daily_stats TYPE datetime;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_daily_stats TYPE record<users>;
+-- Progress metrics
+DEFINE FIELD IF NOT EXISTS daily_value ON goal_daily_stats TYPE float DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS cumulative_value ON goal_daily_stats TYPE float DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS contribution_count ON goal_daily_stats TYPE int DEFAULT 0;
+-- Snapshot state
+DEFINE FIELD IF NOT EXISTS target_value ON goal_daily_stats TYPE option<float>;
+DEFINE FIELD IF NOT EXISTS streak_at_date ON goal_daily_stats TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS status ON goal_daily_stats TYPE string DEFAULT "pending";  -- "pending", "met", "missed", "exceeded"
+-- Timestamps
+DEFINE FIELD IF NOT EXISTS created_at ON goal_daily_stats TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated_at ON goal_daily_stats TYPE datetime DEFAULT time::now();
+-- Indexes for efficient queries
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_unique ON goal_daily_stats COLUMNS goal_id, date UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_user_date ON goal_daily_stats COLUMNS created_by, date;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_date ON goal_daily_stats COLUMNS date;
 -- =============================================================================
--- EXPLICIT RELATION TABLES (Optimized)
+-- ENHANCED INDEXES FOR task_goals
 -- =============================================================================
--- IN_CATEGORY (Universal category linking)
--- Maps: tasks/goals/templates -> categories
-DEFINE TABLE IF NOT EXISTS in_category TYPE RELATION IN tasks | goals | templates OUT categories PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS created_at ON in_category TYPE datetime DEFAULT time::now();
--- Index for finding all items in a category (e.g. "Values" page)
-DEFINE INDEX IF NOT EXISTS idx_in_category_out ON TABLE in_category COLUMNS out;
--- Index for checking category of an item quickly (if not traversing)
-DEFINE INDEX IF NOT EXISTS idx_in_category_in ON TABLE in_category COLUMNS in;
--- GOAL_CHILDREN (Parent -> Child hierarchy)
-DEFINE TABLE IF NOT EXISTS goal_children TYPE RELATION IN goals OUT goals PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS order ON goal_children TYPE int DEFAULT 0;
-DEFINE FIELD IF NOT EXISTS required ON goal_children TYPE bool DEFAULT true;
-DEFINE FIELD IF NOT EXISTS created_at ON goal_children TYPE datetime DEFAULT time::now();
-DEFINE INDEX IF NOT EXISTS idx_goal_children_parent ON TABLE goal_children COLUMNS in, order;
--- CREATED_FROM (Task -> Template origin)
-DEFINE TABLE IF NOT EXISTS created_from TYPE RELATION IN tasks OUT templates PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS created_at ON created_from TYPE datetime DEFAULT time::now();
--- Index for template usage stats (how many tasks created from this template?)
-DEFINE INDEX IF NOT EXISTS idx_created_from_template ON TABLE created_from COLUMNS out;
--- TEMPLATE_GOALS (Template -> Goal auto-linking)
-DEFINE TABLE IF NOT EXISTS template_goals TYPE RELATION IN templates OUT goals PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS auto_link_tasks ON template_goals TYPE bool DEFAULT true;
-DEFINE FIELD IF NOT EXISTS created_at ON template_goals TYPE datetime DEFAULT time::now();
+-- Add indexes to optimize period-based filtering on task_goals edges.
+-- Index for faster goal progress lookups
+DEFINE INDEX IF NOT EXISTS idx_task_goals_goal_completed ON task_goals COLUMNS out, in;
 -- =============================================================================
--- END SCHEMA
+-- EVENTS: Automatic stat updates on task_goals changes
 -- =============================================================================
+-- These events automatically update goal_daily_stats when task_goals are created,
+-- updated, or deleted. This ensures stats are always up-to-date without manual intervention.
+-- Event: When a task-goal link is created
+-- =============================================================================
+-- GOAL ANALYTICS OPTIMIZATION MIGRATION - SIMPLIFIED
+-- =============================================================================
+-- Creates goal_daily_stats table for O(1) progress lookups.
+-- Table is SCHEMALESS for maximum compatibility with SurrealDB 2.6.
+--
+-- Note: Stats are updated via Go code in tasks/repository.go when task_goals
+-- edges are created/updated. Database events were removed due to instability.
+-- =============================================================================
+-- Simple SCHEMALESS table for goal daily stats
+DEFINE TABLE IF NOT EXISTS goal_daily_stats SCHEMALESS PERMISSIONS FULL;
+-- Indexes for efficient queries
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_unique ON goal_daily_stats COLUMNS goal_id, date UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_user_date ON goal_daily_stats COLUMNS created_by, date;
+-- Enhanced index for task_goals lookups
+DEFINE INDEX IF NOT EXISTS idx_task_goals_goal_completed ON task_goals COLUMNS out, in;
+INFO FOR TABLE goal_daily_stats;
+SELECT COUNT() as cnt FROM goal_daily_stats GROUP ALL;
+SELECT * FROM goal_daily_stats LIMIT 5;
+REMOVE TABLE goal_daily_stats; DEFINE TABLE goal_daily_stats SCHEMALESS PERMISSIONS FULL;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_unique ON goal_daily_stats COLUMNS goal_id, date UNIQUE;
+SELECT COUNT() as cnt FROM goal_daily_stats GROUP ALL;
+SELECT goal_id, date, daily_value, contribution_count FROM goal_daily_stats LIMIT 5;
+UPSERT type::thing('goal_daily_stats:test123') SET goal_id = 'goals:test1', date = '2026-02-01T00:00:00Z', daily_value = 30, contribution_count = 1; SELECT * FROM goal_daily_stats;
+DELETE goal_daily_stats;
+SELECT COUNT() as cnt FROM goal_daily_stats GROUP ALL; SELECT goal_id, date, daily_value, contribution_count FROM goal_daily_stats LIMIT 10;
+UPSERT type::record('goal_daily_stats:test_abc123_20260201') SET goal_id = 'goals:xyz', date = '2026-02-01T00:00:00Z', daily_value = 30, contribution_count = 1;
+SELECT * FROM goal_daily_stats;
+SELECT COUNT() FROM goal_daily_stats GROUP ALL;
+SELECT COUNT() as cnt FROM task_goals GROUP ALL; SELECT * FROM task_goals LIMIT 3;
+INFO FOR DB;
+REMOVE TABLE goal_daily_stats; DEFINE TABLE goal_daily_stats SCHEMALESS PERMISSIONS FULL; DEFINE INDEX IF NOT EXISTS idx_goal_daily_unique ON goal_daily_stats COLUMNS goal_id, date UNIQUE;
+SELECT COUNT() as cnt FROM goal_daily_stats GROUP ALL; SELECT goal_id, date, daily_value, contribution_count FROM goal_daily_stats LIMIT 10;

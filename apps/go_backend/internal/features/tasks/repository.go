@@ -32,6 +32,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"time"
 
@@ -290,7 +291,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, er
 	// models.RecordID handles ID serialization automatically
 	task, err := database.QueryFirst[taskDB](ctx, r.db, `
 		SELECT *
-		FROM type::thing($id) FETCH category
+		FROM $id FETCH category
 	`, map[string]any{
 		"id": taskID,
 	})
@@ -639,7 +640,7 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	}
 
 	results, err := database.QueryAll[createResult](ctx, r.db, `
-		CREATE type::thing($id) CONTENT $data
+		CREATE $id CONTENT $data
 	`, map[string]any{
 		"id":   taskID,
 		"data": createData,
@@ -662,9 +663,9 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	// Sync emotion edges for analytics (async-safe, errors logged not returned)
 	r.syncEmotionEdges(ctx, taskIDStr, req.EmotionID, positives, negatives)
 
-	// Sync goal edges (async-safe)
+	// Sync goal edges (async-safe) - pass startDate for goal_daily_stats updates
 	if len(req.GoalLinks) > 0 {
-		r.syncGoalEdges(ctx, taskIDStr, req.GoalLinks)
+		r.syncGoalEdges(ctx, taskIDStr, req.GoalLinks, startDate)
 	}
 
 	// Fetch and return the created task (with category hydrated)
@@ -799,7 +800,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 
 	// Use UPDATE query for reliable single-record update
 	_, err = database.QueryAll[taskDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data
+		UPDATE $id MERGE $data
 	`, map[string]any{
 		"id":   taskID,
 		"data": updateData,
@@ -821,7 +822,8 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	// If GoalLinks is nil, we don't touch existing links (partial update)
 	// To clear links, send empty array
 	if req.GoalLinks != nil {
-		r.syncGoalEdges(ctx, id, *req.GoalLinks)
+		// Use existing start date for stats - for updates, need to get from existing task
+		r.syncGoalEdges(ctx, id, *req.GoalLinks, existing.StartDate)
 	}
 
 	// Fetch and return updated task with category hydrated
@@ -847,7 +849,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 
 	// Use UPDATE query for reliable soft delete
 	_, err = database.QueryAll[taskDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE {
+		UPDATE $id MERGE {
 			deleted_at: $now,
 			updated_by: $user,
 			updated_at: $now
@@ -876,7 +878,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID models.RecordID, userID string) (bool, error) {
 	// Use SDK's typed query for validation
 	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
-		SELECT id FROM type::thing($id) 
+		SELECT id FROM $id 
 		WHERE created_by = $user AND deleted_at = NONE
 	`, map[string]any{
 		"id":   categoryID,
@@ -1091,7 +1093,7 @@ func toEmotionItems(positives, negatives []TaskItem) emotionItemsResult {
 func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotionID *string, positives, negatives []TaskItem) {
 	// First, delete existing edges
 	_, err := database.QueryAll[any](ctx, r.db, `
-		DELETE task_emotions WHERE in = type::thing($task_id)
+		DELETE task_emotions WHERE in = $task_id
 	`, map[string]any{
 		"task_id": database.MustRecordID(Table, taskID),
 	})
@@ -1135,7 +1137,7 @@ func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotio
 	// Execute batch query
 	_, err = database.QueryAll[any](ctx, r.db, `
 		FOR $edge IN $edges {
-			LET $emotion = type::thing("emotions", $edge.emotion_id);
+			LET $emotion = type::record("emotions", $edge.emotion_id);
 			RELATE $task_id -> task_emotions -> $emotion SET
 				type = $edge.type,
 				text = $edge.text;
@@ -1165,12 +1167,12 @@ func convertQuantityInput(input *QuantityInput) *Quantity {
 // GOAL EDGE SYNC
 // =============================================================================
 
-// syncGoalEdges creates graph edges linking task to goals.
 // syncGoalEdges creates graph edges linking task to goals using a batch query.
-func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []GoalLinkInput) {
+// It also updates goal_daily_stats for progress tracking.
+func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []GoalLinkInput, taskStartDate time.Time) {
 	// Delete existing edges for this task
 	_, err := database.QueryAll[any](ctx, r.db, `
-		DELETE task_goals WHERE in = type::thing($task_id)
+		DELETE task_goals WHERE in = $task_id
 	`, map[string]any{
 		"task_id": database.MustRecordID(Table, taskID),
 	})
@@ -1218,7 +1220,7 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 	// Execute batch query - use type::record since goal_id is full ID like "goals:abc123"
 	_, err = database.QueryAll[any](ctx, r.db, `
 		FOR $edge IN $edges {
-			LET $goal = type::record($edge.goal_id);
+			LET $goal = <record>$edge.goal_id;
 			RELATE $task_id -> task_goals -> $goal SET
 				impact_type = $edge.impact_type,
 				is_milestone = $edge.is_milestone,
@@ -1234,5 +1236,62 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 
 	if err != nil {
 		r.logger.Warn().Err(err).Str("task_id", taskID).Int("count", len(links)).Msg("failed to batch sync goal edges")
+		return
+	}
+
+	// Update goal_daily_stats for each linked goal
+	r.updateGoalDailyStats(ctx, links, taskStartDate)
+}
+
+// updateGoalDailyStats updates the goal_daily_stats table for progress tracking.
+// This is called after task_goals edges are created to maintain denormalized stats.
+func (r *repository) updateGoalDailyStats(ctx context.Context, links []GoalLinkInput, taskStartDate time.Time) {
+	// Truncate to start of day for consistent date grouping
+	statDate := time.Date(taskStartDate.Year(), taskStartDate.Month(), taskStartDate.Day(), 0, 0, 0, 0, time.UTC)
+	// Format date as YYYYMMDD for deterministic ID
+	datePart := statDate.Format("20060102")
+
+	for _, link := range links {
+		qty := link.QuantityValue
+		if qty <= 0 {
+			qty = 0 // Count contribution even without quantity
+		}
+
+		// Extract goal ID part (e.g., "goals:abc123" -> "abc123")
+		goalIDPart := link.GoalID
+		if strings.HasPrefix(goalIDPart, "goals:") {
+			goalIDPart = goalIDPart[6:] // Remove "goals:" prefix
+		}
+
+		// Use deterministic ID: goal_daily_stats:{goal_id}_{date}
+		// This ensures UPSERT creates new record if not exists, updates if exists
+		statsID := fmt.Sprintf("goal_daily_stats:%s_%s", goalIDPart, datePart)
+
+		// Upsert goal_daily_stats - uses record ID for proper upsert behavior
+		_, err := database.QueryAll[any](ctx, r.db, `
+			LET $goal = (SELECT created_by, target.value as target_value FROM <record>$goal_id)[0];
+			UPSERT <record>$stats_id SET
+				goal_id = <record>$goal_id,
+				date = $stat_date,
+				created_by = $goal.created_by,
+				daily_value += $qty,
+				contribution_count += 1,
+				updated_at = time::now(),
+				target_value = $goal.target_value;
+		`, map[string]any{
+			"goal_id":   link.GoalID,
+			"stats_id":  statsID,
+			"stat_date": statDate,
+			"qty":       qty,
+		})
+
+		if err != nil {
+			r.logger.Warn().Err(err).
+				Str("goal_id", link.GoalID).
+				Str("stats_id", statsID).
+				Time("stat_date", statDate).
+				Float64("qty", qty).
+				Msg("failed to update goal_daily_stats")
+		}
 	}
 }

@@ -25,10 +25,12 @@
     interface Props {
         value: GoalLink[];
         onChange: (links: GoalLink[]) => void;
+        /** Called when goals are added, with full goal objects for inheritance */
+        onGoalsAdded?: (goals: Goal[]) => void;
         disabled?: boolean;
     }
 
-    let { value = [], onChange, disabled = false }: Props = $props();
+    let { value = [], onChange, onGoalsAdded, disabled = false }: Props = $props();
 
     let modalOpen = $state(false);
 
@@ -75,6 +77,16 @@
             quantity_unit: link.quantity_unit,
         }));
         onChange([...value, ...newLinks]);
+
+        // Notify parent with full goal objects for category/priority inheritance
+        if (onGoalsAdded) {
+            const addedGoals = links
+                .map((link) => goals.find((g) => g.id === link.goal_id))
+                .filter((g): g is Goal => !!g);
+            if (addedGoals.length > 0) {
+                onGoalsAdded(addedGoals);
+            }
+        }
     }
 
     function removeGoal(goalId: string) {

@@ -196,7 +196,7 @@ func (r *repository) CreateBatch(ctx context.Context, taskID string, links []Lin
 	// Use FOR loop for batch creation in single query
 	results, err := database.QueryAll[taskGoalDB](ctx, r.db, `
 		FOR $link IN $links {
-			LET $goal = type::thing("goals", string::split($link.goal_id, ":")[1]);
+			LET $goal = type::record("goals", string::split($link.goal_id, ":")[1]);
 			RELATE $task -> task_goals -> $goal SET
 				impact_type = $link.impact_type,
 				quantity_value = $link.quantity_value,
@@ -299,7 +299,7 @@ func (r *repository) DeleteByEdgeID(ctx context.Context, edgeID string) error {
 	edgeRecordID := database.MustRecordID(Table, edgeID)
 
 	_, err := database.QueryAll[taskGoalDB](ctx, r.db, `
-		DELETE type::thing($id)
+		DELETE $id
 	`, map[string]any{
 		"id": edgeRecordID,
 	})

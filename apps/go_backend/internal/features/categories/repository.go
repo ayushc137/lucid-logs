@@ -130,7 +130,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Category
 	// Use SDK's typed query to fetch category
 	// models.RecordID handles ID deserialization automatically
 	cat, err := database.QueryFirst[categoryDB](ctx, r.db, `
-		SELECT * FROM type::thing($id)
+		SELECT * FROM $id
 		WHERE deleted_at = NONE AND created_by = $user
 	`, map[string]any{
 		"id":   categoryID,
@@ -244,9 +244,9 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	}
 
 	// Use SDK's typed QueryAll for creation to ensure correct table/ID handling
-	// We use CREATE type::thing($id) CONTENT $data to force the ID
+	// We use CREATE $id CONTENT $data to force the ID
 	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
-		CREATE type::thing($id) CONTENT $data
+		CREATE $id CONTENT $data
 	`, map[string]any{
 		"id":   categoryID,
 		"data": createData,
@@ -302,7 +302,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 
 	// Use UPDATE query for reliable single-record update
 	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data
+		UPDATE $id MERGE $data
 	`, map[string]any{
 		"id":   categoryID,
 		"data": updateData,
@@ -339,7 +339,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 
 	// Use UPDATE query for reliable soft delete
 	_, err = database.QueryAll[categoryDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE {
+		UPDATE $id MERGE {
 			deleted_at: $now,
 			updated_by: $user,
 			updated_at: $now

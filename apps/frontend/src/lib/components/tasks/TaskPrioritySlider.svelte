@@ -1,14 +1,16 @@
 <script lang="ts">
 import { Card } from '$lib/components/ui';
 import { cn } from '$lib/utils';
-import { CircleAlert } from 'lucide-svelte';
+import { CircleAlert, Target } from 'lucide-svelte';
 
 interface Props {
 	value: number;
 	onChange?: (value: number) => void;
+	/** Goal title if priority was inherited from a goal */
+	inheritedFrom?: string | null;
 }
 
-let { value = $bindable(3), onChange }: Props = $props();
+let { value = $bindable(3), onChange, inheritedFrom = null }: Props = $props();
 
 const priorityLabels = ['None', 'Low', 'Medium', 'High', 'Critical', 'Urgent'];
 const priorityColors = [
@@ -28,6 +30,12 @@ const priorityColors = [
             <span class="text-xs font-semibold uppercase opacity-50"
                 >Priority</span
             >
+            {#if inheritedFrom}
+                <span class="badge badge-xs badge-ghost gap-1">
+                    <Target class="w-2.5 h-2.5" />
+                    from {inheritedFrom}
+                </span>
+            {/if}
         </div>
         <span class={cn("badge badge-sm", priorityColors[value])}
             >{priorityLabels[value]}</span

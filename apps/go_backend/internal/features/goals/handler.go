@@ -4,6 +4,8 @@ package goals
 import (
 	stderrors "errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -50,6 +52,9 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 //   - GET    /{id}/children     : Get child goals
 //   - POST   /{id}/children     : Add child goal
 //   - DELETE /{id}/children/{child_id} : Remove child goal
+//   - GET    /{id}/daily-progress : Get daily progress history (analytics)
+//   - GET    /{id}/period-stats   : Get period snapshots (analytics)
+//   - GET    /{id}/streak-history : Get streak history (analytics)
 func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
 	h := NewHandler(service, validator)
 
@@ -67,6 +72,9 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 	r.GET("/:id/children", h.GetChildren)
 	r.POST("/:id/children", h.AddChild)
 	r.DELETE("/:id/children/:child_id", h.RemoveChild)
+
+	// Analytics endpoints (pre-aggregated for O(1) lookups)
+	r.GET("/:id/daily-progress", h.GetDailyProgress)
 }
 
 // =============================================================================
@@ -79,13 +87,14 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Va
 // @Description  Get paginated list of goals for the authenticated user
 // @Tags         goals
 // @Produce      json
-// @Param        limit      query int    false "Items per page (default 20, max 100)"
-// @Param        offset     query int    false "Items to skip (default 0)"
-// @Param        status     query string false "Filter by status (active, completed, paused, abandoned)"
-// @Param        goal_type  query string false "Filter by type (discrete, measurable, epic, avoidance)"
-// @Param        recurring  query bool   false "Filter recurring (true) or one-time (false)"
-// @Param        search     query string false "Search in title and description"
-// @Param        sort_by    query string false "Sort by field (created_at, title, streak, priority) with optional -desc suffix"
+// @Param        limit         query int    false "Items per page (default 20, max 100)"
+// @Param        offset        query int    false "Items to skip (default 0)"
+// @Param        status        query string false "Filter by status (active, completed, paused, abandoned)"
+// @Param        goal_type     query string false "Filter by type (discrete, measurable, epic, avoidance)"
+// @Param        recurring     query bool   false "Filter recurring (true) or one-time (false)"
+// @Param        search        query string false "Search in title and description"
+// @Param        sort_by       query string false "Sort by field (created_at, title, streak, priority) with optional -desc suffix"
+// @Param        progress_date query string false "Calculate progress as of this date (RFC3339, for timeline views)"
 // @Success      200 {object} GoalPageResponse
 // @Failure      401 {object} response.APIResponse
 // @Failure      500 {object} response.APIResponse
@@ -117,6 +126,12 @@ func (h *Handler) List(c *gin.Context) {
 	if hasChildren := c.Query("grouped"); hasChildren != "" {
 		hasChild := hasChildren == "true"
 		filters.HasChildren = &hasChild
+	}
+	// Parse progress_date for timeline views
+	if progressDateStr := c.Query("progress_date"); progressDateStr != "" {
+		if progressDate, err := time.Parse(time.RFC3339, progressDateStr); err == nil {
+			filters.ProgressDate = &progressDate
+		}
 	}
 
 	log.Debug().
@@ -488,6 +503,62 @@ func (h *Handler) GetTasks(c *gin.Context) {
 }
 
 // =============================================================================
+// ANALYTICS ENDPOINTS
+// =============================================================================
+
+// GetDailyProgress handles GET /goals/{id}/daily-progress - get daily progress history.
+//
+// @Summary      Get daily progress history
+// @Description  Get pre-computed daily progress stats for a goal within a date range
+// @Tags         goals
+// @Produce      json
+// @Param        id         path   string true  "Goal ID"
+// @Param        start_date query  string false "Start date (RFC3339, defaults to 30 days ago)"
+// @Param        end_date   query  string false "End date (RFC3339, defaults to today)"
+// @Success      200 {object} DailyProgressResponse
+// @Failure      401 {object} response.APIResponse
+// @Failure      404 {object} response.APIResponse
+// @Failure      500 {object} response.APIResponse
+// @Security     BearerAuth
+// @Router       /api/v1/goals/{id}/daily-progress [get]
+func (h *Handler) GetDailyProgress(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	goalID := c.Param("id")
+
+	// Parse date range with defaults
+	startDate, endDate := parseDateRange(c, 30)
+
+	stats, err := h.service.GetDailyProgress(c.Request.Context(), goalID, user.UserID, startDate, endDate)
+	if err != nil {
+		handleGoalError(c, err)
+		return
+	}
+
+	// Get goal for target value
+	goal, err := h.service.Get(c.Request.Context(), goalID, user.UserID)
+	if err != nil {
+		handleGoalError(c, err)
+		return
+	}
+
+	targetValue := 0.0
+	if goal.Target != nil {
+		targetValue = goal.Target.Value
+	}
+
+	response.OK(c, DailyProgressResponse{
+		GoalID:          goalID,
+		TargetPerPeriod: targetValue,
+		Data:            stats,
+	})
+}
+
+// =============================================================================
 // ERROR HANDLING
 // =============================================================================
 
@@ -505,4 +576,36 @@ func handleGoalError(c *gin.Context, err error) {
 	default:
 		response.ErrorFromErr(c, err)
 	}
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+// parseDateRange parses start_date and end_date from query params with defaults.
+func parseDateRange(c *gin.Context, defaultDaysBack int) (startDate, endDate time.Time) {
+	endDate = time.Now().UTC().Truncate(24 * time.Hour)
+	startDate = endDate.AddDate(0, 0, -defaultDaysBack)
+
+	if startStr := c.Query("start_date"); startStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, startStr); err == nil {
+			startDate = parsed.Truncate(24 * time.Hour)
+		}
+	}
+
+	if endStr := c.Query("end_date"); endStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, endStr); err == nil {
+			endDate = parsed.Truncate(24 * time.Hour)
+		}
+	}
+
+	return startDate, endDate
+}
+
+// parseIntDefault parses an int string with a default value.
+func parseIntDefault(s string, defaultVal int) (int, error) {
+	if s == "" {
+		return defaultVal, nil
+	}
+	return strconv.Atoi(s)
 }

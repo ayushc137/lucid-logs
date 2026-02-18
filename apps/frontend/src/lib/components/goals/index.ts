@@ -17,3 +17,8 @@ export { default as GoalRecurrenceSettings } from './GoalRecurrenceSettings.svel
 export { default as GoalTargetSettings } from './GoalTargetSettings.svelte';
 export { default as GoalTasksTab } from './GoalTasksTab.svelte';
 export { default as GoalHistoryTab } from './GoalHistoryTab.svelte';
+
+// Analytics components (pre-aggregated data visualization)
+export { default as GoalProgressChart } from './GoalProgressChart.svelte';
+export { default as GoalStreakHistory } from './GoalStreakHistory.svelte';
+

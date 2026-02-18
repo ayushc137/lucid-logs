@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.21.0
-	github.com/surrealdb/surrealdb.go v1.0.0
+	github.com/surrealdb/surrealdb.go v1.3.0
 	github.com/swaggo/swag v1.16.2
 )
 

@@ -291,7 +291,7 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 					completed,
 					emotion_id,
 					category
-				FROM type::record(triggered_by_task_id))[0]
+				FROM <record>triggered_by_task_id)[0]
 			ELSE
 				NONE
 			END as triggering_task
@@ -321,7 +321,7 @@ func (r *repository) GetSnapshot(ctx context.Context, snapshotID string) (*GoalS
 	sID := database.MustRecordID(SnapshotsTable, snapshotID)
 
 	snapshot, err := database.QueryFirst[goalSnapshotDB](ctx, r.db, `
-		SELECT * FROM type::thing($id)
+		SELECT * FROM $id
 	`, map[string]any{
 		"id": sID,
 	})

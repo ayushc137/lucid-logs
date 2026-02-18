@@ -112,7 +112,7 @@ func (r *repository) FindByID(ctx context.Context, id string) (*Unit, error) {
 	unitID := database.MustRecordID(Table, id)
 
 	unit, err := database.QueryFirst[unitDB](ctx, r.db, `
-		SELECT * FROM type::thing($id)
+		SELECT * FROM $id
 	`, map[string]any{
 		"id": unitID,
 	})
@@ -209,7 +209,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	result, err := database.QueryFirst[unitDB](ctx, r.db, `
-		UPDATE type::thing($id) MERGE $data RETURN AFTER
+		UPDATE $id MERGE $data RETURN AFTER
 	`, map[string]any{
 		"id":   unitID,
 		"data": updateData,
@@ -241,7 +241,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	unitID := database.MustRecordID(Table, id)
 
 	_, err = database.QueryAll[any](ctx, r.db, `
-		DELETE type::thing($id)
+		DELETE $id
 	`, map[string]any{
 		"id": unitID,
 	})
@@ -262,7 +262,7 @@ func (r *repository) SeedSystemUnits(ctx context.Context) error {
 	for _, unit := range SystemUnits {
 		// Use UPSERT to create or update system units
 		_, err := database.QueryAll[any](ctx, r.db, `
-			UPSERT type::thing($id) CONTENT {
+			UPSERT $id CONTENT {
 				name: $name,
 				symbol: $symbol,
 				type: $type,

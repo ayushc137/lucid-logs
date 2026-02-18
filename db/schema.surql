@@ -95,6 +95,35 @@ DEFINE INDEX IF NOT EXISTS idx_goal_logs_event ON TABLE goal_logs COLUMNS event_
 DEFINE TABLE IF NOT EXISTS agg_daily PERMISSIONS FULL;
 DEFINE INDEX IF NOT EXISTS idx_agg_daily ON TABLE agg_daily COLUMNS user_id, date UNIQUE;
 
+-- GOAL_DAILY_STATS (pre-computed daily goal progress for O(1) lookups)
+DEFINE TABLE IF NOT EXISTS goal_daily_stats SCHEMAFULL PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS goal_id ON goal_daily_stats TYPE record<goals>;
+DEFINE FIELD IF NOT EXISTS date ON goal_daily_stats TYPE datetime;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_daily_stats TYPE record<users>;
+DEFINE FIELD IF NOT EXISTS daily_value ON goal_daily_stats TYPE float DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS cumulative_value ON goal_daily_stats TYPE float DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS contribution_count ON goal_daily_stats TYPE int DEFAULT 0;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_unique ON goal_daily_stats COLUMNS goal_id, date UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_goal_daily_user_date ON goal_daily_stats COLUMNS created_by, date;
+
+-- GOAL_PERIOD_SNAPSHOTS (week/month analytics snapshots)
+DEFINE TABLE IF NOT EXISTS goal_period_snapshots SCHEMAFULL PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS goal_id ON goal_period_snapshots TYPE record<goals>;
+DEFINE FIELD IF NOT EXISTS period_type ON goal_period_snapshots TYPE string;
+DEFINE FIELD IF NOT EXISTS period_key ON goal_period_snapshots TYPE string;
+DEFINE FIELD IF NOT EXISTS created_by ON goal_period_snapshots TYPE record<users>;
+DEFINE INDEX IF NOT EXISTS idx_goal_period_unique ON goal_period_snapshots COLUMNS goal_id, period_type, period_key UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_goal_period_user ON goal_period_snapshots COLUMNS created_by, period_type, start_date;
+
+-- STREAK_HISTORY (streak changes over time for analytics)
+DEFINE TABLE IF NOT EXISTS streak_history SCHEMAFULL PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS goal_id ON streak_history TYPE record<goals>;
+DEFINE FIELD IF NOT EXISTS created_by ON streak_history TYPE record<users>;
+DEFINE FIELD IF NOT EXISTS date ON streak_history TYPE datetime;
+DEFINE FIELD IF NOT EXISTS event ON streak_history TYPE string;
+DEFINE INDEX IF NOT EXISTS idx_streak_goal_date ON streak_history COLUMNS goal_id, date;
+DEFINE INDEX IF NOT EXISTS idx_streak_user ON streak_history COLUMNS created_by, date;
+
 
 -- =============================================================================
 -- RELATION TABLES (Graph Edges)
