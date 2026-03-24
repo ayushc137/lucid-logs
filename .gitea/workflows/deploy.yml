@@ -1,0 +1,88 @@
+name: Deploy Lucid Logs
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux]
+    steps:
+      - name: Clone/update repo on NAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_DIR="/home/enduser/repos/lucid-logs"
+          GITEA_URL="http://172.1.0.72:3000"
+
+          if [ ! -d "$REPO_DIR" ]; then
+            mkdir -p "$(dirname $REPO_DIR)"
+            git clone "$GITEA_URL/ayush/lucid-logs.git" "$REPO_DIR"
+          fi
+
+          cd "$REPO_DIR"
+          git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
+          git fetch --prune
+          git checkout main
+          git reset --hard origin/main
+
+          echo "At commit: $(git rev-parse --short HEAD)"
+
+      - name: Create config directory
+        shell: bash
+        run: |
+          mkdir -p /home/enduser/configs/lucid-logs/surrealdb
+
+      - name: Create .env if missing
+        shell: bash
+        run: |
+          ENV_FILE="/home/enduser/repos/lucid-logs/deploy/.env"
+          if [ ! -f "$ENV_FILE" ]; then
+            cat > "$ENV_FILE" <<'EOF'
+          APP_ENV=production
+          DB_USER=root
+          DB_PASS=lucidlogs2026
+          DB_NAMESPACE=daily_journal
+          DB_DATABASE=core
+          JWT_SECRET=$(openssl rand -base64 32)
+          ADMIN_USERNAME=admin@lucidlogs.local
+          ADMIN_PASSWORD=admin123
+          EOF
+            echo "Created default .env"
+          else
+            echo ".env already exists, skipping"
+          fi
+
+      - name: Deploy with Docker Compose
+        shell: bash
+        run: |
+          cd /home/enduser/repos/lucid-logs/deploy
+          docker compose -f docker-compose.prod.yml --env-file .env up -d --build --remove-orphans
+          echo "✅ Lucid Logs deployed!"
+
+      - name: Apply DB schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Waiting for SurrealDB to be healthy..."
+          for i in $(seq 1 30); do
+            if docker exec lucid_logs_db /surreal is-ready 2>/dev/null; then
+              echo "SurrealDB is ready"
+              break
+            fi
+            sleep 2
+          done
+
+          cd /home/enduser/repos/lucid-logs
+          # Apply schema via docker exec
+          docker exec -i lucid_logs_db /surreal sql \
+            --endpoint http://localhost:8000 \
+            --namespace daily_journal --database core \
+            --username root --password lucidlogs2026 \
+            < db/schema.surql && echo "✅ Schema applied"
+
+          # Apply emotion seeds
+          docker exec -i lucid_logs_db /surreal sql \
+            --endpoint http://localhost:8000 \
+            --namespace daily_journal --database core \
+            --username root --password lucidlogs2026 \
+            < db/migrations/002_seed_emotions.surql && echo "✅ Emotions seeded"
