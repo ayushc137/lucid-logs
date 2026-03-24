@@ -1,0 +1,123 @@
+name: Deploy Lucid Logs
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux]
+    steps:
+      - name: Clone/update repo on NAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_DIR="/home/enduser/repos/lucid-logs"
+          GITEA_URL="http://172.1.0.72:3000"
+
+          if [ ! -d "$REPO_DIR" ]; then
+            mkdir -p "$(dirname $REPO_DIR)"
+            git clone "$GITEA_URL/ayush/lucid-logs.git" "$REPO_DIR"
+          fi
+
+          cd "$REPO_DIR"
+          git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
+          git fetch --prune
+          git checkout main
+          git reset --hard origin/main
+
+          echo "At commit: $(git rev-parse --short HEAD)"
+
+      - name: Create config directory
+        shell: bash
+        run: |
+          mkdir -p /home/enduser/configs/lucid-logs/surrealdb
+
+      - name: Create .env if missing
+        shell: bash
+        run: |
+          ENV_FILE="/home/enduser/repos/lucid-logs/deploy/.env"
+          if [ ! -f "$ENV_FILE" ]; then
+            JWT=$(openssl rand -base64 32)
+            cat > "$ENV_FILE" <<-ENVEOF
+          APP_ENV=production
+          DB_USER=root
+          DB_PASS=lucidlogs2026
+          DB_NAMESPACE=daily_journal
+          DB_DATABASE=core
+          JWT_SECRET=${JWT}
+          ADMIN_USERNAME=admin@lucidlogs.local
+          ADMIN_PASSWORD=admin123
+          ENVEOF
+            # Strip leading whitespace from each line
+            sed -i 's/^[[:space:]]*//' "$ENV_FILE"
+            echo "Created default .env with generated JWT_SECRET"
+          else
+            echo ".env already exists, skipping"
+          fi
+
+      - name: Deploy with Docker Compose
+        shell: bash
+        run: |
+          cd /home/enduser/repos/lucid-logs/deploy
+          docker compose -f docker-compose.prod.yml --env-file .env up -d --build --remove-orphans
+          echo "✅ Lucid Logs deployed!"
+
+      - name: Apply DB schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Waiting for SurrealDB to be healthy..."
+          for i in $(seq 1 30); do
+            if docker exec lucid_logs_db /surreal is-ready 2>/dev/null; then
+              echo "SurrealDB is ready"
+              break
+            fi
+            sleep 2
+          done
+
+          cd /home/enduser/repos/lucid-logs
+          # Apply schema via docker exec
+          docker exec -i lucid_logs_db /surreal sql \
+            --endpoint http://localhost:8000 \
+            --namespace daily_journal --database core \
+            --username root --password lucidlogs2026 \
+            < db/schema.surql && echo "✅ Schema applied"
+
+          # Apply emotion seeds
+          docker exec -i lucid_logs_db /surreal sql \
+            --endpoint http://localhost:8000 \
+            --namespace daily_journal --database core \
+            --username root --password lucidlogs2026 \
+            < db/migrations/002_seed_emotions.surql && echo "✅ Emotions seeded"
+
+      - name: Run seed data
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Waiting for backend to be healthy..."
+          for i in $(seq 1 30); do
+            if docker exec lucid_logs_backend wget -q --spider http://localhost:8080/health/ 2>/dev/null; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+
+          # Seed tool connects to http://127.0.0.1:8080 (backend API)
+          # Use --network=container: to share backend's network namespace
+          docker run --rm \
+            --network=container:lucid_logs_backend \
+            -v /home/enduser/repos/lucid-logs/apps/go_backend:/app:ro \
+            -w /app \
+            -e DB_HOST=surrealdb \
+            -e DB_PORT=8000 \
+            -e DB_USER=root \
+            -e DB_PASS=lucidlogs2026 \
+            -e DB_NAMESPACE=daily_journal \
+            -e DB_DATABASE=core \
+            -e HTTP_PORT=8080 \
+            -e ADMIN_USERNAME=admin@lucidlogs.local \
+            -e ADMIN_PASSWORD=admin123 \
+            golang:1.23-alpine sh -c "go run ./cmd/seed" \
+            && echo "✅ Seed data created" \
+            || echo "⚠️ Seed failed (may already exist, or first-run issue)"

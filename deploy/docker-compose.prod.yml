@@ -1,0 +1,86 @@
+# Lucid Logs - Production Docker Compose (NAS)
+# =============================================
+# Deploy via: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # Database: SurrealDB
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: lucid_logs_db
+    user: "0:0"
+    restart: unless-stopped
+    command: start --log info --user ${DB_USER:-root} --pass ${DB_PASS:-root} surrealkv:///data/database.db
+    volumes:
+      - /home/enduser/configs/lucid-logs/surrealdb:/data
+      - ../db:/schema:ro
+    healthcheck:
+      test: ["CMD", "/surreal", "is-ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      proxy:
+        ipv4_address: 172.1.0.200
+      lucid_net:
+
+  # Backend: Go (Gin)
+  backend:
+    build:
+      context: ../apps/go_backend
+      dockerfile: Dockerfile
+    container_name: lucid_logs_backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8080"
+      DB_HOST: surrealdb
+      DB_PORT: "8000"
+      DB_USER: ${DB_USER:-root}
+      DB_PASS: ${DB_PASS:-root}
+      DB_NAMESPACE: ${DB_NAMESPACE:-daily_journal}
+      DB_DATABASE: ${DB_DATABASE:-core}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: "http://lucid-logs"
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+    networks:
+      proxy:
+        ipv4_address: 172.1.0.201
+      lucid_net:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lucid-api.rule=Host(`lucid-logs`) && PathPrefix(`/api`)"
+      - "traefik.http.services.lucid-api.loadbalancer.server.port=8080"
+
+  # Frontend: SvelteKit (Node adapter)
+  frontend:
+    build:
+      context: ../apps/frontend
+      dockerfile: Dockerfile
+    container_name: lucid_logs_frontend
+    restart: unless-stopped
+    environment:
+      ORIGIN: "http://lucid-logs"
+      PORT: "3000"
+      HOST: "0.0.0.0"
+    depends_on:
+      - backend
+    networks:
+      proxy:
+        ipv4_address: 172.1.0.202
+      lucid_net:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lucid-frontend.rule=Host(`lucid-logs`)"
+      - "traefik.http.routers.lucid-frontend.priority=1"
+      - "traefik.http.services.lucid-frontend.loadbalancer.server.port=3000"
+
+networks:
+  proxy:
+    external: true
+  lucid_net:
+    driver: bridge
+
+volumes:
+  surrealdb_data:
