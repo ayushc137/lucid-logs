@@ -37,17 +37,20 @@ jobs:
         run: |
           ENV_FILE="/home/enduser/repos/lucid-logs/deploy/.env"
           if [ ! -f "$ENV_FILE" ]; then
-            cat > "$ENV_FILE" <<'EOF'
+            JWT=$(openssl rand -base64 32)
+            cat > "$ENV_FILE" <<-ENVEOF
           APP_ENV=production
           DB_USER=root
           DB_PASS=lucidlogs2026
           DB_NAMESPACE=daily_journal
           DB_DATABASE=core
-          JWT_SECRET=$(openssl rand -base64 32)
+          JWT_SECRET=${JWT}
           ADMIN_USERNAME=admin@lucidlogs.local
           ADMIN_PASSWORD=admin123
-          EOF
-            echo "Created default .env"
+          ENVEOF
+            # Strip leading whitespace from each line
+            sed -i 's/^[[:space:]]*//' "$ENV_FILE"
+            echo "Created default .env with generated JWT_SECRET"
           else
             echo ".env already exists, skipping"
           fi
@@ -86,3 +89,35 @@ jobs:
             --namespace daily_journal --database core \
             --username root --password lucidlogs2026 \
             < db/migrations/002_seed_emotions.surql && echo "✅ Emotions seeded"
+
+      - name: Run seed data
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Waiting for backend to be healthy..."
+          for i in $(seq 1 30); do
+            if docker exec lucid_logs_backend wget -q --spider http://localhost:8080/health/ 2>/dev/null; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+
+          # Seed tool connects to http://127.0.0.1:8080 (backend API)
+          # Use --network=container: to share backend's network namespace
+          docker run --rm \
+            --network=container:lucid_logs_backend \
+            -v /home/enduser/repos/lucid-logs/apps/go_backend:/app:ro \
+            -w /app \
+            -e DB_HOST=surrealdb \
+            -e DB_PORT=8000 \
+            -e DB_USER=root \
+            -e DB_PASS=lucidlogs2026 \
+            -e DB_NAMESPACE=daily_journal \
+            -e DB_DATABASE=core \
+            -e HTTP_PORT=8080 \
+            -e ADMIN_USERNAME=admin@lucidlogs.local \
+            -e ADMIN_PASSWORD=admin123 \
+            golang:1.23-alpine sh -c "go run ./cmd/seed" \
+            && echo "✅ Seed data created" \
+            || echo "⚠️ Seed failed (may already exist, or first-run issue)"
