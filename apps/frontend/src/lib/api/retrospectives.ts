@@ -25,6 +25,7 @@ export interface RetroAutoSummary {
 	goals?: GoalsSummary;
 	categories?: CategoriesSummary;
 	insights?: string[];
+	ai_narrative?: string;
 }
 
 export interface MoodSummary {
@@ -192,4 +193,10 @@ export async function updateRetrospective(
 
 export async function deleteRetrospective(id: string): Promise<void> {
 	return unwrap(api.delete(`retrospectives/${encodeURIComponent(id)}`));
+}
+
+export async function regenerateInsights(id: string): Promise<Retrospective> {
+	return unwrap(
+		api.post(`retrospectives/${encodeURIComponent(id)}/regenerate-insights`),
+	);
 }

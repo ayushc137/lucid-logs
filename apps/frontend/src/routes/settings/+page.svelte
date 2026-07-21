@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AccountSettings, ThemeSettings } from '$lib/components/settings';
+import { AccountSettings, AISettings, ThemeSettings } from '$lib/components/settings';
 import { cn } from '$lib/utils';
 import { Settings } from 'lucide-svelte';
 
@@ -41,7 +41,10 @@ let activeTab = $state<'appearance' | 'account'>('appearance');
 
   <!-- Tab Content -->
   {#if activeTab === "appearance"}
-    <ThemeSettings />
+    <div class="space-y-6">
+      <ThemeSettings />
+      <AISettings />
+    </div>
   {:else if activeTab === "account"}
     <AccountSettings />
   {/if}

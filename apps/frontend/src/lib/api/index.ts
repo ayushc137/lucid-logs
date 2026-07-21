@@ -174,6 +174,7 @@ export {
 	generateRetrospective,
 	updateRetrospective,
 	deleteRetrospective,
+	regenerateInsights,
 	type Retrospective,
 	type RetroAutoSummary,
 	type MoodSummary,
@@ -196,6 +197,17 @@ export {
 	type UpdateRetroRequest,
 	type RetroListResponse,
 } from './retrospectives';
+
+// Users / Preferences
+export {
+	getUserPreferences,
+	updateUserPreferences,
+	type AISettings,
+	type DailyRetroSettings,
+	type UserPreferences,
+	type UserWithPreferences,
+	type UpdatePreferencesRequest,
+} from './users';
 
 // Analytics
 export {
