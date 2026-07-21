@@ -8,6 +8,7 @@ package middleware
 
 import (
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -98,6 +99,7 @@ func Recovery() gin.HandlerFunc {
 			if err := recover(); err != nil {
 				log.Error().
 					Interface("panic", err).
+					Bytes("stack", debug.Stack()).
 					Str("method", c.Request.Method).
 					Str("path", c.Request.URL.Path).
 					Str("remote_addr", c.ClientIP()).

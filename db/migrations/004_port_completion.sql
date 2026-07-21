@@ -16,6 +16,8 @@ ALTER TABLE activities ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE tasks ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
 
+ALTER TABLE categories ADD COLUMN updated_by TEXT REFERENCES users(id);
+
 ALTER TABLE retrospectives ADD COLUMN auto_summary TEXT;
 ALTER TABLE retrospectives ADD COLUMN user_content TEXT;
 

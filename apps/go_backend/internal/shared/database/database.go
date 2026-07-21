@@ -334,7 +334,7 @@ func Select[T any](ctx context.Context, db *DB, recordID string) (*T, error) {
 	if !identifier.MatchString(table) {
 		return nil, fmt.Errorf("invalid table %q", table)
 	}
-	return QueryFirst[T](ctx, db, "SELECT * FROM "+table+" WHERE id = :record_id", map[string]any{"record_id": recordID})
+	return QueryFirst[T](ctx, db, "SELECT * FROM "+table+" WHERE id = $record_id", map[string]any{"record_id": recordID})
 }
 
 // Delete deletes a record by primary key. Entity repositories should prefer soft deletes.
@@ -461,5 +461,12 @@ func Create[T any](ctx context.Context, db *DB, table string, data map[string]an
 	if !ok {
 		return nil, fmt.Errorf("create %s requires an id", table)
 	}
-	return Select[T](ctx, db, fmt.Sprint(id))
+	created, err := Select[T](ctx, db, fmt.Sprint(id))
+	if err != nil {
+		return nil, err
+	}
+	if created == nil {
+		return nil, fmt.Errorf("created %s record %v could not be read back", table, id)
+	}
+	return created, nil
 }

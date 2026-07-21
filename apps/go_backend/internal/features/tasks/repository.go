@@ -31,7 +31,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -1032,7 +1031,7 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 		MilestoneLabel  string          `json:"milestone_label,omitempty"`
 		GoalDescription string          `json:"goal_description,omitempty"`
 		GoalStatus      string          `json:"goal_status,omitempty"`
-		GoalPriority    string          `json:"goal_priority,omitempty"`
+		GoalPriority    int             `json:"goal_priority,omitempty"`
 		GoalTargetValue *float64        `json:"goal_target_value,omitempty"`
 		GoalTargetUnit  string          `json:"goal_target_unit,omitempty"`
 		GoalCategory    *goalCategoryDB `json:"goal_category,omitempty"`
@@ -1052,7 +1051,7 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 			COALESCE(tg.milestone_label, '') AS milestone_label,
 			COALESCE(g.description, '') AS goal_description,
 			COALESCE(g.status, '') AS goal_status,
-			COALESCE(g.priority, '') AS goal_priority,
+			COALESCE(g.priority, 0) AS goal_priority,
 			json_extract(g.target, '$.value') AS goal_target_value,
 			COALESCE(json_extract(g.target, '$.unit_id'), '') AS goal_target_unit,
 			(
@@ -1080,15 +1079,6 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 
 	goals := make([]TaskGoalLink, len(goalsDB))
 	for i, g := range goalsDB {
-		// Parse the goal_priority string -> int if present (stored as TEXT in SQLite)
-		var goalPriorityInt int
-		if g.GoalPriority != "" {
-			var pri int
-			if _, parseErr := fmt.Sscanf(g.GoalPriority, "%d", &pri); parseErr == nil {
-				goalPriorityInt = pri
-			}
-		}
-
 		link := TaskGoalLink{
 			GoalID:          g.GoalID,
 			GoalTitle:       g.GoalTitle,
@@ -1100,7 +1090,7 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 			MilestoneLabel:  g.MilestoneLabel,
 			GoalDescription: g.GoalDescription,
 			GoalStatus:      g.GoalStatus,
-			GoalPriority:    goalPriorityInt,
+			GoalPriority:    g.GoalPriority,
 			GoalTargetValue: g.GoalTargetValue,
 			GoalTargetUnit:  g.GoalTargetUnit,
 			Notes:           g.Notes,

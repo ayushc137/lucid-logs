@@ -27,7 +27,7 @@ func TestTasksCRUDCoversFullLifecycle(t *testing.T) {
 	}
 	req := apitest.JSONRequest(t, "POST", "/api/v1/tasks", createReq, apitest.WithToken(token))
 	rr := apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var createResp struct {
 		Data struct {
@@ -134,33 +134,35 @@ func TestTasksDateFiltering(t *testing.T) {
 			"end_date":   tc.date.Add(1 * time.Hour).Format(time.RFC3339),
 		}, apitest.WithToken(token))
 		rr := apitest.Do(app.Router, req)
-		apitest.AssertStatus(t, rr, http.StatusOK)
+		apitest.AssertStatus(t, rr, http.StatusCreated)
 	}
 
-	// Filter by start_date = today
-	req := apitest.JSONRequest(t, "GET", "/api/v1/tasks?start_date="+today.Format("2006-01-02"), nil, apitest.WithToken(token))
+	// Filter to today's UTC window.
+	filterPath := "/api/v1/tasks?start_date_from=" + today.Format(time.RFC3339) +
+		"&start_date_to=" + today.Add(24*time.Hour-time.Second).Format(time.RFC3339)
+	req := apitest.JSONRequest(t, "GET", filterPath, nil, apitest.WithToken(token))
 	rr := apitest.Do(app.Router, req)
 	apitest.AssertStatus(t, rr, http.StatusOK)
 
 	var listResp struct {
-		Data []struct {
-			ID    string `json:"id"`
-			Title string `json:"title"`
-		} `json:"data"`
-		Pagination struct {
+		Data struct {
+			Items []struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+			} `json:"items"`
 			Total int `json:"total"`
-		} `json:"pagination"`
+		} `json:"data"`
 	}
 	apitest.Decode(t, rr, &listResp)
 
-	if listResp.Pagination.Total != 1 {
-		t.Errorf("total = %d, want 1; tasks: %+v", listResp.Pagination.Total, listResp.Data)
+	if listResp.Data.Total != 1 {
+		t.Errorf("total = %d, want 1; tasks: %+v", listResp.Data.Total, listResp.Data.Items)
 	}
-	if len(listResp.Data) != 1 {
-		t.Fatalf("len(data) = %d, want 1", len(listResp.Data))
+	if len(listResp.Data.Items) != 1 {
+		t.Fatalf("len(data) = %d, want 1", len(listResp.Data.Items))
 	}
-	if listResp.Data[0].Title != "Today task" {
-		t.Errorf("title = %q, want %q", listResp.Data[0].Title, "Today task")
+	if listResp.Data.Items[0].Title != "Today task" {
+		t.Errorf("title = %q, want %q", listResp.Data.Items[0].Title, "Today task")
 	}
 }
 
@@ -177,7 +179,7 @@ func TestTasksCategoryLinking(t *testing.T) {
 		"color": "#FF5733",
 	}, apitest.WithToken(token))
 	rr := apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var catResp struct {
 		Data struct {
@@ -195,7 +197,7 @@ func TestTasksCategoryLinking(t *testing.T) {
 		"category_id": categoryID,
 	}, apitest.WithToken(token))
 	rr = apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var taskResp struct {
 		Data struct {
@@ -231,7 +233,7 @@ func TestTasksGoalLinking(t *testing.T) {
 		"title": "Learn Go",
 	}, apitest.WithToken(token))
 	rr := apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var goalResp struct {
 		Data struct {
@@ -248,7 +250,7 @@ func TestTasksGoalLinking(t *testing.T) {
 		"end_date":   time.Now().UTC().Add(1 * time.Hour).Format(time.RFC3339),
 	}, apitest.WithToken(token))
 	rr = apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var taskResp struct {
 		Data struct {
@@ -264,7 +266,7 @@ func TestTasksGoalLinking(t *testing.T) {
 		"impact_type": "positive",
 	}, apitest.WithToken(token))
 	rr = apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	// Verify link via GET /tasks/:id/goals
 	req = apitest.JSONRequest(t, "GET", fmt.Sprintf("/api/v1/tasks/%s/goals", taskID), nil, apitest.WithToken(token))
@@ -272,21 +274,23 @@ func TestTasksGoalLinking(t *testing.T) {
 	apitest.AssertStatus(t, rr, http.StatusOK)
 
 	var linksResp struct {
-		Data []struct {
-			GoalID     string `json:"goal_id"`
-			ImpactType string `json:"impact_type"`
+		Data struct {
+			Goals []struct {
+				GoalID     string `json:"goal_id"`
+				ImpactType string `json:"impact_type"`
+			} `json:"goals"`
 		} `json:"data"`
 	}
 	apitest.Decode(t, rr, &linksResp)
 
-	if len(linksResp.Data) != 1 {
-		t.Fatalf("len(links) = %d, want 1", len(linksResp.Data))
+	if len(linksResp.Data.Goals) != 1 {
+		t.Fatalf("len(links) = %d, want 1", len(linksResp.Data.Goals))
 	}
-	if linksResp.Data[0].GoalID != goalID {
-		t.Errorf("goal_id = %q, want %q", linksResp.Data[0].GoalID, goalID)
+	if linksResp.Data.Goals[0].GoalID != goalID {
+		t.Errorf("goal_id = %q, want %q", linksResp.Data.Goals[0].GoalID, goalID)
 	}
-	if linksResp.Data[0].ImpactType != "positive" {
-		t.Errorf("impact_type = %q, want %q", linksResp.Data[0].ImpactType, "positive")
+	if linksResp.Data.Goals[0].ImpactType != "positive" {
+		t.Errorf("impact_type = %q, want %q", linksResp.Data.Goals[0].ImpactType, "positive")
 	}
 }
 
@@ -304,7 +308,7 @@ func TestTasksCompletion(t *testing.T) {
 		"end_date":   time.Now().UTC().Add(1 * time.Hour).Format(time.RFC3339),
 	}, apitest.WithToken(token))
 	rr := apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var createResp struct {
 		Data struct {
@@ -340,17 +344,17 @@ func TestTasksCompletion(t *testing.T) {
 	apitest.AssertStatus(t, rr, http.StatusOK)
 
 	var listResp struct {
-		Data []struct {
-			ID        string `json:"id"`
-			Completed bool   `json:"completed"`
-		} `json:"data"`
-		Pagination struct {
+		Data struct {
+			Items []struct {
+				ID        string `json:"id"`
+				Completed bool   `json:"completed"`
+			} `json:"items"`
 			Total int `json:"total"`
-		} `json:"pagination"`
+		} `json:"data"`
 	}
 	apitest.Decode(t, rr, &listResp)
-	if listResp.Pagination.Total != 1 {
-		t.Errorf("completed tasks total = %d, want 1", listResp.Pagination.Total)
+	if listResp.Data.Total != 1 {
+		t.Errorf("completed tasks total = %d, want 1", listResp.Data.Total)
 	}
 }
 
@@ -398,7 +402,7 @@ func TestTasksPagination(t *testing.T) {
 			"end_date":   time.Now().UTC().Add(time.Duration(i+1) * time.Hour).Format(time.RFC3339),
 		}, apitest.WithToken(token))
 		rr := apitest.Do(app.Router, req)
-		apitest.AssertStatus(t, rr, http.StatusOK)
+		apitest.AssertStatus(t, rr, http.StatusCreated)
 	}
 
 	// Page 1: limit=2, offset=0
@@ -407,22 +411,22 @@ func TestTasksPagination(t *testing.T) {
 	apitest.AssertStatus(t, rr, http.StatusOK)
 
 	var page1 struct {
-		Data []struct {
-			Title string `json:"title"`
-		} `json:"data"`
-		Pagination struct {
+		Data struct {
+			Items []struct {
+				Title string `json:"title"`
+			} `json:"items"`
 			Total  int `json:"total"`
 			Limit  int `json:"limit"`
 			Offset int `json:"offset"`
-		} `json:"pagination"`
+		} `json:"data"`
 	}
 	apitest.Decode(t, rr, &page1)
 
-	if page1.Pagination.Total != 5 {
-		t.Errorf("total = %d, want 5", page1.Pagination.Total)
+	if page1.Data.Total != 5 {
+		t.Errorf("total = %d, want 5", page1.Data.Total)
 	}
-	if len(page1.Data) != 2 {
-		t.Errorf("page1 len = %d, want 2", len(page1.Data))
+	if len(page1.Data.Items) != 2 {
+		t.Errorf("page1 len = %d, want 2", len(page1.Data.Items))
 	}
 
 	// Page 2: limit=2, offset=2
@@ -431,18 +435,20 @@ func TestTasksPagination(t *testing.T) {
 	apitest.AssertStatus(t, rr, http.StatusOK)
 
 	var page2 struct {
-		Data []struct {
-			Title string `json:"title"`
+		Data struct {
+			Items []struct {
+				Title string `json:"title"`
+			} `json:"items"`
 		} `json:"data"`
 	}
 	apitest.Decode(t, rr, &page2)
 
-	if len(page2.Data) != 2 {
-		t.Errorf("page2 len = %d, want 2", len(page2.Data))
+	if len(page2.Data.Items) != 2 {
+		t.Errorf("page2 len = %d, want 2", len(page2.Data.Items))
 	}
 
 	// Verify no overlap between pages
-	if page1.Data[0].Title == page2.Data[0].Title {
+	if page1.Data.Items[0].Title == page2.Data.Items[0].Title {
 		t.Error("page1 and page2 should have different tasks")
 	}
 }
@@ -462,7 +468,7 @@ func TestTasksMultiTenancy(t *testing.T) {
 		"end_date":   time.Now().UTC().Add(1 * time.Hour).Format(time.RFC3339),
 	}, apitest.WithToken(tokenA))
 	rr := apitest.Do(app.Router, req)
-	apitest.AssertStatus(t, rr, http.StatusOK)
+	apitest.AssertStatus(t, rr, http.StatusCreated)
 
 	var createResp struct {
 		Data struct {
@@ -483,15 +489,15 @@ func TestTasksMultiTenancy(t *testing.T) {
 	apitest.AssertStatus(t, rr, http.StatusOK)
 
 	var listResp struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-		Pagination struct {
+		Data struct {
+			Items []struct {
+				ID string `json:"id"`
+			} `json:"items"`
 			Total int `json:"total"`
-		} `json:"pagination"`
+		} `json:"data"`
 	}
 	apitest.Decode(t, rr, &listResp)
-	if listResp.Pagination.Total != 0 {
-		t.Errorf("user B should see 0 tasks, got %d", listResp.Pagination.Total)
+	if listResp.Data.Total != 0 {
+		t.Errorf("user B should see 0 tasks, got %d", listResp.Data.Total)
 	}
 }
