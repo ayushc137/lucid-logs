@@ -18,7 +18,7 @@
 // RecordID Convention:
 //   - taskDB uses models.RecordID for ID and category_id reference fields
 //   - Conversion to string happens in toTask() at the repository boundary
-//   - This preserves the table:value API contract from the SurrealDB era
+//   - This preserves the table:value API contract used across the codebase
 //
 // Emotion Tracking:
 //   - InferredEmotion is calculated on CREATE/UPDATE, not on GET
@@ -1080,7 +1080,7 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 
 	goals := make([]TaskGoalLink, len(goalsDB))
 	for i, g := range goalsDB {
-		// Parse the goal_priority string -> int if present (SurrealDB stored it as int)
+		// Parse the goal_priority string -> int if present (stored as TEXT in SQLite)
 		var goalPriorityInt int
 		if g.GoalPriority != "" {
 			var pri int
@@ -1279,7 +1279,7 @@ func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotio
 		return
 	}
 
-	// Execute per-edge INSERT statements (SQLite has no SurrealQL FOR loop).
+	// Execute per-edge INSERT statements (SQLite has no FOR loop in SQL).
 	for _, edge := range edges {
 		edgeID := generateEdgeRecordID("task_emotions")
 		data := map[string]any{

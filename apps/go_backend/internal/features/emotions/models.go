@@ -11,7 +11,7 @@ import (
 // =============================================================================
 
 // emotionDB is the internal database representation of an emotion.
-// Uses models.RecordID for SurrealDB SDK compatibility.
+// Uses models.RecordID for the table:value ID format.
 type emotionDB struct {
 	ID          models.RecordID `json:"id,omitempty"`
 	Name        string          `json:"name"`

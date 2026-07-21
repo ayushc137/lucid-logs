@@ -60,7 +60,7 @@ type Repository interface {
 }
 
 // =============================================================================
-// SURREAL DB MODELS
+// DATABASE MODELS
 // =============================================================================
 
 // activityDB is the database representation of Activity.
@@ -88,14 +88,14 @@ type activityDB struct {
 	Pinned     bool   `json:"pinned"`
 	SortOrder  int    `json:"sort_order"`
 
-	UseCount   int                   `json:"use_count"`
-	LastUsedAt *database.SurrealTime `json:"last_used_at,omitempty"`
+	UseCount   int                `json:"use_count"`
+	LastUsedAt *database.FlexTime `json:"last_used_at,omitempty"`
 
 	ActiveSession *TimerSession `json:"active_session,omitempty"`
 
-	CreatedAt database.SurrealTime  `json:"created_at"`
-	UpdatedAt database.SurrealTime  `json:"updated_at"`
-	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
+	CreatedAt database.FlexTime  `json:"created_at"`
+	UpdatedAt database.FlexTime  `json:"updated_at"`
+	DeletedAt *database.FlexTime `json:"deleted_at,omitempty"`
 
 	// Populated via subquery
 	Category *categoryDB  `json:"category,omitempty"`
@@ -103,13 +103,13 @@ type activityDB struct {
 }
 
 type categoryDB struct {
-	ID        models.RecordID       `json:"id,omitempty"`
-	Name      string                `json:"name"`
-	Color     string                `json:"color"`
-	CreatedAt database.SurrealTime  `json:"created_at"`
-	UpdatedAt database.SurrealTime  `json:"updated_at"`
-	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
-	CreatedBy string                `json:"created_by"`
+	ID        models.RecordID    `json:"id,omitempty"`
+	Name      string             `json:"name"`
+	Color     string             `json:"color"`
+	CreatedAt database.FlexTime  `json:"created_at"`
+	UpdatedAt database.FlexTime  `json:"updated_at"`
+	DeletedAt *database.FlexTime `json:"deleted_at,omitempty"`
+	CreatedBy string             `json:"created_by"`
 }
 
 type goalLinkDB struct {

@@ -20,7 +20,7 @@
 //   - archived: Hidden from active views
 //
 // Database Architecture:
-//   - Uses SurrealDB graph relations for categories (in_category)
+//   - Uses the in_category relation table for categories
 //   - Child goals via goal_children relation
 //   - History tracking via goal_logs relation
 package goals
@@ -125,7 +125,7 @@ type GoalStats struct {
 }
 
 // GoalTaskLink represents a linked task with impact metadata.
-// This is populated via SurrealDB query from the task_goals relation.
+// This is populated from the task_goals relation.
 //
 // @Description Task linked to goal with impact data
 type GoalTaskLink struct {
@@ -331,7 +331,7 @@ type GoalTasksResponse struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name for goals.
+	// Table is the database table name for goals.
 	Table = "goals"
 
 	// Status values (only 3 now)

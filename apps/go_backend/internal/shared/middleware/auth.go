@@ -92,7 +92,7 @@ func Auth(cfg AuthConfig) gin.HandlerFunc {
 
 		// Parse and validate token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-			// Validate algorithm (SurrealDB uses HS512)
+			// Validate algorithm (HS512)
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
@@ -121,7 +121,7 @@ func Auth(cfg AuthConfig) gin.HandlerFunc {
 		}
 
 		// Extract user ID from claims
-		// SurrealDB uses "ID" claim, but we also support "sub" for flexibility
+		// Support both "ID" and "sub" claims for flexibility
 		userID := ""
 		if id, ok := claims["ID"].(string); ok && id != "" {
 			userID = id

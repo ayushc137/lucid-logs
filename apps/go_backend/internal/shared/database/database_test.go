@@ -113,3 +113,65 @@ func TestQueryAllDecodesSQLiteBooleans(t *testing.T) {
 		t.Fatalf("unexpected boolean column: %#v", got)
 	}
 }
+
+func TestMigrationsCoverSchedulerAndSeedStateTables(t *testing.T) {
+	db, err := New(context.Background(), Config{URL: t.TempDir() + "/coverage.db", MigrationsPath: "../../../../../db/migrations"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close(context.Background())
+
+	for _, table := range []string{
+		"users", "categories", "units", "emotions", "goals", "activities", "tasks",
+		"retrospectives", "task_emotions", "task_goals", "created_from_activity",
+		"activity_goals", "goal_children", "activity_logs", "goal_logs",
+		"goal_snapshots", "goal_daily_stats", "goal_period_snapshots",
+		"streak_history", "agg_daily", "timer_sessions",
+		"scheduler_jobs", "scheduler_state", "demo_seed_state",
+	} {
+		var name string
+		err := db.SQL().QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&name)
+		if err != nil {
+			t.Fatalf("table %s missing: %v", table, err)
+		}
+	}
+
+	var jobCount int
+	if err := db.SQL().QueryRow(`SELECT COUNT(*) FROM scheduler_jobs`).Scan(&jobCount); err != nil {
+		t.Fatal(err)
+	}
+	if jobCount < 2 {
+		t.Fatalf("scheduler_jobs count = %d, want at least 2 seeded jobs", jobCount)
+	}
+}
+
+func TestMigrationsAreIdempotentOnExistingDatabase(t *testing.T) {
+	dir := t.TempDir()
+	cfg := Config{URL: dir + "/idempotent.db", MigrationsPath: "../../../../../db/migrations"}
+	first, err := New(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Close(context.Background())
+
+	second, err := New(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close(context.Background())
+
+	var count int
+	if err := second.SQL().QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count < 3 {
+		t.Fatalf("schema_migrations count = %d, want at least 3 recorded migrations", count)
+	}
+	var emotions int
+	if err := second.SQL().QueryRow(`SELECT COUNT(*) FROM emotions`).Scan(&emotions); err != nil {
+		t.Fatal(err)
+	}
+	if emotions != 100 {
+		t.Fatalf("emotions count = %d after re-run, want 100 (no duplicate seeds)", emotions)
+	}
+}

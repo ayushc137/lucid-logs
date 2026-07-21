@@ -62,14 +62,14 @@ func NewRepository(db *database.DB) Repository {
 // =============================================================================
 
 type unitDB struct {
-	ID        models.RecordID      `json:"id,omitempty"`
-	Name      string               `json:"name"`
-	Symbol    string               `json:"symbol"`
-	Type      string               `json:"type"`
-	IsSystem  bool                 `json:"is_system"`
-	CreatedBy string               `json:"created_by"`
-	CreatedAt database.SurrealTime `json:"created_at"`
-	UpdatedAt database.SurrealTime `json:"updated_at"`
+	ID        models.RecordID   `json:"id,omitempty"`
+	Name      string            `json:"name"`
+	Symbol    string            `json:"symbol"`
+	Type      string            `json:"type"`
+	IsSystem  bool              `json:"is_system"`
+	CreatedBy string            `json:"created_by"`
+	CreatedAt database.FlexTime `json:"created_at"`
+	UpdatedAt database.FlexTime `json:"updated_at"`
 }
 
 func (u *unitDB) toUnit() *Unit {

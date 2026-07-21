@@ -1,66 +1,55 @@
 # Database Migrations
 
-This directory contains two migration files for Lucid Logs.
+Versioned, plain-SQL migrations for the Turso/libSQL database (SQLite dialect).
+They are applied automatically by the Go backend on startup
+(`internal/shared/database/database.go`, `applyMigrations`), in lexical order,
+each inside its own transaction. Applied files are recorded with a SHA-256
+checksum in `schema_migrations(version, checksum, applied_at)` — re-running is
+a no-op, and editing an already-applied file is a hard error.
+
+The legacy SurrealDB migrations (`*.surql`) are kept for historical reference
+only and are not applied by the backend.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `001_schema.surql` | Complete schema: all tables, indexes, and relations |
-| `002_seed_emotions.surql` | Seed 100 emotions reference data |
+| `001_initial.sql` | Complete schema: all entity, relation, history, and analytics tables + indexes |
+| `002_seed_reference.sql` | Reference data: 100 emotions + 17 system units (idempotent upserts) |
+| `003_scheduler.sql` | Scheduler jobs/state tables and demo seed/reset state |
 
-## How to Apply
+## Table coverage
 
-### Apply all migrations:
+Entities: `users`, `categories`, `units`, `emotions`, `tasks`, `goals`,
+`activities`, `retrospectives`, `timer_sessions`.
+Relations: `task_emotions`, `task_goals`, `created_from_activity`,
+`activity_goals`, `goal_children`.
+History/analytics: `activity_logs`, `goal_logs`, `goal_snapshots`,
+`goal_daily_stats`, `goal_period_snapshots`, `streak_history`, `agg_daily`.
+Infrastructure: `scheduler_jobs`, `scheduler_state`, `demo_seed_state`,
+`schema_migrations`.
+
+## Conventions
+
+- Primary keys are the API `table:value` strings (e.g. `tasks:abc123`).
+- Times are UTC RFC3339 text.
+- Multi-tenant tables filter on `created_by`; soft delete via `deleted_at`.
+- Nested/structured values are JSON text columns.
+- Reference-data seeds use `INSERT ... ON CONFLICT DO UPDATE` so migrations
+  are idempotent.
+
+## Configuration
+
+| Variable | Purpose |
+|----------|---------|
+| `LIBSQL_LOCAL_PATH` | Local database file (primary; `DATABASE_PATH` is the legacy alias) |
+| `LIBSQL_URL` | Turso remote URL for sync (legacy alias `TURSO_DATABASE_URL`) |
+| `LIBSQL_AUTH_TOKEN` | Turso auth token (legacy alias `TURSO_AUTH_TOKEN`) |
+| `DATABASE_MIGRATIONS_PATH` | This directory (default `../../db/migrations`) |
+
+## Verifying a fresh database
+
 ```bash
-surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/001_schema.surql
-surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/migrations/002_seed_emotions.surql
-```
-
-### Or use the consolidated schema file:
-```bash
-surreal sql -e http://localhost:8000 -u root -p root -ns lucid -db logs < db/schema.surql
-```
-
-## Schema Design
-
-### Schemaless + Essential Indexes
-- Tables auto-create fields on insert (no schema definitions)
-- Only define tables for permissions and indexes
-- TYPE RELATION for graph edges (provides in/out validation)
-
-### Denormalized Fields (Materialized View Pattern)
-Pre-computed values stored on records, updated on write:
-
-| Table | Fields | When Updated |
-|-------|--------|--------------|
-| `goals` | `current_streak`, `longest_streak`, `last_completed_date` | Goal entry marked met |
-
-### Graph Relations
-
-| Relation | Type | Notes |
-|----------|------|-------|
-| `task_emotions` | Explicit | Has type validation |
-| `task_goals` | Explicit | Has impact/milestone fields |
-| `goal_logs` | Explicit | Event history |
-| `in_category` | Auto | Created on RELATE |
-| `goal_children` | Auto | Created on RELATE |
-| `created_from` | Auto | Created on RELATE |
-| `template_goals` | Auto | Created on RELATE |
-
-## Quick Reference
-
-```sql
--- Goal with linked tasks
-SELECT *, 
-  (SELECT * FROM task_goals WHERE out = $parent.id) as linked_tasks 
-FROM goals:abc
-
--- Task with category
-SELECT *,
-  (SELECT out FROM in_category WHERE in = $parent.id)[0].out as category
-FROM tasks:xyz
-
--- All tasks for a goal
-SELECT <-task_goals<-tasks.* FROM goals:abc
+cd apps/go_backend
+go test ./internal/shared/database/   # applies all migrations on temp DBs
 ```

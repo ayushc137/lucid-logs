@@ -7,7 +7,7 @@
 //
 // This creates a new feature with:
 //   - models.go     (domain types)
-//   - repository.go (data access using SurrealDB SDK)
+//   - repository.go (data access via database/sql libSQL)
 //   - service.go    (business logic)
 //   - handler.go    (HTTP handlers)
 package main
@@ -167,7 +167,7 @@ type UpdateRequest struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name for {{.Name}}s.
+	// Table is the database table name for {{.Name}}s.
 	Table = "{{.NamePlural}}"
 )
 `

@@ -5,7 +5,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Daily journal backend powered by SurrealDB.",
+        "description": "Daily journal backend powered by libSQL (Turso).",
         "title": "Lucid Logs API",
         "contact": {},
         "version": "1.0"

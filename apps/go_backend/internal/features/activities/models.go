@@ -333,13 +333,13 @@ type ActivityGoalLinkDetail struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name for activities.
+	// Table is the database table name for activities.
 	Table = "activities"
 
-	// ActivityGoalsTable is the SurrealDB relation table name.
+	// ActivityGoalsTable is the relation table name.
 	ActivityGoalsTable = "activity_goals"
 
-	// TimerSessionsTable is the SurrealDB table for timer sessions.
+	// TimerSessionsTable is the table for timer sessions.
 	TimerSessionsTable = "timer_sessions"
 
 	// CreatedFromActivityTable tracks task origin.

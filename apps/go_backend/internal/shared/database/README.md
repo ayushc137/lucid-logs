@@ -1,36 +1,23 @@
 # Database Package
 
-This package provides SurrealDB connection and query utilities with type-safe operations.
+This package provides the libSQL (Turso) connection and query utilities with type-safe operations on top of `database/sql`.
 
 ## RecordID Convention
 
-**Use `models.RecordID` for any struct field that stores SurrealDB record IDs in database-facing structs. Convert to string only when crossing API boundaries.**
+**Use `models.RecordID` for any struct field that stores a record ID in database-facing structs. Convert to string only when crossing API boundaries.**
 
-### Why?
-
-SurrealDB returns record IDs as structured objects (`{ tb: "tasks", id: "abc123" }`), not strings. Using `models.RecordID` in DB structs allows the SDK to deserialize IDs correctly without query-time casts like `type::string(id) AS id`.
+Record IDs use the `table:value` format (e.g. `tasks:abc123`). They are stored as plain TEXT primary keys in SQLite, so the driver returns them as strings — but wrapping them in `models.RecordID` keeps the domain layer explicit about the format and validates it on unmarshal.
 
 ### Pattern
 
 ```go
-// ❌ BAD: Uses string for DB struct, requires type::string cast
-type taskDB struct {
-    ID string `json:"id"`
-    // ...
-}
-
-// Query needs explicit cast
-results, _ := database.QueryAll[taskDB](ctx, db, `
-    SELECT *, type::string(id) AS id FROM tasks
-`, nil)
-
 // ✅ GOOD: Uses models.RecordID for DB struct
 type taskDB struct {
     ID models.RecordID `json:"id,omitempty"`
     // ...
 }
 
-// Query is simple - SDK handles deserialization
+// Query is simple - the row mapper handles deserialization
 results, _ := database.QueryAll[taskDB](ctx, db, `
     SELECT * FROM tasks
 `, nil)
@@ -46,18 +33,18 @@ func (t *taskDB) toTask() *Task {
 
 ## Record Links (Relationships)
 
-For fields that reference other records (like `task.category`), use `models.RecordID`:
+For fields that reference other records (like `task.category_id`), use `models.RecordID`:
 
 ```go
 type taskCreateData struct {
-    Category *models.RecordID `json:"category,omitempty"` // Record link
+    CategoryID *models.RecordID `json:"category_id,omitempty"` // Record link
     // ...
 }
 
 // Create the link
 categoryLink := database.NewRecordID("categories", categoryID)
 data := taskCreateData{
-    Category: &categoryLink,
+    CategoryID: &categoryLink,
 }
 ```
 
@@ -76,6 +63,10 @@ data := taskCreateData{
 - `*DB` suffix: Database-facing structs with `models.RecordID` (e.g., `taskDB`, `categoryDB`, `userDB`)
 - No suffix: Domain/API-facing structs with string IDs (e.g., `Task`, `Category`, `User`)
 
+## Timestamps
+
+Timestamp columns are stored as RFC3339 TEXT. Use `database.FlexTime` in scan structs — it embeds `time.Time` and provides `Ptr()` for nullable columns.
+
 ## Example Flow
 
 ```
@@ -85,7 +76,7 @@ Handler (string IDs)
     ↓
 Service (string IDs)
     ↓
-Repository.Create() 
+Repository.Create()
     → MustRecordID() to create RecordID
     → Query with RecordID
     → Result as *DB struct with RecordID
@@ -93,12 +84,3 @@ Repository.Create()
     ↓
 API Response (string IDs)
 ```
-
-## Benefits
-
-1. **No query-time casts**: Plain `SELECT *` instead of `SELECT *, type::string(id) AS id`
-2. **Type safety**: SDK enforces RecordID shape at compile time
-3. **Simpler queries**: No custom RETURN blocks to remap IDs
-4. **Consistent links**: `models.NewRecordID()` ensures valid record references
-5. **Future-proof**: Won't forget casts when adding new queries
-

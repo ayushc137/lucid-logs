@@ -182,9 +182,9 @@ type GoalLogsSummary struct {
 // =============================================================================
 
 const (
-	// LogsTable is the SurrealDB relation table name.
+	// LogsTable is the relation table name.
 	LogsTable = "goal_logs"
 
-	// SnapshotsTable is the SurrealDB table for snapshots.
+	// SnapshotsTable is the table for snapshots.
 	SnapshotsTable = "goal_snapshots"
 )

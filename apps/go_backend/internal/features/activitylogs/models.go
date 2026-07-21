@@ -110,6 +110,6 @@ type ActivityLogsResponse struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name.
+	// Table is the database table name.
 	Table = "activity_logs"
 )

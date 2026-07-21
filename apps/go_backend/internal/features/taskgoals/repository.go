@@ -83,18 +83,18 @@ func NewRepository(db *database.DB) Repository {
 // tags (task_id/goal_id) match the SQLite schema so the row decoder maps
 // them correctly.
 type taskGoalDB struct {
-	ID             models.RecordID      `json:"id,omitempty"`
-	In             models.RecordID      `json:"task_id"` // Task ID (schema column: task_id)
-	Out            models.RecordID      `json:"goal_id"` // Goal ID (schema column: goal_id)
-	ImpactType     string               `json:"impact_type"`
-	QuantityValue  *float64             `json:"quantity_value,omitempty"`
-	UnitID         *string              `json:"unit_id,omitempty"`
-	Notes          string               `json:"notes,omitempty"`
-	Source         string               `json:"source"`
-	IsMilestone    bool                 `json:"is_milestone"`
-	MilestoneLabel string               `json:"milestone_label,omitempty"`
-	MilestoneOrder int                  `json:"milestone_order"`
-	CreatedAt      database.SurrealTime `json:"created_at"`
+	ID             models.RecordID   `json:"id,omitempty"`
+	In             models.RecordID   `json:"task_id"` // Task ID (schema column: task_id)
+	Out            models.RecordID   `json:"goal_id"` // Goal ID (schema column: goal_id)
+	ImpactType     string            `json:"impact_type"`
+	QuantityValue  *float64          `json:"quantity_value,omitempty"`
+	UnitID         *string           `json:"unit_id,omitempty"`
+	Notes          string            `json:"notes,omitempty"`
+	Source         string            `json:"source"`
+	IsMilestone    bool              `json:"is_milestone"`
+	MilestoneLabel string            `json:"milestone_label,omitempty"`
+	MilestoneOrder int               `json:"milestone_order"`
+	CreatedAt      database.FlexTime `json:"created_at"`
 }
 
 func (t *taskGoalDB) toTaskGoal() *TaskGoal {
@@ -170,7 +170,7 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 
 // CreateBatch creates multiple task-goal links efficiently.
 //
-// SQLite has no SurrealQL-style FOR loop; we iterate in Go and call
+// SQLite has no FOR loop in SQL; we iterate in Go and call
 // database.Create for each link, collecting the results. The UNIQUE(task_id,
 // goal_id) constraint prevents duplicates within the batch.
 func (r *repository) CreateBatch(ctx context.Context, taskID string, links []LinkRequest) ([]*TaskGoal, error) {

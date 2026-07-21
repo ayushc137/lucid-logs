@@ -2,13 +2,13 @@
 //
 // This package implements:
 //   - Task-goal linking with impact tracking
-//   - SurrealDB relation table operations (task_goals)
+//   - Relation table operations (task_goals)
 //   - Many-to-many relationship: one task can link to multiple goals
 //   - Milestone tracking for significant task completions
 //
 // Database Architecture:
 //
-// Uses SurrealDB RELATE for creating edges:
+// Relation edges are plain INSERTs into the link table:
 //
 //	RELATE tasks:abc -> task_goals -> goals:xyz SET {
 //	    impact_type: "positive",
@@ -166,7 +166,7 @@ type MilestonesResponse struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB relation table name.
+	// Table is the relation table name.
 	Table = "task_goals"
 
 	// Impact types

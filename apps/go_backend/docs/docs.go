@@ -1430,7 +1430,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "Lucid Logs API",
-	Description:      "Daily journal backend powered by SurrealDB.",
+	Description:      "Daily journal backend powered by libSQL (Turso).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

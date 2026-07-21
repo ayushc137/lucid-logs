@@ -64,19 +64,19 @@ type retroDB struct {
 	ID        models.RecordID `json:"id,omitempty"`
 	CreatedBy string          `json:"created_by"`
 
-	RetroType string               `json:"retro_type"`
-	StartDate database.SurrealTime `json:"start_date"`
-	EndDate   database.SurrealTime `json:"end_date"`
+	RetroType string            `json:"retro_type"`
+	StartDate database.FlexTime `json:"start_date"`
+	EndDate   database.FlexTime `json:"end_date"`
 
 	AutoSummary any `json:"auto_summary"` // Store as JSON object
 	UserContent any `json:"user_content"`
 
 	Status string `json:"status"`
 
-	GeneratedAt database.SurrealTime  `json:"generated_at"`
-	CreatedAt   database.SurrealTime  `json:"created_at"`
-	UpdatedAt   database.SurrealTime  `json:"updated_at"`
-	DeletedAt   *database.SurrealTime `json:"deleted_at,omitempty"`
+	GeneratedAt database.FlexTime  `json:"generated_at"`
+	CreatedAt   database.FlexTime  `json:"created_at"`
+	UpdatedAt   database.FlexTime  `json:"updated_at"`
+	DeletedAt   *database.FlexTime `json:"deleted_at,omitempty"`
 }
 
 func (r *retroDB) toRetrospective() *Retrospective {
@@ -98,7 +98,7 @@ func (r *retroDB) toRetrospective() *Retrospective {
 	}
 
 	// Parse auto_summary and user_content from any
-	// They're stored as JSON objects in SurrealDB
+	// They're stored as JSON TEXT columns in SQLite
 	if r.AutoSummary != nil {
 		if summary, ok := r.AutoSummary.(map[string]interface{}); ok {
 			retro.AutoSummary = parseAutoSummary(summary)

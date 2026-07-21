@@ -106,7 +106,7 @@ type LinkedGoalSummary struct {
 }
 
 // TaskGoalLink represents a linked goal with impact metadata.
-// This is populated via SurrealDB query from the task_goals relation.
+// This is populated from the task_goals relation.
 //
 // @Description Goal linked to task with impact data
 type TaskGoalLink struct {
@@ -259,7 +259,7 @@ type TaskGoalsResponse struct {
 // TaskFilterParams contains filter criteria for listing tasks.
 //
 // Filters can be combined (AND logic). Empty values are ignored.
-// Search uses SurrealDB full-text search on title, journal, and note fields.
+// Search matches on title, journal, and note fields.
 //
 // @Description Query parameters for filtering tasks
 type TaskFilterParams struct {
@@ -298,7 +298,7 @@ type TaskFilterParams struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name for tasks.
+	// Table is the database table name for tasks.
 	Table = "tasks"
 
 	// Source types

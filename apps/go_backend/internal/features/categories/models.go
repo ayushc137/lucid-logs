@@ -52,7 +52,7 @@ type UpdateRequest struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name for categories.
+	// Table is the database table name for categories.
 	Table = "categories"
 )
 

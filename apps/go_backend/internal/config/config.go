@@ -132,10 +132,11 @@ func Load() (*Config, error) {
 	cfg.Server.WriteTimeout = v.GetDuration("SERVER_WRITE_TIMEOUT")
 	cfg.Server.ShutdownTimeout = v.GetDuration("SERVER_SHUTDOWN_TIMEOUT")
 
-	// Database settings
-	cfg.Database.Path = v.GetString("DATABASE_PATH")
-	cfg.Database.URL = v.GetString("TURSO_DATABASE_URL")
-	cfg.Database.AuthToken = v.GetString("TURSO_AUTH_TOKEN")
+	// Database settings. LIBSQL_* variables are the primary contract;
+	// DATABASE_PATH / TURSO_* remain accepted for backwards compatibility.
+	cfg.Database.Path = firstNonEmpty(v.GetString("LIBSQL_LOCAL_PATH"), v.GetString("DATABASE_PATH"))
+	cfg.Database.URL = firstNonEmpty(v.GetString("LIBSQL_URL"), v.GetString("TURSO_DATABASE_URL"))
+	cfg.Database.AuthToken = firstNonEmpty(v.GetString("LIBSQL_AUTH_TOKEN"), v.GetString("TURSO_AUTH_TOKEN"))
 	cfg.Database.MigrationsPath = v.GetString("DATABASE_MIGRATIONS_PATH")
 
 	// JWT settings
@@ -243,6 +244,16 @@ func (c *Config) IsProd() bool {
 // IsDev returns true if running in development environment.
 func (c *Config) IsDev() bool {
 	return c.App.Env == "development" || c.App.Env == "dev"
+}
+
+// firstNonEmpty returns the first non-empty string, or "" if all are empty.
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // generateSecret generates a cryptographically secure random secret.

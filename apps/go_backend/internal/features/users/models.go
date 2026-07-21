@@ -38,7 +38,7 @@ type DailyRetroSettings struct {
 
 // userDB is the internal database representation of a user.
 //
-// This struct uses models.RecordID for the ID field, allowing SurrealDB SDK
+// This struct uses models.RecordID for the ID field, keeping the table:value
 // to populate it directly without type::string casts in queries.
 // Convert to domain model via toUser() at the repository boundary.
 type userDB struct {

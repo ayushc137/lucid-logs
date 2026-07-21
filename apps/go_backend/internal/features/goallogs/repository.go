@@ -351,7 +351,7 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 	}
 
 	// Fetch logs with task details when triggered_by_task_id is present.
-	// SQLite cannot return a struct via subquery the way SurrealDB did, so we
+	// SQLite cannot return a struct via subquery, so we
 	// build the triggering_task object via a json_object() aggregation from a
 	// LEFT JOIN against the tasks table (plus its category).
 	logsDB, err := database.QueryAll[goalLogDB](ctx, r.db, `

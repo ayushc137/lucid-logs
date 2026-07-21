@@ -83,7 +83,7 @@ type UnitListResponse struct {
 // =============================================================================
 
 const (
-	// Table is the SurrealDB table name for units.
+	// Table is the database table name for units.
 	Table = "units"
 
 	// Unit types

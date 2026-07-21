@@ -16,7 +16,7 @@
 //
 // @title           Lucid Logs API
 // @version         1.0
-// @description     Daily journal backend powered by SurrealDB.
+// @description     Daily journal backend powered by libSQL (Turso).
 // @schemes         http https
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth

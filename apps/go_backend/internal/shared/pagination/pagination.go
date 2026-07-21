@@ -146,17 +146,17 @@ func NewResponse[T any](items []T, total int64, params Params) Response[T] {
 // SUREALDB QUERY HELPERS
 // =============================================================================
 
-// ToSurrealQL returns the LIMIT and START clauses for SurrealDB queries.
+// ToSQL returns the LIMIT and OFFSET clauses for SQL queries.
 //
 // Example:
 //
-//	query := "SELECT * FROM tasks " + params.ToSurrealQL()
+//	query := "SELECT * FROM tasks " + params.ToSQL()
 //	// Result: "SELECT * FROM tasks LIMIT 20 START 0"
-func (p Params) ToSurrealQL() string {
+func (p Params) ToSQL() string {
 	return "LIMIT " + strconv.Itoa(p.Limit) + " START " + strconv.Itoa(p.Offset)
 }
 
-// ToVars returns pagination parameters as a map for SurrealDB query binding.
+// ToVars returns pagination parameters as a map for SQL query binding.
 //
 // Example:
 //

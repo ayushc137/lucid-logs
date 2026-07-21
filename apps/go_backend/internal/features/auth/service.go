@@ -25,7 +25,7 @@ import (
 type Service interface {
 	Login(context.Context, *LoginRequest) (*AuthResponse, error)
 	Register(context.Context, *RegisterRequest) (*AuthResponse, error)
-	ValidateToken(string) (*SurrealClaims, error)
+	ValidateToken(string) (*Claims, error)
 }
 
 type service struct {
@@ -37,9 +37,6 @@ type service struct {
 type tokenClaims struct {
 	jwt.RegisteredClaims
 	ID string `json:"ID"`
-	NS string `json:"NS,omitempty"`
-	DB string `json:"DB,omitempty"`
-	AC string `json:"AC"`
 }
 
 type userDB struct {
@@ -143,7 +140,7 @@ func VerifyPassword(password, encoded string) bool {
 	return subtle.ConstantTimeCompare(actual, expected) == 1
 }
 
-func (s *service) ValidateToken(tokenString string) (*SurrealClaims, error) {
+func (s *service) ValidateToken(tokenString string) (*Claims, error) {
 	if tokenString == "" {
 		return nil, errors.ErrUnauthorized.WithMessage("Token is empty")
 	}
@@ -164,7 +161,7 @@ func (s *service) ValidateToken(tokenString string) (*SurrealClaims, error) {
 	if userID == "" {
 		return nil, errors.ErrUnauthorized.WithMessage("Missing user ID in token")
 	}
-	result := &Claims{ID: userID, Access: claims.AC}
+	result := &Claims{ID: userID}
 	if claims.IssuedAt != nil {
 		result.IssuedAt = claims.IssuedAt.Time.Unix()
 	}
@@ -183,7 +180,7 @@ func (s *service) generateToken(userID string) (string, error) {
 	if hours <= 0 {
 		hours = 24
 	}
-	claims := tokenClaims{ID: userID, AC: "account", RegisteredClaims: jwt.RegisteredClaims{
+	claims := tokenClaims{ID: userID, RegisteredClaims: jwt.RegisteredClaims{
 		Subject: userID, Issuer: s.cfg.JWT.Issuer, IssuedAt: jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(hours) * time.Hour)),
 	}}

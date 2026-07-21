@@ -52,15 +52,15 @@ func NewRepository(db *database.DB) Repository {
 // =============================================================================
 
 type activityLogDB struct {
-	ID          models.RecordID      `json:"id,omitempty"`
-	EntityType  string               `json:"entity_type"`
-	EntityID    string               `json:"entity_id"`
-	Event       string               `json:"event"`
-	Changes     map[string]any       `json:"changes,omitempty"`
-	EntityTitle string               `json:"entity_title,omitempty"`
-	EntityIcon  string               `json:"entity_icon,omitempty"`
-	CreatedBy   string               `json:"created_by"`
-	CreatedAt   database.SurrealTime `json:"created_at"`
+	ID          models.RecordID   `json:"id,omitempty"`
+	EntityType  string            `json:"entity_type"`
+	EntityID    string            `json:"entity_id"`
+	Event       string            `json:"event"`
+	Changes     map[string]any    `json:"changes,omitempty"`
+	EntityTitle string            `json:"entity_title,omitempty"`
+	EntityIcon  string            `json:"entity_icon,omitempty"`
+	CreatedBy   string            `json:"created_by"`
+	CreatedAt   database.FlexTime `json:"created_at"`
 }
 
 func (l *activityLogDB) toActivityLog() *ActivityLog {
