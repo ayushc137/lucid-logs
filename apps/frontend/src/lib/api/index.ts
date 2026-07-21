@@ -166,3 +166,32 @@ export {
 	type GoalLinkDefault,
 	type ActivityGoalLinkDetail,
 } from './activities';
+
+// Retrospectives
+export {
+	getRetrospectives,
+	getRetrospective,
+	generateRetrospective,
+	updateRetrospective,
+	deleteRetrospective,
+	type Retrospective,
+	type RetrospectiveListResponse,
+	type RetroAutoSummary,
+	type UserReflection,
+	type GenerateRetrospectiveRequest,
+} from './retrospectives';
+
+// Analytics
+export {
+	getAnalyticsDashboard,
+	type DashboardResponse,
+	type TaskMetrics,
+	type EmotionMetrics,
+	type GoalMetrics,
+	type CategoryMetrics,
+	type CategoryBreakdown,
+	type EmotionCount,
+	type DailyMood,
+	type GoalProgressItem,
+	type StreakInfo,
+} from './analytics';

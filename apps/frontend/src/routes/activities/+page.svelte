@@ -7,7 +7,7 @@ import {
 	type InstantLogResponse,
 } from '$lib/api/activities';
 import { ActivityModal, InstantLogModal } from '$lib/components/activities';
-import { ConfirmDialog, ErrorAlert } from '$lib/components/ui';
+import { ConfirmDialog, ErrorAlert, Fab } from '$lib/components/ui';
 import { cn } from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
 import {
@@ -248,7 +248,7 @@ function highlightText(text: string, query: string): string {
 			</p>
 		</div>
 		<button
-			class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+			class="hidden lg:inline-flex btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
 			onclick={handleCreate}
 		>
 			<Plus class="w-4 h-4" />
@@ -258,7 +258,7 @@ function highlightText(text: string, query: string): string {
 
 	<!-- Search & Filters -->
 	<div class="card bg-base-100 shadow-lg border border-base-200">
-		<div class="card-body p-4">
+		<div class="card-body p-3 sm:p-4">
 			<div class="flex flex-col sm:flex-row gap-3">
 				<!-- Search -->
 				<div class="relative flex-1">
@@ -359,8 +359,8 @@ function highlightText(text: string, query: string): string {
 			</div>
 		</div>
 	{:else}
-		<!-- Activities Table -->
-		<div class="card bg-base-100 shadow-lg border border-base-200 overflow-hidden">
+		<!-- Desktop: table -->
+		<div class="hidden lg:block card bg-base-100 shadow-lg border border-base-200 overflow-hidden">
 			<div class="overflow-x-auto">
 				<table class="table table-lg">
 					<thead class="bg-base-100 border-b border-base-300">
@@ -531,8 +531,112 @@ function highlightText(text: string, query: string): string {
 				{/if}
 			</div>
 		</div>
+
+		<!-- Mobile: card list -->
+		<div class="lg:hidden space-y-2">
+			{#each activities as activity (activity.id)}
+				<article
+					class="card bg-base-100 border border-base-200 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
+					onclick={() => startEdit(activity)}
+					role="link"
+					tabindex="0"
+					onkeydown={(e) => e.key === "Enter" && startEdit(activity)}
+				>
+					<div class="card-body p-3 gap-2">
+						<div class="flex items-start gap-3">
+							<!-- Icon -->
+							<div class="relative shrink-0 mt-0.5">
+								<span class="text-2xl">{activity.icon || '⚡'}</span>
+								{#if activity.pinned}
+									<Pin class="w-3 h-3 text-primary absolute -top-1 -right-1" />
+								{/if}
+							</div>
+
+							<!-- Title + meta -->
+							<div class="flex-1 min-w-0">
+								<p class="font-semibold text-[15px] leading-snug">
+									{#if debouncedSearch}
+										{@html highlightText(activity.title, debouncedSearch)}
+									{:else}
+										{activity.title}
+									{/if}
+								</p>
+								{#if activity.description}
+									<p class="text-xs text-base-content/55 line-clamp-1 mt-0.5">
+										{activity.description}
+									</p>
+								{/if}
+								<div class="flex items-center gap-2 flex-wrap mt-2">
+									{#if activity.category}
+										<span
+											class="badge badge-sm"
+											style="background-color: {activity.category.color}20; color: {activity.category.color};"
+										>
+											{activity.category.name}
+										</span>
+									{/if}
+									{#if activity.default_duration}
+										<span class="badge badge-sm badge-ghost gap-1">
+											<Clock class="w-3 h-3" />
+											{formatDuration(activity.default_duration)}
+										</span>
+									{/if}
+									{#if activity.goals && activity.goals.length > 0}
+										<span class="badge badge-sm badge-ghost gap-1">
+											<Target class="w-3 h-3" />
+											{activity.goals.length}
+										</span>
+									{/if}
+									<span class={cn(
+										"badge badge-sm",
+										activity.default_impact === 'positive' && "badge-success",
+										activity.default_impact === 'negative' && "badge-error",
+										activity.default_impact === 'neutral' && "badge-ghost"
+									)}>
+										{activity.default_impact}
+									</span>
+								</div>
+								<p class="text-xs text-base-content/50 mt-2">
+									{activity.use_count} uses · {formatLastUsed(activity.last_used_at)}
+								</p>
+							</div>
+
+							<!-- Actions -->
+							<div class="flex flex-col items-end gap-1 shrink-0">
+								<button
+									class="btn btn-primary btn-sm gap-1"
+									onclick={(e) => openInstantLog(activity, e)}
+									title="Quick log"
+								>
+									<Play class="w-3 h-3" />
+									Log
+								</button>
+								<button
+									class="btn btn-ghost btn-xs btn-square text-error/70"
+									onclick={(e) => confirmDelete(activity.id, e)}
+									aria-label="Delete activity"
+								>
+									<Trash2 class="w-4 h-4" />
+								</button>
+							</div>
+						</div>
+					</div>
+				</article>
+			{/each}
+
+			<!-- Mobile footer -->
+			<div class="flex items-center justify-between px-1 pt-1 text-sm text-base-content/60">
+				<span>{activities.length} activities</span>
+				{#if $query.isFetching}
+					<LoaderCircle class="w-4 h-4 animate-spin text-primary" />
+				{/if}
+			</div>
+		</div>
 	{/if}
 </div>
+
+<!-- FAB -->
+<Fab onclick={handleCreate} label="New Activity" />
 
 <!-- Activity Modal -->
 <ActivityModal

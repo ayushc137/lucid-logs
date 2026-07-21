@@ -6,7 +6,7 @@ import {
 	updateGoal,
 } from '$lib/api';
 import { GoalModal } from '$lib/components/goals';
-import { ConfirmDialog, ErrorAlert } from '$lib/components/ui';
+import { ConfirmDialog, ErrorAlert, Fab } from '$lib/components/ui';
 import { cn } from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
 import {
@@ -321,7 +321,7 @@ function highlightText(text: string, query: string): string {
       </p>
     </div>
     <button
-      class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+      class="hidden lg:inline-flex btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
       onclick={handleCreate}
     >
       <Plus class="w-4 h-4" />
@@ -331,8 +331,8 @@ function highlightText(text: string, query: string): string {
 
   <!-- Search & Filters Card -->
   <div class="card bg-base-100 shadow-lg border border-base-200">
-    <div class="card-body p-4">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
+    <div class="card-body p-3 sm:p-4">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
         <!-- Search -->
         <div class="relative flex-1">
           {#if isSearching || $query.isFetching}
@@ -365,9 +365,11 @@ function highlightText(text: string, query: string): string {
         </div>
 
         <!-- Today Only Toggle -->
-        <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2">
-          <CalendarDays class="w-4 h-4 opacity-60" />
-          <span class="text-sm font-medium">Today</span>
+        <div class="flex items-center justify-between gap-2 bg-base-200 rounded-lg px-3 py-2">
+          <div class="flex items-center gap-2">
+            <CalendarDays class="w-4 h-4 opacity-60" />
+            <span class="text-sm font-medium">Today</span>
+          </div>
           <input
             type="checkbox"
             class="toggle toggle-primary toggle-sm"
@@ -536,8 +538,9 @@ function highlightText(text: string, query: string): string {
       </div>
     </div>
   {:else}
+    <!-- Desktop: table -->
     <div
-      class="card bg-base-100 shadow-lg border border-base-200 overflow-hidden"
+      class="hidden lg:block card bg-base-100 shadow-lg border border-base-200 overflow-hidden"
     >
       <div class="overflow-x-auto">
         <table class="table table-lg">
@@ -573,7 +576,7 @@ function highlightText(text: string, query: string): string {
               {@const progress = getProgress(goal)}
               {@const typeInfo = getGoalTypeInfo(goal)}
               {@const TypeIcon = typeInfo.icon}
-              {@const goalColor = goal.category?.color || "#8b5cf6"}
+              {@const goalColor = goal.category?.color || "#4f46e5"}
               <tr
                 class="relative hover:bg-base-200/50 transition-colors group cursor-pointer overflow-hidden"
                 onclick={() => startEdit(goal)}
@@ -719,8 +722,124 @@ function highlightText(text: string, query: string): string {
         {/if}
       </div>
     </div>
+
+    <!-- Mobile: card list -->
+    <div class="lg:hidden space-y-2">
+      {#each goals as goal (goal.id)}
+        {@const progress = getProgress(goal)}
+        {@const typeInfo = getGoalTypeInfo(goal)}
+        {@const TypeIcon = typeInfo.icon}
+        {@const goalColor = goal.category?.color || "#4f46e5"}
+        <article
+          class="card bg-base-100 border border-base-200 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
+          onclick={() => startEdit(goal)}
+          role="link"
+          tabindex="0"
+          onkeydown={(e) => e.key === "Enter" && startEdit(goal)}
+        >
+          <div class="card-body p-3 gap-2">
+            <div class="flex items-start gap-3">
+              <!-- Icon -->
+              <div
+                class="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+                style="background-color: {goalColor}20;"
+              >
+                {goal.icon || "🎯"}
+              </div>
+
+              <!-- Title + meta -->
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-[15px] leading-snug">
+                  {#if debouncedSearch}
+                    {@html highlightText(goal.title, debouncedSearch)}
+                  {:else}
+                    {goal.title}
+                  {/if}
+                </p>
+                {#if goal.description}
+                  <p class="text-xs text-base-content/55 line-clamp-1 mt-0.5">
+                    {goal.description}
+                  </p>
+                {/if}
+                <div class="flex items-center gap-2 flex-wrap mt-2">
+                  <span
+                    class="text-xs text-base-content/50 flex items-center gap-1"
+                  >
+                    <TypeIcon class="w-3.5 h-3.5" />
+                    {typeInfo.label}
+                  </span>
+                  {#if goal.stats && goal.stats.current_streak > 0}
+                    <span
+                      class="text-xs font-bold text-warning flex items-center gap-0.5"
+                    >
+                      <Flame class="w-3.5 h-3.5" />
+                      {goal.stats.current_streak}
+                    </span>
+                  {/if}
+                  <span
+                    class={cn(
+                      "badge badge-xs capitalize",
+                      statusColors[goal.status] || "badge-ghost",
+                    )}
+                  >
+                    {goal.status}
+                  </span>
+                </div>
+
+                <!-- Progress -->
+                {#if goal.target}
+                  <div class="flex items-center gap-2 mt-2">
+                    <div
+                      class="flex-1 h-1.5 bg-base-300 rounded-full overflow-hidden"
+                    >
+                      <div
+                        class="h-full rounded-full transition-all duration-500"
+                        style="width: {Math.min(
+                          100,
+                          progress,
+                        )}%; background-color: {goalColor};"
+                      ></div>
+                    </div>
+                    <span class="text-xs font-medium w-9 text-right">
+                      {Math.floor(progress)}%
+                    </span>
+                  </div>
+                {:else if goal.children && goal.children.length > 0}
+                  <p class="text-xs text-base-content/60 mt-2">
+                    {goal.stats?.children_completed || 0}/{goal.stats
+                      ?.children_total || 0} done
+                  </p>
+                {/if}
+              </div>
+
+              <!-- Delete -->
+              <button
+                class="btn btn-ghost btn-xs btn-square text-error/70 shrink-0"
+                onclick={(e) => confirmDelete(goal.id, e)}
+                aria-label="Delete goal"
+              >
+                <Trash2 class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </article>
+      {/each}
+
+      <!-- Mobile footer -->
+      <div
+        class="flex items-center justify-between px-1 pt-1 text-sm text-base-content/60"
+      >
+        <span>{goals.length} goals</span>
+        {#if $query.isFetching}
+          <LoaderCircle class="w-4 h-4 animate-spin text-primary" />
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>
+
+<!-- FAB -->
+<Fab onclick={handleCreate} label="New Goal" />
 
 <!-- Goal Modal -->
 <GoalModal

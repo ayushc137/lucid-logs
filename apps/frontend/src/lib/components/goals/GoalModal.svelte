@@ -514,7 +514,7 @@
 <!-- Modal -->
 <dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>
     <div
-        class="modal-box max-w-4xl p-0 flex flex-col bg-base-100 max-h-[92vh] rounded-3xl shadow-2xl"
+        class="modal-box max-w-4xl p-0 flex flex-col bg-base-100 max-h-[92vh] rounded-b-none sm:rounded-3xl shadow-2xl"
     >
         <!-- Header -->
         <div
