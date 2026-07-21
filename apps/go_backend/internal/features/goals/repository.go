@@ -603,7 +603,9 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		"offset": params.Offset,
 	}
 
-	if filters.Status != "" {
+	// "all" is a client-side convenience value meaning "no status filter" —
+	// never let it reach the SQL predicate (matches tasks repository behavior).
+	if filters.Status != "" && filters.Status != "all" {
 		conditions = append(conditions, "g.status = $status")
 		queryVars["status"] = filters.Status
 	}

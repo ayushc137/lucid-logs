@@ -111,9 +111,12 @@ func (h *Handler) List(c *gin.Context) {
 
 	// Parse filters from query params
 	filters := GoalFilters{
-		Status: c.Query("status"),
 		Search: c.Query("search"),
 		SortBy: c.Query("sort_by"),
+	}
+	// "all" is a client-side convenience value meaning "no status filter"
+	if status := c.Query("status"); status != "" && status != "all" {
+		filters.Status = status
 	}
 	if recurring := c.Query("recurring"); recurring != "" {
 		isRecurring := recurring == "true"
