@@ -1,10 +1,10 @@
 <script lang="ts">
-import { getAnalyticsDashboard, type DashboardResponse } from '$lib/api';
-import { EmptyState, ErrorAlert, LoadingCard } from '$lib/components/ui';
+import { type DashboardResponse, getAnalyticsDashboard } from '$lib/api';
+import ActivityHeatmap from '$lib/components/analytics/ActivityHeatmap.svelte';
 import DonutChart from '$lib/components/analytics/DonutChart.svelte';
 import FocusScore from '$lib/components/analytics/FocusScore.svelte';
 import MoodTrend from '$lib/components/analytics/MoodTrend.svelte';
-import ActivityHeatmap from '$lib/components/analytics/ActivityHeatmap.svelte';
+import { EmptyState, ErrorAlert, LoadingCard } from '$lib/components/ui';
 import { createQuery } from '@tanstack/svelte-query';
 import {
 	Activity,

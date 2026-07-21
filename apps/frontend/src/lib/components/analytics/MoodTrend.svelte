@@ -8,7 +8,10 @@ interface Props {
 let { trend }: Props = $props();
 
 // Chart dimensions
-const W = 320, H = 120, PAD_X = 8, PAD_Y = 10;
+const W = 320;
+const H = 120;
+const PAD_X = 8;
+const PAD_Y = 10;
 const plotW = W - PAD_X * 2;
 const plotH = H - PAD_Y * 2;
 
@@ -24,25 +27,36 @@ function x(index: number): number {
 // Build path
 const path = $derived(
 	trend.length > 0
-		? trend.map((d, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(d.valence).toFixed(1)}`).join(' ')
-		: ''
+		? trend
+				.map(
+					(d, i) =>
+						`${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(d.valence).toFixed(1)}`,
+				)
+				.join(' ')
+		: '',
 );
 
 const areaPath = $derived(
 	trend.length > 0
 		? `${path} L ${x(trend.length - 1).toFixed(1)} ${y(-1)} L ${x(0).toFixed(1)} ${y(-1)} Z`
-		: ''
+		: '',
 );
 
 // Date labels: first, middle, last
 const dateLabels = $derived(
 	trend.length > 0
 		? [
-			{ x: x(0), label: trend[0].date.slice(5) },
-			{ x: x(Math.floor(trend.length / 2)), label: trend[Math.floor(trend.length / 2)].date.slice(5) },
-			{ x: x(trend.length - 1), label: trend[trend.length - 1].date.slice(5) },
-		]
-		: []
+				{ x: x(0), label: trend[0].date.slice(5) },
+				{
+					x: x(Math.floor(trend.length / 2)),
+					label: trend[Math.floor(trend.length / 2)].date.slice(5),
+				},
+				{
+					x: x(trend.length - 1),
+					label: trend[trend.length - 1].date.slice(5),
+				},
+			]
+		: [],
 );
 </script>
 

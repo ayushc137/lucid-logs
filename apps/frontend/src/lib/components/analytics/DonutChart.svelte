@@ -13,20 +13,30 @@ const segments = $derived(
 	distribution.slice(0, 8).map((cat, i) => {
 		const pct = cat.percentage / 100;
 		const angle = pct * 360;
-		const startAngle = distribution.slice(0, i).reduce((a, c) => a + (c.percentage / 100) * 360, -90);
+		const startAngle = distribution
+			.slice(0, i)
+			.reduce((a, c) => a + (c.percentage / 100) * 360, -90);
 		const endAngle = startAngle + angle;
 
 		// Colors: cycle through a palette
 		const colors = [
-			'oklch(var(--p))', 'oklch(var(--s))', 'oklch(var(--a))',
-			'oklch(var(--wa))', 'oklch(var(--in))', 'oklch(var(--er))',
-			'oklch(var(--su))', 'oklch(var(--nc))',
+			'oklch(var(--p))',
+			'oklch(var(--s))',
+			'oklch(var(--a))',
+			'oklch(var(--wa))',
+			'oklch(var(--in))',
+			'oklch(var(--er))',
+			'oklch(var(--su))',
+			'oklch(var(--nc))',
 		];
 		const color = colors[i % colors.length];
 
 		// Donut path
 		const largeArc = angle > 180 ? 1 : 0;
-		const r = 40, ir = 24, cx = 50, cy = 50;
+		const r = 40;
+		const ir = 24;
+		const cx = 50;
+		const cy = 50;
 		const rad = (a: number) => (a * Math.PI) / 180;
 
 		const x1 = cx + r * Math.cos(rad(startAngle));
@@ -40,8 +50,14 @@ const segments = $derived(
 
 		const path = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${ir} ${ir} 0 ${largeArc} 0 ${x4} ${y4} Z`;
 
-		return { path, color, name: cat.category_name, hours: cat.hours, pct: cat.percentage };
-	})
+		return {
+			path,
+			color,
+			name: cat.category_name,
+			hours: cat.hours,
+			pct: cat.percentage,
+		};
+	}),
 );
 </script>
 

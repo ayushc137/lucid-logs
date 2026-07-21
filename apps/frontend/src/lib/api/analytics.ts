@@ -133,7 +133,9 @@ export interface ActivityHeatmapResponse {
 
 // ===== API FUNCTIONS =====
 
-export async function getAnalyticsDashboard(period?: string): Promise<DashboardResponse> {
+export async function getAnalyticsDashboard(
+	period?: string,
+): Promise<DashboardResponse> {
 	const query = period ? `?period=${period}` : '';
 	return unwrap(api.get(`analytics/dashboard${query}`));
 }
@@ -142,10 +144,15 @@ export async function getAnalyticsStreaks(): Promise<StreaksResponse> {
 	return unwrap(api.get('analytics/streaks'));
 }
 
-export async function getActivityHeatmap(params?: { start_date?: string; end_date?: string }): Promise<ActivityHeatmapResponse> {
+export async function getActivityHeatmap(params?: {
+	start_date?: string;
+	end_date?: string;
+}): Promise<ActivityHeatmapResponse> {
 	const searchParams = new URLSearchParams();
 	if (params?.start_date) searchParams.set('start_date', params.start_date);
 	if (params?.end_date) searchParams.set('end_date', params.end_date);
 	const query = searchParams.toString();
-	return unwrap(api.get(`analytics/activity-heatmap${query ? `?${query}` : ''}`));
+	return unwrap(
+		api.get(`analytics/activity-heatmap${query ? `?${query}` : ''}`),
+	);
 }

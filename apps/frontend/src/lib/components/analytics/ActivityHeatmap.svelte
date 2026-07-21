@@ -1,5 +1,5 @@
 <script lang="ts">
-import { getActivityHeatmap, type ActivityHeatmapDay } from '$lib/api';
+import { type ActivityHeatmapDay, getActivityHeatmap } from '$lib/api';
 import { createQuery } from '@tanstack/svelte-query';
 import { Flame } from 'lucide-svelte';
 
@@ -41,7 +41,12 @@ const monthLabels = $derived.by(() => {
 		if (!firstDay) return;
 		const month = new Date(firstDay.date).getMonth();
 		if (month !== lastMonth) {
-			labels.push({ label: new Date(firstDay.date).toLocaleDateString('en-US', { month: 'short' }), weekIndex: i });
+			labels.push({
+				label: new Date(firstDay.date).toLocaleDateString('en-US', {
+					month: 'short',
+				}),
+				weekIndex: i,
+			});
 			lastMonth = month;
 		}
 	});
@@ -52,12 +57,18 @@ const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function intensityClass(intensity: number): string {
 	switch (intensity) {
-		case 0: return 'bg-base-300/50';
-		case 1: return 'bg-primary/20';
-		case 2: return 'bg-primary/40';
-		case 3: return 'bg-primary/60';
-		case 4: return 'bg-primary/80';
-		default: return 'bg-base-300/50';
+		case 0:
+			return 'bg-base-300/50';
+		case 1:
+			return 'bg-primary/20';
+		case 2:
+			return 'bg-primary/40';
+		case 3:
+			return 'bg-primary/60';
+		case 4:
+			return 'bg-primary/80';
+		default:
+			return 'bg-base-300/50';
 	}
 }
 </script>

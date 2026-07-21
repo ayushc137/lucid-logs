@@ -9,8 +9,18 @@ let { score }: Props = $props();
 
 // Map score to color + label
 const info = $derived(() => {
-	if (score >= 70) return { color: 'text-success', label: 'Locked in', ring: 'stroke-success' };
-	if (score >= 40) return { color: 'text-warning', label: 'Mixed focus', ring: 'stroke-warning' };
+	if (score >= 70)
+		return {
+			color: 'text-success',
+			label: 'Locked in',
+			ring: 'stroke-success',
+		};
+	if (score >= 40)
+		return {
+			color: 'text-warning',
+			label: 'Mixed focus',
+			ring: 'stroke-warning',
+		};
 	return { color: 'text-error', label: 'Scattered', ring: 'stroke-error' };
 });
 
