@@ -1,660 +1,305 @@
-// Package database provides SurrealDB connection and query utilities.
-//
-// This package wraps the SurrealDB Go SDK to provide:
-//   - Type-safe CRUD operations using generics
-//   - Connection lifecycle management
-//   - Query logging for debugging
-//   - Record ID utilities with models.RecordID support
-//
-// # RecordID Usage Convention
-//
-// Use models.RecordID for any struct field that stores SurrealDB record IDs
-// in database-facing structs (e.g., taskDB, categoryDB). Convert to string
-// only when crossing API boundaries using ToStringID().
-//
-// SDK Methods Used:
-//   - surrealdb.Select[T]() - Type-safe record selection
-//   - surrealdb.Create[T]() - Type-safe record creation
-//   - surrealdb.Update[T]() - Type-safe full record updates
-//   - surrealdb.Merge[T]()  - Type-safe partial record updates
-//   - surrealdb.Delete[T]() - Type-safe record deletion
-//   - surrealdb.Query[T]()  - Type-safe raw query execution
-//
-// See: https://surrealdb.com/docs/sdk/golang
+// Package database provides the application's database/sql based libSQL connection.
 package database
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/surrealdb/surrealdb.go"
 	"github.com/surrealdb/surrealdb.go/pkg/models"
-
-	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	turso "turso.tech/database/tursogo"
 )
 
-// =============================================================================
-// DATABASE CLIENT
-// =============================================================================
+// Config configures a local Turso database and optional cloud synchronization.
+type Config struct {
+	URL            string
+	RemoteURL      string
+	AuthToken      string
+	MigrationsPath string
+	LogQueries     bool
+}
 
-// DB wraps the SurrealDB client with logging and type-safe utilities.
-//
-// Features:
-//   - Automatic query logging with duration tracking
-//   - Generic methods for type-safe operations
-//   - Error wrapping with context
+// DB owns the database/sql pool and, for synchronized databases, the sync handle.
 type DB struct {
-	client     *surrealdb.DB
+	sql        *sql.DB
+	syncDB     *turso.TursoSyncDb
 	logger     zerolog.Logger
 	logQueries bool
-	namespace  string
-	database   string
 }
 
-// Config holds database connection configuration.
-type Config struct {
-	URL        string // WebSocket URL (e.g., "ws://localhost:8000/rpc")
-	Namespace  string // SurrealDB namespace
-	Database   string // SurrealDB database
-	Username   string // Root username for initial connection
-	Password   string // Root password for initial connection
-	LogQueries bool   // Whether to log all queries (dev mode)
-}
-
-// =============================================================================
-// CONNECTION
-// =============================================================================
-
-// New creates a new database connection using the SurrealDB SDK.
-//
-// Connection flow:
-//  1. Connect via WebSocket
-//  2. Authenticate as root
-//  3. Select namespace and database
+// New opens the database, configures SQLite-compatible safety pragmas, and applies migrations.
 func New(ctx context.Context, cfg Config) (*DB, error) {
 	logger := log.With().Str("component", "database").Logger()
+	path := cfg.URL
+	if path == "" {
+		path = "./data/lucid-logs.db"
+	}
+	if path != ":memory:" && !strings.HasPrefix(path, "file:") {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return nil, fmt.Errorf("create database directory: %w", err)
+		}
+	}
 
-	// Connect to SurrealDB using SDK's New function
-	client, err := surrealdb.New(cfg.URL) //nolint:staticcheck // deprecated but functional
+	var (
+		pool   *sql.DB
+		syncDB *turso.TursoSyncDb
+		err    error
+	)
+	if cfg.RemoteURL != "" || cfg.AuthToken != "" {
+		if cfg.RemoteURL == "" || cfg.AuthToken == "" {
+			return nil, fmt.Errorf("remote URL and auth token must be configured together")
+		}
+		syncDB, err = turso.NewTursoSyncDb(ctx, turso.TursoSyncDbConfig{
+			Path: path, RemoteUrl: cfg.RemoteURL, AuthToken: cfg.AuthToken,
+		})
+		if err == nil {
+			pool, err = syncDB.Connect(ctx)
+		}
+	} else {
+		pool, err = sql.Open("turso", path)
+	}
 	if err != nil {
-		logger.Error().Err(err).Str("url", cfg.URL).Msg("failed to connect to SurrealDB")
-		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("connection failed: %w", err))
+		return nil, fmt.Errorf("open libSQL database: %w", err)
 	}
-
-	// Authenticate as root using SDK's SignIn method
-	// See: https://surrealdb.com/docs/sdk/golang/methods/signin
-	if _, err := client.SignIn(ctx, &surrealdb.Auth{
-		Username: cfg.Username,
-		Password: cfg.Password,
-	}); err != nil {
-		logger.Error().Err(err).Msg("failed to authenticate with SurrealDB")
-		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("authentication failed: %w", err))
+	db := &DB{sql: pool, syncDB: syncDB, logger: logger, logQueries: cfg.LogQueries}
+	if err := db.configure(ctx); err != nil {
+		_ = pool.Close()
+		return nil, err
 	}
-
-	// SurrealDB v3 requires namespace/database to exist before USE.
-	// Define them as root before switching context.
-	if _, err := surrealdb.Query[any](ctx, client,
-		fmt.Sprintf("DEFINE NAMESPACE IF NOT EXISTS %s", cfg.Namespace), nil); err != nil {
-		logger.Warn().Err(err).Str("namespace", cfg.Namespace).Msg("failed to define namespace (may already exist)")
+	if cfg.MigrationsPath != "" {
+		if err := db.applyMigrations(ctx, cfg.MigrationsPath); err != nil {
+			_ = pool.Close()
+			return nil, err
+		}
 	}
-	// Use the namespace first, then define the database within it
-	if err := client.Use(ctx, cfg.Namespace, ""); err != nil {
-		logger.Warn().Err(err).Str("namespace", cfg.Namespace).Msg("failed to use namespace for DB definition")
-	}
-	if _, err := surrealdb.Query[any](ctx, client,
-		fmt.Sprintf("DEFINE DATABASE IF NOT EXISTS %s", cfg.Database), nil); err != nil {
-		logger.Warn().Err(err).Str("database", cfg.Database).Msg("failed to define database (may already exist)")
-	}
-
-	// Select namespace and database using SDK's Use method
-	// See: https://surrealdb.com/docs/sdk/golang/methods/use
-	if err := client.Use(ctx, cfg.Namespace, cfg.Database); err != nil {
-		logger.Error().Err(err).
-			Str("namespace", cfg.Namespace).
-			Str("database", cfg.Database).
-			Msg("failed to select namespace/database")
-		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("use namespace failed: %w", err))
-	}
-
-	logger.Info().
-		Str("url", cfg.URL).
-		Str("namespace", cfg.Namespace).
-		Str("database", cfg.Database).
-		Msg("connected to SurrealDB")
-
-	return &DB{
-		client:     client,
-		logger:     logger,
-		logQueries: cfg.LogQueries,
-		namespace:  cfg.Namespace,
-		database:   cfg.Database,
-	}, nil
+	return db, nil
 }
 
-// Client returns the underlying SurrealDB client.
-//
-// Use this for SDK operations not wrapped by this package, such as:
-//   - SignIn/SignUp for user authentication
-//   - Live queries
-//   - Custom operations
-func (db *DB) Client() *surrealdb.DB {
-	return db.client
-}
-
-// Namespace returns the configured namespace.
-func (db *DB) Namespace() string {
-	return db.namespace
-}
-
-// Database returns the configured database name.
-func (db *DB) Database() string {
-	return db.database
-}
-
-// Close closes the database connection.
-func (db *DB) Close(ctx context.Context) {
-	db.client.Close(ctx)
-	db.logger.Info().Msg("database connection closed")
-}
-
-// =============================================================================
-// TYPED SDK OPERATIONS
-// =============================================================================
-
-// Select retrieves a single record using the SurrealDB SDK's Select method.
-//
-// This is a type-safe wrapper around surrealdb.Select[T]().
-// See: https://surrealdb.com/docs/sdk/golang/methods/select
-//
-// Example:
-//
-//	task, err := Select[Task](ctx, db, "tasks:abc123")
-func Select[T any](ctx context.Context, db *DB, what string) (*T, error) {
-	start := time.Now()
-
-	// Use SDK's generic Select function
-	result, err := surrealdb.Select[T](ctx, db.client, what)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("select", what).
-			Dur("duration", time.Since(start)).
-			Msg("SDK Select executed")
+func (db *DB) configure(ctx context.Context) error {
+	db.sql.SetMaxOpenConns(1)
+	for _, statement := range []string{"PRAGMA foreign_keys = ON", "PRAGMA busy_timeout = 5000"} {
+		if _, err := db.sql.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("configure database (%s): %w", statement, err)
+		}
 	}
+	return db.sql.PingContext(ctx)
+}
 
+// SQL exposes the standard pool for repositories and transactional operations.
+func (db *DB) SQL() *sql.DB { return db.sql }
+
+// Close closes the underlying pool. The context is retained for API compatibility.
+func (db *DB) Close(_ context.Context) { _ = db.sql.Close() }
+
+// Push uploads local commits when this is a synchronized database.
+func (db *DB) Push(ctx context.Context) error {
+	if db.syncDB == nil {
+		return nil
+	}
+	return db.syncDB.Push(ctx)
+}
+
+// Pull downloads remote commits when this is a synchronized database.
+func (db *DB) Pull(ctx context.Context) error {
+	if db.syncDB == nil {
+		return nil
+	}
+	_, err := db.syncDB.Pull(ctx)
+	return err
+}
+
+func (db *DB) applyMigrations(ctx context.Context, dir string) error {
+	if _, err := db.sql.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+	)`); err != nil {
+		return fmt.Errorf("create migration table: %w", err)
+	}
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		db.logger.Error().Err(err).Str("select", what).Msg("SDK Select failed")
-		return nil, errors.ErrDatabase.Wrap(err)
+		return fmt.Errorf("read migrations %q: %w", dir, err)
 	}
-
-	return result, nil
+	var names []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+			names = append(names, entry.Name())
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		body, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return fmt.Errorf("read migration %s: %w", name, err)
+		}
+		sum := sha256.Sum256(body)
+		checksum := hex.EncodeToString(sum[:])
+		var existing string
+		err = db.sql.QueryRowContext(ctx, "SELECT checksum FROM schema_migrations WHERE version = ?", name).Scan(&existing)
+		if err == nil {
+			if existing != checksum {
+				return fmt.Errorf("migration %s checksum changed", name)
+			}
+			continue
+		}
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("inspect migration %s: %w", name, err)
+		}
+		tx, err := db.sql.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("begin migration %s: %w", name, err)
+		}
+		if _, err = tx.ExecContext(ctx, string(body)); err == nil {
+			_, err = tx.ExecContext(ctx, "INSERT INTO schema_migrations(version,checksum,applied_at) VALUES(?,?,?)", name, checksum, time.Now().UTC().Format(time.RFC3339Nano))
+		}
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("apply migration %s: %w", name, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
-// SelectAll retrieves all records from a table using the SurrealDB SDK.
-//
-// This returns a slice of records, useful for listing operations.
-//
-// Example:
-//
-//	tasks, err := SelectAll[Task](ctx, db, "tasks")
-func SelectAll[T any](ctx context.Context, db *DB, table string) ([]T, error) {
-	start := time.Now()
+var namedParameter = regexp.MustCompile(`\$([A-Za-z_][A-Za-z0-9_]*)`)
 
-	// Use SDK's generic Select function with slice type
-	result, err := surrealdb.Select[[]T](ctx, db.client, table)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("select_all", table).
-			Dur("duration", time.Since(start)).
-			Msg("SDK SelectAll executed")
+func bindNamed(query string, vars map[string]any) (string, []any, error) {
+	if len(vars) == 0 {
+		return query, nil, nil
 	}
-
-	if err != nil {
-		db.logger.Error().Err(err).Str("select_all", table).Msg("SDK SelectAll failed")
-		return nil, errors.ErrDatabase.Wrap(err)
+	args := make([]any, 0, len(vars))
+	seen := map[string]bool{}
+	query = namedParameter.ReplaceAllStringFunc(query, func(token string) string {
+		name := token[1:]
+		if !seen[name] {
+			args = append(args, sql.Named(name, vars[name]))
+			seen[name] = true
+		}
+		return ":" + name
+	})
+	for name := range seen {
+		if _, ok := vars[name]; !ok {
+			return "", nil, fmt.Errorf("missing query parameter %q", name)
+		}
 	}
-
-	if result == nil {
-		return []T{}, nil
-	}
-
-	return *result, nil
+	return query, args, nil
 }
 
-// Create creates a new record using the SurrealDB SDK's Create method.
-//
-// This is a type-safe wrapper around surrealdb.Create[T]().
-// See: https://surrealdb.com/docs/sdk/golang/methods/create
-//
-// Examples:
-//
-//	// Create with auto-generated ID
-//	task, err := Create[Task](ctx, db, "tasks", data)
-//
-//	// Create with specific ID
-//	task, err := Create[Task](ctx, db, "tasks:myid", data)
-func Create[T any](ctx context.Context, db *DB, what string, data any) (*T, error) {
-	start := time.Now()
-
-	// Use SDK's generic Create function
-	result, err := surrealdb.Create[T](ctx, db.client, what, data)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("create", what).
-			Dur("duration", time.Since(start)).
-			Msg("SDK Create executed")
-	}
-
-	if err != nil {
-		db.logger.Error().Err(err).Str("create", what).Msg("SDK Create failed")
-		return nil, errors.ErrDatabase.Wrap(err)
-	}
-
-	return result, nil
-}
-
-// Update replaces a record entirely using the SurrealDB SDK's Update method.
-//
-// This is a type-safe wrapper around surrealdb.Update[T]().
-// See: https://surrealdb.com/docs/sdk/golang/methods/update
-//
-// NOTE: This replaces the entire record. Use Merge for partial updates.
-//
-// Example:
-//
-//	task, err := Update[Task](ctx, db, "tasks:abc123", updatedData)
-func Update[T any](ctx context.Context, db *DB, what string, data any) (*T, error) {
-	start := time.Now()
-
-	// Use SDK's generic Update function
-	result, err := surrealdb.Update[T](ctx, db.client, what, data)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("update", what).
-			Dur("duration", time.Since(start)).
-			Msg("SDK Update executed")
-	}
-
-	if err != nil {
-		db.logger.Error().Err(err).Str("update", what).Msg("SDK Update failed")
-		return nil, errors.ErrDatabase.Wrap(err)
-	}
-
-	return result, nil
-}
-
-// Merge partially updates a record using the SurrealDB SDK's Merge method.
-//
-// This is a type-safe wrapper around surrealdb.Merge[T]().
-// See: https://surrealdb.com/docs/sdk/golang/methods/merge
-//
-// Only provided fields are updated; other fields remain unchanged.
-//
-// Example:
-//
-//	task, err := Merge[Task](ctx, db, "tasks:abc123", map[string]any{
-//	    "completed": true,
-//	})
-func Merge[T any](ctx context.Context, db *DB, what string, data any) (*T, error) {
-	start := time.Now()
-
-	// Use SDK's generic Merge function
-	result, err := surrealdb.Merge[T](ctx, db.client, what, data)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("merge", what).
-			Dur("duration", time.Since(start)).
-			Msg("SDK Merge executed")
-	}
-
-	if err != nil {
-		db.logger.Error().Err(err).Str("merge", what).Msg("SDK Merge failed")
-		return nil, errors.ErrDatabase.Wrap(err)
-	}
-
-	return result, nil
-}
-
-// Delete removes a record using the SurrealDB SDK's Delete method.
-//
-// This is a type-safe wrapper around surrealdb.Delete[T]().
-// See: https://surrealdb.com/docs/sdk/golang/methods/delete
-//
-// Example:
-//
-//	task, err := Delete[Task](ctx, db, "tasks:abc123")
-func Delete[T any](ctx context.Context, db *DB, what string) (*T, error) {
-	start := time.Now()
-
-	// Use SDK's generic Delete function
-	result, err := surrealdb.Delete[T](ctx, db.client, what)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("delete", what).
-			Dur("duration", time.Since(start)).
-			Msg("SDK Delete executed")
-	}
-
-	if err != nil {
-		db.logger.Error().Err(err).Str("delete", what).Msg("SDK Delete failed")
-		return nil, errors.ErrDatabase.Wrap(err)
-	}
-
-	return result, nil
-}
-
-// =============================================================================
-// TYPED QUERY OPERATIONS
-// =============================================================================
-
-// Query executes a SurrealQL query using the SDK's Query method.
-//
-// This is a type-safe wrapper around surrealdb.Query[T]().
-// See: https://surrealdb.com/docs/sdk/golang/methods/query
-//
-// The type parameter T is the type of individual result items.
-// For queries returning multiple rows, use QueryAll[T].
-//
-// Example:
-//
-//	results, err := Query[Task](ctx, db, "SELECT * FROM tasks WHERE completed = $completed", map[string]any{
-//	    "completed": true,
-//	})
-func Query[T any](ctx context.Context, db *DB, sql string, vars map[string]any) (*[]surrealdb.QueryResult[[]T], error) {
-	start := time.Now()
-
-	// Use SDK's generic Query function with slice type for result
-	// The SDK returns QueryResult where Result is the type parameter
-	result, err := surrealdb.Query[[]T](ctx, db.client, sql, vars)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("query", truncateQuery(sql, 150)).
-			Dur("duration", time.Since(start)).
-			Msg("SDK Query executed")
-	}
-
-	if err != nil {
-		db.logger.Error().Err(err).Str("query", truncateQuery(sql, 150)).Msg("SDK Query failed")
-		return nil, errors.ErrDatabase.Wrap(err)
-	}
-
-	return result, nil
-}
-
-// QueryFirst executes a query and returns the first result.
-//
-// Useful for queries expected to return a single record.
-//
-// Example:
-//
-//	task, err := QueryFirst[Task](ctx, db, "SELECT * FROM tasks:abc123", nil)
-func QueryFirst[T any](ctx context.Context, db *DB, sql string, vars map[string]any) (*T, error) {
-	results, err := Query[T](ctx, db, sql, vars)
+// QueryAll executes parameterized SQL and maps columns to json-tagged struct fields.
+func QueryAll[T any](ctx context.Context, db *DB, query string, vars map[string]any) ([]T, error) {
+	query, args, err := bindNamed(query, vars)
 	if err != nil {
 		return nil, err
 	}
-
-	if results == nil || len(*results) == 0 {
-		return nil, nil
+	started := time.Now()
+	rows, err := db.sql.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
 	}
-
-	// Get first result set
-	firstResult := (*results)[0]
-	if firstResult.Status != "OK" {
-		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("query failed: %s", firstResult.Status))
+	defer rows.Close()
+	if db.logQueries {
+		db.logger.Debug().Dur("duration", time.Since(started)).Msg("SQL query executed")
 	}
-
-	// Result is []T, get first item
-	if len(firstResult.Result) == 0 {
-		return nil, nil
-	}
-
-	return &firstResult.Result[0], nil
-}
-
-// QueryAll executes a query and returns all results from the first result set.
-//
-// Example:
-//
-//	tasks, err := QueryAll[Task](ctx, db, "SELECT * FROM tasks WHERE completed = true", nil)
-func QueryAll[T any](ctx context.Context, db *DB, sql string, vars map[string]any) ([]T, error) {
-	results, err := Query[T](ctx, db, sql, vars)
+	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
 	}
-
-	if results == nil || len(*results) == 0 {
-		return []T{}, nil
+	result := make([]T, 0)
+	for rows.Next() {
+		values := make([]any, len(columns))
+		pointers := make([]any, len(columns))
+		for i := range values {
+			pointers[i] = &values[i]
+		}
+		if err := rows.Scan(pointers...); err != nil {
+			return nil, err
+		}
+		mapped := make(map[string]any, len(columns))
+		for i, column := range columns {
+			value := values[i]
+			if b, ok := value.([]byte); ok {
+				value = string(b)
+			}
+			mapped[column] = value
+		}
+		encoded, err := json.Marshal(mapped)
+		if err != nil {
+			return nil, err
+		}
+		var item T
+		if err := json.Unmarshal(encoded, &item); err != nil {
+			return nil, fmt.Errorf("decode SQL row: %w", err)
+		}
+		result = append(result, item)
 	}
-
-	// Get first result set
-	firstResult := (*results)[0]
-	if firstResult.Status != "OK" {
-		return nil, errors.ErrDatabase.Wrap(fmt.Errorf("query failed: %s", firstResult.Status))
-	}
-
-	return firstResult.Result, nil
+	return result, rows.Err()
 }
 
-// QueryScalar executes a query and returns a scalar value.
-//
-// Useful for COUNT queries and functions that return single values.
-//
-// Example:
-//
-//	count, err := QueryScalar[int64](ctx, db, "RETURN fn::task::count_for_user($user)", map[string]any{"user": userID})
-func QueryScalar[T any](ctx context.Context, db *DB, sql string, vars map[string]any) (T, error) {
+func QueryFirst[T any](ctx context.Context, db *DB, query string, vars map[string]any) (*T, error) {
+	rows, err := QueryAll[T](ctx, db, query, vars)
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	return &rows[0], nil
+}
+
+func QueryScalar[T any](ctx context.Context, db *DB, query string, vars map[string]any) (T, error) {
 	var zero T
-	start := time.Now()
-
-	// Use SDK's generic Query function with any type
-	result, err := surrealdb.Query[any](ctx, db.client, sql, vars)
-
-	if db.logQueries {
-		db.logger.Debug().
-			Str("query_scalar", truncateQuery(sql, 150)).
-			Dur("duration", time.Since(start)).
-			Msg("SDK QueryScalar executed")
-	}
-
+	query, args, err := bindNamed(query, vars)
 	if err != nil {
-		db.logger.Error().Err(err).Str("query", truncateQuery(sql, 150)).Msg("SDK QueryScalar failed")
-		return zero, errors.ErrDatabase.Wrap(err)
+		return zero, err
 	}
-
-	if result == nil || len(*result) == 0 {
-		return zero, nil
+	var raw any
+	if err := db.sql.QueryRowContext(ctx, query, args...).Scan(&raw); err != nil {
+		return zero, err
 	}
-
-	firstResult := (*result)[0]
-	if firstResult.Status != "OK" {
-		return zero, errors.ErrDatabase.Wrap(fmt.Errorf("query failed: %s", firstResult.Status))
-	}
-
-	// Result is the scalar value directly
-	val := firstResult.Result
-
-	// Handle direct type match
-	if v, ok := val.(T); ok {
-		return v, nil
-	}
-
-	// Handle numeric conversions (SurrealDB often returns float64 or int64)
-	if f, ok := val.(float64); ok {
-		switch any(zero).(type) {
-		case int64:
-			return any(int64(f)).(T), nil //nolint:errcheck // type assertion
-		case int:
-			return any(int(f)).(T), nil //nolint:errcheck // type assertion
-		case float32:
-			return any(float32(f)).(T), nil //nolint:errcheck // type assertion
-		case float64:
-			return any(f).(T), nil //nolint:errcheck // type assertion
+	encoded, _ := json.Marshal(raw)
+	var out T
+	if err := json.Unmarshal(encoded, &out); err != nil {
+		target := reflect.ValueOf(&out).Elem()
+		value := reflect.ValueOf(raw)
+		if value.IsValid() && value.Type().ConvertibleTo(target.Type()) {
+			target.Set(value.Convert(target.Type()))
+			return out, nil
 		}
+		return zero, err
 	}
-
-	// Handle int64 (SurrealDB SDK may return int64 for integers)
-	if i, ok := val.(int64); ok {
-		switch any(zero).(type) {
-		case int64:
-			return any(i).(T), nil //nolint:errcheck // type assertion
-		case int:
-			return any(int(i)).(T), nil //nolint:errcheck // type assertion
-		case float32:
-			return any(float32(i)).(T), nil //nolint:errcheck // type assertion
-		case float64:
-			return any(float64(i)).(T), nil //nolint:errcheck // type assertion
-		}
-	}
-
-	// Handle int
-	if i, ok := val.(int); ok {
-		switch any(zero).(type) {
-		case int64:
-			return any(int64(i)).(T), nil //nolint:errcheck // type assertion
-		case int:
-			return any(i).(T), nil //nolint:errcheck // type assertion
-		case float32:
-			return any(float32(i)).(T), nil //nolint:errcheck // type assertion
-		case float64:
-			return any(float64(i)).(T), nil //nolint:errcheck // type assertion
-		}
-	}
-
-	// Try JSON marshaling as fallback
-	data, err := json.Marshal(val)
-	if err != nil {
-		return zero, fmt.Errorf("cannot convert result: %w", err)
-	}
-	var t T
-	if err := json.Unmarshal(data, &t); err != nil {
-		return zero, fmt.Errorf("cannot unmarshal result: %w", err)
-	}
-	return t, nil
+	return out, nil
 }
 
-// =============================================================================
-// RECORD ID UTILITIES
-// =============================================================================
-
-// ToStringID converts a models.RecordID to its string representation.
-//
-// This is the primary way to convert SurrealDB record IDs to strings
-// when crossing API boundaries (e.g., in toTask(), toCategory() converters).
-//
-// Example:
-//
-//	rid := models.NewRecordID("tasks", "abc123")
-//	str := ToStringID(rid) // "tasks:abc123"
-func ToStringID(rid models.RecordID) string {
-	return rid.String()
-}
-
-// MustRecordID creates a models.RecordID from a table name and raw ID string.
-//
-// Use this when you have a string ID and need to convert it to RecordID
-// for database operations. The raw string can be either:
-//   - Just the ID portion: "abc123"
-//   - Full record ID: "tasks:abc123" (table will be extracted)
-//
-// Example:
-//
-//	rid := MustRecordID("tasks", "abc123")           // tasks:abc123
-//	rid := MustRecordID("tasks", "tasks:abc123")    // tasks:abc123 (extracts ID)
+// Record ID helpers remain during the repository migration to preserve table:value API IDs.
+func ToStringID(rid models.RecordID) string { return rid.String() }
 func MustRecordID(table, raw string) models.RecordID {
-	// If raw already contains table prefix, extract just the ID
 	if strings.Contains(raw, ":") {
-		_, raw = ParseRecordID(raw)
+		if rid, err := models.ParseRecordID(raw); err == nil {
+			return *rid
+		}
 	}
 	return models.NewRecordID(table, raw)
 }
-
-// NewRecordID is an alias for models.NewRecordID for convenience.
-//
-// Use this to create record links for relationships (e.g., task.category).
-//
-// Example:
-//
-//	categoryLink := NewRecordID("categories", catID)
-func NewRecordID(table string, id any) models.RecordID {
-	return models.NewRecordID(table, id)
-}
-
-// RecordIDFromString parses a string record ID into models.RecordID.
-//
-// Returns an error if the string cannot be parsed.
-//
-// Example:
-//
-//	rid, err := RecordIDFromString("tasks:abc123")
-func RecordIDFromString(s string) (models.RecordID, error) {
-	rid, err := models.ParseRecordID(s)
+func NewRecordID(table string, id any) models.RecordID { return models.NewRecordID(table, id) }
+func RecordIDFromString(value string) (models.RecordID, error) {
+	rid, err := models.ParseRecordID(value)
 	if err != nil {
-		return models.RecordID{}, fmt.Errorf("invalid record ID %q: %w", s, err)
+		return models.RecordID{}, fmt.Errorf("invalid record ID %q: %w", value, err)
 	}
 	return *rid, nil
 }
-
-// RecordID creates a SurrealDB record ID string from table and ID parts.
-//
-// Deprecated: Use MustRecordID() to get models.RecordID for type safety,
-// or NewRecordID() for creating record links.
-//
-// Examples:
-//
-//	RecordID("tasks", "abc123")      // "tasks:abc123"
-//	RecordID("tasks", "tasks:xyz")   // "tasks:xyz" (unchanged)
-func RecordID(table, id string) string {
-	if strings.Contains(id, ":") {
-		return id
+func RecordID(table, raw string) string {
+	if strings.Contains(raw, ":") {
+		return raw
 	}
-	return table + ":" + id
-}
-
-// ParseRecordID splits a record ID string into table and ID parts.
-//
-// Example:
-//
-//	table, id := ParseRecordID("tasks:abc123")
-//	// table = "tasks", id = "abc123"
-func ParseRecordID(recordID string) (table, id string) {
-	parts := strings.SplitN(recordID, ":", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return "", recordID
-}
-
-// ExtractID extracts just the ID portion from a record ID string.
-//
-// Example:
-//
-//	id := ExtractID("tasks:abc123") // "abc123"
-func ExtractID(recordID string) string {
-	_, id := ParseRecordID(recordID)
-	return id
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-// truncateQuery truncates a query string for logging.
-func truncateQuery(s string, maxLen int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
+	return table + ":" + raw
 }
