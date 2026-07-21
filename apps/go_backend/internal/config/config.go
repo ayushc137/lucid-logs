@@ -50,21 +50,17 @@ type ServerConfig struct {
 	ShutdownTimeout time.Duration // Graceful shutdown timeout
 }
 
-// DatabaseConfig contains SurrealDB connection settings.
+// DatabaseConfig contains local and optional Turso sync settings.
 type DatabaseConfig struct {
-	Host           string // Database host
-	Port           int    // Database port
-	User           string // Root username
-	Password       string // Root password
-	Namespace      string // SurrealDB namespace
-	Database       string // SurrealDB database
-	SchemaPath     string // Path to schema.surql file
-	MigrationsPath string // Path to migrations directory
+	Path           string // Local database or replica path
+	URL            string // Optional Turso remote URL
+	AuthToken      string // Optional Turso authentication token
+	MigrationsPath string // Path to SQL migrations directory
 }
 
-// WebSocketURL returns the WebSocket URL for SurrealDB connection.
-func (d DatabaseConfig) WebSocketURL() string {
-	return fmt.Sprintf("ws://%s:%d/rpc", d.Host, d.Port)
+// IsSynced reports whether local-to-Turso synchronization is configured.
+func (d DatabaseConfig) IsSynced() bool {
+	return d.URL != "" && d.AuthToken != ""
 }
 
 // JWTConfig contains JWT authentication settings.
@@ -137,14 +133,10 @@ func Load() (*Config, error) {
 	cfg.Server.ShutdownTimeout = v.GetDuration("SERVER_SHUTDOWN_TIMEOUT")
 
 	// Database settings
-	cfg.Database.Host = v.GetString("DB_HOST")
-	cfg.Database.Port = v.GetInt("DB_PORT")
-	cfg.Database.User = v.GetString("DB_USER")
-	cfg.Database.Password = v.GetString("DB_PASS")
-	cfg.Database.Namespace = v.GetString("DB_NAMESPACE")
-	cfg.Database.Database = v.GetString("DB_DATABASE")
-	cfg.Database.SchemaPath = v.GetString("DB_SCHEMA_PATH")
-	cfg.Database.MigrationsPath = v.GetString("DB_MIGRATIONS_PATH")
+	cfg.Database.Path = v.GetString("DATABASE_PATH")
+	cfg.Database.URL = v.GetString("TURSO_DATABASE_URL")
+	cfg.Database.AuthToken = v.GetString("TURSO_AUTH_TOKEN")
+	cfg.Database.MigrationsPath = v.GetString("DATABASE_MIGRATIONS_PATH")
 
 	// JWT settings
 	cfg.JWT.Secret = v.GetString("JWT_SECRET")
@@ -185,13 +177,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("SERVER_SHUTDOWN_TIMEOUT", "10s")
 
 	// Database defaults
-	v.SetDefault("DB_HOST", "localhost")
-	v.SetDefault("DB_PORT", 8000)
-	v.SetDefault("DB_USER", "root")
-	v.SetDefault("DB_PASS", "root")
-	v.SetDefault("DB_NAMESPACE", "daily_journal")
-	v.SetDefault("DB_DATABASE", "core")
-	v.SetDefault("DB_MIGRATIONS_PATH", "../../db/migrations")
+	v.SetDefault("DATABASE_PATH", "./data/lucid-logs.db")
+	v.SetDefault("DATABASE_MIGRATIONS_PATH", "../../db/migrations")
 
 	// JWT defaults
 	v.SetDefault("JWT_EXPIRATION_HOURS", 24)
@@ -205,6 +192,13 @@ func setDefaults(v *viper.Viper) {
 // validateAndSecure validates security-critical settings.
 func validateAndSecure(cfg *Config) error {
 	isProd := cfg.IsProd()
+
+	if cfg.Database.Path == "" {
+		return fmt.Errorf("DATABASE_PATH is required")
+	}
+	if (cfg.Database.URL == "") != (cfg.Database.AuthToken == "") {
+		return fmt.Errorf("TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set together")
+	}
 
 	// Handle JWT secret
 	if cfg.JWT.Secret == "" {
