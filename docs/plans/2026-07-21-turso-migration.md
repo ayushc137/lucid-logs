@@ -234,6 +234,30 @@ Each slice must record the exact RED and GREEN command/result below before movin
 
 A RED is valid only when the test compiles and fails because behavior is missing. Baseline on 2026-07-21: `go test ./...` passed but reported `[no test files]` for every package. Frontend `pnpm check` and `pnpm build` passed with one pre-existing `GoalSearchModal.svelte` ARIA warning.
 
+## Baseline status snapshot (2026-07-21, task t_eae4eef0)
+
+After three prior implementation runs on the parent card, the tree state at the time this baseline task ran is:
+
+- `go build ./...` — clean
+- `go vet ./...` — clean
+- `gofmt -l .` — clean (after a `gofmt -w .` pass during this task)
+- `go test ./...` — 4 packages with tests, all passing:
+  - `internal/config` (local/synced Turso config selection, credential rejection)
+  - `internal/features/auth` (Argon2id hash/verify, register/login service against SQL)
+  - `internal/shared/database` (migration runner, checksums, FK pragma, row scanning)
+  - `internal/shared/recordid` (Surreal `table:id` string compatibility helpers)
+- All other packages report `[no test files]` — per-repository tests are owned by the per-repo child tasks.
+- Frontend was not re-run during this baseline task; last recorded state (above) had `pnpm check`/`pnpm build` green with one ARIA warning.
+
+Committed branch state at this point:
+
+- `926ccab` test: establish Turso migration plan and baseline (this plan + config/database tests)
+- `e36faf3` feat: add Turso database core and SQL migrations (`tursogo` driver, `database/sql` core, `db/migrations/001_initial.sql`)
+- `6c53f44` feat: port all repositories to database/sql libSQL (users/auth + RecordID compat + partial repository ports; commit message overstates — see remaining-surface inventory in the parent card comments)
+- `wip` commit from this task preserving the mixed-tree partial work (remaining repository ports in progress across analytics, categories, goallogs, goals, retrospectives, taskgoals, tasks, units; bootstrap and seeder partial ports; Surreal SDK dependency removal)
+
+No `.surql` files, Surreal schema assets, Docker services, or runtime/docs references have been deleted yet. The Surreal Go SDK module is removed from `go.mod` only where the ported code no longer imports it; remaining SurrealQL call sites inside repositories are inventoried in the parent card and assigned to per-repo child tasks.
+
 ## Cutover phases
 
 1. Add tests and database/config/migration infrastructure without changing handlers.

@@ -1,26 +1,29 @@
-// Package taskgoals provides task-goal relationship management using SurrealDB.
+// Package taskgoals provides task-goal relationship management using SQLite/libSQL.
 //
 // This package implements:
-//   - RELATE operations for creating task→goal edges
+//   - INSERT operations for creating task→goal edges in the task_goals join table
 //   - Delete operations for unlinking
 //   - Edge lookup by task+goal for duplicate prevention
 //
 // Database Architecture:
 //
-// Uses SurrealDB RELATE for creating edges:
+// The task_goals table is a many-to-many join table between tasks and goals:
 //
-//	RELATE tasks:abc -> goals:xyz SET impact_type = "positive", ...
+//	INSERT INTO task_goals (id, task_id, goal_id, impact_type, ...) VALUES (...)
 //
-// The task_goals table is a relation table (TYPE RELATION IN tasks OUT goals).
+// The schema enforces UNIQUE(task_id, goal_id) for duplicate prevention and
+// uses ON DELETE CASCADE to clean up edges when either endpoint is removed.
 package taskgoals
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
@@ -74,10 +77,15 @@ func NewRepository(db *database.DB) Repository {
 // =============================================================================
 
 // taskGoalDB is the internal database representation.
+//
+// JSON tags map directly to the task_goals table columns. The In/Out field
+// names are preserved for compatibility with toTaskGoal(), but their JSON
+// tags (task_id/goal_id) match the SQLite schema so the row decoder maps
+// them correctly.
 type taskGoalDB struct {
 	ID             models.RecordID      `json:"id,omitempty"`
-	In             models.RecordID      `json:"in"`  // Task ID
-	Out            models.RecordID      `json:"out"` // Goal ID
+	In             models.RecordID      `json:"task_id"` // Task ID (schema column: task_id)
+	Out            models.RecordID      `json:"goal_id"` // Goal ID (schema column: goal_id)
 	ImpactType     string               `json:"impact_type"`
 	QuantityValue  *float64             `json:"quantity_value,omitempty"`
 	UnitID         *string              `json:"unit_id,omitempty"`
@@ -111,28 +119,20 @@ func (t *taskGoalDB) toTaskGoal() *TaskGoal {
 // =============================================================================
 
 func (r *repository) Create(ctx context.Context, taskID, goalID string, req *LinkRequest, userID string) (*TaskGoal, error) {
-	taskRecordID := database.MustRecordID("tasks", taskID)
-	goalRecordID := database.MustRecordID("goals", goalID)
-	now := time.Now().UTC()
+	// Normalize to table:value record IDs for storage.
+	taskRef := database.RecordID("tasks", taskID)
+	goalRef := database.RecordID("goals", goalID)
+	edgeID := generateEdgeRecordID()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 
 	// Set defaults
 	source := SourceManual
 
-	// Use RELATE to create the edge
-	result, err := database.QueryFirst[taskGoalDB](ctx, r.db, `
-		RELATE $task -> task_goals -> $goal SET
-			impact_type = $impact_type,
-			quantity_value = $quantity_value,
-			unit_id = $unit_id,
-			notes = $notes,
-			source = $source,
-			is_milestone = $is_milestone,
-			milestone_label = $milestone_label,
-			milestone_order = $milestone_order,
-			created_at = $created_at
-	`, map[string]any{
-		"task":            taskRecordID,
-		"goal":            goalRecordID,
+	// Use database.Create to INSERT and SELECT the row back in one call.
+	result, err := database.Create[taskGoalDB](ctx, r.db, Table, map[string]any{
+		"id":              edgeID.String(),
+		"task_id":         taskRef,
+		"goal_id":         goalRef,
 		"impact_type":     req.ImpactType,
 		"quantity_value":  req.QuantityValue,
 		"unit_id":         req.UnitID,
@@ -168,63 +168,54 @@ func (r *repository) Create(ctx context.Context, taskID, goalID string, req *Lin
 // CREATE BATCH
 // =============================================================================
 
-// CreateBatch creates multiple task-goal links efficiently in a single query.
-// This uses SurrealDB's FOR loop to minimize database round trips.
+// CreateBatch creates multiple task-goal links efficiently.
+//
+// SQLite has no SurrealQL-style FOR loop; we iterate in Go and call
+// database.Create for each link, collecting the results. The UNIQUE(task_id,
+// goal_id) constraint prevents duplicates within the batch.
 func (r *repository) CreateBatch(ctx context.Context, taskID string, links []LinkRequest) ([]*TaskGoal, error) {
 	if len(links) == 0 {
 		return []*TaskGoal{}, nil
 	}
 
-	taskRecordID := database.MustRecordID("tasks", taskID)
-	now := time.Now().UTC()
+	taskRef := database.RecordID("tasks", taskID)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	source := SourceManual
 
-	// Build array of link data for batch insertion
-	linkData := make([]map[string]any, len(links))
-	for i, link := range links {
-		linkData[i] = map[string]any{
-			"goal_id":         link.GoalID,
+	taskGoals := make([]*TaskGoal, 0, len(links))
+
+	for _, link := range links {
+		goalRef := database.RecordID("goals", link.GoalID)
+		edgeID := generateEdgeRecordID()
+
+		result, err := database.Create[taskGoalDB](ctx, r.db, Table, map[string]any{
+			"id":              edgeID.String(),
+			"task_id":         taskRef,
+			"goal_id":         goalRef,
 			"impact_type":     link.ImpactType,
 			"quantity_value":  link.QuantityValue,
 			"unit_id":         link.UnitID,
 			"notes":           link.Notes,
+			"source":          source,
 			"is_milestone":    link.IsMilestone,
 			"milestone_label": link.MilestoneLabel,
 			"milestone_order": link.MilestoneOrder,
+			"created_at":      now,
+		})
+		if err != nil {
+			r.logger.Error().Err(err).
+				Str("task_id", taskID).
+				Str("goal_id", link.GoalID).
+				Int("link_count", len(links)).
+				Msg("failed to create batch task-goal links")
+			return nil, errors.ErrDatabase.Wrap(err)
 		}
-	}
 
-	// Use FOR loop for batch creation in single query
-	results, err := database.QueryAll[taskGoalDB](ctx, r.db, `
-		FOR $link IN $links {
-			LET $goal = type::record("goals", string::split($link.goal_id, ":")[1]);
-			RELATE $task -> task_goals -> $goal SET
-				impact_type = $link.impact_type,
-				quantity_value = $link.quantity_value,
-				unit_id = $link.unit_id,
-				notes = $link.notes,
-				source = $source,
-				is_milestone = $link.is_milestone,
-				milestone_label = $link.milestone_label,
-				milestone_order = $link.milestone_order,
-				created_at = $now;
+		if result == nil {
+			return nil, errors.ErrDatabase.WithMessage("failed to create task-goal link")
 		}
-	`, map[string]any{
-		"task":   taskRecordID,
-		"links":  linkData,
-		"source": SourceManual,
-		"now":    now,
-	})
-	if err != nil {
-		r.logger.Error().Err(err).
-			Str("task_id", taskID).
-			Int("link_count", len(links)).
-			Msg("failed to create batch task-goal links")
-		return nil, errors.ErrDatabase.Wrap(err)
-	}
 
-	taskGoals := make([]*TaskGoal, len(results))
-	for i, tg := range results {
-		taskGoals[i] = tg.toTaskGoal()
+		taskGoals = append(taskGoals, result.toTaskGoal())
 	}
 
 	r.logger.Info().
@@ -240,15 +231,16 @@ func (r *repository) CreateBatch(ctx context.Context, taskID string, links []Lin
 // =============================================================================
 
 func (r *repository) FindByTaskAndGoal(ctx context.Context, taskID, goalID string) (*TaskGoal, error) {
-	taskRecordID := database.MustRecordID("tasks", taskID)
-	goalRecordID := database.MustRecordID("goals", goalID)
+	taskRef := database.RecordID("tasks", taskID)
+	goalRef := database.RecordID("goals", goalID)
 
 	result, err := database.QueryFirst[taskGoalDB](ctx, r.db, `
-		SELECT * FROM task_goals 
-		WHERE in = $task AND out = $goal
+		SELECT * FROM task_goals
+		WHERE task_id = $task AND goal_id = $goal
+		LIMIT 1
 	`, map[string]any{
-		"task": taskRecordID,
-		"goal": goalRecordID,
+		"task": taskRef,
+		"goal": goalRef,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).
@@ -270,14 +262,14 @@ func (r *repository) FindByTaskAndGoal(ctx context.Context, taskID, goalID strin
 // =============================================================================
 
 func (r *repository) Delete(ctx context.Context, taskID, goalID string) error {
-	taskRecordID := database.MustRecordID("tasks", taskID)
-	goalRecordID := database.MustRecordID("goals", goalID)
+	taskRef := database.RecordID("tasks", taskID)
+	goalRef := database.RecordID("goals", goalID)
 
-	_, err := database.QueryAll[taskGoalDB](ctx, r.db, `
-		DELETE task_goals WHERE in = $task AND out = $goal
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE FROM task_goals WHERE task_id = $task AND goal_id = $goal
 	`, map[string]any{
-		"task": taskRecordID,
-		"goal": goalRecordID,
+		"task": taskRef,
+		"goal": goalRef,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).
@@ -296,12 +288,12 @@ func (r *repository) Delete(ctx context.Context, taskID, goalID string) error {
 }
 
 func (r *repository) DeleteByEdgeID(ctx context.Context, edgeID string) error {
-	edgeRecordID := database.MustRecordID(Table, edgeID)
+	edgeRef := database.RecordID(Table, edgeID)
 
-	_, err := database.QueryAll[taskGoalDB](ctx, r.db, `
-		DELETE $id
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE FROM task_goals WHERE id = $id
 	`, map[string]any{
-		"id": edgeRecordID,
+		"id": edgeRef,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("edge_id", edgeID).Msg("failed to delete task-goal link by ID")
@@ -314,13 +306,16 @@ func (r *repository) DeleteByEdgeID(ctx context.Context, edgeID string) error {
 
 // DeleteByTask removes all goal links for a specific task.
 // This is useful when deleting a task or resetting all its goal associations.
+// The task_goals table has ON DELETE CASCADE on task_id, so the database
+// handles cleanup automatically when a task row is deleted; this method
+// supports explicit unlinking without removing the task itself.
 func (r *repository) DeleteByTask(ctx context.Context, taskID string) error {
-	taskRecordID := database.MustRecordID("tasks", taskID)
+	taskRef := database.RecordID("tasks", taskID)
 
-	_, err := database.QueryAll[taskGoalDB](ctx, r.db, `
-		DELETE task_goals WHERE in = $task
+	_, err := database.QueryAll[any](ctx, r.db, `
+		DELETE FROM task_goals WHERE task_id = $task
 	`, map[string]any{
-		"task": taskRecordID,
+		"task": taskRef,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("task_id", taskID).Msg("failed to delete all task-goal links for task")
@@ -329,4 +324,15 @@ func (r *repository) DeleteByTask(ctx context.Context, taskID string) error {
 
 	r.logger.Info().Str("task_id", taskID).Msg("all task-goal links deleted for task")
 	return nil
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+// generateEdgeRecordID produces a unique task_goals:<hex> record ID for new edges.
+func generateEdgeRecordID() models.RecordID {
+	bytes := make([]byte, 16)
+	_, _ = rand.Read(bytes) //nolint:gosec // crypto/rand.Read never fails in practice
+	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }

@@ -3,6 +3,7 @@ package analytics
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -71,18 +72,17 @@ type taskMetricsDB struct {
 func (r *repository) GetTaskMetrics(ctx context.Context, userID string, start, end time.Time) (*TaskMetrics, error) {
 	// Query task counts and duration
 	result, err := database.QueryFirst[taskMetricsDB](ctx, r.db, `
-		SELECT 
-			count() as total,
-			count(IF completed = true THEN 1 ELSE NONE END) as completed,
-			count(IF status = "postponed" THEN 1 ELSE NONE END) as postponed,
-			count(IF status = "abandoned" THEN 1 ELSE NONE END) as abandoned,
-			math::sum(duration::secs(end_date - start_date)) as total_secs
+		SELECT
+			COUNT(*) as total,
+			SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
+			SUM(CASE WHEN status = 'postponed' THEN 1 ELSE 0 END) as postponed,
+			SUM(CASE WHEN status = 'abandoned' THEN 1 ELSE 0 END) as abandoned,
+			COALESCE(SUM(CAST(strftime('%s', end_date) AS REAL) - CAST(strftime('%s', start_date) AS REAL)), 0) as total_secs
 		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
+		WHERE created_by = $user
+		  AND start_date >= $start
 		  AND start_date <= $end
-		  AND deleted_at IS NONE
-		GROUP ALL
+		  AND deleted_at IS NULL
 	`, map[string]any{
 		"user":  userID,
 		"start": start,
@@ -148,18 +148,19 @@ type categoryBreakdownDB struct {
 
 func (r *repository) getCategoryBreakdown(ctx context.Context, userID string, start, end time.Time) ([]CategoryBreakdown, error) {
 	results, err := database.QueryAll[categoryBreakdownDB](ctx, r.db, `
-		SELECT 
-			category.id as category_id,
-			category.name as category_name,
-			count() as task_count,
-			math::sum(duration::secs(end_date - start_date)) as total_secs
-		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
-		  AND start_date <= $end
-		  AND deleted_at IS NONE
-		  AND category IS NOT NONE
-		GROUP BY category
+		SELECT
+			c.id as category_id,
+			c.name as category_name,
+			COUNT(*) as task_count,
+			COALESCE(SUM(CAST(strftime('%s', t.end_date) AS REAL) - CAST(strftime('%s', t.start_date) AS REAL)), 0) as total_secs
+		FROM tasks t
+		JOIN categories c ON c.id = t.category_id
+		WHERE t.created_by = $user
+		  AND t.start_date >= $start
+		  AND t.start_date <= $end
+		  AND t.deleted_at IS NULL
+		  AND t.category_id IS NOT NULL
+		GROUP BY c.id, c.name
 	`, map[string]any{
 		"user":  userID,
 		"start": start,
@@ -200,15 +201,15 @@ type peakHourDB struct {
 
 func (r *repository) getPeakHours(ctx context.Context, userID string, start, end time.Time) ([]int, error) {
 	results, err := database.QueryAll[peakHourDB](ctx, r.db, `
-		SELECT 
-			time::hour(start_date) as hour,
-			count() as count
+		SELECT
+			CAST(strftime('%H', start_date) AS INTEGER) as hour,
+			COUNT(*) as count
 		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
+		WHERE created_by = $user
+		  AND start_date >= $start
 		  AND start_date <= $end
-		  AND completed = true
-		  AND deleted_at IS NONE
+		  AND completed = 1
+		  AND deleted_at IS NULL
 		GROUP BY hour
 		ORDER BY count DESC
 		LIMIT 3
@@ -233,10 +234,11 @@ func (r *repository) getPeakHours(ctx context.Context, userID string, start, end
 // =============================================================================
 
 type emotionMetricsDB struct {
-	AvgValence float64 `json:"avg_valence"`
-	AvgArousal float64 `json:"avg_arousal"`
-	StdValence float64 `json:"std_valence"`
-	TotalCount int     `json:"total_count"`
+	AvgValence   float64 `json:"avg_valence"`
+	AvgArousal   float64 `json:"avg_arousal"`
+	SumValence   float64 `json:"sum_valence"`
+	SumSqValence float64 `json:"sum_sq_valence"`
+	TotalCount   int     `json:"total_count"`
 }
 
 type quadrantCountDB struct {
@@ -252,19 +254,21 @@ type emotionCountDB struct {
 }
 
 func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start, end time.Time) (*EmotionMetrics, error) {
-	// Get average valence/arousal
+	// Get average valence/arousal and aggregates for computing std dev
 	avgResult, err := database.QueryFirst[emotionMetricsDB](ctx, r.db, `
-		SELECT 
-			math::mean(->task_emotions->emotions.valence) as avg_valence,
-			math::mean(->task_emotions->emotions.arousal) as avg_arousal,
-			math::stddev(->task_emotions->emotions.valence) as std_valence,
-			count(->task_emotions) as total_count
-		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
-		  AND start_date <= $end
-		  AND deleted_at IS NONE
-		GROUP ALL
+		SELECT
+			AVG(e.valence) as avg_valence,
+			AVG(e.arousal) as avg_arousal,
+			COALESCE(SUM(e.valence), 0) as sum_valence,
+			COALESCE(SUM(e.valence * e.valence), 0) as sum_sq_valence,
+			COUNT(*) as total_count
+		FROM tasks t
+		JOIN task_emotions te ON te.task_id = t.id
+		JOIN emotions e ON e.id = te.emotion_id
+		WHERE t.created_by = $user
+		  AND t.start_date >= $start
+		  AND t.start_date <= $end
+		  AND t.deleted_at IS NULL
 	`, map[string]any{
 		"user":  userID,
 		"start": start,
@@ -275,21 +279,35 @@ func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start
 		return nil, err
 	}
 
-	if avgResult == nil {
+	if avgResult == nil || avgResult.TotalCount == 0 {
 		return &EmotionMetrics{}, nil
+	}
+
+	// Compute standard deviation of valence using the computational formula:
+	// variance = E[x^2] - (E[x])^2
+	stdValence := 0.0
+	if avgResult.TotalCount > 0 {
+		meanSq := avgResult.SumSqValence / float64(avgResult.TotalCount)
+		mean := avgResult.SumValence / float64(avgResult.TotalCount)
+		variance := meanSq - (mean * mean)
+		if variance > 0 {
+			stdValence = math.Sqrt(variance)
+		}
 	}
 
 	// Get quadrant distribution
 	quadrants, err := database.QueryAll[quadrantCountDB](ctx, r.db, `
-		SELECT 
-			->task_emotions->emotions.quadrant as quadrant,
-			count() as count
-		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
-		  AND start_date <= $end
-		  AND deleted_at IS NONE
-		GROUP BY quadrant
+		SELECT
+			e.quadrant as quadrant,
+			COUNT(*) as count
+		FROM tasks t
+		JOIN task_emotions te ON te.task_id = t.id
+		JOIN emotions e ON e.id = te.emotion_id
+		WHERE t.created_by = $user
+		  AND t.start_date >= $start
+		  AND t.start_date <= $end
+		  AND t.deleted_at IS NULL
+		GROUP BY e.quadrant
 	`, map[string]any{
 		"user":  userID,
 		"start": start,
@@ -331,17 +349,19 @@ func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start
 
 	// Get top emotions
 	topEmotions, err := database.QueryAll[emotionCountDB](ctx, r.db, `
-		SELECT 
-			->task_emotions->emotions.id as emotion_id,
-			->task_emotions->emotions.name as emotion_name,
-			->task_emotions->emotions.quadrant as quadrant,
-			count() as count
-		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
-		  AND start_date <= $end
-		  AND deleted_at IS NONE
-		GROUP BY emotion_id, emotion_name, quadrant
+		SELECT
+			e.id as emotion_id,
+			e.name as emotion_name,
+			e.quadrant as quadrant,
+			COUNT(*) as count
+		FROM tasks t
+		JOIN task_emotions te ON te.task_id = t.id
+		JOIN emotions e ON e.id = te.emotion_id
+		WHERE t.created_by = $user
+		  AND t.start_date >= $start
+		  AND t.start_date <= $end
+		  AND t.deleted_at IS NULL
+		GROUP BY e.id, e.name, e.quadrant
 		ORDER BY count DESC
 		LIMIT 5
 	`, map[string]any{
@@ -360,9 +380,9 @@ func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start
 
 	// Calculate mood stability (1 - normalized std dev)
 	moodStability := 1.0
-	if avgResult.StdValence > 0 {
+	if stdValence > 0 {
 		// Normalize: max expected std dev is ~1 for valence range -1 to 1
-		moodStability = 1.0 - (avgResult.StdValence / 1.0)
+		moodStability = 1.0 - (stdValence / 1.0)
 		if moodStability < 0 {
 			moodStability = 0
 		}
@@ -395,18 +415,23 @@ type goalProgressDB struct {
 
 func (r *repository) GetGoalMetrics(ctx context.Context, userID string) (*GoalMetrics, error) {
 	goals, err := database.QueryAll[goalProgressDB](ctx, r.db, `
-		SELECT 
+		SELECT
 			id as goal_id,
 			title as goal_title,
-			goal_type,
+			CASE
+				WHEN recurrence IS NOT NULL THEN 'habit'
+				WHEN target IS NOT NULL AND json_extract(target, '$.operator') IN ('lte', 'eq') THEN 'avoidance'
+				WHEN target IS NOT NULL THEN 'measurable'
+				ELSE 'simple'
+			END as goal_type,
 			status,
-			target.current_value as current_value,
-			target.value as target_value,
+			COALESCE(current_value, 0) as current_value,
+			COALESCE(json_extract(target, '$.value'), 0) as target_value,
 			current_streak,
 			longest_streak
 		FROM goals
-		WHERE created_by = $user 
-		  AND deleted_at IS NONE
+		WHERE created_by = $user
+		  AND deleted_at IS NULL
 	`, map[string]any{
 		"user": userID,
 	})
@@ -510,40 +535,44 @@ func (r *repository) GetTimeSeriesData(ctx context.Context, userID, metric, grou
 	switch metric {
 	case MetricTaskCompletion:
 		query = `
-			SELECT 
-				time::format(time::floor(start_date, 1d), "%Y-%m-%d") as date,
-				count(IF completed = true THEN 1 ELSE NONE END) as value
+			SELECT
+				date(start_date) as date,
+				SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as value
 			FROM tasks
-			WHERE created_by = $user 
-			  AND start_date >= $start 
+			WHERE created_by = $user
+			  AND start_date >= $start
 			  AND start_date <= $end
-			  AND deleted_at IS NONE
+			  AND deleted_at IS NULL
 			GROUP BY date
 			ORDER BY date
 		`
 	case MetricValence, MetricMood:
 		query = `
-			SELECT 
-				time::format(time::floor(start_date, 1d), "%Y-%m-%d") as date,
-				math::mean(->task_emotions->emotions.valence) as value
-			FROM tasks
-			WHERE created_by = $user 
-			  AND start_date >= $start 
-			  AND start_date <= $end
-			  AND deleted_at IS NONE
+			SELECT
+				date(t.start_date) as date,
+				AVG(e.valence) as value
+			FROM tasks t
+			JOIN task_emotions te ON te.task_id = t.id
+			JOIN emotions e ON e.id = te.emotion_id
+			WHERE t.created_by = $user
+			  AND t.start_date >= $start
+			  AND t.start_date <= $end
+			  AND t.deleted_at IS NULL
 			GROUP BY date
 			ORDER BY date
 		`
 	case MetricArousal:
 		query = `
-			SELECT 
-				time::format(time::floor(start_date, 1d), "%Y-%m-%d") as date,
-				math::mean(->task_emotions->emotions.arousal) as value
-			FROM tasks
-			WHERE created_by = $user 
-			  AND start_date >= $start 
-			  AND start_date <= $end
-			  AND deleted_at IS NONE
+			SELECT
+				date(t.start_date) as date,
+				AVG(e.arousal) as value
+			FROM tasks t
+			JOIN task_emotions te ON te.task_id = t.id
+			JOIN emotions e ON e.id = te.emotion_id
+			WHERE t.created_by = $user
+			  AND t.start_date >= $start
+			  AND t.start_date <= $end
+			  AND t.deleted_at IS NULL
 			GROUP BY date
 			ORDER BY date
 		`
@@ -582,15 +611,17 @@ func (r *repository) GetTimeSeriesData(ctx context.Context, userID, metric, grou
 
 func (r *repository) GetQuadrantDistribution(ctx context.Context, userID string, start, end time.Time) (*PieChartData, error) {
 	quadrants, err := database.QueryAll[quadrantCountDB](ctx, r.db, `
-		SELECT 
-			->task_emotions->emotions.quadrant as quadrant,
-			count() as count
-		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
-		  AND start_date <= $end
-		  AND deleted_at IS NONE
-		GROUP BY quadrant
+		SELECT
+			e.quadrant as quadrant,
+			COUNT(*) as count
+		FROM tasks t
+		JOIN task_emotions te ON te.task_id = t.id
+		JOIN emotions e ON e.id = te.emotion_id
+		WHERE t.created_by = $user
+		  AND t.start_date >= $start
+		  AND t.start_date <= $end
+		  AND t.deleted_at IS NULL
+		GROUP BY e.quadrant
 	`, map[string]any{
 		"user":  userID,
 		"start": start,
@@ -644,16 +675,16 @@ func (r *repository) GetProductivityHeatmap(ctx context.Context, userID string, 
 	}
 
 	results, err := database.QueryAll[heatmapCell](ctx, r.db, `
-		SELECT 
-			time::wday(start_date) as day_of_week,
-			time::hour(start_date) as hour,
-			count() as count
+		SELECT
+			CAST(strftime('%w', start_date) AS INTEGER) as day_of_week,
+			CAST(strftime('%H', start_date) AS INTEGER) as hour,
+			COUNT(*) as count
 		FROM tasks
-		WHERE created_by = $user 
-		  AND start_date >= $start 
+		WHERE created_by = $user
+		  AND start_date >= $start
 		  AND start_date <= $end
-		  AND completed = true
-		  AND deleted_at IS NONE
+		  AND completed = 1
+		  AND deleted_at IS NULL
 		GROUP BY day_of_week, hour
 	`, map[string]any{
 		"user":  userID,

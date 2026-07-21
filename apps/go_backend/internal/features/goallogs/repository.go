@@ -3,10 +3,13 @@ package goallogs
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"time"
 
-	"github.com/rs/zerolog"
 	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
+	"github.com/rs/zerolog"
 
 	"github.com/lucid-logs/go-backend/internal/features/goals"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
@@ -54,33 +57,37 @@ func NewRepository(db *database.DB) Repository {
 // DATABASE MODELS
 // =============================================================================
 
+// goalLogDB mirrors the goal_logs table columns. The value-tracking fields
+// (value_contributed, value_unit, progress_before, progress_after) have no
+// dedicated columns in the SQLite schema, so they are persisted inside the
+// `changes` JSON payload and decoded back here on read.
 type goalLogDB struct {
-	ID                models.RecordID      `json:"id,omitempty"`
-	GoalID            models.RecordID      `json:"in"`         // RELATE in
-	SnapshotID        models.RecordID      `json:"out"`        // RELATE out
-	Event             string               `json:"event_type"` // Changed to match schema
-	Changes           map[string]any       `json:"changes,omitempty"`
-	TriggeredByTaskID string               `json:"triggered_by_task_id,omitempty"` // Changed to match schema
-	CreatedBy         models.RecordID      `json:"created_by"`
-	CreatedAt         database.SurrealTime `json:"created_at"`
+	ID                models.RecordID `json:"id,omitempty"`
+	GoalID            string          `json:"goal_id"`
+	SnapshotID        *string         `json:"snapshot_id,omitempty"`
+	Event             string          `json:"event_type"`
+	Changes           map[string]any  `json:"changes,omitempty"`
+	TriggeredByTaskID string          `json:"triggered_by_task_id,omitempty"`
+	CreatedBy         string          `json:"created_by"`
+	CreatedAt         time.Time       `json:"created_at"`
 
-	// Value tracking
+	// Value tracking (decoded from changes JSON on read)
 	ValueContributed *float64 `json:"value_contributed,omitempty"`
 	ValueUnit        string   `json:"value_unit,omitempty"`
 	ProgressBefore   *float64 `json:"progress_before,omitempty"`
 	ProgressAfter    *float64 `json:"progress_after,omitempty"`
 
-	// Task details (populated on read via subquery)
+	// Task details (populated via LEFT JOIN on read; not a stored column)
 	TriggeringTask *triggeringTaskDB `json:"triggering_task,omitempty"`
 }
 
 type triggeringTaskDB struct {
-	ID        string                `json:"id"`
-	Title     string                `json:"title"`
-	StartDate *database.SurrealTime `json:"start_date,omitempty"`
-	EndDate   *database.SurrealTime `json:"end_date,omitempty"`
-	Completed bool                  `json:"completed"`
-	EmotionID *string               `json:"emotion_id,omitempty"`
+	ID        string     `json:"id"`
+	Title     string     `json:"title"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
+	Completed bool       `json:"completed"`
+	EmotionID *string    `json:"emotion_id,omitempty"`
 	Category  *struct {
 		ID    string `json:"id"`
 		Name  string `json:"name"`
@@ -88,19 +95,64 @@ type triggeringTaskDB struct {
 	} `json:"category,omitempty"`
 }
 
+// extractValueTracking pulls the value-tracking fields the writer embedded in
+// the changes payload back out into the dedicated struct fields.
+func (l *goalLogDB) extractValueTracking() {
+	if l.Changes == nil {
+		return
+	}
+	if v, ok := l.Changes["__value_contributed"]; ok && v != nil {
+		if f, ok := v.(float64); ok {
+			l.ValueContributed = &f
+		}
+	}
+	if v, ok := l.Changes["__value_unit"]; ok && v != nil {
+		if s, ok := v.(string); ok {
+			l.ValueUnit = s
+		}
+	}
+	if v, ok := l.Changes["__progress_before"]; ok && v != nil {
+		if f, ok := v.(float64); ok {
+			l.ProgressBefore = &f
+		}
+	}
+	if v, ok := l.Changes["__progress_after"]; ok && v != nil {
+		if f, ok := v.(float64); ok {
+			l.ProgressAfter = &f
+		}
+	}
+}
+
 func (l *goalLogDB) toGoalLog() *GoalLog {
+	l.extractValueTracking()
+
+	// Strip the private tracking keys so they do not leak into API responses.
+	if l.Changes != nil {
+		filtered := make(map[string]any, len(l.Changes))
+		for k, v := range l.Changes {
+			if k == "__value_contributed" || k == "__value_unit" || k == "__progress_before" || k == "__progress_after" {
+				continue
+			}
+			filtered[k] = v
+		}
+		l.Changes = filtered
+	}
+
 	log := &GoalLog{
 		ID:                database.ToStringID(l.ID),
-		GoalID:            database.ToStringID(l.GoalID),
+		GoalID:            database.RecordID(goals.Table, l.GoalID),
 		Event:             l.Event,
 		Changes:           l.Changes,
 		TriggeredByTaskID: l.TriggeredByTaskID,
-		SnapshotID:        database.ToStringID(l.SnapshotID),
-		CreatedAt:         l.CreatedAt.Time,
+		CreatedAt:         l.CreatedAt,
 		ValueContributed:  l.ValueContributed,
 		ValueUnit:         l.ValueUnit,
 		ProgressBefore:    l.ProgressBefore,
 		ProgressAfter:     l.ProgressAfter,
+	}
+
+	if l.SnapshotID != nil && *l.SnapshotID != "" {
+		log.SnapshotID = database.RecordID(SnapshotsTable, *l.SnapshotID)
 	}
 
 	if l.TriggeringTask != nil {
@@ -109,14 +161,8 @@ func (l *goalLogDB) toGoalLog() *GoalLog {
 			Title:     l.TriggeringTask.Title,
 			Completed: l.TriggeringTask.Completed,
 			EmotionID: l.TriggeringTask.EmotionID,
-		}
-		if l.TriggeringTask.StartDate != nil {
-			t := l.TriggeringTask.StartDate.Time
-			taskInfo.StartDate = &t
-		}
-		if l.TriggeringTask.EndDate != nil {
-			t := l.TriggeringTask.EndDate.Time
-			taskInfo.EndDate = &t
+			StartDate: l.TriggeringTask.StartDate,
+			EndDate:   l.TriggeringTask.EndDate,
 		}
 		if l.TriggeringTask.Category != nil {
 			taskInfo.Category = l.TriggeringTask.Category
@@ -127,25 +173,41 @@ func (l *goalLogDB) toGoalLog() *GoalLog {
 	return log
 }
 
+// goalSnapshotDB reflects the goal_snapshots table. The table stores the
+// snapshot body (status + stats + target) in a single JSON `snapshot` column.
 type goalSnapshotDB struct {
-	ID        models.RecordID      `json:"id,omitempty"`
-	GoalID    models.RecordID      `json:"goal_id"`
-	Status    string               `json:"status"`
-	Stats     *goals.GoalStats     `json:"stats,omitempty"`
-	Target    *goals.Target        `json:"target,omitempty"`
-	CreatedBy models.RecordID      `json:"created_by"`
-	CreatedAt database.SurrealTime `json:"created_at"`
+	ID        models.RecordID `json:"id,omitempty"`
+	GoalID    string          `json:"goal_id"`
+	CreatedBy string          `json:"created_by"`
+	CreatedAt time.Time       `json:"created_at"`
+	Snapshot  json.RawMessage `json:"snapshot,omitempty"`
+}
+
+// snapshotBody is the JSON payload persisted in the goal_snapshots.snapshot column.
+type snapshotBody struct {
+	Status string           `json:"status"`
+	Stats  *goals.GoalStats `json:"stats,omitempty"`
+	Target *goals.Target    `json:"target,omitempty"`
 }
 
 func (s *goalSnapshotDB) toGoalSnapshot() *GoalSnapshot {
-	return &GoalSnapshot{
+	out := &GoalSnapshot{
 		ID:        database.ToStringID(s.ID),
-		GoalID:    database.ToStringID(s.GoalID),
-		Status:    s.Status,
-		Stats:     s.Stats,
-		Target:    s.Target,
-		CreatedAt: s.CreatedAt.Time,
+		GoalID:    database.RecordID(goals.Table, s.GoalID),
+		CreatedAt: s.CreatedAt,
 	}
+	if len(s.Snapshot) > 0 {
+		var body snapshotBody
+		if err := json.Unmarshal(s.Snapshot, &body); err == nil {
+			out.Status = body.Status
+			out.Stats = body.Stats
+			out.Target = body.Target
+		}
+	}
+	if out.Status == "" {
+		out.Status = goals.StatusActive
+	}
+	return out
 }
 
 // =============================================================================
@@ -153,100 +215,116 @@ func (s *goalSnapshotDB) toGoalSnapshot() *GoalSnapshot {
 // =============================================================================
 
 func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID string) (*GoalLog, error) {
-	now := time.Now()
-	goalID := database.MustRecordID(goals.Table, req.GoalID)
-	userRecordID := database.MustRecordID("users", userID)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	goalID := database.RecordID(goals.Table, req.GoalID)
+	userRecordID := database.RecordID("users", userID)
 
-	// First create a snapshot if stats are provided
-	snapshotID := ""
-	if req.Stats != nil {
-		snapshot, err := database.QueryFirst[goalSnapshotDB](ctx, r.db, `
-			CREATE goal_snapshots CONTENT {
-				goal_id: $goal_id,
-				status: $status,
-				stats: $stats,
-				created_by: $user,
-				created_at: $now
-			}
-		`, map[string]any{
-			"goal_id": goalID,
-			"status":  goals.StatusActive, // Will be updated from actual goal
-			"stats":   req.Stats,
-			"user":    userRecordID,
-			"now":     now,
-		})
-		if err != nil {
-			r.logger.Warn().Err(err).Msg("Failed to create snapshot")
-		} else if snapshot != nil {
-			snapshotID = database.ToStringID(snapshot.ID)
-		}
-	}
-
-	// Create the log entry using RELATE
-	var logResult *goalLogDB
-	var err error
-
-	// Prepare changes - use NONE if nil
+	// Prepare changes payload. Embed value-tracking fields with reserved keys so
+	// they survive the single JSON column on the goal_logs table.
 	changes := req.Changes
 	if changes == nil {
 		changes = map[string]any{}
+	} else {
+		// Copy so we don't mutate caller's map.
+		dup := make(map[string]any, len(changes))
+		for k, v := range changes {
+			dup[k] = v
+		}
+		changes = dup
+	}
+	if req.ValueContributed != nil {
+		changes["__value_contributed"] = *req.ValueContributed
+	}
+	if req.ValueUnit != "" {
+		changes["__value_unit"] = req.ValueUnit
+	}
+	if req.ProgressBefore != nil {
+		changes["__progress_before"] = *req.ProgressBefore
+	}
+	if req.ProgressAfter != nil {
+		changes["__progress_after"] = *req.ProgressAfter
 	}
 
-	// Build content data with optional fields
-	contentData := map[string]any{
-		"event_type":           req.Event,
-		"changes":              changes,
-		"triggered_by_task_id": req.TriggeredByTaskID,
-		"created_by":           userRecordID,
-		"created_at":           now,
-		"value_contributed":    req.ValueContributed,
-		"value_unit":           req.ValueUnit,
-		"progress_before":      req.ProgressBefore,
-		"progress_after":       req.ProgressAfter,
+	changesJSON, err := json.Marshal(changes)
+	if err != nil {
+		return nil, errors.ErrInternal.Wrap(err)
 	}
+
+	// First create a snapshot if stats are provided.
+	snapshotID := ""
+	if req.Stats != nil {
+		body := snapshotBody{
+			Status: goals.StatusActive, // Will be updated from actual goal
+			Stats:  req.Stats,
+			Target: nil,
+		}
+		bodyJSON, err := json.Marshal(body)
+		if err != nil {
+			r.logger.Warn().Err(err).Msg("Failed to marshal snapshot body")
+		} else {
+			newSnapshotID := database.NewRecordID(SnapshotsTable, generateSnapshotID()).String()
+			_, err = database.QueryAll[any](ctx, r.db, `
+				INSERT INTO goal_snapshots (id, goal_id, created_by, snapshot, created_at)
+				VALUES ($id, $goal_id, $user, $snapshot, $now)
+			`, map[string]any{
+				"id":       newSnapshotID,
+				"goal_id":  goalID,
+				"user":     userRecordID,
+				"snapshot": string(bodyJSON),
+				"now":      now,
+			})
+			if err != nil {
+				r.logger.Warn().Err(err).Msg("Failed to create snapshot")
+			} else {
+				snapshotID = newSnapshotID
+			}
+		}
+	}
+
+	logID := database.NewRecordID(LogsTable, generateLogID()).String()
 
 	if snapshotID != "" {
-		snapshotRecordID := database.MustRecordID(SnapshotsTable, snapshotID)
-
-		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
-			RELATE $goal_id->goal_logs->$snapshot_id CONTENT $content
+		_, err = database.QueryAll[any](ctx, r.db, `
+			INSERT INTO goal_logs (id, goal_id, snapshot_id, event_type, changes, triggered_by_task_id, created_by, created_at)
+			VALUES ($id, $goal_id, $snapshot_id, $event, $changes, $triggered_by, $user, $now)
 		`, map[string]any{
-			"goal_id":     goalID,
-			"snapshot_id": snapshotRecordID,
-			"content":     contentData,
+			"id":           logID,
+			"goal_id":      goalID,
+			"snapshot_id":  snapshotID,
+			"event":        req.Event,
+			"changes":      string(changesJSON),
+			"triggered_by": nullableString(req.TriggeredByTaskID),
+			"user":         userRecordID,
+			"now":          now,
 		})
 	} else {
-		// For events without snapshots, we still need a RELATE but with a null out
-		// We'll create a dummy snapshot or skip the out field
-
-		logResult, err = database.QueryFirst[goalLogDB](ctx, r.db, `
-			CREATE goal_logs SET
-				`+"`in`"+` = $goal_id,
-				`+"`out`"+` = NONE,
-				event_type = $event,
-				changes = $changes,
-				triggered_by_task_id = $triggered_by,
-				created_by = $user,
-				created_at = $now,
-				value_contributed = $value_contributed,
-				value_unit = $value_unit,
-				progress_before = $progress_before,
-				progress_after = $progress_after
+		_, err = database.QueryAll[any](ctx, r.db, `
+			INSERT INTO goal_logs (id, goal_id, snapshot_id, event_type, changes, triggered_by_task_id, created_by, created_at)
+			VALUES ($id, $goal_id, NULL, $event, $changes, $triggered_by, $user, $now)
 		`, map[string]any{
-			"goal_id":           goalID,
-			"event":             req.Event,
-			"changes":           changes,
-			"triggered_by":      req.TriggeredByTaskID,
-			"user":              userRecordID,
-			"now":               now,
-			"value_contributed": req.ValueContributed,
-			"value_unit":        req.ValueUnit,
-			"progress_before":   req.ProgressBefore,
-			"progress_after":    req.ProgressAfter,
+			"id":           logID,
+			"goal_id":      goalID,
+			"event":        req.Event,
+			"changes":      string(changesJSON),
+			"triggered_by": nullableString(req.TriggeredByTaskID),
+			"user":         userRecordID,
+			"now":          now,
 		})
 	}
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
+	}
+
+	// Re-read the row so the returned GoalLog reflects committed state.
+	logResult, err := database.QueryFirst[goalLogDB](ctx, r.db, `
+		SELECT id, goal_id, snapshot_id, event_type, changes, triggered_by_task_id, created_by, created_at
+		FROM goal_logs WHERE id = $id
+	`, map[string]any{"id": logID})
+	if err != nil {
+		return nil, errors.ErrDatabase.Wrap(err)
+	}
+	if logResult == nil {
+		return nil, errors.ErrInternal.WithMessage("goal log disappeared after insert")
 	}
 
 	return logResult.toGoalLog(), nil
@@ -257,15 +335,13 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 // =============================================================================
 
 func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, params pagination.Params) ([]*GoalLog, int64, error) {
-	gID := database.MustRecordID(goals.Table, goalID)
-	userRecordID := database.MustRecordID("users", userID)
+	gID := database.RecordID(goals.Table, goalID)
+	userRecordID := database.RecordID("users", userID)
 
-	// Count total
-	countResult, err := database.QueryFirst[struct {
-		Count int64 `json:"count"`
-	}](ctx, r.db, `
-		SELECT count() as count FROM goal_logs
-		WHERE `+"`in`"+` = $goal_id AND created_by = $user
+	// Count total.
+	total, err := database.QueryScalar[int64](ctx, r.db, `
+		SELECT COUNT(*) FROM goal_logs
+		WHERE goal_id = $goal_id AND created_by = $user
 	`, map[string]any{
 		"goal_id": gID,
 		"user":    userRecordID,
@@ -274,31 +350,42 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 		return nil, 0, errors.ErrDatabase.Wrap(err)
 	}
 
-	total := int64(0)
-	if countResult != nil {
-		total = countResult.Count
-	}
-
-	// Fetch logs with task details when triggered_by_task_id is present
+	// Fetch logs with task details when triggered_by_task_id is present.
+	// SQLite cannot return a struct via subquery the way SurrealDB did, so we
+	// build the triggering_task object via a json_object() aggregation from a
+	// LEFT JOIN against the tasks table (plus its category).
 	logsDB, err := database.QueryAll[goalLogDB](ctx, r.db, `
-		SELECT *,
-			IF triggered_by_task_id != NONE AND triggered_by_task_id != "" THEN
-				(SELECT
-					type::string(id) as id,
-					title,
-					start_date,
-					end_date,
-					completed,
-					emotion_id,
-					category
-				FROM <record>triggered_by_task_id)[0]
-			ELSE
-				NONE
-			END as triggering_task
-		FROM goal_logs
-		WHERE `+"`in`"+` = $goal_id AND created_by = $user
-		ORDER BY created_at DESC
-		LIMIT $limit START $offset
+		SELECT
+			gl.id            AS id,
+			gl.goal_id       AS goal_id,
+			gl.snapshot_id   AS snapshot_id,
+			gl.event_type    AS event_type,
+			gl.changes       AS changes,
+			gl.triggered_by_task_id AS triggered_by_task_id,
+			gl.created_by    AS created_by,
+			gl.created_at    AS created_at,
+			CASE
+				WHEN gl.triggered_by_task_id IS NOT NULL AND gl.triggered_by_task_id != '' THEN
+					json_object(
+						'id',         t.id,
+						'title',      t.title,
+						'start_date', t.start_date,
+						'end_date',   t.end_date,
+						'completed',  t.completed,
+						'emotion_id', t.emotion_id,
+						'category',   CASE
+							WHEN c.id IS NOT NULL THEN json_object('id', c.id, 'name', c.name, 'color', c.color)
+							ELSE NULL
+						END
+					)
+				ELSE NULL
+			END AS triggering_task
+		FROM goal_logs gl
+		LEFT JOIN tasks t ON t.id = gl.triggered_by_task_id
+		LEFT JOIN categories c ON c.id = t.category_id
+		WHERE gl.goal_id = $goal_id AND gl.created_by = $user
+		ORDER BY gl.created_at DESC
+		LIMIT $limit OFFSET $offset
 	`, map[string]any{
 		"goal_id": gID,
 		"user":    userRecordID,
@@ -318,10 +405,11 @@ func (r *repository) FindByGoal(ctx context.Context, goalID, userID string, para
 }
 
 func (r *repository) GetSnapshot(ctx context.Context, snapshotID string) (*GoalSnapshot, error) {
-	sID := database.MustRecordID(SnapshotsTable, snapshotID)
+	sID := database.RecordID(SnapshotsTable, snapshotID)
 
 	snapshot, err := database.QueryFirst[goalSnapshotDB](ctx, r.db, `
-		SELECT * FROM $id
+		SELECT id, goal_id, created_by, snapshot, created_at
+		FROM goal_snapshots WHERE id = $id
 	`, map[string]any{
 		"id": sID,
 	})
@@ -336,25 +424,21 @@ func (r *repository) GetSnapshot(ctx context.Context, snapshotID string) (*GoalS
 }
 
 func (r *repository) GetSummary(ctx context.Context, goalID, userID string, days int) (*GoalLogsSummary, error) {
-	gID := database.MustRecordID(goals.Table, goalID)
-	startDate := time.Now().AddDate(0, 0, -days).Truncate(24 * time.Hour)
+	gID := database.RecordID(goals.Table, goalID)
+	userRecordID := database.RecordID("users", userID)
+	startDate := time.Now().AddDate(0, 0, -days).Truncate(24 * time.Hour).UTC().Format(time.RFC3339Nano)
 
 	summary, err := database.QueryFirst[GoalLogsSummary](ctx, r.db, `
-		LET $logs = SELECT * FROM goal_logs 
-			WHERE `+"`in`"+` = $goal_id  
-			AND created_by = $user
-			AND created_at >= $start_date;
-		
-		LET $met = (SELECT count() FROM $logs WHERE event = "target_met").count ?? 0;
-		LET $exceeded = (SELECT count() FROM $logs WHERE event = "target_exceeded").count ?? 0;
-		
-		RETURN {
-			days_met: $met,
-			days_missed: $exceeded
-		};
+		SELECT
+			COUNT(CASE WHEN event_type = 'target_met' THEN 1 END) AS days_met,
+			COUNT(CASE WHEN event_type = 'target_exceeded' THEN 1 END) AS days_missed
+		FROM goal_logs
+		WHERE goal_id = $goal_id
+		  AND created_by = $user
+		  AND created_at >= $start_date
 	`, map[string]any{
 		"goal_id":    gID,
-		"user":       userID,
+		"user":       userRecordID,
 		"start_date": startDate,
 	})
 	if err != nil {
@@ -404,4 +488,34 @@ func (a *GoalLoggerAdapter) LogTaskEvent(ctx context.Context, goalID, event, use
 		ValueUnit:         valueUnit,
 	}, userID)
 	return err
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+// nullableString returns the string for non-empty input, or nil for empty input
+// so SQLite stores NULL rather than an empty string.
+func nullableString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// generateLogID returns a 32-character hex identifier for a goal_logs row.
+func generateLogID() string {
+	return generateHexID(16)
+}
+
+// generateSnapshotID returns a 32-character hex identifier for a goal_snapshots row.
+func generateSnapshotID() string {
+	return generateHexID(16)
+}
+
+// generateHexID returns n random bytes as a hex string (length 2*n).
+func generateHexID(n int) string {
+	bytes := make([]byte, n)
+	_, _ = rand.Read(bytes) //nolint:errcheck // crypto/rand.Read never fails in practice
+	return hex.EncodeToString(bytes)
 }

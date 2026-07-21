@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
@@ -586,20 +586,21 @@ func (r *repository) LinkGoal(ctx context.Context, activityID string, link *Goal
 	goalID := database.MustRecordID("goals", link.GoalID)
 
 	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $activity_id -> activity_goals -> $goal_id
-		SET
-			auto_link_tasks = $auto_link,
-			quantity_multiplier = $multiplier,
-			default_quantity = $default_quantity,
-			default_impact = $impact,
-			created_at = time::now()
+		INSERT INTO activity_goals (activity_id, goal_id, auto_link_tasks, quantity_multiplier, default_quantity, default_impact, created_at)
+		VALUES ($activity_id, $goal_id, $auto_link, $multiplier, $default_quantity, $impact, $now)
+		ON CONFLICT(activity_id, goal_id) DO UPDATE SET
+			auto_link_tasks = excluded.auto_link_tasks,
+			quantity_multiplier = excluded.quantity_multiplier,
+			default_quantity = excluded.default_quantity,
+			default_impact = excluded.default_impact
 	`, map[string]any{
-		"activity_id":      actID,
-		"goal_id":          goalID,
+		"activity_id":      actID.String(),
+		"goal_id":          goalID.String(),
 		"auto_link":        link.AutoLinkTasks,
 		"multiplier":       multiplier,
 		"default_quantity": link.DefaultQuantity,
 		"impact":           impact,
+		"now":              time.Now().UTC().Format(time.RFC3339Nano),
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("activity_id", activityID).Str("goal_id", link.GoalID).Msg("link goal failed")

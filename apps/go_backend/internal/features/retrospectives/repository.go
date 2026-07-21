@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"time"
 
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
@@ -144,13 +144,13 @@ func (r *repository) FindByDateRange(ctx context.Context, userID, retroType stri
 		  AND retro_type = $type
 		  AND start_date = $start
 		  AND end_date = $end
-		  AND deleted_at IS NONE
+		  AND deleted_at IS NULL
 		LIMIT 1
 	`, map[string]any{
 		"user":  userID,
 		"type":  retroType,
-		"start": start,
-		"end":   end,
+		"start": start.Format(time.RFC3339Nano),
+		"end":   end.Format(time.RFC3339Nano),
 	})
 	if err != nil {
 		return nil, err
@@ -165,13 +165,9 @@ func (r *repository) FindByDateRange(ctx context.Context, userID, retroType stri
 
 func (r *repository) FindPaginated(ctx context.Context, userID string, limit, offset int) ([]*Retrospective, int, error) {
 	// Get total count
-	type countResult struct {
-		Count int `json:"count"`
-	}
-	countRes, err := database.QueryFirst[countResult](ctx, r.db, `
-		SELECT count() as count FROM retrospectives
-		WHERE created_by = $user AND deleted_at IS NONE
-		GROUP ALL
+	total, err := database.QueryScalar[int64](ctx, r.db, `
+		SELECT COUNT(*) FROM retrospectives
+		WHERE created_by = $user AND deleted_at IS NULL
 	`, map[string]any{
 		"user": userID,
 	})
@@ -179,17 +175,12 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, limit, of
 		return nil, 0, err
 	}
 
-	total := 0
-	if countRes != nil {
-		total = countRes.Count
-	}
-
 	// Get paginated results
 	results, err := database.QueryAll[retroDB](ctx, r.db, `
 		SELECT * FROM retrospectives
-		WHERE created_by = $user AND deleted_at IS NONE
+		WHERE created_by = $user AND deleted_at IS NULL
 		ORDER BY start_date DESC
-		LIMIT $limit START $offset
+		LIMIT $limit OFFSET $offset
 	`, map[string]any{
 		"user":   userID,
 		"limit":  limit,
@@ -204,7 +195,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, limit, of
 		retros[i] = res.toRetrospective()
 	}
 
-	return retros, total, nil
+	return retros, int(total), nil
 }
 
 // =============================================================================

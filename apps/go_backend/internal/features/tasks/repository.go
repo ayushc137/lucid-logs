@@ -1,8 +1,8 @@
-// Package tasks provides task management functionality using SurrealDB SDK.
+// Package tasks provides task management functionality using libSQL/SQLite.
 //
 // This package implements:
 //   - CRUD operations for tasks using typed SDK methods
-//   - Category linking (record links)
+//   - Category linking via category_id foreign key
 //   - Emotion tracking with inferred emotion calculation
 //   - Soft delete support
 //   - Pagination
@@ -16,29 +16,28 @@
 //   - database.QueryScalar[T]() - Scalar value queries
 //
 // RecordID Convention:
-//   - taskDB uses models.RecordID for ID and category link fields
+//   - taskDB uses models.RecordID for ID and category_id reference fields
 //   - Conversion to string happens in toTask() at the repository boundary
-//   - This enables type-safe queries without SELECT type::string(id) casts
+//   - This preserves the table:value API contract from the SurrealDB era
 //
 // Emotion Tracking:
 //   - InferredEmotion is calculated on CREATE/UPDATE, not on GET
 //   - Uses weighted centroid of all emotion tags in positives/negatives
 //   - Stored in database for efficient querying
-//
-// See: https://surrealdb.com/docs/sdk/golang
 package tasks
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
@@ -109,37 +108,37 @@ func NewRepository(db *database.DB) Repository {
 
 // taskDB is the internal database representation of a task.
 //
-// This struct uses models.RecordID for the ID field, allowing SurrealDB SDK
-// to populate it directly without type::string casts in queries.
-//
-// The Category field uses categoryDB when fetched via FETCH clause,
-// which also uses models.RecordID for its ID.
+// This struct uses models.RecordID for the ID field so the JSON layer can
+// round-trip the table:value API identifier. The Category field is hydrated
+// via a LEFT JOIN against the categories table.
 type taskDB struct {
-	ID        models.RecordID      `json:"id,omitempty"`
-	Title     string               `json:"title"`
-	Journal   string               `json:"journal"`
-	StartDate database.SurrealTime `json:"start_date"`
-	EndDate   database.SurrealTime `json:"end_date"`
-	Completed bool                 `json:"completed"`
-	Priority  int                  `json:"priority"`
-	Source    string               `json:"source"`
-	Note      string               `json:"note"`
-	Positives []TaskItem           `json:"positives"`
-	Negatives []TaskItem           `json:"negatives"`
-	Category  *categoryDB          `json:"category,omitempty"` // Hydrated via FETCH
+	ID        models.RecordID `json:"id,omitempty"`
+	Title     string          `json:"title"`
+	Journal   string          `json:"journal"`
+	StartDate time.Time       `json:"start_date"`
+	EndDate   time.Time       `json:"end_date"`
+	Completed bool            `json:"completed"`
+	Priority  string          `json:"priority"`
+	Source    string          `json:"source"`
+	Note      string          `json:"note"`
+	Positives []TaskItem      `json:"positives"`
+	Negatives []TaskItem      `json:"negatives"`
+	Category  *categoryDB     `json:"category,omitempty"` // Hydrated via LEFT JOIN
 
 	// Emotion tracking
 	EmotionID       *string                   `json:"emotion_id,omitempty"`
 	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
 
+	// Quantity (denormalized from quantity_value/unit_id columns)
+	Quantity *Quantity `json:"quantity,omitempty"`
+
 	// Linked goals (populated via subquery)
 	LinkedGoals []linkedGoalDB `json:"linked_goals,omitempty"`
 
-	CreatedAt database.SurrealTime  `json:"created_at"`
-	UpdatedAt database.SurrealTime  `json:"updated_at"`
-	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
-	CreatedBy string                `json:"created_by"`
-	UpdatedBy string                `json:"updated_by"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	CreatedBy string     `json:"created_by"`
 }
 
 // linkedGoalDB is the database representation of a linked goal from subquery.
@@ -153,19 +152,19 @@ type linkedGoalDB struct {
 	UnitSymbol    string   `json:"unit_symbol"`
 }
 
-// categoryDB is the database representation of a category when fetched.
+// categoryDB is the database representation of a category when fetched via JOIN.
 //
 // This struct uses models.RecordID for the ID field for type-safe
-// SurrealDB interactions. Convert to categories.Category via toCategory().
+// interactions. Convert to categories.Category via toCategory().
 type categoryDB struct {
-	ID        models.RecordID       `json:"id,omitempty"`
-	Name      string                `json:"name"`
-	Color     string                `json:"color"`
-	CreatedAt database.SurrealTime  `json:"created_at"`
-	UpdatedAt database.SurrealTime  `json:"updated_at"`
-	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
-	CreatedBy string                `json:"created_by"`
-	UpdatedBy string                `json:"updated_by"`
+	ID        models.RecordID `json:"id,omitempty"`
+	Name      string          `json:"name"`
+	Color     string          `json:"color"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	DeletedAt *time.Time      `json:"deleted_at,omitempty"`
+	CreatedBy string          `json:"created_by"`
+	UpdatedBy string          `json:"updated_by"`
 }
 
 // toCategory converts categoryDB to the domain model.
@@ -173,18 +172,13 @@ func (c *categoryDB) toCategory() *categories.Category {
 	if c == nil {
 		return nil
 	}
-	var deletedAt *time.Time
-	if c.DeletedAt != nil && !c.DeletedAt.IsZero() {
-		dt := c.DeletedAt.Time
-		deletedAt = &dt
-	}
 	return &categories.Category{
 		ID:        database.ToStringID(c.ID),
 		Name:      c.Name,
 		Color:     c.Color,
-		CreatedAt: c.CreatedAt.Time,
-		UpdatedAt: c.UpdatedAt.Time,
-		DeletedAt: deletedAt,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+		DeletedAt: c.DeletedAt,
 		CreatedBy: c.CreatedBy,
 		UpdatedBy: c.UpdatedBy,
 	}
@@ -198,12 +192,6 @@ func (t *taskDB) toTask() *Task {
 	var cat *categories.Category
 	if t.Category != nil {
 		cat = t.Category.toCategory()
-	}
-
-	var deletedAt *time.Time
-	if t.DeletedAt != nil && !t.DeletedAt.IsZero() {
-		dt := t.DeletedAt.Time
-		deletedAt = &dt
 	}
 
 	// Convert linked goals
@@ -227,8 +215,8 @@ func (t *taskDB) toTask() *Task {
 		ID:              database.ToStringID(t.ID),
 		Title:           t.Title,
 		Journal:         t.Journal,
-		StartDate:       t.StartDate.Time,
-		EndDate:         t.EndDate.Time,
+		StartDate:       t.StartDate,
+		EndDate:         t.EndDate,
 		Completed:       t.Completed,
 		Source:          t.Source,
 		Note:            t.Note,
@@ -237,42 +225,13 @@ func (t *taskDB) toTask() *Task {
 		Category:        cat,
 		EmotionID:       t.EmotionID,
 		InferredEmotion: t.InferredEmotion,
+		Quantity:        t.Quantity,
 		LinkedGoals:     linkedGoals,
-		CreatedAt:       t.CreatedAt.Time,
-		UpdatedAt:       t.UpdatedAt.Time,
-		DeletedAt:       deletedAt,
+		CreatedAt:       t.CreatedAt,
+		UpdatedAt:       t.UpdatedAt,
+		DeletedAt:       t.DeletedAt,
 		CreatedBy:       t.CreatedBy,
 	}
-}
-
-// =============================================================================
-// CREATE DATA STRUCTURES
-// =============================================================================
-
-// taskCreateData is the data structure for creating a task.
-//
-// This matches SurrealDB's expected format for CREATE operations.
-// Category uses *models.RecordID for type-safe record linking.
-type taskCreateData struct {
-	Title     string           `json:"title"`
-	Journal   string           `json:"journal"`
-	StartDate time.Time        `json:"start_date"`
-	EndDate   time.Time        `json:"end_date"`
-	Completed bool             `json:"completed"`
-	Source    string           `json:"source"`
-	Note      string           `json:"note"`
-	Positives []TaskItem       `json:"positives"`
-	Negatives []TaskItem       `json:"negatives"`
-	Category  *models.RecordID `json:"category,omitempty"` // Record link or nil
-	Quantity  *Quantity        `json:"quantity,omitempty"` // Contribution quantity
-
-	// Emotion tracking
-	EmotionID       *string                   `json:"emotion_id,omitempty"`
-	InferredEmotion *emotions.InferredEmotion `json:"inferred_emotion,omitempty"`
-
-	CreatedBy string    `json:"created_by"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // =============================================================================
@@ -281,19 +240,52 @@ type taskCreateData struct {
 
 // FindByID retrieves a task by ID for a specific user using SDK methods.
 //
-// This uses the database.QueryFirst[T]() SDK wrapper for type-safe queries.
-// The query fetches the task with its category hydrated via FETCH.
-// No type::string(id) cast needed since taskDB.ID is models.RecordID.
+// The query LEFT JOINs the categories table so the hydrated Category is
+// available on the returned task.
 func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, error) {
 	taskID := database.MustRecordID(Table, id)
 
-	// Use SDK's typed query to fetch task with category
-	// models.RecordID handles ID serialization automatically
+	// Fetch the task with category hydrated via LEFT JOIN.
 	task, err := database.QueryFirst[taskDB](ctx, r.db, `
-		SELECT *
-		FROM $id FETCH category
+		SELECT
+			t.id AS id,
+			t.title AS title,
+			t.journal AS journal,
+			t.start_date AS start_date,
+			t.end_date AS end_date,
+			t.completed AS completed,
+			COALESCE(t.priority, '') AS priority,
+			COALESCE(t.source, '') AS source,
+			COALESCE(t.note, '') AS note,
+			t.positives AS positives,
+			t.negatives AS negatives,
+			t.emotion_id AS emotion_id,
+			t.inferred_emotion AS inferred_emotion,
+			t.quantity_value AS quantity_value,
+			t.unit_id AS unit_id,
+			t.created_at AS created_at,
+			t.updated_at AS updated_at,
+			t.deleted_at AS deleted_at,
+			t.created_by AS created_by,
+			(
+				SELECT json_object(
+					'id', c.id,
+					'name', c.name,
+					'color', c.color,
+					'created_at', c.created_at,
+					'updated_at', c.updated_at,
+					'deleted_at', c.deleted_at,
+					'created_by', c.created_by,
+					'updated_by', ''
+				)
+				FROM categories c
+				WHERE c.id = t.category_id
+				LIMIT 1
+			) AS category
+		FROM tasks t
+		WHERE t.id = $id
 	`, map[string]any{
-		"id": taskID,
+		"id": database.ToStringID(taskID),
 	})
 	if err != nil {
 		r.logger.Error().Err(err).
@@ -314,6 +306,11 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, er
 
 	result := task.toTask()
 
+	// Hydrate linked goals for the task
+	if err := r.hydrateLinkedGoals(ctx, result); err != nil {
+		r.logger.Warn().Err(err).Str("task_id", id).Msg("failed to hydrate linked goals")
+	}
+
 	// Sanitize: remove deleted categories from response
 	sanitizeCategory(result)
 
@@ -325,14 +322,11 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Task, er
 // This uses:
 //   - database.QueryScalar[T]() for counting records
 //   - database.QueryAll[T]() for fetching paginated results
-//
-// No type::string(id) cast needed since taskDB.ID is models.RecordID.
 func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params) ([]*Task, int64, error) {
-	// Get total count using server-side function with SDK's QueryScalar
-	total, err := database.QueryScalar[float64](ctx, r.db, `
-		RETURN (SELECT count() FROM tasks
-			WHERE created_by = $user AND deleted_at = NONE
-			GROUP ALL)[0].count OR 0
+	// Get total count using SQLite COUNT(*)
+	total, err := database.QueryScalar[int64](ctx, r.db, `
+		SELECT COUNT(*) FROM tasks
+		WHERE created_by = $user AND deleted_at IS NULL
 	`, map[string]any{
 		"user": userID,
 	})
@@ -342,14 +336,46 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	// Get paginated tasks using SDK's typed QueryAll
-	// models.RecordID handles ID deserialization automatically
 	tasksDB, err := database.QueryAll[taskDB](ctx, r.db, `
-		SELECT *
-		FROM tasks
-		WHERE created_by = $user AND deleted_at = NONE
-		ORDER BY start_date DESC
-		LIMIT $limit START $offset
-		FETCH category
+		SELECT
+			t.id AS id,
+			t.title AS title,
+			t.journal AS journal,
+			t.start_date AS start_date,
+			t.end_date AS end_date,
+			t.completed AS completed,
+			COALESCE(t.priority, '') AS priority,
+			COALESCE(t.source, '') AS source,
+			COALESCE(t.note, '') AS note,
+			t.positives AS positives,
+			t.negatives AS negatives,
+			t.emotion_id AS emotion_id,
+			t.inferred_emotion AS inferred_emotion,
+			t.quantity_value AS quantity_value,
+			t.unit_id AS unit_id,
+			t.created_at AS created_at,
+			t.updated_at AS updated_at,
+			t.deleted_at AS deleted_at,
+			t.created_by AS created_by,
+			(
+				SELECT json_object(
+					'id', c.id,
+					'name', c.name,
+					'color', c.color,
+					'created_at', c.created_at,
+					'updated_at', c.updated_at,
+					'deleted_at', c.deleted_at,
+					'created_by', c.created_by,
+					'updated_by', ''
+				)
+				FROM categories c
+				WHERE c.id = t.category_id
+				LIMIT 1
+			) AS category
+		FROM tasks t
+		WHERE t.created_by = $user AND t.deleted_at IS NULL
+		ORDER BY t.start_date DESC
+		LIMIT $limit OFFSET $offset
 	`, map[string]any{
 		"user":   userID,
 		"limit":  params.Limit,
@@ -368,7 +394,7 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		tasks[i] = task
 	}
 
-	return tasks, int64(total), nil
+	return tasks, total, nil
 }
 
 // =============================================================================
@@ -378,83 +404,80 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 // FindFiltered retrieves tasks with filters, search, and pagination.
 //
 // This method supports:
-//   - Full-text search on title, journal, and note fields (SurrealDB FTS with BM25)
+//   - Full-text search on title, journal, and note fields (case-insensitive LIKE)
 //   - Category filtering
 //   - Status filtering (completed/pending)
-//   - Priority range filtering
 //   - Date range filtering
 //   - Custom sorting
-//
-// The full-text search uses the task_search_analyzer defined in migrations.
 func (r *repository) FindFiltered(ctx context.Context, userID string, filters TaskFilterParams, params pagination.Params) ([]*Task, int64, error) {
 	// Build dynamic WHERE conditions
-	conditions := []string{"created_by = $user", "deleted_at = NONE"}
+	conditions := []string{"t.created_by = $user", "t.deleted_at IS NULL"}
 	queryVars := map[string]any{
 		"user":   userID,
 		"limit":  params.Limit,
 		"offset": params.Offset,
 	}
 
-	// Full-text search across title, journal, note
-	// Using string::lowercase + string::contains for reliable case-insensitive search
-	// FTS with @@ requires existing records to be re-indexed after index creation
+	// Full-text search across title, journal, note using case-insensitive LIKE.
 	hasSearch := filters.Search != ""
 	if hasSearch {
-		conditions = append(conditions, "(string::lowercase(title) CONTAINS string::lowercase($search) OR string::lowercase(journal) CONTAINS string::lowercase($search) OR string::lowercase(note) CONTAINS string::lowercase($search))")
+		conditions = append(conditions, "(LOWER(t.title) LIKE LOWER('%' || $search || '%') OR LOWER(t.journal) LIKE LOWER('%' || $search || '%') OR LOWER(t.note) LIKE LOWER('%' || $search || '%'))")
 		queryVars["search"] = filters.Search
 	}
 
 	// Category filter - NoCategoryFilter takes precedence
 	if filters.NoCategoryFilter {
 		// Filter for tasks without any category
-		conditions = append(conditions, "category = NONE")
+		conditions = append(conditions, "t.category_id IS NULL")
 	} else if filters.CategoryID != "" {
 		catID := database.MustRecordID(categories.Table, filters.CategoryID)
-		conditions = append(conditions, "category = $category")
-		queryVars["category"] = catID
+		conditions = append(conditions, "t.category_id = $category")
+		queryVars["category"] = database.ToStringID(catID)
 	}
 
 	// Status filter
 	switch filters.Status {
 	case StatusCompleted:
-		conditions = append(conditions, "completed = true")
+		conditions = append(conditions, "t.completed = 1")
 	case StatusPending:
-		conditions = append(conditions, "completed = false")
+		conditions = append(conditions, "t.completed = 0")
 		// StatusAll or empty: no filter
 	}
 
-	// Goal ID filter
+	// Goal ID filter (via task_goals join table)
 	if filters.GoalID != "" {
-		conditions = append(conditions, "id IN (SELECT in FROM task_goals WHERE out = $goal_id)")
-		queryVars["goal_id"] = database.MustRecordID("goals", filters.GoalID)
+		goalID := database.MustRecordID("goals", filters.GoalID)
+		conditions = append(conditions, "t.id IN (SELECT task_id FROM task_goals WHERE goal_id = $goal_id)")
+		queryVars["goal_id"] = database.ToStringID(goalID)
 	}
 
-	// Activity ID filter (via created_from_activity edge)
+	// Activity ID filter (via created_from_activity join table)
 	if filters.ActivityID != "" {
-		conditions = append(conditions, "id IN (SELECT in FROM created_from_activity WHERE out = $activity_id)")
-		queryVars["activity_id"] = database.MustRecordID("activities", filters.ActivityID)
+		activityID := database.MustRecordID("activities", filters.ActivityID)
+		conditions = append(conditions, "t.id IN (SELECT task_id FROM created_from_activity WHERE activity_id = $activity_id)")
+		queryVars["activity_id"] = database.ToStringID(activityID)
 	}
 
 	// Has quantity filter
 	if filters.HasQuantity != nil {
 		if *filters.HasQuantity {
-			conditions = append(conditions, "quantity IS NOT NONE")
+			conditions = append(conditions, "t.quantity_value IS NOT NULL")
 		} else {
-			conditions = append(conditions, "quantity IS NONE")
+			conditions = append(conditions, "t.quantity_value IS NULL")
 		}
 	}
 
-	// Date range filter - parse strings to time.Time for proper SurrealDB datetime comparison
+	// Date range filter - parse strings to time.Time for proper datetime comparison
 	if filters.StartDateFrom != "" {
 		if parsedTime, err := time.Parse(time.RFC3339, filters.StartDateFrom); err == nil {
-			conditions = append(conditions, "start_date >= $start_from")
-			queryVars["start_from"] = parsedTime
+			conditions = append(conditions, "t.start_date >= $start_from")
+			queryVars["start_from"] = parsedTime.UTC().Format(time.RFC3339Nano)
 		}
 	}
 	if filters.StartDateTo != "" {
 		if parsedTime, err := time.Parse(time.RFC3339, filters.StartDateTo); err == nil {
-			conditions = append(conditions, "start_date <= $start_to")
-			queryVars["start_to"] = parsedTime
+			conditions = append(conditions, "t.start_date <= $start_to")
+			queryVars["start_to"] = parsedTime.UTC().Format(time.RFC3339Nano)
 		}
 	}
 
@@ -465,39 +488,75 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 	orderClause := buildOrderClause(filters.SortField, filters.SortOrder, hasSearch)
 
 	// Count query
-	countQuery := `
-		RETURN (SELECT count() FROM tasks
-			WHERE ` + whereClause + `
-			GROUP ALL)[0].count OR 0
-	`
+	countQuery := `SELECT COUNT(*) FROM tasks t WHERE ` + whereClause
 
-	total, err := database.QueryScalar[float64](ctx, r.db, countQuery, queryVars)
+	total, err := database.QueryScalar[int64](ctx, r.db, countQuery, queryVars)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("FindFiltered count query failed")
 		return nil, 0, err
 	}
 
-	// Main query with category fetch and linked goals subquery
+	// Main query with category fetch and linked goals subquery.
 	// The linked_goals subquery fetches goal summary data for highlighting:
-	// - Joins task_goals edge with goals table
-	// - Gets goal's category color via FETCH or subquery
+	// - Joins task_goals table with goals table
+	// - Gets goal's category color via LEFT JOIN to categories
 	// - Includes quantity_value for displaying contribution in popover
 	selectQuery := `
-		SELECT *,
-			(SELECT 
-				type::string(out.id) as id,
-				out.title as title,
-				out.icon as icon,
-				out.category.color as color,
-				impact_type,
-				quantity_value,
-				out.target.unit_id as unit_symbol
-			FROM task_goals WHERE in = $parent.id) as linked_goals
-		FROM tasks
+		SELECT
+			t.id AS id,
+			t.title AS title,
+			t.journal AS journal,
+			t.start_date AS start_date,
+			t.end_date AS end_date,
+			t.completed AS completed,
+			COALESCE(t.priority, '') AS priority,
+			COALESCE(t.source, '') AS source,
+			COALESCE(t.note, '') AS note,
+			t.positives AS positives,
+			t.negatives AS negatives,
+			t.emotion_id AS emotion_id,
+			t.inferred_emotion AS inferred_emotion,
+			t.quantity_value AS quantity_value,
+			t.unit_id AS unit_id,
+			t.created_at AS created_at,
+			t.updated_at AS updated_at,
+			t.deleted_at AS deleted_at,
+			t.created_by AS created_by,
+			(
+				SELECT json_object(
+					'id', c.id,
+					'name', c.name,
+					'color', c.color,
+					'created_at', c.created_at,
+					'updated_at', c.updated_at,
+					'deleted_at', c.deleted_at,
+					'created_by', c.created_by,
+					'updated_by', ''
+				)
+				FROM categories c
+				WHERE c.id = t.category_id
+				LIMIT 1
+			) AS category,
+			(
+				SELECT json_group_array(json_object(
+					'id', g.id,
+					'title', g.title,
+					'icon', COALESCE(g.icon, ''),
+					'color', COALESCE(gc.color, ''),
+					'impact_type', tg.impact_type,
+					'quantity_value', tg.quantity_value,
+					'unit_symbol', COALESCE(u.symbol, '')
+				))
+				FROM task_goals tg
+				JOIN goals g ON g.id = tg.goal_id
+				LEFT JOIN categories gc ON gc.id = g.category_id
+				LEFT JOIN units u ON u.id = tg.unit_id
+				WHERE tg.task_id = t.id
+			) AS linked_goals
+		FROM tasks t
 		WHERE ` + whereClause + `
 		` + orderClause + `
-		LIMIT $limit START $offset
-		FETCH category
+		LIMIT $limit OFFSET $offset
 	`
 
 	r.logger.Debug().
@@ -522,11 +581,10 @@ func (r *repository) FindFiltered(ctx context.Context, userID string, filters Ta
 		tasks[i] = task
 	}
 
-	return tasks, int64(total), nil
+	return tasks, total, nil
 }
 
 // buildOrderClause constructs the ORDER BY clause based on sort parameters.
-// When searching with FTS, we can use search::score for relevance-based sorting.
 func buildOrderClause(sortField, sortOrder string, hasSearch bool) string {
 	// Default sort direction based on field type
 	if sortOrder == "" {
@@ -544,18 +602,16 @@ func buildOrderClause(sortField, sortOrder string, hasSearch bool) string {
 	}
 
 	// Determine sort field
-	field := "start_date" // default
+	field := "t.start_date" // default
 	switch sortField {
 	case SortByTitle:
-		field = "title"
+		field = "t.title"
 	case SortByCreatedAt:
-		field = "created_at"
+		field = "t.created_at"
 	case SortByStartDate:
-		field = "start_date"
+		field = "t.start_date"
 	}
 
-	// When searching, we could optionally add search::score() for relevance
-	// but for now we keep it simple with the specified sort field
 	return "ORDER BY " + field + " " + direction
 }
 
@@ -563,15 +619,13 @@ func buildOrderClause(sortField, sortOrder string, hasSearch bool) string {
 // CREATE OPERATION
 // =============================================================================
 
-// Create creates a new task using SDK's Create method.
+// Create creates a new task.
 //
-// This uses database.Create[T]() for type-safe record creation.
-// Category links use models.RecordID for type-safe record references.
+// Inserts into tasks table and syncs emotion/goal edges via join tables.
 // InferredEmotion is calculated at write time from positives/negatives emotions.
-// See: https://surrealdb.com/docs/sdk/golang/methods/create
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Task, error) {
 	// Validate category ownership if provided
-	var categoryLink *models.RecordID
+	var categoryID *string
 	if req.CategoryID != "" {
 		catID := database.MustRecordID(categories.Table, req.CategoryID)
 		exists, err := r.validateCategoryOwnership(ctx, catID, userID)
@@ -581,8 +635,8 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		if !exists {
 			return nil, errors.ErrCategoryNotFound
 		}
-		// Use models.RecordID for type-safe record link
-		categoryLink = &catID
+		idStr := database.ToStringID(catID)
+		categoryID = &idStr
 	}
 
 	// Parse dates (validated in service)
@@ -612,52 +666,78 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 
 	// Generate task ID using models.RecordID
 	taskID := generateTaskRecordID()
+	taskIDStr := database.ToStringID(taskID)
 	now := time.Now().UTC()
+	nowStr := now.Format(time.RFC3339Nano)
 
-	// Create task data for SDK Create
-	createData := taskCreateData{
-		Title:           req.Title,
-		Journal:         req.Journal,
-		StartDate:       startDate,
-		EndDate:         endDate,
-		Completed:       false,
-		Source:          source,
-		Note:            req.Note,
-		Positives:       positives,
-		Negatives:       negatives,
-		Category:        categoryLink,
-		Quantity:        convertQuantityInput(req.Quantity),
-		EmotionID:       req.EmotionID,
-		InferredEmotion: inferredEmotion,
-		CreatedBy:       userID,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+	// Marshal JSON-encoded columns
+	positivesJSON, _ := json.Marshal(positives)
+	negativesJSON, _ := json.Marshal(negatives)
+
+	// Build the data map for the INSERT (only non-optional / always-present fields)
+	data := map[string]any{
+		"id":         taskIDStr,
+		"created_by": userID,
+		"title":      req.Title,
+		"note":       req.Note,
+		"journal":    req.Journal,
+		"start_date": startDate.UTC().Format(time.RFC3339Nano),
+		"end_date":   endDate.UTC().Format(time.RFC3339Nano),
+		"completed":  false,
+		"source":     source,
+		"positives":  string(positivesJSON),
+		"negatives":  string(negativesJSON),
+		"metadata":   "{}",
+		"created_at": nowStr,
+		"updated_at": nowStr,
 	}
 
-	// Use CREATE query but only decode the ID to avoid time parsing issues
+	if categoryID != nil {
+		data["category_id"] = *categoryID
+	}
+
+	// Emotion ID
+	if req.EmotionID != nil && strings.TrimSpace(*req.EmotionID) != "" {
+		data["emotion_id"] = strings.TrimSpace(*req.EmotionID)
+	}
+
+	// Inferred emotion stored as JSON text
+	if inferredEmotion != nil {
+		ieJSON, err := json.Marshal(inferredEmotion)
+		if err != nil {
+			r.logger.Warn().Err(err).Msg("failed to marshal inferred emotion")
+		} else {
+			data["inferred_emotion"] = string(ieJSON)
+		}
+	}
+
+	// Activity link
+	if req.ActivityID != "" {
+		activityID := database.MustRecordID("activities", req.ActivityID)
+		data["activity_id"] = database.ToStringID(activityID)
+	}
+
+	// Quantity
+	if req.Quantity != nil {
+		data["quantity_value"] = req.Quantity.Value
+		if req.Quantity.UnitID != "" {
+			data["unit_id"] = req.Quantity.UnitID
+		}
+	}
+
+	// Use the SDK's typed Create to INSERT and return the new row
 	type createResult struct {
 		ID models.RecordID `json:"id"`
 	}
-
-	results, err := database.QueryAll[createResult](ctx, r.db, `
-		CREATE $id CONTENT $data
-	`, map[string]any{
-		"id":   taskID,
-		"data": createData,
-	})
+	_, err := database.Create[createResult](ctx, r.db, Table, data)
 	if err != nil {
 		r.logger.Error().Err(err).
-			Str("task_id", database.ToStringID(taskID)).
+			Str("task_id", taskIDStr).
 			Str("user_id", userID).
 			Msg("SDK Create query failed for task")
 		return nil, err
 	}
 
-	if len(results) == 0 {
-		return nil, errors.ErrInternal.WithMessage("Failed to create task")
-	}
-
-	taskIDStr := database.ToStringID(taskID)
 	r.logger.Info().Str("task_id", taskIDStr).Msg("task created via SDK")
 
 	// Sync emotion edges for analytics (async-safe, errors logged not returned)
@@ -676,9 +756,8 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 // UPDATE OPERATION
 // =============================================================================
 
-// Update updates an existing task using query-based UPDATE.
+// Update updates an existing task.
 //
-// Uses UPDATE query for reliable single-record updates with models.RecordID.
 // Recalculates InferredEmotion when positives/negatives or emotion_id changes.
 func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Task, error) {
 	// Verify task exists and user has ownership
@@ -688,12 +767,13 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	taskID := database.MustRecordID(Table, id)
+	taskIDStr := database.ToStringID(taskID)
 	now := time.Now().UTC()
+	nowStr := now.Format(time.RFC3339Nano)
 
 	// Build update data dynamically with only provided fields
 	updateData := map[string]any{
-		"updated_by": userID,
-		"updated_at": now,
+		"updated_at": nowStr,
 	}
 
 	if req.Title != nil {
@@ -718,7 +798,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 			return nil, errors.ErrBadRequest.WithMessage("Invalid start_date format")
 		}
 		newStart = &t
-		updateData["start_date"] = t
+		updateData["start_date"] = t.UTC().Format(time.RFC3339Nano)
 	}
 	if req.EndDate != nil {
 		endStr := strings.TrimSpace(*req.EndDate)
@@ -730,7 +810,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 			return nil, errors.ErrBadRequest.WithMessage("Invalid end_date format")
 		}
 		newEnd = &t
-		updateData["end_date"] = t
+		updateData["end_date"] = t.UTC().Format(time.RFC3339Nano)
 	}
 	if req.Completed != nil {
 		updateData["completed"] = *req.Completed
@@ -739,13 +819,18 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		updateData["note"] = *req.Note
 	}
 	if req.Positives != nil {
-		updateData["positives"] = req.Positives
+		positivesJSON, _ := json.Marshal(req.Positives)
+		updateData["positives"] = string(positivesJSON)
 	}
 	if req.Negatives != nil {
-		updateData["negatives"] = req.Negatives
+		negativesJSON, _ := json.Marshal(req.Negatives)
+		updateData["negatives"] = string(negativesJSON)
 	}
 	if req.Quantity != nil {
-		updateData["quantity"] = convertQuantityInput(req.Quantity)
+		updateData["quantity_value"] = req.Quantity.Value
+		if req.Quantity.UnitID != "" {
+			updateData["unit_id"] = req.Quantity.UnitID
+		}
 	}
 
 	// Handle emotion fields
@@ -788,23 +873,23 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 
 	// Recalculate inferred emotion if positives, negatives, or emotion changed
 	if req.Positives != nil || req.Negatives != nil || emotionChanged {
-		// Calculate inferred emotion
 		emotionItems := toEmotionItems(finalPositives, finalNegatives)
 		if len(emotionItems.positives) > 0 || len(emotionItems.negatives) > 0 {
-			updateData["inferred_emotion"] = emotions.InferFromItems(emotionItems.positives, emotionItems.negatives)
+			ie := emotions.InferFromItems(emotionItems.positives, emotionItems.negatives)
+			ieJSON, err := json.Marshal(ie)
+			if err != nil {
+				r.logger.Warn().Err(err).Msg("failed to marshal inferred emotion")
+			} else {
+				updateData["inferred_emotion"] = string(ieJSON)
+			}
 		} else {
 			// Explicitly remove inferred emotion if no items
 			updateData["inferred_emotion"] = nil
 		}
 	}
 
-	// Use UPDATE query for reliable single-record update
-	_, err = database.QueryAll[taskDB](ctx, r.db, `
-		UPDATE $id MERGE $data
-	`, map[string]any{
-		"id":   taskID,
-		"data": updateData,
-	})
+	// Use SDK's Merge helper for the UPDATE
+	_, err = database.Merge[taskDB](ctx, r.db, taskIDStr, updateData)
 	if err != nil {
 		r.logger.Error().Err(err).Str("task_id", id).Msg("UPDATE query failed for task")
 		return nil, err
@@ -834,9 +919,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 // DELETE OPERATION
 // =============================================================================
 
-// Delete soft-deletes a task using query-based UPDATE.
-//
-// Uses UPDATE query for reliable single-record soft delete with models.RecordID.
+// Delete soft-deletes a task using the Merge helper.
 func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	// Verify ownership first
 	_, err := r.FindByID(ctx, id, userID)
@@ -845,19 +928,14 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	}
 
 	taskID := database.MustRecordID(Table, id)
+	taskIDStr := database.ToStringID(taskID)
 	now := time.Now().UTC()
+	nowStr := now.Format(time.RFC3339Nano)
 
-	// Use UPDATE query for reliable soft delete
-	_, err = database.QueryAll[taskDB](ctx, r.db, `
-		UPDATE $id MERGE {
-			deleted_at: $now,
-			updated_by: $user,
-			updated_at: $now
-		}
-	`, map[string]any{
-		"id":   taskID,
-		"now":  now,
-		"user": userID,
+	// Use Merge for reliable soft delete
+	_, err = database.Merge[taskDB](ctx, r.db, taskIDStr, map[string]any{
+		"deleted_at": nowStr,
+		"updated_at": nowStr,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("task_id", id).Msg("UPDATE query failed for soft delete")
@@ -873,15 +951,13 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 // =============================================================================
 
 // validateCategoryOwnership checks if a category exists and belongs to the user.
-//
-// Uses models.RecordID for type-safe category reference.
 func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID models.RecordID, userID string) (bool, error) {
 	// Use SDK's typed query for validation
 	cats, err := database.QueryAll[categoryDB](ctx, r.db, `
-		SELECT id FROM $id 
-		WHERE created_by = $user AND deleted_at = NONE
+		SELECT * FROM categories
+		WHERE id = $id AND created_by = $user AND deleted_at IS NULL
 	`, map[string]any{
-		"id":   categoryID,
+		"id":   database.ToStringID(categoryID),
 		"user": userID,
 	})
 	if err != nil {
@@ -903,21 +979,22 @@ func (r *repository) validateCategoryOwnership(ctx context.Context, categoryID m
 func (r *repository) GetLastTaskEndTime(ctx context.Context, userID string) (*time.Time, error) {
 	// Query to find the most recent task that has already finished
 	query := `
-		SELECT end_date FROM tasks 
-		WHERE created_by = $user 
-		  AND deleted_at = NONE 
-		  AND end_date <= time::now()
-		ORDER BY end_date DESC 
-		LIMIT 1;
+		SELECT end_date FROM tasks
+		WHERE created_by = $user
+		  AND deleted_at IS NULL
+		  AND end_date <= $now
+		ORDER BY end_date DESC
+		LIMIT 1
 	`
 
 	type result struct {
-		EndDate database.SurrealTime `json:"end_date"`
+		EndDate time.Time `json:"end_date"`
 	}
 
 	// Use QueryFirst to get a single result
 	record, err := database.QueryFirst[result](ctx, r.db, query, map[string]any{
 		"user": userID,
+		"now":  time.Now().UTC().Format(time.RFC3339Nano),
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("failed to get last task end time")
@@ -928,11 +1005,12 @@ func (r *repository) GetLastTaskEndTime(ctx context.Context, userID string) (*ti
 		return nil, nil
 	}
 
-	return &record.EndDate.Time, nil
+	return &record.EndDate, nil
 }
 
 func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string) ([]TaskGoalLink, error) {
 	tID := database.MustRecordID(Table, taskID)
+	taskIDStr := database.ToStringID(tID)
 
 	type goalCategoryDB struct {
 		ID    string `json:"id"`
@@ -940,48 +1018,60 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 		Color string `json:"color"`
 	}
 
+	// Parse target JSON column for goal_target_value and goal_target_unit.
+	// The goals.target column is TEXT holding JSON like:
+	//   {"value": 10, "unit_id": "units:km"}
 	type goalLinkDB struct {
-		GoalID         string   `json:"goal_id"`
-		GoalTitle      string   `json:"goal_title"`
-		GoalIcon       string   `json:"goal_icon,omitempty"`
-		ImpactType     string   `json:"impact_type"`
-		QuantityValue  *float64 `json:"quantity_value,omitempty"`
-		UnitID         *string  `json:"unit_id,omitempty"`
-		IsMilestone    bool     `json:"is_milestone"`
-		MilestoneLabel string   `json:"milestone_label,omitempty"`
-		// Additional goal details
-		GoalDescription string                `json:"goal_description,omitempty"`
-		GoalStatus      string                `json:"goal_status,omitempty"`
-		GoalPriority    int                   `json:"goal_priority,omitempty"`
-		GoalTargetValue *float64              `json:"goal_target_value,omitempty"`
-		GoalTargetUnit  string                `json:"goal_target_unit,omitempty"`
-		GoalCategory    *goalCategoryDB       `json:"goal_category,omitempty"`
-		LinkedAt        *database.SurrealTime `json:"linked_at,omitempty"`
-		Notes           string                `json:"notes,omitempty"`
+		GoalID          string          `json:"goal_id"`
+		GoalTitle       string          `json:"goal_title"`
+		GoalIcon        string          `json:"goal_icon,omitempty"`
+		ImpactType      string          `json:"impact_type"`
+		QuantityValue   *float64        `json:"quantity_value,omitempty"`
+		UnitID          *string         `json:"unit_id,omitempty"`
+		IsMilestone     bool            `json:"is_milestone"`
+		MilestoneLabel  string          `json:"milestone_label,omitempty"`
+		GoalDescription string          `json:"goal_description,omitempty"`
+		GoalStatus      string          `json:"goal_status,omitempty"`
+		GoalPriority    string          `json:"goal_priority,omitempty"`
+		GoalTargetValue *float64        `json:"goal_target_value,omitempty"`
+		GoalTargetUnit  string          `json:"goal_target_unit,omitempty"`
+		GoalCategory    *goalCategoryDB `json:"goal_category,omitempty"`
+		LinkedAt        *time.Time      `json:"linked_at,omitempty"`
+		Notes           string          `json:"notes,omitempty"`
 	}
 
 	goalsDB, err := database.QueryAll[goalLinkDB](ctx, r.db, `
 		SELECT
-			type::string(out) as goal_id,
-			out.title as goal_title,
-			out.icon as goal_icon,
-			impact_type,
-			quantity_value,
-			unit_id,
-			is_milestone,
-			milestone_label,
-			out.description as goal_description,
-			out.status as goal_status,
-			out.priority as goal_priority,
-			out.target.value as goal_target_value,
-			out.target.unit_id as goal_target_unit,
-			(out->in_category.out.*)[0] as goal_category,
-			created_at as linked_at,
-			notes
-		FROM $task_id->task_goals
-		WHERE out.deleted_at IS NONE
+			tg.goal_id AS goal_id,
+			g.title AS goal_title,
+			COALESCE(g.icon, '') AS goal_icon,
+			tg.impact_type AS impact_type,
+			tg.quantity_value AS quantity_value,
+			tg.unit_id AS unit_id,
+			CASE WHEN tg.is_milestone = 1 THEN 1 ELSE 0 END AS is_milestone,
+			COALESCE(tg.milestone_label, '') AS milestone_label,
+			COALESCE(g.description, '') AS goal_description,
+			COALESCE(g.status, '') AS goal_status,
+			COALESCE(g.priority, '') AS goal_priority,
+			json_extract(g.target, '$.value') AS goal_target_value,
+			COALESCE(json_extract(g.target, '$.unit_id'), '') AS goal_target_unit,
+			(
+				SELECT json_object(
+					'id', c.id,
+					'name', c.name,
+					'color', c.color
+				)
+				FROM categories c
+				WHERE c.id = g.category_id
+				LIMIT 1
+			) AS goal_category,
+			tg.created_at AS linked_at,
+			COALESCE(tg.notes, '') AS notes
+		FROM task_goals tg
+		JOIN goals g ON g.id = tg.goal_id
+		WHERE tg.task_id = $task_id AND g.deleted_at IS NULL
 	`, map[string]any{
-		"task_id": tID,
+		"task_id": taskIDStr,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("task_id", taskID).Msg("find goals for task failed")
@@ -990,6 +1080,15 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 
 	goals := make([]TaskGoalLink, len(goalsDB))
 	for i, g := range goalsDB {
+		// Parse the goal_priority string -> int if present (SurrealDB stored it as int)
+		var goalPriorityInt int
+		if g.GoalPriority != "" {
+			var pri int
+			if _, parseErr := fmt.Sscanf(g.GoalPriority, "%d", &pri); parseErr == nil {
+				goalPriorityInt = pri
+			}
+		}
+
 		link := TaskGoalLink{
 			GoalID:          g.GoalID,
 			GoalTitle:       g.GoalTitle,
@@ -1001,17 +1100,17 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 			MilestoneLabel:  g.MilestoneLabel,
 			GoalDescription: g.GoalDescription,
 			GoalStatus:      g.GoalStatus,
-			GoalPriority:    g.GoalPriority,
+			GoalPriority:    goalPriorityInt,
 			GoalTargetValue: g.GoalTargetValue,
 			GoalTargetUnit:  g.GoalTargetUnit,
 			Notes:           g.Notes,
 		}
 
-		if g.LinkedAt != nil {
-			linkedAt := g.LinkedAt.Time
+		if g.LinkedAt != nil && !g.LinkedAt.IsZero() {
+			linkedAt := *g.LinkedAt
 			link.LinkedAt = &linkedAt
 		}
-		if g.GoalCategory != nil {
+		if g.GoalCategory != nil && g.GoalCategory.ID != "" {
 			link.GoalCategory = &struct {
 				ID    string `json:"id"`
 				Name  string `json:"name"`
@@ -1027,6 +1126,49 @@ func (r *repository) FindGoalsForTask(ctx context.Context, taskID, userID string
 	}
 
 	return goals, nil
+}
+
+// hydrateLinkedGoals populates the LinkedGoals field on a Task by querying the
+// task_goals join table. Used by FindByID where the SELECT does not include
+// the linked_goals subquery.
+func (r *repository) hydrateLinkedGoals(ctx context.Context, task *Task) error {
+	if task == nil {
+		return nil
+	}
+	linked, err := database.QueryAll[linkedGoalDB](ctx, r.db, `
+		SELECT
+			g.id AS id,
+			g.title AS title,
+			COALESCE(g.icon, '') AS icon,
+			COALESCE(gc.color, '') AS color,
+			tg.impact_type AS impact_type,
+			tg.quantity_value AS quantity_value,
+			COALESCE(u.symbol, '') AS unit_symbol
+		FROM task_goals tg
+		JOIN goals g ON g.id = tg.goal_id
+		LEFT JOIN categories gc ON gc.id = g.category_id
+		LEFT JOIN units u ON u.id = tg.unit_id
+		WHERE tg.task_id = $task_id
+	`, map[string]any{
+		"task_id": task.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	task.LinkedGoals = make([]LinkedGoalSummary, len(linked))
+	for i, lg := range linked {
+		task.LinkedGoals[i] = LinkedGoalSummary{
+			ID:            lg.ID,
+			Title:         lg.Title,
+			Icon:          lg.Icon,
+			Color:         lg.Color,
+			ImpactType:    lg.ImpactType,
+			QuantityValue: lg.QuantityValue,
+			UnitSymbol:    lg.UnitSymbol,
+		}
+	}
+	return nil
 }
 
 // generateTaskRecordID generates a unique task ID as models.RecordID.
@@ -1079,7 +1221,8 @@ func toEmotionItems(positives, negatives []TaskItem) emotionItemsResult {
 // EMOTION EDGE SYNC
 // =============================================================================
 
-// syncEmotionEdges creates graph edges linking task to emotions for analytics.
+// syncEmotionEdges inserts rows into the task_emotions join table linking
+// a task to emotions for analytics.
 // This enables efficient queries like "all tasks where user felt E16" and
 // emotion frequency aggregations.
 //
@@ -1088,14 +1231,16 @@ func toEmotionItems(positives, negatives []TaskItem) emotionItemsResult {
 //   - "positive": Emotions from positive items
 //   - "negative": Emotions from negative items
 //
-// syncEmotionEdges creates graph edges linking task to emotions for analytics.
-// Optimized to use a single batch query for all edges.
+// Optimized to delete existing rows then re-insert in a batch.
 func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotionID *string, positives, negatives []TaskItem) {
+	taskRID := database.MustRecordID(Table, taskID)
+	taskIDStr := database.ToStringID(taskRID)
+
 	// First, delete existing edges
 	_, err := database.QueryAll[any](ctx, r.db, `
-		DELETE task_emotions WHERE in = $task_id
+		DELETE FROM task_emotions WHERE task_id = $task_id
 	`, map[string]any{
-		"task_id": database.MustRecordID(Table, taskID),
+		"task_id": taskIDStr,
 	})
 	if err != nil {
 		r.logger.Warn().Err(err).Str("task_id", taskID).Msg("failed to delete old emotion edges")
@@ -1134,21 +1279,26 @@ func (r *repository) syncEmotionEdges(ctx context.Context, taskID string, emotio
 		return
 	}
 
-	// Execute batch query
-	_, err = database.QueryAll[any](ctx, r.db, `
-		FOR $edge IN $edges {
-			LET $emotion = type::record("emotions", $edge.emotion_id);
-			RELATE $task_id -> task_emotions -> $emotion SET
-				type = $edge.type,
-				text = $edge.text;
+	// Execute per-edge INSERT statements (SQLite has no SurrealQL FOR loop).
+	for _, edge := range edges {
+		edgeID := generateEdgeRecordID("task_emotions")
+		data := map[string]any{
+			"id":         edgeID,
+			"task_id":    taskIDStr,
+			"emotion_id": edge.EmotionID,
+			"type":       edge.Type,
+			"created_at": time.Now().UTC().Format(time.RFC3339Nano),
 		}
-	`, map[string]any{
-		"task_id": database.MustRecordID(Table, taskID),
-		"edges":   edges,
-	})
-
-	if err != nil {
-		r.logger.Warn().Err(err).Str("task_id", taskID).Int("count", len(edges)).Msg("failed to batch sync emotion edges")
+		if edge.Text != nil {
+			data["text"] = *edge.Text
+		}
+		if _, err := database.Create[any](ctx, r.db, "task_emotions", data); err != nil {
+			r.logger.Warn().Err(err).
+				Str("task_id", taskID).
+				Str("emotion_id", edge.EmotionID).
+				Str("type", edge.Type).
+				Msg("failed to insert emotion edge")
+		}
 	}
 }
 
@@ -1167,14 +1317,17 @@ func convertQuantityInput(input *QuantityInput) *Quantity {
 // GOAL EDGE SYNC
 // =============================================================================
 
-// syncGoalEdges creates graph edges linking task to goals using a batch query.
+// syncGoalEdges creates rows in the task_goals join table linking task to goals.
 // It also updates goal_daily_stats for progress tracking.
 func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []GoalLinkInput, taskStartDate time.Time) {
+	taskRID := database.MustRecordID(Table, taskID)
+	taskIDStr := database.ToStringID(taskRID)
+
 	// Delete existing edges for this task
 	_, err := database.QueryAll[any](ctx, r.db, `
-		DELETE task_goals WHERE in = $task_id
+		DELETE FROM task_goals WHERE task_id = $task_id
 	`, map[string]any{
-		"task_id": database.MustRecordID(Table, taskID),
+		"task_id": taskIDStr,
 	})
 	if err != nil {
 		r.logger.Warn().Err(err).Str("task_id", taskID).Msg("failed to delete old goal edges")
@@ -1184,59 +1337,43 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 		return
 	}
 
-	// Prepare batch data
-	type edgeData struct {
-		GoalID         string   `json:"goal_id"`
-		ImpactType     string   `json:"impact_type"`
-		IsMilestone    bool     `json:"is_milestone"`
-		QuantityValue  *float64 `json:"quantity_value,omitempty"`
-		MilestoneLabel string   `json:"milestone_label,omitempty"`
-		MilestoneOrder int      `json:"milestone_order,omitempty"`
-		Notes          string   `json:"notes,omitempty"`
-	}
-
-	edges := make([]edgeData, len(links))
-	for i, link := range links {
+	for _, link := range links {
 		// Defaults
 		impactType := link.ImpactType
 		if impactType == "" {
 			impactType = "neutral"
 		}
 
-		edges[i] = edgeData{
-			GoalID:         link.GoalID,
-			ImpactType:     impactType,
-			IsMilestone:    link.IsMilestone,
-			QuantityValue:  nil, // Set below if > 0
-			MilestoneLabel: link.MilestoneLabel,
-			MilestoneOrder: link.MilestoneOrder,
-			Notes:          link.Notes,
+		// Normalize goal ID to goals:value form if needed
+		goalIDStr := link.GoalID
+		if !strings.Contains(goalIDStr, ":") {
+			goalIDStr = "goals:" + goalIDStr
+		}
+
+		edgeID := generateEdgeRecordID("task_goals")
+		data := map[string]any{
+			"id":              edgeID,
+			"task_id":         taskIDStr,
+			"goal_id":         goalIDStr,
+			"impact_type":     impactType,
+			"is_milestone":    link.IsMilestone,
+			"milestone_label": link.MilestoneLabel,
+			"milestone_order": link.MilestoneOrder,
+			"notes":           link.Notes,
+			"source":          "manual",
+			"created_at":      time.Now().UTC().Format(time.RFC3339Nano),
 		}
 		if link.QuantityValue > 0 {
-			edges[i].QuantityValue = &link.QuantityValue
+			data["quantity_value"] = link.QuantityValue
 		}
-	}
 
-	// Execute batch query - use type::record since goal_id is full ID like "goals:abc123"
-	_, err = database.QueryAll[any](ctx, r.db, `
-		FOR $edge IN $edges {
-			LET $goal = <record>$edge.goal_id;
-			RELATE $task_id -> task_goals -> $goal SET
-				impact_type = $edge.impact_type,
-				is_milestone = $edge.is_milestone,
-				quantity_value = $edge.quantity_value,
-				milestone_label = $edge.milestone_label,
-				milestone_order = $edge.milestone_order,
-				notes = $edge.notes;
+		if _, err := database.Create[any](ctx, r.db, "task_goals", data); err != nil {
+			r.logger.Warn().Err(err).
+				Str("task_id", taskID).
+				Str("goal_id", goalIDStr).
+				Msg("failed to insert goal edge")
+			continue
 		}
-	`, map[string]any{
-		"task_id": database.MustRecordID(Table, taskID),
-		"edges":   edges,
-	})
-
-	if err != nil {
-		r.logger.Warn().Err(err).Str("task_id", taskID).Int("count", len(links)).Msg("failed to batch sync goal edges")
-		return
 	}
 
 	// Update goal_daily_stats for each linked goal
@@ -1244,12 +1381,12 @@ func (r *repository) syncGoalEdges(ctx context.Context, taskID string, links []G
 }
 
 // updateGoalDailyStats updates the goal_daily_stats table for progress tracking.
-// This is called after task_goals edges are created to maintain denormalized stats.
+// This is called after task_goals rows are created to maintain denormalized stats.
 func (r *repository) updateGoalDailyStats(ctx context.Context, links []GoalLinkInput, taskStartDate time.Time) {
 	// Truncate to start of day for consistent date grouping
 	statDate := time.Date(taskStartDate.Year(), taskStartDate.Month(), taskStartDate.Day(), 0, 0, 0, 0, time.UTC)
-	// Format date as YYYYMMDD for deterministic ID
-	datePart := statDate.Format("20060102")
+	statDateStr := statDate.Format(time.RFC3339Nano)
+	nowStr := time.Now().UTC().Format(time.RFC3339Nano)
 
 	for _, link := range links {
 		qty := link.QuantityValue
@@ -1257,41 +1394,102 @@ func (r *repository) updateGoalDailyStats(ctx context.Context, links []GoalLinkI
 			qty = 0 // Count contribution even without quantity
 		}
 
-		// Extract goal ID part (e.g., "goals:abc123" -> "abc123")
-		goalIDPart := link.GoalID
-		if strings.HasPrefix(goalIDPart, "goals:") {
-			goalIDPart = goalIDPart[6:] // Remove "goals:" prefix
+		// Normalize goal ID
+		goalIDStr := link.GoalID
+		if !strings.Contains(goalIDStr, ":") {
+			goalIDStr = "goals:" + goalIDStr
 		}
 
-		// Use deterministic ID: goal_daily_stats:{goal_id}_{date}
-		// This ensures UPSERT creates new record if not exists, updates if exists
-		statsID := fmt.Sprintf("goal_daily_stats:%s_%s", goalIDPart, datePart)
-
-		// Upsert goal_daily_stats - uses record ID for proper upsert behavior
-		_, err := database.QueryAll[any](ctx, r.db, `
-			LET $goal = (SELECT created_by, target.value as target_value FROM <record>$goal_id)[0];
-			UPSERT <record>$stats_id SET
-				goal_id = <record>$goal_id,
-				date = $stat_date,
-				created_by = $goal.created_by,
-				daily_value += $qty,
-				contribution_count += 1,
-				updated_at = time::now(),
-				target_value = $goal.target_value;
+		// Fetch the goal's created_by and target value for denormalized columns.
+		type goalRow struct {
+			CreatedBy  string  `json:"created_by"`
+			TargetJSON *string `json:"target"`
+		}
+		goal, err := database.QueryFirst[goalRow](ctx, r.db, `
+			SELECT created_by, target AS target FROM goals WHERE id = $goal_id
 		`, map[string]any{
-			"goal_id":   link.GoalID,
-			"stats_id":  statsID,
-			"stat_date": statDate,
-			"qty":       qty,
+			"goal_id": goalIDStr,
 		})
-
 		if err != nil {
 			r.logger.Warn().Err(err).
 				Str("goal_id", link.GoalID).
-				Str("stats_id", statsID).
-				Time("stat_date", statDate).
+				Msg("failed to fetch goal for daily stats update")
+			continue
+		}
+		if goal == nil {
+			continue
+		}
+
+		var targetValue *float64
+		if goal.TargetJSON != nil && *goal.TargetJSON != "" {
+			var target struct {
+				Value  *float64 `json:"value"`
+				UnitID string   `json:"unit_id"`
+			}
+			if json.Unmarshal([]byte(*goal.TargetJSON), &target) == nil {
+				targetValue = target.Value
+			}
+		}
+
+		// Upsert goal_daily_stats using INSERT ... ON CONFLICT.
+		// The primary key (goal_id, date) determines uniqueness.
+		data := map[string]any{
+			"goal_id":            goalIDStr,
+			"date":               statDate.Format("2006-01-02"),
+			"created_by":         goal.CreatedBy,
+			"daily_value":        qty,
+			"cumulative_value":   0,
+			"contribution_count": 1,
+			"status":             "pending",
+			"target_value":       targetValue,
+			"created_at":         nowStr,
+			"updated_at":         nowStr,
+		}
+		// Use a raw upsert via QueryAll since the SDK's Create helper would
+		// conflict on the composite primary key. The upsert increments
+		// daily_value and contribution_count for existing rows.
+		if targetValue != nil {
+			data["target_value"] = *targetValue
+		}
+
+		if _, err := database.QueryAll[any](ctx, r.db, `
+			INSERT INTO goal_daily_stats
+				(goal_id, date, created_by, daily_value, cumulative_value,
+				 contribution_count, status, target_value, created_at, updated_at)
+			VALUES
+				($goal_id, $date, $created_by, $daily_value, $cumulative_value,
+				 $contribution_count, $status, $target_value, $created_at, $updated_at)
+			ON CONFLICT(goal_id, date) DO UPDATE SET
+				daily_value = daily_value + excluded.daily_value,
+				contribution_count = contribution_count + excluded.contribution_count,
+				updated_at = excluded.updated_at
+		`, map[string]any{
+			"goal_id":            data["goal_id"],
+			"date":               data["date"],
+			"created_by":         data["created_by"],
+			"daily_value":        data["daily_value"],
+			"cumulative_value":   data["cumulative_value"],
+			"contribution_count": data["contribution_count"],
+			"status":             data["status"],
+			"target_value":       targetValue,
+			"created_at":         nowStr,
+			"updated_at":         nowStr,
+		}); err != nil {
+			r.logger.Warn().Err(err).
+				Str("goal_id", link.GoalID).
+				Str("date", statDateStr).
 				Float64("qty", qty).
 				Msg("failed to update goal_daily_stats")
 		}
 	}
+}
+
+// generateEdgeRecordID generates a unique record ID for a join-table row.
+// Uses random hex like the task ID generator.
+func generateEdgeRecordID(table string) string {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		panic(err)
+	}
+	return table + ":" + hex.EncodeToString(bytes)
 }

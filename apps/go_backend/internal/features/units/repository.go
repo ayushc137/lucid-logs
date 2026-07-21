@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/rs/zerolog"
 	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
+	"github.com/rs/zerolog"
 
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
@@ -260,23 +260,22 @@ func (r *repository) SeedSystemUnits(ctx context.Context) error {
 	now := time.Now().UTC()
 
 	for _, unit := range SystemUnits {
-		// Use UPSERT to create or update system units
+		id := database.MustRecordID(Table, unit.ID).String()
 		_, err := database.QueryAll[any](ctx, r.db, `
-			UPSERT $id CONTENT {
-				name: $name,
-				symbol: $symbol,
-				type: $type,
-				is_system: true,
-				created_by: "",
-				created_at: $now,
-				updated_at: $now
-			}
+			INSERT INTO units (id, name, symbol, type, is_system, created_by, created_at, updated_at)
+			VALUES ($id, $name, $symbol, $type, 1, '', $now, $now)
+			ON CONFLICT(id) DO UPDATE SET
+				name = excluded.name,
+				symbol = excluded.symbol,
+				type = excluded.type,
+				is_system = 1,
+				updated_at = excluded.updated_at
 		`, map[string]any{
-			"id":     database.MustRecordID(Table, unit.ID),
+			"id":     id,
 			"name":   unit.Name,
 			"symbol": unit.Symbol,
 			"type":   unit.Type,
-			"now":    now,
+			"now":    now.Format(time.RFC3339Nano),
 		})
 		if err != nil {
 			r.logger.Warn().Err(err).Str("unit", unit.ID).Msg("Failed to seed unit")

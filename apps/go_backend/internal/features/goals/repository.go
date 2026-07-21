@@ -1,27 +1,30 @@
-// Package goals provides goal management functionality using SurrealDB SDK.
+// Package goals provides goal management functionality on libSQL/SQLite.
 //
 // This package implements:
-//   - CRUD operations for goals using typed SDK methods
+//   - CRUD operations for goals using SQL queries
 //   - Graph-inferred goal nature (no goal_type enum)
-//   - Category linking via in_category relation
-//   - Child goals via goal_children relation
+//   - Category linking via the goals.category_id foreign key
+//   - Child goals via the goal_children join table
 //   - Soft delete support
 //   - Pagination with filtering
 //
 // Database Architecture:
-//   - in_category: RELATE table for category assignment
-//   - goal_children: RELATE table for parent-child relationships
-//   - goal_logs: RELATE table for history tracking
+//   - goals.category_id: FK to categories(id) (replaces in_category edge)
+//   - goal_children: join table for parent-child relationships
+//   - task_goals: join table linking tasks to goals with impact metadata
+//   - goal_daily_stats: pre-aggregated daily progress per goal
 package goals
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
@@ -125,9 +128,18 @@ func NewRepository(db *database.DB) Repository {
 // =============================================================================
 
 // goalDB is the internal database representation of a goal.
+//
+// The goals table stores recurrence/target as JSON-encoded TEXT columns. We
+// decode them into map[string]any to preserve compatibility with the existing
+// domain conversion helpers (mapToRecurrence / mapToTarget).
+//
+// Computed columns (filtered_stats_total, filtered_stats_count,
+// children_stats_total, children_stats_completed, linked_task_ids,
+// category_*) are populated via JOINs/subqueries in the SELECT queries and
+// are decoded into the nested structs below.
 type goalDB struct {
-	ID        models.RecordID `json:"id,omitempty"`
-	CreatedBy string          `json:"created_by"`
+	ID        string `json:"id"`
+	CreatedBy string `json:"created_by"`
 
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
@@ -136,29 +148,29 @@ type goalDB struct {
 	Recurrence map[string]any `json:"recurrence,omitempty"`
 	Target     map[string]any `json:"target,omitempty"`
 
-	StartDate   *database.SurrealTime `json:"start_date,omitempty"`
-	Deadline    *database.SurrealTime `json:"deadline,omitempty"`
-	CompletedAt *database.SurrealTime `json:"completed_at,omitempty"`
+	StartDate   *time.Time `json:"start_date,omitempty"`
+	Deadline    *time.Time `json:"deadline,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 
 	Status   string `json:"status"`
 	Priority int    `json:"priority"`
 
 	// Denormalized streak fields (stored for fast reads)
-	CurrentStreak     int                   `json:"current_streak"`
-	LongestStreak     int                   `json:"longest_streak"`
-	LastCompletedDate *database.SurrealTime `json:"last_completed_date,omitempty"`
+	CurrentStreak     int        `json:"current_streak"`
+	LongestStreak     int        `json:"longest_streak"`
+	LastCompletedDate *time.Time `json:"last_completed_date,omitempty"`
 
-	// Category (populated via in_category edge)
+	// Category (populated via LEFT JOIN on goals.category_id)
 	Category *categoryDB `json:"category,omitempty"`
 
-	// Children (populated via goal_children edge)
+	// Children (populated via goal_children join — currently unused by reads
+	// but kept for API compatibility with the previous struct shape).
 	Children []goalChildDB `json:"children,omitempty"`
 
-	// Linked task IDs (populated via task_goals edge, for highlighting)
+	// Linked task IDs (populated via GROUP_CONCAT over task_goals)
 	LinkedTaskIDs []string `json:"linked_task_ids,omitempty"`
 
-	// Computed stats (populated via subquery in optimized fetches)
-	// Consolidating stats into single objects to reduce graph traversals
+	// Computed stats (populated via subqueries in optimized fetches)
 	FilteredStats *struct {
 		Total any `json:"total"`
 		Count any `json:"count"`
@@ -169,9 +181,9 @@ type goalDB struct {
 		Completed any `json:"completed"`
 	} `json:"children_stats,omitempty"`
 
-	CreatedAt database.SurrealTime  `json:"created_at"`
-	UpdatedAt database.SurrealTime  `json:"updated_at"`
-	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }
 
 // goalChildDB represents a child goal link.
@@ -183,31 +195,26 @@ type goalChildDB struct {
 
 // categoryDB is the database representation of a category when fetched.
 type categoryDB struct {
-	ID        models.RecordID       `json:"id,omitempty"`
-	Name      string                `json:"name"`
-	Color     string                `json:"color"`
-	CreatedAt database.SurrealTime  `json:"created_at"`
-	UpdatedAt database.SurrealTime  `json:"updated_at"`
-	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
-	CreatedBy string                `json:"created_by"`
+	ID        string     `json:"id,omitempty"`
+	Name      string     `json:"name"`
+	Color     string     `json:"color"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	CreatedBy string     `json:"created_by"`
 }
 
 func (c *categoryDB) toCategory() *categories.Category {
 	if c == nil {
 		return nil
 	}
-	var deletedAt *time.Time
-	if c.DeletedAt != nil && !c.DeletedAt.IsZero() {
-		dt := c.DeletedAt.Time
-		deletedAt = &dt
-	}
 	return &categories.Category{
-		ID:        database.ToStringID(c.ID),
+		ID:        c.ID,
 		Name:      c.Name,
 		Color:     c.Color,
-		CreatedAt: c.CreatedAt.Time,
-		UpdatedAt: c.UpdatedAt.Time,
-		DeletedAt: deletedAt,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+		DeletedAt: c.DeletedAt,
 		CreatedBy: c.CreatedBy,
 	}
 }
@@ -215,7 +222,7 @@ func (c *categoryDB) toCategory() *categories.Category {
 // toGoal converts the database model to the domain model.
 func (g *goalDB) toGoal() *Goal {
 	goal := &Goal{
-		ID:        database.ToStringID(g.ID),
+		ID:        g.ID,
 		CreatedBy: g.CreatedBy,
 
 		Title:       g.Title,
@@ -225,8 +232,8 @@ func (g *goalDB) toGoal() *Goal {
 		Status:   g.Status,
 		Priority: g.Priority,
 
-		CreatedAt: g.CreatedAt.Time,
-		UpdatedAt: g.UpdatedAt.Time,
+		CreatedAt: g.CreatedAt,
+		UpdatedAt: g.UpdatedAt,
 	}
 
 	// Convert category
@@ -234,23 +241,11 @@ func (g *goalDB) toGoal() *Goal {
 		goal.Category = g.Category.toCategory()
 	}
 
-	// Convert dates
-	if g.StartDate != nil && !g.StartDate.IsZero() {
-		t := g.StartDate.Time
-		goal.StartDate = &t
-	}
-	if g.Deadline != nil && !g.Deadline.IsZero() {
-		t := g.Deadline.Time
-		goal.Deadline = &t
-	}
-	if g.CompletedAt != nil && !g.CompletedAt.IsZero() {
-		t := g.CompletedAt.Time
-		goal.CompletedAt = &t
-	}
-	if g.DeletedAt != nil && !g.DeletedAt.IsZero() {
-		t := g.DeletedAt.Time
-		goal.DeletedAt = &t
-	}
+	// Convert dates (pointer-copied directly since goalDB now uses *time.Time)
+	goal.StartDate = g.StartDate
+	goal.Deadline = g.Deadline
+	goal.CompletedAt = g.CompletedAt
+	goal.DeletedAt = g.DeletedAt
 
 	// Convert recurrence
 	if g.Recurrence != nil {
@@ -286,10 +281,7 @@ func (g *goalDB) toGoal() *Goal {
 		ChildrenCompleted:  computedChildrenCompleted,
 	}
 
-	if g.LastCompletedDate != nil && !g.LastCompletedDate.IsZero() {
-		t := g.LastCompletedDate.Time
-		stats.LastCompletedDate = &t
-	}
+	stats.LastCompletedDate = g.LastCompletedDate
 
 	// Calculate progress percent and status logic
 	if goal.Target != nil && goal.Target.Value > 0 {
@@ -328,7 +320,7 @@ func (g *goalDB) toGoal() *Goal {
 	return goal
 }
 
-// anyToFloat64 converts an any type (from SurrealDB) to float64
+// anyToFloat64 converts an any type (from JSON decoding) to float64
 func anyToFloat64(v any) float64 {
 	if v == nil {
 		return 0
@@ -355,7 +347,7 @@ func anyToFloat64(v any) float64 {
 	}
 }
 
-// anyToInt converts an any type (from SurrealDB) to int
+// anyToInt converts an any type (from JSON decoding) to int
 func anyToInt(v any) int {
 	if v == nil {
 		return 0
@@ -387,7 +379,7 @@ func mapToRecurrence(m map[string]any) *Recurrence {
 		return nil
 	}
 	r := &Recurrence{}
-	// Handle frequency - SurrealDB SDK may return various numeric types
+	// Handle frequency - JSON decoding returns float64 for numbers
 	switch v := m["frequency"].(type) {
 	case float64:
 		r.Frequency = int(v)
@@ -451,7 +443,7 @@ func mapToTarget(m map[string]any) *Target {
 	t := &Target{
 		Operator: DefaultOperator, // Default to GTE
 	}
-	// Handle value - SurrealDB SDK may return various numeric types
+	// Handle value - JSON decoding returns float64 for numbers
 	switch v := m["value"].(type) {
 	case float64:
 		t.Value = v
@@ -483,41 +475,107 @@ func mapToTarget(m map[string]any) *Target {
 }
 
 // =============================================================================
+// SQL HELPERS
+// =============================================================================
+
+// goalSelectColumns is the canonical column list for selecting goals, with
+// JSON columns decoded and priority coerced to integer for the goalDB struct.
+// Aliases match the json tags on goalDB.
+const goalSelectColumns = `g.id, g.created_by, g.title, g.description, g.icon,
+	g.recurrence, g.target, g.start_date, g.deadline, g.completed_at,
+	g.status, COALESCE(CAST(g.priority AS INTEGER), 0) AS priority,
+	g.current_streak, g.longest_streak, g.last_completed_date,
+	g.created_at, g.updated_at, g.deleted_at`
+
+// resolveGoalID normalizes a caller-supplied id (with or without "goals:"
+// prefix) into the canonical "goals:<id>" form used as the primary key.
+func resolveGoalID(id string) string {
+	return database.RecordID(Table, id)
+}
+
+// =============================================================================
 // FIND OPERATIONS
 // =============================================================================
 
 func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, error) {
-	goalID := database.MustRecordID(Table, id)
+	goalID := resolveGoalID(id)
 
-	goal, err := database.QueryFirst[goalDB](ctx, r.db, `
-		SELECT *,
-			(->in_category.out.*)[0] as category,
-			(SELECT
-				math::sum(quantity_value) AS total,
-				count() AS count
-			 FROM <-task_goals
-				WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
-				AND (
-					-- Non-recurring goals: include all contributions
-					$parent.recurrence IS NONE
-					-- Recurring goals: filter by current period
-					OR (
-						$parent.recurrence.period = 'day' AND time::floor(in.completed_at, 1d) = time::floor(time::now(), 1d)
-					)
-					OR (
-						$parent.recurrence.period = 'week' AND time::week(in.completed_at) = time::week() AND time::year(in.completed_at) = time::year()
-					)
-					OR (
-						$parent.recurrence.period = 'month' AND time::month(in.completed_at) = time::month() AND time::year(in.completed_at) = time::year()
-					)
-				)
-				GROUP ALL)[0] as filtered_stats,
-			(SELECT
-				count() AS total,
-				count(out.status = 'completed') AS completed
-			 FROM ->goal_children GROUP ALL)[0] as children_stats
-		FROM $id
-	`, map[string]any{
+	// Single query that fetches the goal along with its category (LEFT JOIN),
+	// aggregated task contributions (filtered_stats), and child stats.
+	query := `
+		SELECT
+			` + goalSelectColumns + `,
+			JSON_OBJECT(
+				'id', c.id, 'name', c.name, 'color', c.color,
+				'created_at', c.created_at, 'updated_at', c.updated_at,
+				'deleted_at', c.deleted_at, 'created_by', c.created_by
+			) AS category,
+			JSON_OBJECT(
+				'total', COALESCE((
+					SELECT SUM(tg.quantity_value)
+					FROM task_goals tg
+					JOIN tasks t ON t.id = tg.task_id
+					WHERE tg.goal_id = g.id
+					  AND (json_extract(g.target, '$.track_completed_only') IS NULL
+					       OR json_extract(g.target, '$.track_completed_only') != 1
+					       OR t.completed = 1)
+					  AND (
+						g.recurrence IS NULL
+						OR (
+						  json_extract(g.recurrence, '$.period') = 'day'
+						  AND date(COALESCE(t.completed_at, t.start_date)) = date('now')
+						)
+						OR (
+						  json_extract(g.recurrence, '$.period') = 'week'
+						  AND strftime('%W', COALESCE(t.completed_at, t.start_date)) = strftime('%W', 'now')
+						  AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', 'now')
+						)
+						OR (
+						  json_extract(g.recurrence, '$.period') = 'month'
+						  AND strftime('%m', COALESCE(t.completed_at, t.start_date)) = strftime('%m', 'now')
+						  AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', 'now')
+						)
+					  )
+					), 0),
+				'count', COALESCE((
+					SELECT COUNT(*)
+					FROM task_goals tg
+					JOIN tasks t ON t.id = tg.task_id
+					WHERE tg.goal_id = g.id
+					  AND (json_extract(g.target, '$.track_completed_only') IS NULL
+					       OR json_extract(g.target, '$.track_completed_only') != 1
+					       OR t.completed = 1)
+					  AND (
+						g.recurrence IS NULL
+						OR (
+						  json_extract(g.recurrence, '$.period') = 'day'
+						  AND date(COALESCE(t.completed_at, t.start_date)) = date('now')
+						)
+						OR (
+						  json_extract(g.recurrence, '$.period') = 'week'
+						  AND strftime('%W', COALESCE(t.completed_at, t.start_date)) = strftime('%W', 'now')
+						  AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', 'now')
+						)
+						OR (
+						  json_extract(g.recurrence, '$.period') = 'month'
+						  AND strftime('%m', COALESCE(t.completed_at, t.start_date)) = strftime('%m', 'now')
+						  AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', 'now')
+						)
+					  )
+					), 0)
+			) AS filtered_stats,
+			JSON_OBJECT(
+				'total', (SELECT COUNT(*) FROM goal_children gc WHERE gc.parent_goal_id = g.id),
+				'completed', (SELECT COUNT(*) FROM goal_children gc
+							  JOIN goals cg ON cg.id = gc.child_goal_id
+							  WHERE gc.parent_goal_id = g.id AND cg.status = 'completed')
+			) AS children_stats
+		FROM goals g
+		LEFT JOIN categories c ON c.id = g.category_id
+		WHERE g.id = $id
+	`
+
+	goal, err := database.QueryFirst[goalDB](ctx, r.db, query, map[string]any{
 		"id": goalID,
 	})
 	if err != nil {
@@ -538,7 +596,7 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Goal, er
 
 func (r *repository) FindPaginated(ctx context.Context, userID string, params pagination.Params, filters GoalFilters) ([]*Goal, int64, error) {
 	// Build WHERE clause dynamically
-	conditions := []string{"created_by = $user", "deleted_at IS NONE"}
+	conditions := []string{"g.created_by = $user", "g.deleted_at IS NULL"}
 	queryVars := map[string]any{
 		"user":   userID,
 		"limit":  params.Limit,
@@ -546,32 +604,32 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 	}
 
 	if filters.Status != "" {
-		conditions = append(conditions, "status = $status")
+		conditions = append(conditions, "g.status = $status")
 		queryVars["status"] = filters.Status
 	}
 	if filters.IsRecurring != nil {
 		if *filters.IsRecurring {
-			conditions = append(conditions, "recurrence IS NOT NONE")
+			conditions = append(conditions, "g.recurrence IS NOT NULL")
 		} else {
-			conditions = append(conditions, "recurrence IS NONE")
+			conditions = append(conditions, "g.recurrence IS NULL")
 		}
 	}
 	if filters.HasTarget != nil {
 		if *filters.HasTarget {
-			conditions = append(conditions, "target IS NOT NONE")
+			conditions = append(conditions, "g.target IS NOT NULL")
 		} else {
-			conditions = append(conditions, "target IS NONE")
+			conditions = append(conditions, "g.target IS NULL")
 		}
 	}
 	if filters.Search != "" {
-		conditions = append(conditions, "(string::lowercase(title) CONTAINS string::lowercase($search) OR string::lowercase(description) CONTAINS string::lowercase($search))")
+		conditions = append(conditions, "(LOWER(g.title) LIKE '%' || LOWER($search) || '%' OR LOWER(g.description) LIKE '%' || LOWER($search) || '%')")
 		queryVars["search"] = filters.Search
 	}
 
 	whereClause := strings.Join(conditions, " AND ")
 
 	// Determine sort order
-	orderClause := "ORDER BY created_at DESC" // default
+	orderClause := "ORDER BY g.created_at DESC" // default
 	if filters.SortBy != "" {
 		sortField := filters.SortBy
 		sortDir := "ASC"
@@ -584,21 +642,21 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		}
 		switch sortField {
 		case "title":
-			orderClause = "ORDER BY title " + sortDir
+			orderClause = "ORDER BY g.title " + sortDir
 		case "priority":
-			orderClause = "ORDER BY priority " + sortDir
+			orderClause = "ORDER BY g.priority " + sortDir
 		case "updated_at":
-			orderClause = "ORDER BY updated_at " + sortDir
+			orderClause = "ORDER BY g.updated_at " + sortDir
 		case "created_at":
-			orderClause = "ORDER BY created_at " + sortDir
+			orderClause = "ORDER BY g.created_at " + sortDir
 		default:
-			orderClause = "ORDER BY created_at DESC"
+			orderClause = "ORDER BY g.created_at DESC"
 		}
 	}
 
 	// Count query
-	countQuery := "RETURN (SELECT count() FROM goals WHERE " + whereClause + " GROUP ALL)[0].count OR 0"
-	total, err := database.QueryScalar[float64](ctx, r.db, countQuery, queryVars)
+	countQuery := "SELECT COUNT(*) FROM goals g WHERE " + whereClause
+	total, err := database.QueryScalar[int64](ctx, r.db, countQuery, queryVars)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("count query failed")
 		return nil, 0, err
@@ -606,63 +664,91 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 
 	// Build the time reference for progress filtering
 	// Default is now(), but for timeline views we use progress_date
-	timeRef := "time::now()"
+	timeRef := "'now'"
 	if filters.ProgressDate != nil {
-		queryVars["progress_date"] = *filters.ProgressDate
+		queryVars["progress_date"] = filters.ProgressDate.UTC().Format(time.RFC3339Nano)
 		timeRef = "$progress_date"
 	}
 
-	// Main query with computed stats and linked task IDs
-	// Uses pre-computed goal_daily_stats for O(1) period progress lookup (preferred)
-	// Falls back to computing from task_goals with period filter if no pre-computed data
-	// Non-recurring goals: sum all contributions from task_goals
-	// linked_task_ids enables bi-directional highlighting in the UI
-	// Note: SurrealDB 2.6 doesn't allow LET inside IF expressions, so we use inline time::floor()
-	dataQuery := `SELECT *,
-		(->in_category.out.*)[0] as category,
-		(SELECT VALUE type::string(in.id) FROM <-task_goals) as linked_task_ids,
-		-- For recurring goals: prefer pre-computed stats, fallback to computed
-		-- For non-recurring: sum all contributions
-		(
-			IF recurrence IS NOT NONE THEN
-				-- Recurring goal: try pre-computed stats first
-				(SELECT daily_value AS total, contribution_count AS count 
-				 FROM goal_daily_stats 
-				 WHERE goal_id = $parent.id AND date = time::floor(` + timeRef + `, 1d))[0]
-				??
-				-- Fallback: compute from task_goals with period filter
-				(SELECT
-					math::sum(quantity_value) AS total,
-					count() AS count
-				FROM <-task_goals
-					WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
-					AND (
-						($parent.recurrence.period = 'day' 
-							AND time::floor(IF in.completed THEN in.completed_at ELSE in.start_date END, 1d) = time::floor(` + timeRef + `, 1d))
-						OR ($parent.recurrence.period = 'week' 
-							AND time::week(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::week(` + timeRef + `)
-							AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year(` + timeRef + `))
-						OR ($parent.recurrence.period = 'month' 
-							AND time::month(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::month(` + timeRef + `)
-							AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year(` + timeRef + `))
+	// Main query with computed stats and linked task IDs.
+	// For recurring goals: prefer pre-computed goal_daily_stats; fallback to
+	// computing from task_goals with a period filter.
+	// For non-recurring: sum all contributions.
+	// linked_task_ids is populated via a JSON aggregation over task_goals so
+	// the UI can highlight tasks linked to this goal.
+	dataQuery := `
+		SELECT
+			` + goalSelectColumns + `,
+			JSON_OBJECT(
+				'id', c.id, 'name', c.name, 'color', c.color,
+				'created_at', c.created_at, 'updated_at', c.updated_at,
+				'deleted_at', c.deleted_at, 'created_by', c.created_by
+			) AS category,
+			COALESCE((
+				SELECT JSON_GROUP_ARRAY(tg.task_id)
+				FROM task_goals tg
+				WHERE tg.goal_id = g.id
+			), '[]') AS linked_task_ids,
+			CASE
+				WHEN g.recurrence IS NOT NULL THEN
+					COALESCE(
+						(SELECT JSON_OBJECT(
+							'total', daily_value,
+							'count', contribution_count
+						 )
+						 FROM goal_daily_stats
+						 WHERE goal_id = g.id AND date = date(` + timeRef + `)),
+						(SELECT JSON_OBJECT(
+							'total', COALESCE(SUM(tg.quantity_value), 0),
+							'count', COUNT(*)
+						 )
+						 FROM task_goals tg
+						 JOIN tasks t ON t.id = tg.task_id
+						 WHERE tg.goal_id = g.id
+						   AND (json_extract(g.target, '$.track_completed_only') IS NULL
+						        OR json_extract(g.target, '$.track_completed_only') != 1
+						        OR t.completed = 1)
+						   AND (
+						     (json_extract(g.recurrence, '$.period') = 'day'
+						      AND date(COALESCE(t.completed_at, t.start_date)) = date(` + timeRef + `))
+						     OR (json_extract(g.recurrence, '$.period') = 'week'
+						      AND strftime('%W', COALESCE(t.completed_at, t.start_date)) = strftime('%W', ` + timeRef + `)
+						      AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', ` + timeRef + `))
+						     OR (json_extract(g.recurrence, '$.period') = 'month'
+						      AND strftime('%m', COALESCE(t.completed_at, t.start_date)) = strftime('%m', ` + timeRef + `)
+						      AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', ` + timeRef + `))
+						   )
+						),
+						JSON_OBJECT('total', 0, 'count', 0)
 					)
-					GROUP ALL)[0]
-				?? { total: 0, count: 0 }
-			ELSE
-				-- Non-recurring goal: sum all contributions
-				(SELECT
-					math::sum(quantity_value) AS total,
-					count() AS count
-				FROM <-task_goals
-					WHERE ($parent.target.track_completed_only IS NOT TRUE OR in.completed = true)
-					GROUP ALL)[0] ?? { total: 0, count: 0 }
-			END
-		) as filtered_stats,
-		(SELECT
-			count() AS total,
-			count(out.status = 'completed') AS completed
-		 FROM ->goal_children GROUP ALL)[0] as children_stats
-		FROM goals WHERE ` + whereClause + " " + orderClause + " LIMIT $limit START $offset"
+				ELSE
+					COALESCE(
+						(SELECT JSON_OBJECT(
+							'total', COALESCE(SUM(tg.quantity_value), 0),
+							'count', COUNT(*)
+						 )
+						 FROM task_goals tg
+						 JOIN tasks t ON t.id = tg.task_id
+						 WHERE tg.goal_id = g.id
+						   AND (json_extract(g.target, '$.track_completed_only') IS NULL
+						        OR json_extract(g.target, '$.track_completed_only') != 1
+						        OR t.completed = 1)
+						),
+						JSON_OBJECT('total', 0, 'count', 0)
+					)
+			END AS filtered_stats,
+			JSON_OBJECT(
+				'total', (SELECT COUNT(*) FROM goal_children gc WHERE gc.parent_goal_id = g.id),
+				'completed', (SELECT COUNT(*) FROM goal_children gc
+							  JOIN goals cg ON cg.id = gc.child_goal_id
+							  WHERE gc.parent_goal_id = g.id AND cg.status = 'completed')
+			) AS children_stats
+		FROM goals g
+		LEFT JOIN categories c ON c.id = g.category_id
+		WHERE ` + whereClause + `
+		` + orderClause + `
+		LIMIT $limit OFFSET $offset`
+
 	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, dataQuery, queryVars)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("list query failed")
@@ -674,24 +760,38 @@ func (r *repository) FindPaginated(ctx context.Context, userID string, params pa
 		goals[i] = goalsDB[i].toGoal()
 	}
 
-	return goals, int64(total), nil
+	return goals, total, nil
 }
 
 func (r *repository) FindRecurringForDate(ctx context.Context, userID string, date time.Time) ([]*Goal, error) {
-	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
-		LET $today = time::floor(time::now(), 1d);
-		SELECT *,
-		-- Lookup pre-computed daily stats for O(1) performance
-		(SELECT daily_value AS total, contribution_count AS count 
-		 FROM goal_daily_stats 
-		 WHERE goal_id = $parent.id AND date = $today)[0] ?? { total: 0, count: 0 } as filtered_stats
-		FROM goals
-		WHERE created_by = $user
-		  AND deleted_at IS NONE
-		  AND status = "active"
-		  AND recurrence IS NOT NONE
-	`, map[string]any{
+	dateStr := date.UTC().Format(time.RFC3339Nano)
+	query := `
+		SELECT
+			` + goalSelectColumns + `,
+			JSON_OBJECT(
+				'id', c.id, 'name', c.name, 'color', c.color,
+				'created_at', c.created_at, 'updated_at', c.updated_at,
+				'deleted_at', c.deleted_at, 'created_by', c.created_by
+			) AS category,
+			COALESCE(
+				(SELECT JSON_OBJECT(
+					'total', daily_value,
+					'count', contribution_count
+				 )
+				 FROM goal_daily_stats
+				 WHERE goal_id = g.id AND date = date($date)),
+				JSON_OBJECT('total', 0, 'count', 0)
+			) AS filtered_stats
+		FROM goals g
+		LEFT JOIN categories c ON c.id = g.category_id
+		WHERE g.created_by = $user
+		  AND g.deleted_at IS NULL
+		  AND g.status = 'active'
+		  AND g.recurrence IS NOT NULL
+	`
+	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, query, map[string]any{
 		"user": userID,
+		"date": dateStr,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("recurring goals query failed")
@@ -711,22 +811,24 @@ func (r *repository) FindRecurringForDate(ctx context.Context, userID string, da
 // =============================================================================
 
 func (r *repository) Create(ctx context.Context, req *CreateRequest, userID string) (*Goal, error) {
-	now := time.Now()
+	now := time.Now().UTC()
+	goalID := generateGoalRecordID()
 
 	createData := map[string]any{
+		"id":          goalID,
 		"created_by":  userID,
 		"title":       req.Title,
 		"description": req.Description,
 		"icon":        req.Icon,
 		"status":      StatusActive,
 		"priority":    req.Priority,
-		"created_at":  now,
-		"updated_at":  now,
+		"created_at":  now.Format(time.RFC3339Nano),
+		"updated_at":  now.Format(time.RFC3339Nano),
 	}
 
 	// Handle recurrence
 	if req.Recurrence != nil {
-		createData["recurrence"] = map[string]any{
+		recurrenceMap := map[string]any{
 			"frequency":   req.Recurrence.Frequency,
 			"period":      req.Recurrence.Period,
 			"active_days": req.Recurrence.ActiveDays,
@@ -734,6 +836,12 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 			"after_time":  req.Recurrence.AfterTime,
 			"grace_days":  req.Recurrence.GraceDays,
 		}
+		encoded, err := json.Marshal(recurrenceMap)
+		if err != nil {
+			r.logger.Error().Err(err).Msg("failed to encode recurrence")
+			return nil, errors.ErrInternal.Wrap(err)
+		}
+		createData["recurrence"] = string(encoded)
 	}
 
 	// Handle target with operator
@@ -742,19 +850,25 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		if operator == "" {
 			operator = DefaultOperator
 		}
-		createData["target"] = map[string]any{
+		targetMap := map[string]any{
 			"value":                req.Target.Value,
 			"unit_id":              req.Target.UnitID,
 			"operator":             operator,
 			"track_completed_only": req.Target.TrackCompletedOnly,
 		}
+		encoded, err := json.Marshal(targetMap)
+		if err != nil {
+			r.logger.Error().Err(err).Msg("failed to encode target")
+			return nil, errors.ErrInternal.Wrap(err)
+		}
+		createData["target"] = string(encoded)
 	}
 
 	// Handle start date
 	if req.StartDate != nil {
 		startDate, err := time.Parse(time.RFC3339, *req.StartDate)
 		if err == nil {
-			createData["start_date"] = startDate
+			createData["start_date"] = startDate.UTC().Format(time.RFC3339Nano)
 		}
 	}
 
@@ -762,28 +876,20 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	if req.Deadline != nil {
 		deadline, err := time.Parse(time.RFC3339, *req.Deadline)
 		if err == nil {
-			createData["deadline"] = deadline
+			createData["deadline"] = deadline.UTC().Format(time.RFC3339Nano)
 		}
 	}
 
-	// Create the goal
-	result, err := database.QueryFirst[goalDB](ctx, r.db, `
-		CREATE goals CONTENT $data
-	`, map[string]any{
-		"data": createData,
-	})
+	// Link category (direct column)
+	if req.CategoryID != "" {
+		createData["category_id"] = database.RecordID("categories", req.CategoryID)
+	}
+
+	// Create the goal via the typed Create helper
+	_, err := database.Create[goalDB](ctx, r.db, Table, createData)
 	if err != nil {
 		r.logger.Error().Err(err).Str("user_id", userID).Msg("create goal failed")
 		return nil, err
-	}
-
-	goalID := database.ToStringID(result.ID)
-
-	// Link category via in_category relation
-	if req.CategoryID != "" {
-		if err := r.UpdateCategory(ctx, goalID, req.CategoryID, userID); err != nil {
-			r.logger.Warn().Err(err).Msg("failed to link category")
-		}
 	}
 
 	// Link to parent goal if specified
@@ -809,11 +915,11 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		return nil, err
 	}
 
-	goalID := database.MustRecordID(Table, id)
+	goalID := resolveGoalID(id)
 	now := time.Now().UTC()
 
 	updateData := map[string]any{
-		"updated_at": now,
+		"updated_at": now.Format(time.RFC3339Nano),
 	}
 
 	if req.Title != nil {
@@ -828,7 +934,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	if req.Status != nil {
 		updateData["status"] = *req.Status
 		if *req.Status == StatusCompleted {
-			updateData["completed_at"] = now
+			updateData["completed_at"] = now.Format(time.RFC3339Nano)
 		}
 	}
 	if req.Priority != nil {
@@ -836,7 +942,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	if req.Recurrence != nil {
-		updateData["recurrence"] = map[string]any{
+		recurrenceMap := map[string]any{
 			"frequency":   req.Recurrence.Frequency,
 			"period":      req.Recurrence.Period,
 			"active_days": req.Recurrence.ActiveDays,
@@ -844,6 +950,11 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 			"after_time":  req.Recurrence.AfterTime,
 			"grace_days":  req.Recurrence.GraceDays,
 		}
+		encoded, err := json.Marshal(recurrenceMap)
+		if err != nil {
+			return nil, errors.ErrInternal.Wrap(err)
+		}
+		updateData["recurrence"] = string(encoded)
 	}
 
 	if req.Target != nil {
@@ -851,21 +962,20 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		if operator == "" {
 			operator = DefaultOperator
 		}
-		updateData["target"] = map[string]any{
+		targetMap := map[string]any{
 			"value":                req.Target.Value,
 			"unit_id":              req.Target.UnitID,
 			"operator":             operator,
 			"track_completed_only": req.Target.TrackCompletedOnly,
 		}
+		encoded, err := json.Marshal(targetMap)
+		if err != nil {
+			return nil, errors.ErrInternal.Wrap(err)
+		}
+		updateData["target"] = string(encoded)
 	}
 
-	_, err = database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE $id MERGE $data
-	`, map[string]any{
-		"id":   goalID,
-		"data": updateData,
-	})
-	if err != nil {
+	if _, err := database.Merge[goalDB](ctx, r.db, goalID, updateData); err != nil {
 		r.logger.Error().Err(err).Str("goal_id", id).Msg("update goal failed")
 		return nil, err
 	}
@@ -893,17 +1003,12 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 		return err
 	}
 
-	goalID := database.MustRecordID(Table, id)
+	goalID := resolveGoalID(id)
 	now := time.Now().UTC()
 
-	_, err = database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE $id MERGE {
-			deleted_at: $now,
-			updated_at: $now
-		}
-	`, map[string]any{
-		"id":  goalID,
-		"now": now,
+	_, err = database.Merge[goalDB](ctx, r.db, goalID, map[string]any{
+		"deleted_at": now.Format(time.RFC3339Nano),
+		"updated_at": now.Format(time.RFC3339Nano),
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("goal_id", id).Msg("soft delete goal failed")
@@ -915,17 +1020,29 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 }
 
 // =============================================================================
-// CHILD GOALS OPERATIONS (via goal_children relation)
+// CHILD GOALS OPERATIONS (via goal_children join table)
 // =============================================================================
 
 func (r *repository) FindChildren(ctx context.Context, parentGoalID, userID string) ([]*Goal, error) {
-	parentID := database.MustRecordID(Table, parentGoalID)
+	parentID := resolveGoalID(parentGoalID)
 
-	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, `
-		SELECT out.* FROM $parent_id->goal_children 
-		WHERE out.created_by = $user AND out.deleted_at IS NONE
-		ORDER BY `+"`order`"+` ASC
-	`, map[string]any{
+	query := `
+		SELECT
+			` + goalSelectColumns + `,
+			JSON_OBJECT(
+				'id', c.id, 'name', c.name, 'color', c.color,
+				'created_at', c.created_at, 'updated_at', c.updated_at,
+				'deleted_at', c.deleted_at, 'created_by', c.created_by
+			) AS category
+		FROM goal_children gc
+		JOIN goals g ON g.id = gc.child_goal_id
+		LEFT JOIN categories c ON c.id = g.category_id
+		WHERE gc.parent_goal_id = $parent_id
+		  AND g.created_by = $user
+		  AND g.deleted_at IS NULL
+		ORDER BY gc.sort_order ASC
+	`
+	goalsDB, err := database.QueryAll[goalDB](ctx, r.db, query, map[string]any{
 		"parent_id": parentID,
 		"user":      userID,
 	})
@@ -943,7 +1060,7 @@ func (r *repository) FindChildren(ctx context.Context, parentGoalID, userID stri
 }
 
 func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string) ([]GoalTaskLink, error) {
-	gID := database.MustRecordID(Table, goalID)
+	gID := resolveGoalID(goalID)
 
 	type taskCategoryDB struct {
 		ID    string `json:"id"`
@@ -952,39 +1069,47 @@ func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string
 	}
 
 	type taskLinkDB struct {
-		TaskID        string                `json:"task_id"`
-		TaskTitle     string                `json:"task_title"`
-		ImpactType    string                `json:"impact_type"`
-		QuantityValue *float64              `json:"quantity_value,omitempty"`
-		UnitID        *string               `json:"unit_id,omitempty"`
-		TaskJournal   string                `json:"task_journal,omitempty"`
-		TaskStartDate *database.SurrealTime `json:"task_start_date,omitempty"`
-		TaskEndDate   *database.SurrealTime `json:"task_end_date,omitempty"`
-		TaskCompleted bool                  `json:"task_completed"`
-		TaskEmotionID *string               `json:"task_emotion_id,omitempty"`
-		TaskCategory  *taskCategoryDB       `json:"task_category,omitempty"`
-		LinkedAt      *database.SurrealTime `json:"linked_at,omitempty"`
-		Notes         string                `json:"notes,omitempty"`
+		TaskID        string          `json:"task_id"`
+		TaskTitle     string          `json:"task_title"`
+		ImpactType    string          `json:"impact_type"`
+		QuantityValue *float64        `json:"quantity_value,omitempty"`
+		UnitID        *string         `json:"unit_id,omitempty"`
+		TaskJournal   string          `json:"task_journal,omitempty"`
+		TaskStartDate *time.Time      `json:"task_start_date,omitempty"`
+		TaskEndDate   *time.Time      `json:"task_end_date,omitempty"`
+		TaskCompleted bool            `json:"task_completed"`
+		TaskEmotionID *string         `json:"task_emotion_id,omitempty"`
+		TaskCategory  *taskCategoryDB `json:"task_category,omitempty"`
+		LinkedAt      *time.Time      `json:"linked_at,omitempty"`
+		Notes         string          `json:"notes,omitempty"`
 	}
 
-	tasksDB, err := database.QueryAll[taskLinkDB](ctx, r.db, `
+	query := `
 		SELECT
-			type::string(in) as task_id,
-			in.title as task_title,
-			impact_type,
-			quantity_value,
-			unit_id,
-			in.journal as task_journal,
-			in.start_date as task_start_date,
-			in.end_date as task_end_date,
-			in.completed as task_completed,
-			in.emotion_id as task_emotion_id,
-			in.category as task_category,
-			created_at as linked_at,
-			notes
-		FROM $goal_id<-task_goals
-		WHERE in.deleted_at IS NONE
-	`, map[string]any{
+			tg.task_id AS task_id,
+			t.title AS task_title,
+			tg.impact_type,
+			tg.quantity_value,
+			tg.unit_id,
+			t.journal AS task_journal,
+			t.start_date AS task_start_date,
+			t.end_date AS task_end_date,
+			CASE WHEN t.completed = 1 THEN 1 ELSE 0 END AS task_completed,
+			t.emotion_id AS task_emotion_id,
+			CASE WHEN t.category_id IS NOT NULL THEN
+				JSON_OBJECT(
+					'id', tc.id, 'name', tc.name, 'color', tc.color
+				)
+			ELSE NULL END AS task_category,
+			tg.created_at AS linked_at,
+			tg.notes
+		FROM task_goals tg
+		JOIN tasks t ON t.id = tg.task_id
+		LEFT JOIN categories tc ON tc.id = t.category_id
+		WHERE tg.goal_id = $goal_id
+		  AND t.deleted_at IS NULL
+	`
+	tasksDB, err := database.QueryAll[taskLinkDB](ctx, r.db, query, map[string]any{
 		"goal_id": gID,
 	})
 	if err != nil {
@@ -1006,18 +1131,10 @@ func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string
 			Notes:         t.Notes,
 		}
 
-		if t.TaskStartDate != nil {
-			startDate := t.TaskStartDate.Time
-			link.TaskStartDate = &startDate
-		}
-		if t.TaskEndDate != nil {
-			endDate := t.TaskEndDate.Time
-			link.TaskEndDate = &endDate
-		}
-		if t.LinkedAt != nil {
-			linkedAt := t.LinkedAt.Time
-			link.LinkedAt = &linkedAt
-		}
+		link.TaskStartDate = t.TaskStartDate
+		link.TaskEndDate = t.TaskEndDate
+		link.LinkedAt = t.LinkedAt
+
 		if t.TaskCategory != nil {
 			link.TaskCategory = &struct {
 				ID    string `json:"id"`
@@ -1037,31 +1154,29 @@ func (r *repository) FindTasksForGoal(ctx context.Context, goalID, userID string
 }
 
 func (r *repository) AddChild(ctx context.Context, parentID, childID, userID string, order int, required bool) error {
-	pID := database.MustRecordID(Table, parentID)
-	cID := database.MustRecordID(Table, childID)
+	pID := resolveGoalID(parentID)
+	cID := resolveGoalID(childID)
 	now := time.Now().UTC()
 
 	r.logger.Debug().
 		Str("parent_id", parentID).
 		Str("child_id", childID).
-		Interface("pID", pID).
-		Interface("cID", cID).
+		Str("pID", pID).
+		Str("cID", cID).
 		Msg("adding child goal")
 
-	_, err := database.QueryAll[any](ctx, r.db, `
-		RELATE $parent -> goal_children -> $child SET
-			`+"`order`"+` = $order,
-			required = $required,
-			created_by = $user,
-			created_at = $now
-	`, map[string]any{
-		"parent":   pID,
-		"child":    cID,
-		"order":    order,
-		"required": required,
-		"user":     userID,
-		"now":      now,
-	})
+	requiredInt := 0
+	if required {
+		requiredInt = 1
+	}
+
+	_, err := r.db.SQL().ExecContext(ctx, `
+		INSERT INTO goal_children (parent_goal_id, child_goal_id, sort_order, required, created_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(parent_goal_id, child_goal_id) DO UPDATE SET
+			sort_order = excluded.sort_order,
+			required = excluded.required
+	`, pID, cID, order, requiredInt, now.Format(time.RFC3339Nano))
 	if err != nil {
 		r.logger.Error().Err(err).Str("parent", parentID).Str("child", childID).Msg("add child goal failed")
 		return err
@@ -1071,15 +1186,13 @@ func (r *repository) AddChild(ctx context.Context, parentID, childID, userID str
 }
 
 func (r *repository) RemoveChild(ctx context.Context, parentID, childID, userID string) error {
-	pID := database.MustRecordID(Table, parentID)
-	cID := database.MustRecordID(Table, childID)
+	pID := resolveGoalID(parentID)
+	cID := resolveGoalID(childID)
 
-	_, err := database.QueryAll[any](ctx, r.db, `
-		DELETE $parent->goal_children WHERE out = $child
-	`, map[string]any{
-		"parent": pID,
-		"child":  cID,
-	})
+	_, err := r.db.SQL().ExecContext(ctx,
+		`DELETE FROM goal_children WHERE parent_goal_id = ? AND child_goal_id = ?`,
+		pID, cID,
+	)
 	if err != nil {
 		r.logger.Error().Err(err).Str("parent", parentID).Str("child", childID).Msg("remove child goal failed")
 		return err
@@ -1089,33 +1202,20 @@ func (r *repository) RemoveChild(ctx context.Context, parentID, childID, userID 
 }
 
 // =============================================================================
-// CATEGORY OPERATIONS (via in_category relation)
+// CATEGORY OPERATIONS (direct column on goals)
 // =============================================================================
 
 func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, userID string) error {
-	gID := database.MustRecordID(Table, goalID)
-	now := time.Now().UTC()
+	gID := resolveGoalID(goalID)
 
-	// Combine DELETE and RELATE into single transaction string
-	query := `DELETE $goal_id->in_category;`
-	params := map[string]any{
-		"goal_id": gID,
-	}
-
+	var catVal any
 	if categoryID != "" {
-		cID := database.MustRecordID("categories", categoryID)
-		query += `
-			RELATE $goal -> in_category -> $category SET
-				created_by = $user,
-				created_at = $now;
-		`
-		params["goal"] = gID
-		params["category"] = cID
-		params["user"] = userID
-		params["now"] = now
+		catVal = database.RecordID("categories", categoryID)
 	}
 
-	_, err := database.QueryAll[any](ctx, r.db, query, params)
+	_, err := database.Merge[goalDB](ctx, r.db, gID, map[string]any{
+		"category_id": catVal,
+	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("goal", goalID).Str("category", categoryID).Msg("update category failed")
 		return err
@@ -1129,7 +1229,7 @@ func (r *repository) UpdateCategory(ctx context.Context, goalID, categoryID, use
 // =============================================================================
 
 func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*GoalStats, error) {
-	gID := database.MustRecordID(Table, goalID)
+	gID := resolveGoalID(goalID)
 
 	// Get goal first (includes denormalized streak fields)
 	goal, err := r.FindByID(ctx, goalID, userID)
@@ -1145,7 +1245,7 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 	}
 
 	// For recurring goals: try pre-computed goal_daily_stats, fallback to computing
-	// For non-recurring goals: aggregate from task_goals edges
+	// For non-recurring goals: aggregate from task_goals join table
 	if goal.Recurrence != nil {
 		// Recurring goal: try pre-computed daily stats first (O(1))
 		dailyStats, err := database.QueryFirst[struct {
@@ -1154,7 +1254,7 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		}](ctx, r.db, `
 			SELECT daily_value, contribution_count
 			FROM goal_daily_stats
-			WHERE goal_id = $goal_id AND date = time::floor(time::now(), 1d)
+			WHERE goal_id = $goal_id AND date = date('now')
 		`, map[string]any{
 			"goal_id": gID,
 		})
@@ -1166,16 +1266,16 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 			var periodCondition string
 			switch goal.Recurrence.Period {
 			case PeriodDay:
-				periodCondition = "time::floor(IF in.completed THEN in.completed_at ELSE in.start_date END, 1d) = time::floor(time::now(), 1d)"
+				periodCondition = "date(COALESCE(t.completed_at, t.start_date)) = date('now')"
 			case PeriodWeek:
-				periodCondition = "time::week(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::week() AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year()"
+				periodCondition = "strftime('%W', COALESCE(t.completed_at, t.start_date)) = strftime('%W', 'now') AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', 'now')"
 			case PeriodMonth:
-				periodCondition = "time::month(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::month() AND time::year(IF in.completed THEN in.completed_at ELSE in.start_date END) = time::year()"
+				periodCondition = "strftime('%m', COALESCE(t.completed_at, t.start_date)) = strftime('%m', 'now') AND strftime('%Y', COALESCE(t.completed_at, t.start_date)) = strftime('%Y', 'now')"
 			}
 
 			conditions := []string{periodCondition}
 			if goal.Target != nil && goal.Target.TrackCompletedOnly {
-				conditions = append(conditions, "in.completed = true")
+				conditions = append(conditions, "t.completed = 1")
 			}
 
 			computed, err := database.QueryFirst[struct {
@@ -1183,11 +1283,12 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 				Count int     `json:"count"`
 			}](ctx, r.db, `
 				SELECT
-					math::sum(quantity_value) as total,
-					count() as count
-				FROM $goal_id<-task_goals
-				WHERE `+strings.Join(conditions, " AND ")+`
-				GROUP ALL
+					COALESCE(SUM(tg.quantity_value), 0) AS total,
+					COUNT(*) AS count
+				FROM task_goals tg
+				JOIN tasks t ON t.id = tg.task_id
+				WHERE tg.goal_id = $goal_id
+				  AND `+strings.Join(conditions, " AND ")+`
 			`, map[string]any{
 				"goal_id": gID,
 			})
@@ -1198,14 +1299,9 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		}
 	} else {
 		// Non-recurring goal: aggregate all contributions
-		conditions := []string{}
+		conditions := []string{"tg.goal_id = $goal_id"}
 		if goal.Target != nil && goal.Target.TrackCompletedOnly {
-			conditions = append(conditions, "in.completed = true")
-		}
-
-		whereClause := ""
-		if len(conditions) > 0 {
-			whereClause = "WHERE " + strings.Join(conditions, " AND ")
+			conditions = append(conditions, "t.completed = 1")
 		}
 
 		sumResult, err := database.QueryFirst[struct {
@@ -1213,11 +1309,11 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 			Count int     `json:"count"`
 		}](ctx, r.db, `
 			SELECT
-				math::sum(quantity_value) as total,
-				count() as count
-			FROM $goal_id<-task_goals
-			`+whereClause+`
-			GROUP ALL
+				COALESCE(SUM(tg.quantity_value), 0) AS total,
+				COUNT(*) AS count
+			FROM task_goals tg
+			JOIN tasks t ON t.id = tg.task_id
+			WHERE `+strings.Join(conditions, " AND ")+`
 		`, map[string]any{
 			"goal_id": gID,
 		})
@@ -1262,11 +1358,12 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 		Total     int `json:"total"`
 		Completed int `json:"completed"`
 	}](ctx, r.db, `
-		SELECT 
-			count() as total,
-			count(out.status = "completed") as completed
-		FROM $goal_id->goal_children 
-		GROUP ALL
+		SELECT
+			COUNT(*) AS total,
+			SUM(CASE WHEN cg.status = 'completed' THEN 1 ELSE 0 END) AS completed
+		FROM goal_children gc
+		LEFT JOIN goals cg ON cg.id = gc.child_goal_id
+		WHERE gc.parent_goal_id = $goal_id
 	`, map[string]any{
 		"goal_id": gID,
 	})
@@ -1285,25 +1382,20 @@ func (r *repository) ComputeStats(ctx context.Context, goalID, userID string) (*
 // UpdateStreaks updates the denormalized streak fields directly on the goal.
 // This is called when tasks are completed or habit entries are logged.
 func (r *repository) UpdateStreaks(ctx context.Context, goalID string, currentStreak, longestStreak int, lastCompleted *time.Time) error {
-	gID := database.MustRecordID(Table, goalID)
+	gID := resolveGoalID(goalID)
 	now := time.Now().UTC()
 
 	updateData := map[string]any{
 		"current_streak": currentStreak,
 		"longest_streak": longestStreak,
-		"updated_at":     now,
+		"updated_at":     now.Format(time.RFC3339Nano),
 	}
 
 	if lastCompleted != nil {
-		updateData["last_completed_date"] = *lastCompleted
+		updateData["last_completed_date"] = lastCompleted.UTC().Format(time.RFC3339Nano)
 	}
 
-	_, err := database.QueryAll[goalDB](ctx, r.db, `
-		UPDATE $id MERGE $data
-	`, map[string]any{
-		"id":   gID,
-		"data": updateData,
-	})
+	_, err := database.Merge[goalDB](ctx, r.db, gID, updateData)
 	if err != nil {
 		r.logger.Error().Err(err).Str("goal_id", goalID).Msg("update streaks failed")
 		return err
@@ -1316,4 +1408,15 @@ func (r *repository) UpdateStreaks(ctx context.Context, goalID string, currentSt
 		Msg("goal streaks updated")
 
 	return nil
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+// generateGoalRecordID generates a unique goal ID as a "goals:<hex>" string.
+func generateGoalRecordID() string {
+	bytes := make([]byte, 16)
+	_, _ = rand.Read(bytes) //nolint:errcheck // crypto/rand.Read never fails in practice
+	return database.RecordID(Table, hex.EncodeToString(bytes))
 }

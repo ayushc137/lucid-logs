@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	turso "turso.tech/database/tursogo"
 )
 

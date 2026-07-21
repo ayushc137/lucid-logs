@@ -41,7 +41,11 @@ import (
 	swaggerDocs "github.com/lucid-logs/go-backend/docs/swagger"
 	"github.com/lucid-logs/go-backend/internal/bootstrap"
 	"github.com/lucid-logs/go-backend/internal/config"
+	"github.com/lucid-logs/go-backend/internal/features/analytics"
 	"github.com/lucid-logs/go-backend/internal/features/emotions"
+	"github.com/lucid-logs/go-backend/internal/features/retrospectives"
+	"github.com/lucid-logs/go-backend/internal/features/users"
+	"github.com/lucid-logs/go-backend/internal/scheduler"
 	"github.com/lucid-logs/go-backend/internal/server"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
@@ -119,6 +123,33 @@ func main() {
 		DB:        db,
 		Validator: val,
 	})
+
+	// =========================================================================
+	// START SCHEDULER
+	// =========================================================================
+
+	userRepo := users.NewRepository(db)
+	retroRepo := retrospectives.NewRepository(db)
+	analyticsRepo := analytics.NewRepository(db)
+	retroService := retrospectives.NewService(retroRepo, analyticsRepo)
+
+	sched, err := scheduler.New(scheduler.Config{
+		RetroService: retroService,
+		UserRepo:     userRepo,
+	})
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to create scheduler")
+	} else {
+		if err := sched.Start(); err != nil {
+			log.Warn().Err(err).Msg("failed to start scheduler")
+		} else {
+			defer func() {
+				if stopErr := sched.Stop(); stopErr != nil {
+					log.Error().Err(stopErr).Msg("failed to stop scheduler")
+				}
+			}()
+		}
+	}
 
 	// =========================================================================
 	// CREATE HTTP SERVER

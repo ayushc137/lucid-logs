@@ -32,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -237,89 +238,65 @@ func apiRequest(method, path string, body any) (map[string]any, error) {
 // DATABASE HELPERS
 // =============================================================================
 
-type userResult struct {
-	ID string `json:"id"`
-}
-
 func findAdminUser(ctx context.Context, db *database.DB, email string) (string, error) {
-	users, err := database.QueryAll[userResult](ctx, db, `
-		SELECT type::string(id) as id FROM users WHERE email = $email LIMIT 1
-	`, map[string]any{
-		"email": email,
-	})
+	var id string
+	err := db.SQL().QueryRowContext(ctx, `SELECT id FROM users WHERE email = ? LIMIT 1`, email).Scan(&id)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("admin user not found (email: %s): %w", email, err)
 	}
-	if len(users) == 0 {
-		return "", fmt.Errorf("admin user not found (email: %s)", email)
-	}
-	return users[0].ID, nil
+	return id, nil
 }
 
+// resetSeededData deletes only rows owned by the seed user, in dependency order.
+// Relation tables are keyed by the entity FKs they reference, so we delete them
+// via EXISTS against the owning entities rather than by created_by.
 func resetSeededData(ctx context.Context, db *database.DB, userID string) error {
-	// Delete all relations and entities in correct order
-	// Note: created_from (templates) is deprecated, use created_from_activity
-	tables := []string{
-		"task_goals", "task_emotions", "created_from_activity", "activity_goals",
-		"in_category", "goal_children", "goal_logs", "goal_snapshots",
-		"tasks", "activities", "goals", "categories",
+	tx, err := db.SQL().BeginTx(ctx, nil)
+	if err != nil {
+		return err
 	}
+	defer tx.Rollback() //nolint:errcheck
 
-	for _, table := range tables {
-		//nolint:errcheck // ignore delete errors in reset
-		_, _ = database.QueryAll[any](ctx, db, fmt.Sprintf(`
-			DELETE FROM %s WHERE created_by = $user OR true
-		`, table), map[string]any{"user": userID})
+	stmts := []struct {
+		query string
+		args  []any
+	}{
+		{`DELETE FROM task_emotions WHERE task_id IN (SELECT id FROM tasks WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM task_goals WHERE task_id IN (SELECT id FROM tasks WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM created_from_activity WHERE task_id IN (SELECT id FROM tasks WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM activity_goals WHERE activity_id IN (SELECT id FROM activities WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM goal_children WHERE parent_goal_id IN (SELECT id FROM goals WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM goal_logs WHERE goal_id IN (SELECT id FROM goals WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM goal_snapshots WHERE goal_id IN (SELECT id FROM goals WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM goal_daily_stats WHERE goal_id IN (SELECT id FROM goals WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM goal_period_snapshots WHERE goal_id IN (SELECT id FROM goals WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM streak_history WHERE goal_id IN (SELECT id FROM goals WHERE created_by = ?)`, []any{userID}},
+		{`DELETE FROM activity_logs WHERE created_by = ?`, []any{userID}},
+		{`DELETE FROM retrospectives WHERE created_by = ?`, []any{userID}},
+		{`DELETE FROM tasks WHERE created_by = ?`, []any{userID}},
+		{`DELETE FROM activities WHERE created_by = ?`, []any{userID}},
+		{`DELETE FROM goals WHERE created_by = ?`, []any{userID}},
+		{`DELETE FROM categories WHERE created_by = ?`, []any{userID}},
 	}
-
-	return nil
+	for _, s := range stmts {
+		if _, err := tx.ExecContext(ctx, s.query, s.args...); err != nil {
+			return fmt.Errorf("reset %q: %w", s.query, err)
+		}
+	}
+	return tx.Commit()
 }
 
+// seedUnits is a no-op: system units are seeded by migration 002_seed_reference.sql.
+// Kept as a sanity check that the migration ran.
 func seedUnits(ctx context.Context, db *database.DB) error {
-	now := time.Now()
-	units := []struct {
-		id, name, symbol, unitType string
-	}{
-		{"units:km", "kilometers", "km", "distance"},
-		{"units:mi", "miles", "mi", "distance"},
-		{"units:m", "meters", "m", "distance"},
-		{"units:steps", "steps", "steps", "distance"},
-		{"units:min", "minutes", "min", "time"},
-		{"units:hr", "hours", "hr", "time"},
-		{"units:sec", "seconds", "sec", "time"},
-		{"units:l", "liters", "L", "volume"},
-		{"units:ml", "milliliters", "ml", "volume"},
-		{"units:cups", "cups", "cups", "volume"},
-		{"units:count", "count", "×", "count"},
-		{"units:pages", "pages", "pg", "count"},
-		{"units:reps", "repetitions", "reps", "count"},
-		{"units:sets", "sets", "sets", "count"},
-		{"units:cal", "calories", "cal", "count"},
-		{"units:dollars", "dollars", "$", "count"},
+	var count int
+	if err := db.SQL().QueryRowContext(ctx, `SELECT COUNT(*) FROM units WHERE is_system = 1`).Scan(&count); err != nil {
+		return fmt.Errorf("verify system units: %w", err)
 	}
-
-	for _, u := range units {
-		//nolint:errcheck // ignore upsert errors for idempotent seeding
-		_, _ = database.QueryAll[any](ctx, db, `
-			UPSERT $id CONTENT {
-				name: $name,
-				symbol: $symbol,
-				type: $type,
-				is_system: true,
-				created_by: "",
-				created_at: $now,
-				updated_at: $now
-			}
-		`, map[string]any{
-			"id":     database.MustRecordID("units", u.id),
-			"name":   u.name,
-			"symbol": u.symbol,
-			"type":   u.unitType,
-			"now":    now,
-		})
+	if count == 0 {
+		return fmt.Errorf("no system units found; migrations may not have run")
 	}
-
-	log.Info().Int("count", len(units)).Msg("✅ System units seeded")
+	log.Info().Int("count", count).Msg("✅ System units present (from migrations)")
 	return nil
 }
 
@@ -2600,16 +2577,10 @@ func seedGoalStreaksAndHistory(ctx context.Context, db *database.DB, goals map[s
 
 		// Update goal with current progress value
 		progress := (data.current / data.target) * 100
-		_, err := database.QueryAll[any](ctx, db, `
-			UPDATE $id MERGE {
-				current_value: $current,
-				updated_at: $now
-			}
-		`, map[string]any{
-			"id":      database.MustRecordID("goals", goalID),
-			"current": data.current,
-			"now":     now,
-		})
+		goalRecordID := database.RecordID("goals", goalID)
+		_, err := db.SQL().ExecContext(ctx,
+			`UPDATE goals SET current_value = ?, updated_at = ? WHERE id = ?`,
+			data.current, now.Format(time.RFC3339Nano), goalRecordID)
 		if err != nil {
 			log.Warn().Err(err).Str("goal", goalTitle).Msg("Failed to update progress")
 			continue
@@ -2649,66 +2620,37 @@ func randomElement(items []string) string {
 	return items[rand.Intn(len(items))]
 }
 
-// createGoalLog creates a log entry using the same format as the goallogs repository
+// createGoalLog creates a goal snapshot and a log entry linked to it.
 func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, changes map[string]any, createdAt time.Time, userID string) error {
-	goalRecordID := database.MustRecordID("goals", goalID)
-	userRecordID := database.MustRecordID("users", userID)
+	goalRecordID := database.RecordID("goals", goalID)
+	userRecordID := database.RecordID("users", userID)
 
-	// First create a snapshot
-	snapshotResult, err := database.QueryFirst[struct {
-		ID any `json:"id"`
-	}](ctx, db, `
-		CREATE goal_snapshots CONTENT {
-			goal_id: $goal_id,
-			status: "active",
-			created_by: $user,
-			created_at: $now
-		}
-	`, map[string]any{
-		"goal_id": goalRecordID,
-		"user":    userRecordID,
-		"now":     createdAt,
-	})
+	snapshotID := "goal_snapshots:" + uuid.NewString()
+	snapshotBody, _ := json.Marshal(map[string]any{"status": "active"})
+	_, err := db.SQL().ExecContext(ctx,
+		`INSERT INTO goal_snapshots(id,goal_id,created_by,snapshot,created_at) VALUES(?,?,?,?,?)`,
+		snapshotID, goalRecordID, userRecordID, string(snapshotBody), createdAt.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return err
 	}
 
-	// Then create the log entry using RELATE
-	// Ensure changes is not nil
 	if changes == nil {
 		changes = map[string]any{}
 	}
-
-	_, err = database.QueryAll[any](ctx, db, `
-		RELATE $goal_id->goal_logs->$snapshot_id CONTENT {
-			event_type: $event,
-			changes: $changes,
-			created_by: $user,
-			created_at: $now
-		}
-	`, map[string]any{
-		"goal_id":     goalRecordID,
-		"snapshot_id": snapshotResult.ID,
-		"event":       event,
-		"changes":     changes,
-		"user":        userRecordID,
-		"now":         createdAt,
-	})
+	changesJSON, _ := json.Marshal(changes)
+	logID := "goal_logs:" + uuid.NewString()
+	_, err = db.SQL().ExecContext(ctx,
+		`INSERT INTO goal_logs(id,goal_id,snapshot_id,created_by,event_type,changes,created_at) VALUES(?,?,?,?,?,?,?)`,
+		logID, goalRecordID, snapshotID, userRecordID, event, string(changesJSON), createdAt.UTC().Format(time.RFC3339Nano))
 	return err
 }
 
 // updateGoalStreak updates the goal stats in DB
 func updateGoalStreak(ctx context.Context, db *database.DB, goalID string, streak int, lastCompleted time.Time) error {
-	_, err := database.QueryAll[any](ctx, db, `
-		UPDATE $id MERGE {
-			current_streak: $streak,
-			last_completed_date: $date,
-			updated_at: $date
-		}
-	`, map[string]any{
-		"id":     database.MustRecordID("goals", goalID),
-		"streak": streak,
-		"date":   lastCompleted,
-	})
+	goalRecordID := database.RecordID("goals", goalID)
+	dateStr := lastCompleted.UTC().Format(time.RFC3339Nano)
+	_, err := db.SQL().ExecContext(ctx,
+		`UPDATE goals SET current_streak = ?, last_completed_date = ?, updated_at = ? WHERE id = ?`,
+		streak, dateStr, dateStr, goalRecordID)
 	return err
 }
