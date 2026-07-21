@@ -104,4 +104,7 @@ coverage/
 *.lcov# Debug
 .debug/# Temporary files
 *.tmp
-*.tempapps/go_backend/migrate-surreal-to-libsql
+*.temp
+
+# Built migration tool binary
+apps/go_backend/migrate-surreal-to-libsql
