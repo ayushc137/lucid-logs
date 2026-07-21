@@ -7,7 +7,7 @@ import {
 } from '$lib/api';
 import { GoalModal } from '$lib/components/goals';
 import { ConfirmDialog, ErrorAlert, Fab } from '$lib/components/ui';
-import { cn } from '$lib/utils';
+import { cn, FALLBACK_GOAL_COLOR} from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
 import {
 	createMutation,
@@ -309,7 +309,7 @@ function highlightText(text: string, query: string): string {
     class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
   >
     <div>
-      <h1 class="text-3xl font-bold">Goals</h1>
+      <h1 class="text-2xl font-semibold tracking-tight">Goals</h1>
       <p class="text-sm opacity-60 mt-1">
         {#if todayOnly}
           Today's goals ({totalGoals})
@@ -576,7 +576,7 @@ function highlightText(text: string, query: string): string {
               {@const progress = getProgress(goal)}
               {@const typeInfo = getGoalTypeInfo(goal)}
               {@const TypeIcon = typeInfo.icon}
-              {@const goalColor = goal.category?.color || "#4f46e5"}
+              {@const goalColor = goal.category?.color || FALLBACK_GOAL_COLOR}
               <tr
                 class="relative hover:bg-base-200/50 transition-colors group cursor-pointer overflow-hidden"
                 onclick={() => startEdit(goal)}
@@ -729,7 +729,7 @@ function highlightText(text: string, query: string): string {
         {@const progress = getProgress(goal)}
         {@const typeInfo = getGoalTypeInfo(goal)}
         {@const TypeIcon = typeInfo.icon}
-        {@const goalColor = goal.category?.color || "#4f46e5"}
+        {@const goalColor = goal.category?.color || FALLBACK_GOAL_COLOR}
         <article
           class="card bg-base-100 border border-base-200 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
           onclick={() => startEdit(goal)}

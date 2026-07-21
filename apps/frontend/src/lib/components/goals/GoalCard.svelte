@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { Goal } from '$lib/api';
-import { cn } from '$lib/utils';
+import { cn, FALLBACK_CATEGORY_COLOR} from '$lib/utils';
 import {
 	Archive,
 	Calendar,
@@ -122,7 +122,7 @@ let menuOpen = $state(false);
         <!-- Color Bar -->
         <div
             class="h-1.5 rounded-t-xl"
-            style="background-color: {goal.category?.color || '#6b7280'};"
+            style="background-color: {goal.category?.color || FALLBACK_CATEGORY_COLOR};"
         ></div>
 
         <div class="card-body p-4 gap-3">
@@ -131,8 +131,7 @@ let menuOpen = $state(false);
                 <!-- Icon -->
                 <div
                     class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                    style="background-color: {goal.category?.color ||
-                        '#6b7280'}20;"
+                    style="background-color: {goal.category?.color || FALLBACK_CATEGORY_COLOR}20;"
                 >
                     {goal.icon || "🎯"}
                 </div>
@@ -260,7 +259,7 @@ let menuOpen = $state(false);
                         </span>
                         <span
                             class="font-bold"
-                            style="color: {goal.category?.color || '#6b7280'};"
+                            style="color: {goal.category?.color || FALLBACK_CATEGORY_COLOR};"
                             >{progress}%</span
                         >
                     </div>
@@ -270,7 +269,7 @@ let menuOpen = $state(false);
                         <div
                             class="h-full rounded-full transition-all duration-500"
                             style="width: {progress}%; background-color: {goal
-                                .category?.color || '#6b7280'};"
+                                .category?.color || FALLBACK_CATEGORY_COLOR};"
                         ></div>
                     </div>
                 </div>
@@ -322,7 +321,7 @@ let menuOpen = $state(false);
         <!-- Icon -->
         <div
             class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
-            style="background-color: {goal.category?.color || '#6b7280'}20;"
+            style="background-color: {goal.category?.color || FALLBACK_CATEGORY_COLOR}20;"
         >
             {goal.icon || "🎯"}
         </div>
@@ -361,7 +360,7 @@ let menuOpen = $state(false);
                 <div
                     class="radial-progress text-xs"
                     style="--value:{progress}; --size:2rem; --thickness:3px; color: {goal
-                        .category?.color || '#6b7280'};"
+                        .category?.color || FALLBACK_CATEGORY_COLOR};"
                     role="progressbar"
                 >
                     {progress}%

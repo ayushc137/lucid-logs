@@ -113,7 +113,7 @@ function formatDate(s: string): string {
 				<CalendarDays class="w-5.5 h-5.5" />
 			</div>
 			<div>
-				<h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight leading-tight capitalize">{retro.retro_type} Retrospective</h1>
+				<h1 class="text-2xl font-semibold tracking-tight capitalize">{retro.retro_type} Retrospective</h1>
 				<p class="text-sm text-base-content/55">
 					{formatDate(retro.start_date)} → {formatDate(retro.end_date)}
 					<span class="badge badge-sm ml-2" class:badge-success={retro.status === 'completed'}>

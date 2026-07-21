@@ -16,7 +16,7 @@ let activeTab = $state<'appearance' | 'account'>('appearance');
       <Settings class="w-5.5 h-5.5" />
     </div>
     <div>
-      <h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight leading-tight">Settings</h1>
+      <h1 class="text-2xl font-semibold tracking-tight">Settings</h1>
       <p class="text-sm text-base-content/55">Make it yours</p>
     </div>
   </div>

@@ -29,7 +29,7 @@ import {
 	ConfirmDialog,
 } from '$lib/components/ui';
 import { emotionStore } from '$lib/stores/emotions.svelte';
-import { cn } from '$lib/utils';
+import { cn, DEFAULT_CATEGORY_COLOR} from '$lib/utils';
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { createQuery } from '@tanstack/svelte-query';
 
@@ -129,7 +129,7 @@ let endTime = $state('10:00:00');
 
 // Category creation
 let newCategoryName = $state('');
-let newCategoryColor = $state('#6366f1');
+let newCategoryColor = $state(DEFAULT_CATEGORY_COLOR);
 let showNewCategory = $state(false);
 let useCustomCategoryColor = $state(false);
 
@@ -215,7 +215,7 @@ const createCategoryMut = createMutation({
 		queryClient.invalidateQueries({ queryKey: ['categories'] });
 		categoryId = newCat.id;
 		newCategoryName = '';
-		newCategoryColor = '#6366f1';
+		newCategoryColor = DEFAULT_CATEGORY_COLOR;
 		useCustomCategoryColor = false;
 		showNewCategory = false;
 	},

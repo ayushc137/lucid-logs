@@ -78,7 +78,7 @@ const selectedCat = $derived(
     {#if showDropdown}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-base-100 rounded-xl shadow-2xl border border-base-200 z-[100] min-w-[220px] max-w-[300px]"
+            class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-base-100 rounded-xl shadow-2xl border border-base-200 z-50 min-w-[220px] max-w-[300px]"
             in:scale={{ duration: 150, start: 0.95 }}
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.key === "Escape" && (showDropdown = false)}

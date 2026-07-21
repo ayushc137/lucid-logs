@@ -10,7 +10,7 @@
 	import { getGoals, type Goal } from '$lib/api/goals';
 	import { getUnits } from '$lib/api/units';
 	import { CategoryDropdown, ColorPicker } from '$lib/components/ui';
-	import { cn } from '$lib/utils';
+	import { cn, FALLBACK_CATEGORY_COLOR, DEFAULT_CATEGORY_COLOR} from '$lib/utils';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount } from 'svelte';
 	import {
@@ -99,7 +99,7 @@
 	// Category creation state
 	let showCreateCategory = $state(false);
 	let newCategoryName = $state('');
-	let newCategoryColor = $state('#6366f1');
+	let newCategoryColor = $state(DEFAULT_CATEGORY_COLOR);
 	let useCustomCategoryColor = $state(false);
 
 	// Suggested emojis for activities
@@ -306,7 +306,7 @@
 			categoryId = newCat.id;
 			showCreateCategory = false;
 			newCategoryName = '';
-			newCategoryColor = '#6366f1';
+			newCategoryColor = DEFAULT_CATEGORY_COLOR;
 			useCustomCategoryColor = false;
 		},
 	});
@@ -329,14 +329,18 @@
 
 <!-- Modal -->
 <dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>
-	<div class="modal-box max-w-4xl p-0 flex flex-col bg-base-100 max-h-[90vh] rounded-b-none sm:rounded-3xl shadow-2xl">
+	<div class="modal-box max-w-4xl p-0 flex flex-col max-h-[90vh] overflow-hidden">
+		<!-- Mobile drag handle -->
+		<div class="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+			<div class="w-10 h-1 rounded-full bg-base-content/15"></div>
+		</div>
 		<!-- Header -->
-		<div class="flex items-center gap-4 px-6 py-5 border-b border-base-200/50 bg-gradient-to-r from-primary/5 via-base-100 to-secondary/5">
+		<div class="flex items-center gap-4 px-6 py-5 border-b border-base-content/5">
 			<!-- Icon Picker -->
 			<div class="relative">
 				<button
 					type="button"
-					class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/10 flex items-center justify-center text-3xl hover:from-primary/30 hover:to-secondary/20 transition-all shadow-lg border border-primary/10 hover:scale-105"
+					class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl hover:bg-primary/20 transition-all shadow-lg border border-primary/10 hover:scale-105"
 					onclick={() => (showEmojiPicker = !showEmojiPicker)}
 				>
 					{icon}
@@ -414,7 +418,7 @@
 				{/if}
 			</div>
 
-			<button class="btn btn-ghost btn-sm btn-circle" onclick={handleClose}>
+			<button class="btn btn-ghost btn-sm btn-square" onclick={handleClose} aria-label="Close">
 				<X class="w-5 h-5" />
 			</button>
 		</div>
@@ -431,7 +435,7 @@
 		{/if}
 
 		<!-- Tabs -->
-		<div class="flex border-b border-base-200/50 px-6 bg-base-100/50">
+		<div class="flex border-b border-base-content/5 px-6">
 			<button
 				class={cn(
 					"px-5 py-3.5 text-sm font-medium border-b-2 -mb-px transition-all flex items-center gap-2",
@@ -589,7 +593,7 @@
 				<div class="flex h-[450px]">
 					<!-- Available Goals List -->
 					<div class="flex-1 flex flex-col border-r border-base-200">
-						<div class="px-4 py-3 border-b border-base-200">
+						<div class="px-4 py-3 border-b border-base-content/5">
 							<div class="relative">
 								<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
 								<input
@@ -622,7 +626,7 @@
 										>
 											<div
 												class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform"
-												style="background-color: {goal.category?.color || '#6b7280'}20;"
+												style="background-color: {goal.category?.color || FALLBACK_CATEGORY_COLOR}20;"
 											>
 												{goal.icon || '🎯'}
 											</div>
@@ -656,7 +660,7 @@
 
 					<!-- Linked Goals Panel -->
 					<div class="w-80 shrink-0 flex flex-col bg-base-200/30">
-						<div class="px-4 py-3 border-b border-base-200">
+						<div class="px-4 py-3 border-b border-base-content/5">
 							<h3 class="font-semibold">Linked Goals</h3>
 							<p class="text-xs text-base-content/50">
 								{linkedGoals.length} goal{linkedGoals.length !== 1 ? 's' : ''} selected
@@ -753,7 +757,7 @@
 		</div>
 
 		<!-- Footer -->
-		<div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-base-200/50 bg-base-100/80">
+		<div class="flex items-center justify-end gap-2 px-4 sm:px-6 py-4 border-t border-base-content/5">
 			<button class="btn btn-ghost btn-sm" onclick={handleClose} disabled={isPending}>
 				Cancel
 			</button>

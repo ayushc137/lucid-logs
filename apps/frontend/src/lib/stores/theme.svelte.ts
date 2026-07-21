@@ -1,21 +1,12 @@
 /**
  * Theme Store - DaisyUI Themes for Lucid Logs
  * Single source of truth for theme configuration across the app.
+ *
+ * Design language (lib/DESIGN_LANGUAGE.md §3.1): exactly two themes ship.
+ * Anything else was never designed for and must not be selectable.
  */
 
-export type ThemeId =
-	| 'lucid-light'
-	| 'lucid-dark'
-	| 'light'
-	| 'dark'
-	| 'nord'
-	| 'night'
-	| 'dim'
-	| 'lofi'
-	| 'winter'
-	| 'corporate'
-	| 'retro'
-	| 'dracula';
+export type ThemeId = 'lucid-light' | 'lucid-dark';
 
 export interface Theme {
 	id: ThemeId;
@@ -25,90 +16,19 @@ export interface Theme {
 	isDark: boolean;
 }
 
-// 10 curated themes - used by both sidebar and settings
 export const THEMES: Theme[] = [
 	{
 		id: 'lucid-light',
-		label: 'Lucid',
+		label: 'Light',
 		emoji: '✨',
-		description: 'Clean & Modern',
+		description: 'Clean & modern',
 		isDark: false,
 	},
 	{
 		id: 'lucid-dark',
-		label: 'Lucid Dark',
-		emoji: '🌌',
-		description: 'Calm & Focused',
-		isDark: true,
-	},
-	{
-		id: 'light',
-		label: 'Light',
-		emoji: '☀️',
-		description: 'Clean & Bright',
-		isDark: false,
-	},
-	{
-		id: 'dark',
 		label: 'Dark',
-		emoji: '🌙',
-		description: 'Easy on Eyes',
-		isDark: true,
-	},
-	{
-		id: 'nord',
-		label: 'Nord',
-		emoji: '❄️',
-		description: 'Arctic Cool',
-		isDark: true,
-	},
-	{
-		id: 'night',
-		label: 'Night',
-		emoji: '🌃',
-		description: 'Deep Blue',
-		isDark: true,
-	},
-	{
-		id: 'dim',
-		label: 'Dim',
-		emoji: '🌑',
-		description: 'Soft Dark',
-		isDark: true,
-	},
-	{
-		id: 'lofi',
-		label: 'Lofi',
-		emoji: '📻',
-		description: 'Muted Tones',
-		isDark: false,
-	},
-	{
-		id: 'winter',
-		label: 'Winter',
-		emoji: '⛄',
-		description: 'Frosty Light',
-		isDark: false,
-	},
-	{
-		id: 'corporate',
-		label: 'Corporate',
-		emoji: '💼',
-		description: 'Professional',
-		isDark: false,
-	},
-	{
-		id: 'retro',
-		label: 'Retro',
-		emoji: '🕹️',
-		description: 'Vintage Vibes',
-		isDark: false,
-	},
-	{
-		id: 'dracula',
-		label: 'Dracula',
-		emoji: '🧛',
-		description: 'Dark Purple',
+		emoji: '🌌',
+		description: 'Calm & focused',
 		isDark: true,
 	},
 ];
@@ -117,14 +37,20 @@ export const THEMES: Theme[] = [
 const STORAGE_KEY = 'theme';
 const DEFAULT_THEME: ThemeId = 'lucid-light';
 
+/** Map a stored theme id (possibly from a retired theme) to a shipped one. */
+function resolveTheme(stored: string | null): ThemeId {
+	if (stored === 'lucid-light' || stored === 'lucid-dark') return stored;
+	// Retired dark themes fall back to lucid-dark, light ones to lucid-light.
+	const retiredDark = ['dark', 'nord', 'night', 'dim', 'dracula'];
+	if (stored && retiredDark.includes(stored)) return 'lucid-dark';
+	return DEFAULT_THEME;
+}
+
 function createThemeStore() {
 	// Determine initial theme before creating state to avoid state_referenced_locally warning
 	let initialTheme: ThemeId = DEFAULT_THEME;
 	if (typeof window !== 'undefined') {
-		const stored = localStorage.getItem(STORAGE_KEY) as ThemeId | null;
-		if (stored && THEMES.some((t) => t.id === stored)) {
-			initialTheme = stored;
-		}
+		initialTheme = resolveTheme(localStorage.getItem(STORAGE_KEY));
 		// Apply theme immediately
 		document.documentElement.setAttribute('data-theme', initialTheme);
 	}

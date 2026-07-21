@@ -8,8 +8,7 @@
 @plugin "daisyui" {
 	themes:
 		lucid-light --default,
-		lucid-dark --prefersdark,
-		light, dark, nord, night, dim, lofi, winter, corporate, retro, dracula;
+		lucid-dark --prefersdark;
 }
 
 /* ─── Lucid Logs custom themes ───────────────────────────────────────────

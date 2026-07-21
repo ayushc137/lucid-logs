@@ -72,7 +72,7 @@ function formatDate(date: Date | undefined): string {
 </script>
 
 <div
-    class="fixed z-[9999] pointer-events-none transition-all duration-150 ease-out origin-bottom"
+    class="fixed z-50 pointer-events-none transition-all duration-150 ease-out origin-bottom"
     style="top: {smartPosition.y}px; left: {smartPosition.x}px; transform: translateY(-100%);"
     in:scale={{ duration: 200, start: 0.9, opacity: 0, easing: (t) => t * (2 - t) }}
     out:scale={{ duration: 150, start: 1, opacity: 0, easing: (t) => t * t }}

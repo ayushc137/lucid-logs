@@ -266,7 +266,7 @@ func goalsSubquery(extraCondition string) string {
 			'goal_id', g.id,
 			'goal_title', g.title,
 			'goal_icon', COALESCE(g.icon, ''),
-			'auto_link_tasks', ag.auto_link_tasks,
+			'auto_link_tasks', CASE WHEN ag.auto_link_tasks != 0 THEN json('true') ELSE json('false') END,
 			'quantity_multiplier', ag.quantity_multiplier,
 			'default_quantity', ag.default_quantity,
 			'default_impact', ag.default_impact,

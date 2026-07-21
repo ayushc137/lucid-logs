@@ -10,7 +10,7 @@ import {
 	type Quadrant,
 } from '$lib/components/emotions/emotionData';
 import { OpenMoji } from '$lib/components/ui';
-import { stripHtml } from '$lib/utils';
+import { stripHtml, FALLBACK_CATEGORY_COLOR} from '$lib/utils';
 import { ArrowRight, Check, Sparkles } from 'lucide-svelte';
 import { cubicOut } from 'svelte/easing';
 import { fly } from 'svelte/transition';
@@ -40,7 +40,7 @@ let {
 	onMouseLeave,
 }: Props = $props();
 
-const bg = $derived(task.categoryColor || '#6b7280');
+const bg = $derived(task.categoryColor || FALLBACK_CATEGORY_COLOR);
 const isCompleted = $derived(task.completed);
 
 // Determine emotion to display (actual or inferred)

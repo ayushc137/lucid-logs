@@ -108,3 +108,7 @@ coverage/
 
 # Built migration tool binary
 apps/go_backend/migrate-surreal-to-libsql
+
+.worktrees/
+graphify-out/
+apps/graphify-out/

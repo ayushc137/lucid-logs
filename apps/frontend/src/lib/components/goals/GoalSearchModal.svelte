@@ -1,4 +1,6 @@
 <script lang="ts">
+import { FALLBACK_CATEGORY_COLOR } from '$lib/utils';
+
     import { type Goal, getGoals, getUnits } from "$lib/api";
     import { cn } from "$lib/utils";
     import { createQuery } from "@tanstack/svelte-query";
@@ -151,42 +153,47 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if open}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
     <div
         class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+        role="presentation"
         onclick={handleBackdropClick}
         transition:fade={{ duration: 150 }}
     >
-        <div class="absolute inset-0 bg-base-content/40 backdrop-blur-sm"></div>
+        <div class="absolute inset-0 bg-base-content/20 backdrop-blur-sm"></div>
 
         <div
-            class="relative bg-base-100 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden border border-base-200"
+            class="relative bg-base-100 rounded-t-box sm:rounded-box shadow-xl w-full max-w-4xl overflow-hidden border border-base-content/10"
             transition:scale={{ duration: 200, start: 0.95 }}
         >
+            <!-- Mobile drag handle -->
+            <div class="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+                <div class="w-10 h-1 rounded-full bg-base-content/15"></div>
+            </div>
             <!-- Header -->
             <div
-                class="flex items-center justify-between px-6 py-5 border-b border-base-200"
+                class="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-base-content/5"
             >
                 <div class="flex items-center gap-4">
                     <div
-                        class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 flex items-center justify-center"
+                        class="w-10 h-10 rounded-box bg-primary/10 flex items-center justify-center shrink-0"
                     >
-                        <Target class="w-6 h-6 text-primary" />
+                        <Target class="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold">Link Goals</h2>
+                        <h2 class="text-lg font-semibold">Link Goals</h2>
                         <p class="text-sm text-base-content/50">
                             Select goals to track with this task
                         </p>
                     </div>
                 </div>
-                <button class="btn btn-ghost btn-circle" onclick={handleClose}>
+                <button class="btn btn-ghost btn-sm btn-square" onclick={handleClose} aria-label="Close">
                     <X class="w-5 h-5" />
                 </button>
             </div>
 
             <!-- Search -->
-            <div class="px-6 py-4 bg-base-50">
+            <div class="px-4 sm:px-6 py-4">
                 <div class="relative">
                     <Search
                         class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-base-content/40"
@@ -205,7 +212,7 @@
             <div class="flex h-[550px]">
                 <!-- Goals List -->
                 <div
-                    class="flex-1 overflow-y-auto border-r border-base-200 p-4"
+                    class="flex-1 overflow-y-auto border-r border-base-content/5 p-4"
                 >
                     {#if $goalsQuery.isLoading}
                         <div class="flex items-center justify-center h-full">
@@ -239,7 +246,7 @@
                                     <div
                                         class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-transform group-hover:scale-110"
                                         style="background-color: {goal.category
-                                            ?.color || '#6b7280'}20;"
+                                            ?.color || FALLBACK_CATEGORY_COLOR}20;"
                                     >
                                         {goal.icon || "🎯"}
                                     </div>
@@ -449,7 +456,7 @@
 
             <!-- Footer -->
             <div
-                class="flex items-center justify-end gap-3 px-6 py-4 border-t border-base-200 bg-base-50"
+                class="flex items-center justify-end gap-2 px-4 sm:px-6 py-4 border-t border-base-content/5"
             >
                 <button class="btn btn-ghost" onclick={handleClose}>
                     Cancel

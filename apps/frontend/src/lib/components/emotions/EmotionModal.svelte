@@ -109,7 +109,7 @@ const quadrantRestrictionLabel = $derived.by(() => {
         >
             <!-- Header -->
             <div
-                class="flex items-start justify-between gap-4 px-6 py-5 border-b border-base-content/5 shrink-0 min-h-24 bg-base-100/60 backdrop-blur-xl sticky top-0 z-30"
+                class="flex items-start justify-between gap-4 px-4 sm:px-6 py-4 border-b border-base-content/5 shrink-0"
             >
                 {#if displayEmotion}
                     {@const colors =
@@ -281,7 +281,7 @@ const quadrantRestrictionLabel = $derived.by(() => {
                 </div>
             </div>
         </div>
-        <form method="dialog" class="modal-backdrop bg-base-content/20">
+        <form method="dialog" class="modal-backdrop bg-base-content/20 backdrop-blur-sm">
             <button onclick={handleClose}>close</button>
         </form>
     </dialog>

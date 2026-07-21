@@ -1,4 +1,6 @@
 <script lang="ts">
+import { FALLBACK_CATEGORY_COLOR } from '$lib/utils';
+
 	import { OpenMoji } from "$lib/components/ui";
 	import { cn, stripHtml } from "$lib/utils";
 	import {
@@ -1120,7 +1122,7 @@
 				<!-- Tasks -->
 				<div class="relative px-2">
 					{#each packed.rows as { task, row } (task.id)}
-						{@const bg = task.categoryColor || "#6b7280"}
+						{@const bg = task.categoryColor || FALLBACK_CATEGORY_COLOR}
 						{@const txt = getTextColor(bg)}
 						{@const isHov = hoveredTaskId === task.id}
 						{@const isDragging = draggedTaskId === task.id}
@@ -1177,7 +1179,7 @@
 								? 'opacity-30 grayscale-[50%] blur-[1px]'
 								: 'opacity-100'}
                                 {shouldShowHoverEffect ? 'z-50' : 'z-10'}
-                                {isDragging ? 'z-[100]' : ''}"
+                                {isDragging ? 'z-40' : ''}"
 							style="
                                 left: {pos.left}%; 
                                 width: {pos.width}%; 
@@ -1381,7 +1383,7 @@
 <!-- Fixed position drag time preview - positioned above task at mouse X -->
 {#if dragMode && previewStartTime && previewEndTime}
 	<div
-		class="fixed pointer-events-none z-[9999]"
+		class="fixed pointer-events-none z-50"
 		style="left: {dragMouseX}px; top: {dragTaskTop -
 			36}px; transform: translateX(-50%);"
 	>

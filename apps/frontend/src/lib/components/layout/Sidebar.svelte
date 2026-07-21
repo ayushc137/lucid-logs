@@ -147,7 +147,7 @@ function handleLogout() {
 
       <ul
         class={cn(
-          "dropdown-content menu bg-base-100 rounded-xl z-[100] w-60 p-1.5 shadow-xl border border-base-300/70",
+          "dropdown-content menu bg-base-100 rounded-box z-50 w-60 p-1.5 shadow-xl border border-base-300/70",
           collapsed && "ml-2",
         )}
       >

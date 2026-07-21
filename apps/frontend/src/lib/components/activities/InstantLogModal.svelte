@@ -86,14 +86,14 @@
 
 <!-- Modal: bottom sheet on mobile, centered dialog on desktop -->
 <dialog class={cn('modal modal-bottom sm:modal-middle', isOpen && 'modal-open')}>
-	<div class="modal-box max-w-sm w-full sm:w-auto rounded-b-none sm:rounded-b-box">
+	<div class="modal-box max-w-sm w-full sm:w-auto">
 		<!-- Drag handle (mobile) -->
-		<div class="sm:hidden flex justify-center -mt-2 mb-3">
-			<div class="w-10 h-1.5 rounded-full bg-base-content/20"></div>
+		<div class="sm:hidden flex justify-center pt-1 pb-3">
+			<div class="w-10 h-1 rounded-full bg-base-content/15"></div>
 		</div>
 		<!-- Header -->
 		<div class="flex items-center gap-3 mb-6">
-			<div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl">
+			<div class="w-10 h-10 rounded-box bg-primary/10 flex items-center justify-center text-xl shrink-0">
 				{activity.icon || '⚡'}
 			</div>
 			<div class="flex-1">
@@ -224,7 +224,7 @@
 	</div>
 
 	<!-- Click outside to close -->
-	<form method="dialog" class="modal-backdrop">
+	<form method="dialog" class="modal-backdrop bg-base-content/20 backdrop-blur-sm">
 		<button onclick={onClose}>close</button>
 	</form>
 </dialog>

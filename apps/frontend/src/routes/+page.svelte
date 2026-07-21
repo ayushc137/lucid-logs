@@ -8,7 +8,7 @@ import QuickCapture from '$lib/components/tasks/QuickCapture.svelte';
 import { TimelineGantt, type TimelineGoal } from '$lib/components/timeline';
 import { ConfirmDialog } from '$lib/components/ui';
 import { emotionStore } from '$lib/stores/emotions.svelte';
-import { cn } from '$lib/utils';
+import { cn, FALLBACK_GOAL_COLOR } from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
 import {
 	createMutation,
@@ -152,7 +152,7 @@ function transformGoals(apiGoals: Goal[]): TimelineGoal[] {
 		id: goal.id,
 		title: goal.title,
 		icon: goal.icon || '🎯',
-		color: goal.category?.color || '#8b5cf6',
+		color: goal.category?.color || FALLBACK_GOAL_COLOR,
 		startDate: goal.start_date ? new Date(goal.start_date) : undefined,
 		deadline: goal.deadline ? new Date(goal.deadline) : undefined,
 		recurrence: goal.recurrence
@@ -434,7 +434,7 @@ function confirmUncomplete() {
 	}
 }
 
-// Quick logs data
+// Quick logs data — colors from COLOR_PRESETS (design language §3.4)
 const quickLogs = [
 	{ emoji: '☕', label: 'Morning', color: '#f97316' },
 	{ emoji: '💪', label: 'Workout', color: '#ef4444' },
@@ -528,7 +528,7 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 				<p class="text-[13px] font-medium text-base-content/50">
 					{formatDate()}
 				</p>
-				<h1 class="text-[1.65rem] sm:text-3xl font-bold tracking-tight mt-0.5 leading-tight">
+				<h1 class="text-2xl font-semibold tracking-tight mt-0.5">
 					{getGreeting()}
 				</h1>
 			</div>

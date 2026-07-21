@@ -221,7 +221,7 @@ function highlightText(text: string, query: string): string {
         class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
     >
         <div>
-            <h1 class="text-3xl font-bold">Categories</h1>
+            <h1 class="text-2xl font-semibold tracking-tight">Categories</h1>
             <p class="text-sm opacity-60 mt-1">
                 {#if debouncedSearch}
                     Found {categories.length} matching categories

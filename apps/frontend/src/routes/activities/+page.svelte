@@ -233,7 +233,7 @@ function highlightText(text: string, query: string): string {
 	<!-- Header -->
 	<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 		<div>
-			<h1 class="text-3xl font-bold flex items-center gap-3">
+			<h1 class="text-2xl font-semibold tracking-tight flex items-center gap-3">
 				<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
 					<Zap class="w-5 h-5 text-primary" />
 				</div>

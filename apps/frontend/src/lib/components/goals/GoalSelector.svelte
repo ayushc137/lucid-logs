@@ -1,4 +1,6 @@
 <script lang="ts">
+import { FALLBACK_CATEGORY_COLOR } from '$lib/utils';
+
     import { type Goal, getGoals, getUnits } from "$lib/api";
     import { cn } from "$lib/utils";
     import { createQuery } from "@tanstack/svelte-query";
@@ -161,7 +163,7 @@
                                 <div
                                     class="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
                                     style="background-color: {goal.category
-                                        ?.color || '#6b7280'}20;"
+                                        ?.color || FALLBACK_CATEGORY_COLOR}20;"
                                 >
                                     {goal.icon || "🎯"}
                                 </div>

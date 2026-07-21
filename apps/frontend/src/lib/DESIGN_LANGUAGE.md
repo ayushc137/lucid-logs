@@ -1,486 +1,173 @@
 # Lucid Logs Design Language
 
-## Overview
-
-This document defines the design language and component patterns for Lucid Logs. 
-All UI components should follow these guidelines for consistency.
-
----
-
-## Core Principles
-
-1. **Clarity First** - Every element should have clear purpose
-2. **Consistent Spacing** - Use 4px grid system (gap-1, gap-2, gap-3, gap-4...)
-3. **Visual Hierarchy** - Use size and weight to establish importance
-4. **Accessible Colors** - All text must have sufficient contrast
-5. **Responsive by Default** - Components should work on all screen sizes
+> **This document is the law, not a suggestion.** If a pattern you need isn't here,
+> add it to this doc and build it as a shared primitive — don't one-off it in a page.
+> UI primitives live in `$lib/components/ui/`. Feature components compose them.
 
 ---
 
-## Color System
+## 1. Principles
 
-### Semantic Colors (DaisyUI)
-- `primary` - Main actions, active states
-- `secondary` - Supporting actions
-- `accent` - Highlights, goals
-- `info` - Information, tasks
-- `success` - Positive states, mood
-- `warning` - Caution, streaks
-- `error` - Destructive actions, errors
-
-### Opacity Patterns
-- Full opacity - Primary content
-- `opacity-60` - Secondary labels, subtext
-- `opacity-50` - Tertiary labels, hints
-- `opacity-40` - Disabled/inactive
-
-### Background Patterns
-- Component backgrounds: `bg-{color}/10` (10% opacity of semantic color)
-- Icon containers: `bg-{color}` with `text-{color}-content`
-- Card backgrounds: `bg-base-100`
-- Overlays: `bg-base-content/20` with `backdrop-blur-sm`
+1. **One way to do each thing.** One modal. One button. One page header. One empty state.
+   If two exist, one is a bug.
+2. **Mobile-first, touch-first.** 44px min touch targets. Bottom sheets on mobile,
+   centered dialogs on desktop. Same component handles both.
+3. **Calm surfaces.** Neutral backgrounds, one accent color, generous radius,
+   soft tinted shadows. No pure black, no neon.
+4. **Theme tokens only.** Never hardcode hex/rgb in components — use DaisyUI
+   semantic colors (`primary`, `base-100`, `base-content`, …). Exceptions live
+   in the chart palette only (see §3.4).
+5. **Motion is subtle.** 150–250ms, `ease-out`. Everything interactive has
+   hover + active + focus-visible states.
 
 ---
 
-## Typography
+## 2. Typography
 
-### Headings
-- **Page Title**: `text-3xl font-bold` or `text-2xl font-extrabold`
-- **Section Title**: `text-lg font-bold` or `font-bold` (base size)
-- **Card Title**: `font-semibold text-sm`
-- **Label**: `text-xs font-medium uppercase opacity-50`
+Fonts: **Inter** (UI, loaded 400–800 with `opsz` axis) · **JetBrains Mono** (numbers, code).
 
-### Body Text
-- **Primary**: Default size and weight
-- **Secondary**: `text-sm`
-- **Caption**: `text-xs` or `text-[10px]`
-- **Muted**: Add `opacity-50` or `opacity-60`
+### Scale (the only sizes allowed)
 
----
+| Role | Classes |
+|---|---|
+| Page title | `text-2xl sm:text-[1.7rem] font-bold tracking-tight leading-tight` |
+| Section title | `text-lg font-semibold` |
+| Card title | `text-sm font-semibold` |
+| Body | `text-sm` (default) |
+| Caption / meta | `text-xs text-base-content/60` |
+| Overline / label | `text-xs font-medium uppercase tracking-wide text-base-content/50` |
+| Numbers / stats | `font-mono tabular-nums` (never proportional digits in stats) |
 
-## Spacing
-
-### Standard Gaps
-- `gap-1` (4px) - Tight inline elements
-- `gap-2` (8px) - Related items
-- `gap-3` (12px) - Component internals
-- `gap-4` (16px) - Section separation
-- `gap-6` (24px) - Major sections
-
-### Padding
-- **Cards**: `p-4` standard, `p-5` for larger cards
-- **Buttons**: Default button padding, `btn-sm` for compact
-- **Modal Content**: `px-6 py-4` for header/footer, `p-6` for body
-- **Input**: Standard form control padding
+Rules: page titles come from `<PageHeader>` — never hand-write an `<h1>` in a page.
+Muted text uses `text-base-content/60` (or `/50`, `/40`) — **not** `opacity-*` on the parent
+(that dims children too) and **not** `#6b7280`.
 
 ---
 
-## Component Patterns
+## 3. Color
 
-### 1. Icon Container (`IconBox`)
-Square containers for icons with semantic coloring.
+### 3.1 Themes
+Only two themes ship: **`lucid-light`** (default) and **`lucid-dark`**.
+No others. The theme switcher offers exactly these two (+ system).
 
-```svelte
-<IconBox size="md" variant="subtle" color="primary">
-    <Icon class="w-5 h-5" />
-</IconBox>
+### 3.2 Semantic mapping
+| Token | Use |
+|---|---|
+| `primary` | The one accent: primary buttons, active nav, selected states, links |
+| `secondary` | Teal — goals/progress accents only |
+| `success/warning/error/info` | Status only (streaks, alerts, destructive) |
+| `base-100` | Cards, sheets, raised surfaces |
+| `base-200` | Page background |
+| `base-300` | Inset wells, dividers on dark |
+| `base-content` | Text (with `/60`, `/50`, `/40` for hierarchy) |
+| `neutral` | Rarely — high-emphasis neutral chips only |
 
-Size Options:
-- sm: w-9 h-9 rounded-lg
-- md: w-10 h-10 rounded-xl  (default)
-- lg: w-16 h-16 rounded-full
-- xl: w-20 h-20 rounded-full
+### 3.3 Surfaces & elevation
+- Card: `bg-base-100 rounded-box border border-base-content/5` (+ optional `shadow-sm`)
+- Page bg: `bg-base-200`
+- Inset/well: `bg-base-200` on light, `bg-base-300/50` on dark — or simply `bg-base-content/5` (works both)
+- Overlay (all modals/drawers): `bg-base-content/20 backdrop-blur-sm` — via `modal-backdrop`, never custom
+- Borders: prefer `border-base-content/5` (subtle) over `border-base-300`; hover can bump to `/10`
 
-Variant Options:
-- solid: bg-{color} text-{color}-content
-- subtle: bg-{color}/10 text-{color}
-```
-
-### 2. Stat Card (`StatCard`)
-Display key metrics with icon and value.
-
-```svelte
-<StatCard value={7} label="Streak" unit="d" color="warning">
-    {#snippet icon()}
-        <Flame class="w-5 h-5" />
-    {/snippet}
-</StatCard>
-```
-
-### 3. Section Header (`SectionHeader`)
-Consistent header pattern for sections.
-
-```svelte
-<SectionHeader title="Today's Timeline" subtitle="5 tasks scheduled" color="info">
-    {#snippet icon()}
-        <Calendar class="w-5 h-5" />
-    {/snippet}
-    {#snippet actions()}
-        <button class="btn btn-sm">Action</button>
-    {/snippet}
-</SectionHeader>
-```
-
-### 4. Cards (`Card`)
-Container components with consistent styling.
-
-```svelte
-<Card variant="bordered" shadow={true}>
-    Content here
-</Card>
-
-Variants:
-- default: Standard card
-- bordered: With border-base-200
-- compact: Smaller padding (p-3)
-```
-
-### 5. Buttons
-
-```
-Primary Action:
-- btn btn-primary gap-2 shadow-lg shadow-primary/20
-
-Secondary Action:
-- btn btn-ghost
-
-Danger:
-- btn btn-error btn-sm
-
-Icon Only:
-- btn btn-ghost btn-sm btn-square
-
-With badge:
-- Add: <span class="badge badge-sm badge-secondary">Label</span>
-```
-
-### 6. Empty State (`EmptyState`)
-Centered content when no data exists.
-
-```svelte
-<EmptyState
-    title="No goals yet"
-    description="Set goals to track your progress"
-    buttonLabel="Create Your First Goal"
-    onButtonClick={handleAdd}
->
-    {#snippet icon()}
-        <Target class="w-10 h-10 text-primary" />
-    {/snippet}
-</EmptyState>
-```
-
-### 7. Error State (`ErrorAlert`)
-Alert for error conditions with retry capability.
-
-```svelte
-<ErrorAlert
-    message="Failed to load data. Please try again."
-    onRetry={() => query.refetch()}
-/>
-```
-
-### 8. Loading State (`LoadingCard`)
-Centered spinner with message.
-
-```svelte
-<LoadingCard message="Loading tasks..." />
-```
+### 3.4 Chart palette (the only hardcoded values allowed)
+Charts may use a fixed categorical palette (defined in `$lib/utils/chart-colors.ts`),
+chosen to read in both themes. Feature CSS may not introduce other hexes.
 
 ---
 
-## Modal Patterns
+## 4. Shape & spacing
 
-### 9. Modal (`Modal`)
-Structured modal with header, content, and footer.
-
-```svelte
-<Modal
-    bind:open={modalOpen}
-    size="lg"
-    title="Edit Task"
-    subtitle="Capture your moment"
-    onClose={handleClose}
->
-    {#snippet icon()}
-        <Sparkles class="w-5 h-5 text-primary" />
-    {/snippet}
-
-    <!-- Main content here -->
-
-    {#snippet actions()}
-        <button class="btn btn-ghost" onclick={handleClose}>Cancel</button>
-        <button class="btn btn-primary" onclick={handleSave}>Save</button>
-    {/snippet}
-</Modal>
-
-Sizes:
-- sm: max-w-sm
-- md: max-w-lg (default)
-- lg: max-w-3xl
-- xl: max-w-5xl
-- full: max-w-5xl h-[85vh]
-```
-
-### 10. Confirm Dialog (`ConfirmDialog`)
-Structured confirmation dialog with header/content/footer matching Modal design.
-
-**Two Variants:**
-- `destructive={true}` - Red styling for permanent actions (delete)
-- `destructive={false}` - Warning/amber styling for reversible actions (uncomplete)
-
-```svelte
-<!-- Destructive example (delete) -->
-<ConfirmDialog
-    bind:open={deleteOpen}
-    title="Delete Task?"
-    message="This action cannot be undone. The task and all associated data will be permanently removed."
-    confirmText="Delete"
-    destructive={true}
-    loading={isDeleting}
-    onConfirm={handleDelete}
-    onCancel={() => deleteOpen = false}
-/>
-
-<!-- Warning example (uncomplete) -->
-<ConfirmDialog
-    bind:open={uncompleteOpen}
-    title="Mark as Incomplete?"
-    message="Are you sure you want to mark this task as incomplete? This will remove the completion status."
-    confirmText="Mark Incomplete"
-    cancelText="Keep Complete"
-    destructive={false}
-    loading={isPending}
-    onConfirm={handleUncomplete}
-    onCancel={() => uncompleteOpen = false}
-/>
-```
-
-**Features:**
-- Header with icon box (error or warning themed)
-- Title with semantic color
-- Subtitle reflecting action type
-- Content area with message
-- Footer with cancel/confirm actions
-- Consistent with Modal component styling
+- Radius: selectors `rounded-selector` · fields `rounded-field` · cards/sheets `rounded-box` (1rem).
+  Don't hand-pick `rounded-lg/xl/2xl` — use the tokens.
+- Spacing: 4px grid. Common rhythms: `gap-2` tight, `gap-3` default, `gap-4` sections, `gap-6` page blocks.
+- Page padding: `px-4 sm:px-6 lg:px-8`, vertical `py-4 sm:py-6`. Max content width `max-w-6xl mx-auto`.
+- z-index scale (the only values allowed):
+  `z-10` sticky in-page · `z-20` dropdowns · `z-30` sticky headers inside modals ·
+  `z-40` drawers · `z-50` modals/toasts. No `z-[100]`, no `z-[9999]`.
 
 ---
 
-## Table Patterns
+## 5. Components — the canonical set
 
-### 11. Data Table (`DataTable`)
-Consistent table with card wrapper.
+### 5.1 Button — `<Button>` (wraps DaisyUI `btn`)
+Variants: `primary | neutral | ghost | outline | error` · Sizes: `xs | sm | md`.
+Rules:
+- **Every** clickable thing is a `<Button>` or a `<button class="btn …">`. Raw styled
+  `<button>`/`<div onclick>` are banned outside primitives.
+- Primary action per view: **one**. Everything else is `ghost` or `outline`.
+- Icon-only buttons: `btn-ghost btn-square` (`btn-circle` only for the FAB).
+- Destructive: `btn-error btn-outline` inline; `btn-error` solid only in confirm dialogs.
+- Always `:active:scale-[0.98]` (built into Button), `transition`, visible `focus-visible` ring.
 
-```svelte
-<DataTable variant="lg" hover={true}>
-    <thead class="bg-base-200">
-        <tr>
-            <SortableHeader 
-                label="Title" 
-                field="title" 
-                {sortField} 
-                {sortDirection}
-                onSort={toggleSort}
-            />
-            <th>Category</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {#each items as item}
-            <tr>...</tr>
-        {/each}
-    </tbody>
-</DataTable>
+### 5.2 Modal — `<Modal>`
+One component, bottom sheet on mobile → centered dialog on desktop
+(`modal modal-bottom sm:modal-middle`, backdrop `bg-base-content/20 backdrop-blur-sm`).
+- Props: `open`, `size` (`sm|md|lg|xl|full`), `title`, `subtitle`, `icon`, `actions` snippet, `onClose`.
+- Header: title + optional icon, close `X` button, `border-b border-base-content/5`.
+- Body: `px-6 py-5` default padding, scrollable.
+- Footer (`actions` snippet): right-aligned `justify-end gap-2`, `border-t border-base-content/5`.
+- **All feature modals must use `<Modal>`.** Confirm flows use `<ConfirmDialog>` (same shell,
+  error-solid action). No `<dialog>` elements outside `ui/`.
 
-Variants:
-- default: table
-- lg: table table-lg
-- compact: table table-sm
-```
+### 5.3 Card — `<Card>`
+`title?`, `icon?`, `actions?` snippet, `padding` (`sm|md|lg`, default md = `p-4 sm:p-5`).
+Stat tiles use `<StatCard>` (value `font-mono`, label caption, delta arrow).
+No bespoke `div class="bg-base-100 rounded-…"` cards in pages.
 
-### 12. Sortable Header (`SortableHeader`)
-Table column header with sort controls.
+### 5.4 Page header — `<PageHeader>`
+`title`, `subtitle?`, `icon?`, `actions?` snippet. Handles the title scale in §2.
+Every route starts with exactly one.
 
-```svelte
-<SortableHeader
-    label="Date"
-    field="start_date"
-    sortField={currentSort}
-    sortDirection="asc"
-    onSort={(field) => toggleSort(field)}
-/>
-```
+### 5.5 Inputs
+Text/select/textarea: DaisyUI `input input-bordered w-full` / `select` / `textarea`,
+always wrapped in a `label` with `text-xs font-medium text-base-content/60`.
+Errors: `input-error` + inline `text-xs text-error` below. No alert() for validation.
 
----
+### 5.6 Badges / chips
+Status: `badge badge-{semantic} badge-sm`. Category chips use the category color at
+`/10` bg + full-color text. Priority: colored dot + label, not colored background walls.
 
-## Form Patterns
+### 5.7 States
+- Loading: `<LoadingCard>` skeletons (pulse), never spinners alone.
+- Empty: `<EmptyState icon title body>` + one primary CTA.
+- Error: `<ErrorAlert>` inline at top of the failing region.
 
-### 13. Color Picker (`ColorPicker`)
-Color selection with presets and custom mode.
-
-```svelte
-<ColorPicker
-    bind:value={selectedColor}
-    allowCustom={true}
-    cols={8}
-    customMode={useCustomColor}
-    onCustomModeChange={(v) => useCustomColor = v}
-/>
-```
-
-### Input Groups
-```
-Label: text-xs font-semibold uppercase opacity-50
-Input: input input-bordered input-sm w-full
-Error: input-error class + alert message below
-```
+### 5.8 Dropdowns / popovers
+`dropdown` pattern from DaisyUI; popovers `z-20`, `bg-base-100 rounded-box border border-base-content/5 shadow-lg`.
+One open at a time; close on outside click (use the shared `clickOutside` action).
 
 ---
 
-## Animation
+## 6. Layout
 
-### Standard Animations
-- `animate-spin` - Loading spinners
-- `animate-fade-in` - Content appearing
-- `transition-all duration-300` - State changes
-
-### Animation Keyframes (defined in CSS)
-```css
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-```
+- **Desktop (lg+):** fixed left sidebar (`w-64`), content column `max-w-6xl`.
+- **Mobile:** top app bar (compact, page title + primary action) + bottom tab bar
+  (5 tabs max) with center-lifted FAB. `safe-area-inset-bottom` padding on the tab bar.
+- Drawers/sheets slide with 200ms ease; content never jumps when they open.
+- Lists on mobile render as cards; tables are desktop-only (`hidden md:table` + card list below).
 
 ---
 
-## Responsive Breakpoints
+## 7. Do / Don't
 
-- **sm** (640px): Phone landscape / tablet portrait
-- **md** (768px): Tablet landscape
-- **lg** (1024px): Desktop
-- **xl** (1280px): Large desktop
-
-### Common Patterns
-```
-Grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
-Text: text-2xl sm:text-3xl
-Padding: p-4 lg:p-6
-Hide/Show: hidden sm:inline
-Modal: modal-bottom sm:modal-middle
-Table Columns: hidden lg:table-cell
-```
+| ✅ Do | ❌ Don't |
+|---|---|
+| `<Modal>` for every dialog | hand-rolled `<dialog>` / `fixed inset-0` overlays |
+| `btn btn-primary` via `<Button>` | `<button class="bg-indigo-600 …">` one-offs |
+| `text-base-content/60` for muted text | `text-[#6b7280]`, `opacity-60` wrappers |
+| `rounded-box` token | `rounded-2xl` sprinkled per-component |
+| `<PageHeader>` on every route | per-page `<h1>` styling |
+| z-10/20/30/40/50 from §4 | `z-[9999]`, `z-[100000]` |
+| lucid-light / lucid-dark themes | shipping retro/dracula/lofi we never designed |
+| 150–250ms ease-out transitions | 500ms+ bounces, or none at all |
 
 ---
 
-## File Organization
+## 8. Migration notes (July 2026 coherence pass)
 
-```
-src/lib/
-├── components/
-│   ├── ui/                        # Core UI primitives
-│   │   ├── IconBox.svelte         # Icon containers
-│   │   ├── Card.svelte            # Card containers
-│   │   ├── StatCard.svelte        # Metric display
-│   │   ├── PageHeader.svelte      # Page titles
-│   │   ├── SectionHeader.svelte   # Section titles
-│   │   ├── EmptyState.svelte      # No data placeholder
-│   │   ├── ErrorAlert.svelte      # Error with retry
-│   │   ├── LoadingCard.svelte     # Loading spinner
-│   │   ├── Modal.svelte           # Modal dialog
-│   │   ├── ConfirmDialog.svelte   # Confirmation dialog
-│   │   ├── DataTable.svelte       # Table wrapper
-│   │   ├── SortableHeader.svelte  # Sortable column
-│   │   ├── ColorPicker.svelte     # Color selection
-│   │   ├── CategoryDropdown.svelte
-│   │   ├── StatusDropdown.svelte
-│   │   ├── PriorityDropdown.svelte
-│   │   ├── FilterDropdown.svelte
-│   │   └── index.ts               # Exports
-│   ├── layout/                    # Layout components
-│   ├── tasks/                     # Feature: Tasks
-│   ├── timeline/                  # Feature: Timeline
-│   └── settings/                  # Feature: Settings
-├── constants.ts                   # Shared constants (colors, etc.)
-└── utils.ts                       # Utility functions
-```
-
----
-
-## Import Examples
-
-```svelte
-// All UI components
-import { 
-    Modal, 
-    ConfirmDialog, 
-    DataTable, 
-    SortableHeader,
-    IconBox, 
-    StatCard, 
-    SectionHeader,
-    Card,
-    EmptyState, 
-    ErrorAlert, 
-    LoadingCard,
-    ColorPicker,
-    PageHeader,
-} from "$lib/components/ui";
-
-// Shared constants
-import { COLOR_PRESETS, DEFAULT_COLOR, getContrastColor } from "$lib/constants";
-```
-
----
-
-## URL State Persistence
-
-To maintain application state across refreshes and shareable links, use the `navigation.ts` utility. This ensures filters, sort options, and other view preferences are persisted in the URL query parameters.
-
-### Usage Pattern
-
-1. **Import Utilities**:
-```typescript
-import { getUrlParams, updateUrlParams, parsers } from "$lib/utils/navigation";
-import { browser } from "$app/environment";
-```
-
-2. **Initialize State**:
-Use `getUrlParams` to set initial values for reactive state variables.
-```typescript
-const initialParams = getUrlParams({
-    q: parsers.string(""),           // String param
-    page: parsers.number(1),         // Number param
-    active: parsers.boolean(true),   // Boolean param
-    date: parsers.dateOnly(new Date()), // Date (YYYY-MM-DD local)
-});
-
-let searchQuery = $state(initialParams.q);
-let page = $state(initialParams.page);
-```
-
-3. **Sync to URL**:
-Use `$effect` to automatically update the URL when state changes.
-```typescript
-$effect(() => {
-    updateUrlParams({
-        q: searchQuery,
-        page: page
-    }, { replace: true, keepFocus: true });
-});
-```
-
-4. **Navigate Back**:
-When constructing "Back" buttons from detail pages, use `sessionStorage` to properly return the user to their previous filtered state if applicable.
-```typescript
-// On navigation TO detail page
-if (browser) {
-    sessionStorage.setItem("referrer", $page.url.pathname + $page.url.search);
-}
-
-// On navigation BACK
-const referrer = sessionStorage.getItem("referrer") || "/default-path";
-goto(referrer);
-```
-
+This doc replaced a 486-line aspirational version. The audit found: 6 hand-rolled
+modals (canonical `<Modal>` unused), 261 raw `<button>` elements, 22 button class
+combos, 12 shipped themes, 3 competing page-title styles, z-index chaos
+(`z-[100]`, `z-[9999]`, `z-[100000]`). The pass converts feature modals to `<Modal>`,
+routes all page titles through `<PageHeader>`, prunes themes to lucid-light/dark,
+moves chart hexes to one palette module, and normalizes the z-index scale.

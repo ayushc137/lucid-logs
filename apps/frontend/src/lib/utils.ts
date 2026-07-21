@@ -5,6 +5,16 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+// Chart & category color constants — see lib/DESIGN_LANGUAGE.md §3.4.
+// Re-exported here so `$lib/utils` stays the single import site.
+export {
+	FALLBACK_CATEGORY_COLOR,
+	DEFAULT_CATEGORY_COLOR,
+	FALLBACK_GOAL_COLOR,
+	categoryColor,
+	goalColor,
+} from './utils/chart-colors';
+
 /**
  * Strip HTML tags from rich text content while preserving formatting intent.
  * Handles paragraphs, line breaks, lists, etc. for clean plain text display.

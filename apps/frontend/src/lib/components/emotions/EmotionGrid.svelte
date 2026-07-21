@@ -899,7 +899,7 @@ function portal(node: HTMLElement) {
     {@const colors = getEmotionColors(hoveredEmotion)}
     {@const dots = getIndicatorDots(hoveredEmotion)}
     <div
-        class="fixed z-[100000] min-w-[180px] max-w-[260px] bg-base-100 text-base-content rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-base-300 overflow-hidden pointer-events-none animate-[tooltipIn_0.12s_ease-out]"
+        class="fixed z-50 min-w-[180px] max-w-[260px] bg-base-100 text-base-content rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-base-300 overflow-hidden pointer-events-none animate-[tooltipIn_0.12s_ease-out]"
         style="left: {tooltipPosition.x}px; top: {tooltipPosition.y}px;"
         use:portal
     >

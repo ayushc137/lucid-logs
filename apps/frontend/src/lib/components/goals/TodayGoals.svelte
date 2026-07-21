@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from '$app/navigation';
 import { type Goal, getGoals } from '$lib/api';
-import { cn } from '$lib/utils';
+import { cn, FALLBACK_GOAL_COLOR} from '$lib/utils';
 import { createQuery } from '@tanstack/svelte-query';
 import {
 	Check,
@@ -122,8 +122,7 @@ function formatRecurrence(rec: Goal['recurrence']): string {
                     <!-- Icon -->
                     <div
                         class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 transition-transform group-hover:scale-110"
-                        style="background-color: {goal.category?.color ||
-                            '#8b5cf6'}20;"
+                        style="background-color: {goal.category?.color || FALLBACK_GOAL_COLOR}20;"
                     >
                         {goal.icon || "🎯"}
                     </div>
@@ -173,7 +172,7 @@ function formatRecurrence(rec: Goal['recurrence']): string {
                         <div
                             class="radial-progress text-xs font-bold"
                             style="--value:{progress}; --size:2rem; --thickness:3px; color: {goal
-                                .category?.color || '#8b5cf6'};"
+                                .category?.color || FALLBACK_GOAL_COLOR};"
                             role="progressbar"
                         >
                             {progress}%

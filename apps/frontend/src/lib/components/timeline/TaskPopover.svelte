@@ -4,7 +4,7 @@ import {
 	type Quadrant,
 } from '$lib/components/emotions/emotionData';
 import { OpenMoji } from '$lib/components/ui';
-import { stripHtml } from '$lib/utils';
+import { stripHtml, FALLBACK_CATEGORY_COLOR, FALLBACK_GOAL_COLOR} from '$lib/utils';
 import { Check, Clock, FileText, Heart, Sparkles } from 'lucide-svelte';
 import { scale } from 'svelte/transition';
 import type { TimelineTask } from './types';
@@ -101,7 +101,7 @@ const descriptionPreview = $derived(
 </script>
 
 <div
-    class="fixed z-[9999] pointer-events-none transition-all duration-150 ease-out {smartPosition.shouldFlipY ? 'origin-bottom' : 'origin-top'}"
+    class="fixed z-50 pointer-events-none transition-all duration-150 ease-out {smartPosition.shouldFlipY ? 'origin-bottom' : 'origin-top'}"
     style="top: {smartPosition.y}px; left: {smartPosition.x}px; {smartPosition.shouldFlipY ? 'transform: translateY(-100%);' : ''}"
     in:scale={{ duration: 200, start: 0.9, opacity: 0, easing: (t) => t * (2 - t) }}
     out:scale={{ duration: 150, start: 1, opacity: 0, easing: (t) => t * t }}
@@ -110,7 +110,7 @@ const descriptionPreview = $derived(
         <!-- Header with category color accent -->
         <div
             class="h-1.5 w-full"
-            style="background-color: {task.categoryColor || '#6b7280'};"
+            style="background-color: {task.categoryColor || FALLBACK_CATEGORY_COLOR};"
         ></div>
 
         <div class="p-4">
@@ -118,7 +118,7 @@ const descriptionPreview = $derived(
             <div class="flex gap-3 mb-3">
                 <div
                     class="w-3 h-3 rounded-full shrink-0 mt-1 ring-2 ring-base-200 shadow-sm"
-                    style="background-color: {task.categoryColor || '#6b7280'}"
+                    style="background-color: {task.categoryColor || FALLBACK_CATEGORY_COLOR}"
                 ></div>
                 <div class="min-w-0 flex-1">
                     <p class="font-bold text-sm leading-snug line-clamp-2">
@@ -262,7 +262,7 @@ const descriptionPreview = $derived(
                                 <span class="text-sm">{goal.icon || "🎯"}</span>
                                 <span
                                     class="font-medium flex-1 truncate"
-                                    style="color: {goal.color || '#8b5cf6'};"
+                                    style="color: {goal.color || FALLBACK_GOAL_COLOR};"
                                 >
                                     {goal.title}
                                 </span>

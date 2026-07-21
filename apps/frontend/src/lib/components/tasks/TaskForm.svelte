@@ -1,4 +1,5 @@
 <script lang="ts">
+import { DEFAULT_CATEGORY_COLOR } from '$lib/utils';
 	import { browser } from "$app/environment";
 	import { goto } from "$app/navigation";
 	import {
@@ -185,7 +186,7 @@
 
 	// Category creation
 	let newCategoryName = $state("");
-	let newCategoryColor = $state("#6366f1");
+	let newCategoryColor = $state(DEFAULT_CATEGORY_COLOR);
 	let showNewCategory = $state(false);
 	let useCustomCategoryColor = $state(false);
 
@@ -522,7 +523,7 @@
 			queryClient.invalidateQueries({ queryKey: ["categories"] });
 			categoryId = newCat.id;
 			newCategoryName = "";
-			newCategoryColor = "#6366f1";
+			newCategoryColor = DEFAULT_CATEGORY_COLOR;
 			useCustomCategoryColor = false;
 			showNewCategory = false;
 		},

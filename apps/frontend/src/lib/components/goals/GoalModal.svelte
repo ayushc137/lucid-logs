@@ -1,4 +1,5 @@
 <script lang="ts">
+import { DEFAULT_CATEGORY_COLOR } from '$lib/utils';
     import { browser } from "$app/environment";
     import {
         type CreateGoalRequest,
@@ -158,7 +159,7 @@
     // Category creation state
     let showCreateCategory = $state(false);
     let newCategoryName = $state("");
-    let newCategoryColor = $state("#6366f1");
+    let newCategoryColor = $state(DEFAULT_CATEGORY_COLOR);
     let useCustomCategoryColor = $state(false);
 
     // Unit creation state
@@ -469,7 +470,7 @@
             categoryId = newCat.id;
             showCreateCategory = false;
             newCategoryName = "";
-            newCategoryColor = "#6366f1";
+            newCategoryColor = DEFAULT_CATEGORY_COLOR;
             useCustomCategoryColor = false;
         },
     });
@@ -514,17 +515,21 @@
 <!-- Modal -->
 <dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>
     <div
-        class="modal-box max-w-4xl p-0 flex flex-col bg-base-100 max-h-[92vh] rounded-b-none sm:rounded-3xl shadow-2xl"
+        class="modal-box max-w-4xl p-0 flex flex-col max-h-[92vh] overflow-hidden"
     >
+		<!-- Mobile drag handle -->
+		<div class="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+			<div class="w-10 h-1 rounded-full bg-base-content/15"></div>
+		</div>
         <!-- Header -->
         <div
-            class="flex items-center gap-4 px-6 py-5 border-b border-base-200/50 bg-gradient-to-r from-primary/5 via-base-100 to-secondary/5"
+            class="flex items-center gap-4 px-6 py-5 border-b border-base-content/5"
         >
             <!-- Icon Picker -->
             <div class="relative">
                 <button
                     type="button"
-                    class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/10 flex items-center justify-center text-4xl hover:from-primary/30 hover:to-secondary/20 transition-all shadow-lg border border-primary/10 hover:scale-105"
+                    class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-4xl hover:bg-primary/20 transition-all shadow-lg border border-primary/10 hover:scale-105"
                     onclick={() => (showEmojiPicker = !showEmojiPicker)}
                 >
                     {icon}
@@ -688,7 +693,7 @@
         </div>
 
         <!-- Tabs -->
-        <div class="flex border-b border-base-200/50 px-6 bg-base-100/50">
+        <div class="flex border-b border-base-content/5 px-6">
             <button
                 class={cn(
                     "px-5 py-3.5 text-sm font-medium border-b-2 -mb-px transition-all flex items-center gap-2",
@@ -1053,7 +1058,7 @@
 
         <!-- Footer -->
         <div
-            class="flex items-center justify-between gap-3 px-6 py-4 border-t border-base-200/50 bg-gradient-to-r from-base-200/30 via-transparent to-base-200/30"
+            class="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-t border-base-content/5"
         >
             <div class="text-xs text-base-content/40">
                 {#if isEditing}
@@ -1089,7 +1094,7 @@
     </div>
 
     <!-- Backdrop -->
-    <form method="dialog" class="modal-backdrop bg-black/50 backdrop-blur-sm">
+    <form method="dialog" class="modal-backdrop bg-base-content/20 backdrop-blur-sm">
         <button onclick={handleClose}>close</button>
     </form>
 </dialog>
