@@ -172,6 +172,7 @@ type TaskMetrics struct {
 	AvgTaskDuration    float64             `json:"avg_task_duration_minutes"`
 	Velocity           float64             `json:"velocity"`   // Tasks per day
 	PeakHours          []int               `json:"peak_hours"` // Most productive hours
+	FocusScore         float64             `json:"focus_score"` // % of time on high-priority (4+) tasks
 	ByCategory         []CategoryBreakdown `json:"by_category,omitempty"`
 }
 

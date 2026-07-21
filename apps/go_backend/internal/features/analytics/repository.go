@@ -131,6 +131,31 @@ func (r *repository) GetTaskMetrics(ctx context.Context, userID string, start, e
 		r.logger.Warn().Err(err).Msg("get peak hours failed")
 	}
 
+	// Get focus score: % of time on high-priority (4+) tasks
+	focusScore := 0.0
+	if result.TotalSecs > 0 {
+		focusResult, focusErr := database.QueryFirst[struct {
+			HighSecs float64 `json:"high_secs"`
+		}](ctx, r.db, `
+			SELECT COALESCE(SUM(CAST(strftime('%s', end_date) AS REAL) - CAST(strftime('%s', start_date) AS REAL)), 0) as high_secs
+			FROM tasks
+			WHERE created_by = $user
+			  AND start_date >= $start
+			  AND start_date <= $end
+			  AND deleted_at IS NULL
+			  AND CAST(priority AS INTEGER) >= 4
+		`, map[string]any{
+			"user":  userID,
+			"start": start,
+			"end":   end,
+		})
+		if focusErr != nil {
+			r.logger.Warn().Err(focusErr).Msg("get focus score failed")
+		} else if focusResult != nil {
+			focusScore = (focusResult.HighSecs / result.TotalSecs) * 100
+		}
+	}
+
 	return &TaskMetrics{
 		CompletionRate:     completionRate,
 		TotalTasks:         result.Total,
@@ -141,6 +166,7 @@ func (r *repository) GetTaskMetrics(ctx context.Context, userID string, start, e
 		AvgTaskDuration:    avgDuration,
 		Velocity:           float64(result.Completed) / days,
 		PeakHours:          peakHours,
+		FocusScore:         focusScore,
 		ByCategory:         categories,
 	}, nil
 }
@@ -394,6 +420,55 @@ func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start
 		}
 	}
 
+	// Get daily mood trend (avg valence/arousal per day)
+	dailyTrend, trendErr := database.QueryAll[struct {
+		Date    string  `json:"date"`
+		Valence float64 `json:"valence"`
+		Arousal float64 `json:"arousal"`
+	}](ctx, r.db, `
+		SELECT
+			date(t.start_date) as date,
+			AVG(e.valence) as valence,
+			AVG(e.arousal) as arousal
+		FROM tasks t
+		JOIN task_emotions te ON te.task_id = t.id
+		JOIN emotions e ON e.id = te.emotion_id
+		WHERE t.created_by = $user
+		  AND t.start_date >= $start
+		  AND t.start_date <= $end
+		  AND t.deleted_at IS NULL
+		GROUP BY date(t.start_date)
+		ORDER BY date
+	`, map[string]any{
+		"user":  userID,
+		"start": start,
+		"end":   end,
+	})
+	if trendErr != nil {
+		r.logger.Warn().Err(trendErr).Msg("get mood trend failed")
+	}
+
+	trend := make([]DailyMood, len(dailyTrend))
+	for i, d := range dailyTrend {
+		quadrant := ""
+		switch {
+		case d.Valence >= 0 && d.Arousal >= 0:
+			quadrant = "yellow"
+		case d.Valence >= 0 && d.Arousal < 0:
+			quadrant = "green"
+		case d.Valence < 0 && d.Arousal >= 0:
+			quadrant = "red"
+		default:
+			quadrant = "blue"
+		}
+		trend[i] = DailyMood{
+			Date:     d.Date,
+			Valence:  d.Valence,
+			Arousal:  d.Arousal,
+			Quadrant: quadrant,
+		}
+	}
+
 	return &EmotionMetrics{
 		AverageValence:       avgResult.AvgValence,
 		AverageArousal:       avgResult.AvgArousal,
@@ -401,6 +476,7 @@ func (r *repository) GetEmotionMetrics(ctx context.Context, userID string, start
 		DominantQuadrant:     dominantQuadrant,
 		QuadrantDistribution: quadrantDist,
 		TopEmotions:          topEmotionsList,
+		Trend:                trend,
 	}, nil
 }
 

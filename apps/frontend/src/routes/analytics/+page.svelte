@@ -25,7 +25,9 @@ import {
 let period = $state<'week' | 'month' | 'year'>('week');
 
 const analyticsQuery = createQuery({
-	queryKey: ['analytics', period],
+	get queryKey() {
+		return ['analytics', period];
+	},
 	queryFn: () => getAnalyticsDashboard(period),
 });
 
