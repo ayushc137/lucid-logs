@@ -183,14 +183,14 @@ const activeStreaks = $derived.by(() => {
 	return (s.continued?.length ?? 0) + (s.started?.length ?? 0);
 });
 
-const hasMoodData = !!mood && (mood.average_valence !== 0 || mood.average_arousal !== 0 || mood.dominant_quadrant !== '');
-const hasTimeData = !!categories?.time_distribution && categories.time_distribution.length > 0;
-const hasTaskData = !!tasks && (tasks.completed > 0 || tasks.postponed > 0 || tasks.canceled > 0);
-const hasHabitData = !!habits && ((habits.met?.length ?? 0) > 0 || (habits.partially_met?.length ?? 0) > 0 || (habits.missed?.length ?? 0) > 0);
-const hasStreakData = !!streaks && ((streaks.continued?.length ?? 0) > 0 || (streaks.broken?.length ?? 0) > 0 || (streaks.started?.length ?? 0) > 0);
-const hasGoalData = !!goals?.net_impact && goals.net_impact.length > 0;
+const hasMoodData = $derived(!!mood && (mood.average_valence !== 0 || mood.average_arousal !== 0 || mood.dominant_quadrant !== ''));
+const hasTimeData = $derived(!!categories?.time_distribution && categories.time_distribution.length > 0);
+const hasTaskData = $derived(!!tasks && (tasks.completed > 0 || tasks.postponed > 0 || tasks.canceled > 0));
+const hasHabitData = $derived(!!habits && ((habits.met?.length ?? 0) > 0 || (habits.partially_met?.length ?? 0) > 0 || (habits.missed?.length ?? 0) > 0));
+const hasStreakData = $derived(!!streaks && ((streaks.continued?.length ?? 0) > 0 || (streaks.broken?.length ?? 0) > 0 || (streaks.started?.length ?? 0) > 0));
+const hasGoalData = $derived(!!goals?.net_impact && goals.net_impact.length > 0);
 
-const hasAIContent = !!summary && ((summary.insights?.length ?? 0) > 0 || !!summary.ai_narrative);
+const hasAIContent = $derived(!!summary && ((summary.insights?.length ?? 0) > 0 || !!summary.ai_narrative));
 
 // Reflection prompts config
 const reflectionPrompts = [
