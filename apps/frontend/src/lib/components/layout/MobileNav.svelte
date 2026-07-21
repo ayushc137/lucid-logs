@@ -3,6 +3,7 @@ import { page } from '$app/stores';
 import { cn } from '$lib/utils';
 import {
 	BarChart3,
+	BookOpen,
 	Home,
 	ListTodo,
 	Target,
@@ -15,6 +16,7 @@ const tabs = [
 	{ href: '/activities', icon: Zap, label: 'Log' },
 	{ href: '/goals', icon: Target, label: 'Goals' },
 	{ href: '/analytics', icon: BarChart3, label: 'Stats' },
+	{ href: '/retrospectives', icon: BookOpen, label: 'Retro' },
 ] as const;
 
 function isActive(href: string): boolean {
@@ -27,7 +29,7 @@ function isActive(href: string): boolean {
   class="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-base-100/90 backdrop-blur-lg border-t border-base-300 pb-safe"
   aria-label="Primary"
 >
-  <div class="grid grid-cols-5 h-16">
+  <div class="grid grid-cols-6 h-16">
     {#each tabs as tab}
       {@const active = isActive(tab.href)}
       <a

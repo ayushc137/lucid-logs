@@ -153,14 +153,14 @@
 {#if open}
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center p-6"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
         onclick={handleBackdropClick}
         transition:fade={{ duration: 150 }}
     >
         <div class="absolute inset-0 bg-base-content/40 backdrop-blur-sm"></div>
 
         <div
-            class="relative bg-base-100 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden border border-base-200"
+            class="relative bg-base-100 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden border border-base-200"
             transition:scale={{ duration: 200, start: 0.95 }}
         >
             <!-- Header -->

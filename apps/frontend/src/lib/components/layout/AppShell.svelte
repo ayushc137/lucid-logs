@@ -25,15 +25,17 @@ let mobileMenuOpen = $state(false);
   <!-- Mobile slide-over menu -->
   {#if mobileMenuOpen}
     <div class="fixed inset-0 z-50 lg:hidden">
-      <div
-        class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+      <button
+        class="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
         onclick={() => (mobileMenuOpen = false)}
-        onkeydown={(e) => e.key === "Escape" && (mobileMenuOpen = false)}
-        role="button"
-        tabindex="0"
         aria-label="Close menu"
-      ></div>
-      <div class="absolute left-0 top-0 h-full shadow-2xl">
+      ></button>
+      <div
+        class="absolute left-0 top-0 h-full shadow-2xl animate-in slide-in-from-left duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+      >
         <Sidebar collapsed={false} onToggle={() => (mobileMenuOpen = false)} />
       </div>
     </div>

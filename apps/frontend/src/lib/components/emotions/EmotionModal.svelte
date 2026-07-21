@@ -103,7 +103,7 @@ const quadrantRestrictionLabel = $derived.by(() => {
 </script>
 
 {#if open}
-    <dialog class="modal modal-open">
+    <dialog class="modal modal-bottom sm:modal-middle modal-open">
         <div
             class="modal-box max-w-5xl h-[85vh] max-h-[750px] p-0 flex flex-col overflow-hidden"
         >

@@ -15,11 +15,13 @@ import {
 	LoadingCard,
 } from '$lib/components/ui';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-import { ArrowLeft, Save, Trash2 } from 'lucide-svelte';
+import { ArrowLeft, BookOpen, CalendarDays, Save, Sparkles, Trash2 } from 'lucide-svelte';
 
 const queryClient = useQueryClient();
 
-const retroId = $derived($page.params.id as string);
+function getRetroId(): string {
+	return $page.params.id as string;
+}
 
 let showDeleteConfirm = $state(false);
 
@@ -32,9 +34,9 @@ let changeTomorrow = $state('');
 let additionalNotes = $state('');
 
 const retroQuery = createQuery({
-	queryKey: ['retrospective', retroId],
-	queryFn: () => getRetrospective(retroId),
-	enabled: browser && !!retroId,
+	queryKey: ['retrospective', $page.params.id],
+	queryFn: () => getRetrospective($page.params.id as string),
+	enabled: browser && !!$page.params.id,
 });
 
 // Populate form when retro loads
@@ -52,15 +54,15 @@ $effect(() => {
 });
 
 const updateMutation = createMutation({
-	mutationFn: (data: UpdateRetroRequest) => updateRetrospective(retroId, data),
+	mutationFn: (data: UpdateRetroRequest) => updateRetrospective(getRetroId(), data),
 	onSuccess: () => {
-		queryClient.invalidateQueries({ queryKey: ['retrospective', retroId] });
+		queryClient.invalidateQueries({ queryKey: ['retrospective', getRetroId()] });
 		queryClient.invalidateQueries({ queryKey: ['retrospectives'] });
 	},
 });
 
 const deleteMutation = createMutation({
-	mutationFn: () => deleteRetrospective(retroId),
+	mutationFn: () => deleteRetrospective(getRetroId()),
 	onSuccess: () => {
 		queryClient.invalidateQueries({ queryKey: ['retrospectives'] });
 		goto('/retrospectives');
@@ -90,8 +92,8 @@ function formatDate(s: string): string {
 }
 </script>
 
-<div class="container mx-auto max-w-3xl px-4 py-6">
-	<button class="btn btn-ghost btn-sm gap-2 mb-4" onclick={() => goto('/retrospectives')}>
+<div class="flex flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 max-w-3xl mx-auto w-full">
+	<button class="btn btn-ghost btn-sm gap-2 self-start" onclick={() => goto('/retrospectives')}>
 		<ArrowLeft class="h-4 w-4" />
 		Back
 	</button>
@@ -105,20 +107,29 @@ function formatDate(s: string): string {
 		/>
 	{:else if $retroQuery.data}
 		{@const retro = $retroQuery.data}
-		<div class="mb-6">
-			<h1 class="text-2xl font-bold capitalize">{retro.retro_type} Retrospective</h1>
-			<p class="text-sm opacity-70">
-				{formatDate(retro.start_date)} → {formatDate(retro.end_date)}
-				<span class="badge badge-sm ml-2" class:badge-success={retro.status === 'completed'}>
-					{retro.status}
-				</span>
-			</p>
+		<!-- Header -->
+		<div class="flex items-center gap-3.5">
+			<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+				<CalendarDays class="w-5.5 h-5.5" />
+			</div>
+			<div>
+				<h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight leading-tight capitalize">{retro.retro_type} Retrospective</h1>
+				<p class="text-sm text-base-content/55">
+					{formatDate(retro.start_date)} → {formatDate(retro.end_date)}
+					<span class="badge badge-sm ml-2" class:badge-success={retro.status === 'completed'}>
+						{retro.status}
+					</span>
+				</p>
+			</div>
 		</div>
 
 		{#if retro.auto_summary}
-			<div class="card bg-base-100 border border-base-200 mb-6">
-				<div class="card-body">
-					<h2 class="card-title text-base">Auto Summary</h2>
+			<div class="card bg-base-100 border border-base-200 shadow-sm">
+				<div class="card-body p-4 sm:p-5">
+					<h2 class="font-semibold text-[15px] flex items-center gap-2">
+						<Sparkles class="w-4 h-4 text-primary" />
+						Auto Summary
+					</h2>
 					{#if retro.auto_summary.insights && retro.auto_summary.insights.length > 0}
 						<ul class="list-disc pl-5 space-y-1 text-sm">
 							{#each retro.auto_summary.insights as insight}
@@ -126,15 +137,18 @@ function formatDate(s: string): string {
 							{/each}
 						</ul>
 					{:else}
-						<p class="text-sm opacity-70">No insights generated for this period.</p>
+						<p class="text-sm text-base-content/55">No insights generated for this period.</p>
 					{/if}
 				</div>
 			</div>
 		{/if}
 
-		<div class="card bg-base-100 border border-base-200">
-			<div class="card-body space-y-4">
-				<h2 class="card-title text-base">Your Reflection</h2>
+		<div class="card bg-base-100 border border-base-200 shadow-sm">
+			<div class="card-body p-4 sm:p-5 space-y-4">
+				<h2 class="font-semibold text-[15px] flex items-center gap-2">
+					<BookOpen class="w-4 h-4 text-secondary" />
+					Your Reflection
+				</h2>
 
 				<label class="form-control">
 					<span class="label-text font-medium">What went well?</span>
@@ -166,9 +180,9 @@ function formatDate(s: string): string {
 					<textarea class="textarea textarea-bordered" rows="3" bind:value={additionalNotes}></textarea>
 				</label>
 
-				<div class="flex gap-2 pt-4">
+				<div class="flex flex-wrap gap-2 pt-4">
 					<button
-						class="btn btn-outline gap-2"
+						class="btn btn-outline gap-2 flex-1 sm:flex-none"
 						disabled={$updateMutation.isPending}
 						onclick={() => handleSave(false)}
 					>
@@ -176,7 +190,7 @@ function formatDate(s: string): string {
 						Save Draft
 					</button>
 					<button
-						class="btn btn-primary gap-2"
+						class="btn btn-primary gap-2 flex-1 sm:flex-none"
 						disabled={$updateMutation.isPending}
 						onclick={() => handleSave(true)}
 					>
@@ -184,11 +198,11 @@ function formatDate(s: string): string {
 						Mark Complete
 					</button>
 					<button
-						class="btn btn-error btn-outline gap-2 ml-auto"
+						class="btn btn-error btn-outline gap-2 sm:ml-auto"
 						onclick={() => (showDeleteConfirm = true)}
 					>
 						<Trash2 class="h-4 w-4" />
-						Delete
+						<span class="hidden sm:inline">Delete</span>
 					</button>
 				</div>
 			</div>
