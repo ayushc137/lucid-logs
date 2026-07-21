@@ -2,6 +2,7 @@
 package models
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -36,6 +37,12 @@ func (r RecordID) String() string {
 
 func (r RecordID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.String())
+}
+
+// Value implements driver.Valuer so RecordID can be passed directly to
+// database/sql as a query parameter (stored as "table:id" string).
+func (r RecordID) Value() (driver.Value, error) {
+	return r.String(), nil
 }
 
 func (r *RecordID) UnmarshalJSON(data []byte) error {

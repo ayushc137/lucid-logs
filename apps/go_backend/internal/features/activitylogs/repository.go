@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
@@ -96,7 +97,7 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 		"entity_type":  req.EntityType,
 		"entity_id":    req.EntityID,
 		"event_type":   req.Event,
-		"changes":      changes,
+		"changes":      mustJSON(changes),
 		"entity_title": req.EntityTitle,
 		"entity_icon":  req.EntityIcon,
 		"created_by":   userID,
@@ -232,6 +233,18 @@ func (l *ActivityLogger) Log(ctx context.Context, entityType, entityID, entityTi
 		Changes:     changes,
 	}, userID)
 	return err
+}
+
+// mustJSON serializes a map to a JSON string for SQLite storage.
+func mustJSON(m map[string]any) string {
+	if m == nil {
+		return "{}"
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }
 
 // generateRecordID creates a new table:value record identifier.

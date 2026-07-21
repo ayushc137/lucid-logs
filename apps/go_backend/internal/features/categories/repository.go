@@ -207,7 +207,7 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
 	data := map[string]any{
-		"id":         categoryID,
+		"id":         database.ToStringID(categoryID),
 		"name":       req.Name,
 		"color":      req.Color,
 		"created_by": userID,
