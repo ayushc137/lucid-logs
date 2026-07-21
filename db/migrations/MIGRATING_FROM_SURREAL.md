@@ -146,3 +146,7 @@ system rows; imported rows are merged in idempotently (existing IDs skipped).
 - The legacy **`in_category`** edges are applied via UPDATE after core
   entities import; edges pointing at non-existent rows are logged as warnings
   and skipped.
+- Under **`--limit`** (sampling), relation rows whose parents were excluded by
+  the limit are logged as warnings and skipped instead of aborting the run —
+  sampling runs are for smoke-testing the pipeline, not for complete data.
+  Full runs (no `--limit`) stay strict: any FK violation fails the import.

@@ -209,10 +209,19 @@ The seed command calls the same repository/service/API paths used by the app. St
 
 ## Existing-data migration path
 
-Do not connect to or mutate the running demo database during cutover. Provide two explicit offline commands:
+Do not connect to or mutate the running demo database during cutover. The
+migration runs fully offline via one tool:
 
-1. `cmd/migrate-surreal export --input <Surreal JSON export> --output <neutral.json>` parses an operator-created export, converts record references to stable strings, validates every row, and writes a neutral versioned JSON bundle. It has no network client and therefore cannot modify the source.
-2. `cmd/migrate-surreal import --input <neutral.json>` validates all foreign keys, imports in dependency order inside one libSQL transaction, and supports `--dry-run`. It aborts and rolls back on validation or constraint failure.
+- `cmd/migrate-surreal-to-libsql` reads a JSON export produced with
+  `surreal sql --json` (never queries SurrealDB live), maps all 22 audited
+  tables/relations into the libSQL schema, and inserts idempotently
+  (`INSERT OR IGNORE`, record IDs preserved verbatim). Flags: `--dry-run`,
+  `--limit N` (per-table sampling), `--tables a,b,c`, `--v`. A final
+  validation report compares per-table source vs target counts and runs
+  `PRAGMA foreign_key_check`.
+
+The exact export invocation, flag reference, field-mapping table, and
+rollback steps are documented in `db/migrations/MIGRATING_FROM_SURREAL.md`.
 
 Demo-only data can be regenerated with the seeder, but this utility preserves a future production migration route.
 

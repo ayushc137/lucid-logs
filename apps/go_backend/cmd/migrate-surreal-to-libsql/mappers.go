@@ -17,6 +17,13 @@ import (
 //   - Nested objects/arrays become JSON TEXT columns.
 //   - `in`/`out` edge columns map to typed FK columns.
 
+// isFKError reports whether an insert error is a foreign-key constraint
+// violation. Under --limit (sampling) these are expected for rows whose
+// parents were excluded, and are downgraded to skip+warning by callers.
+func isFKError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "FOREIGN KEY constraint failed")
+}
+
 func (im *Importer) importUsers(ctx context.Context, rows []Row) error {
 	sum := im.sum("users")
 	sum.SourceRows = len(rows)
@@ -39,6 +46,11 @@ func (im *Importer) importUsers(ctx context.Context, rows []Row) error {
 				str(row, "updated_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("users", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -70,6 +82,11 @@ func (im *Importer) importCategories(ctx context.Context, rows []Row) error {
 				strPtr(row, "deleted_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("categories", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -106,6 +123,11 @@ func (im *Importer) importUnits(ctx context.Context, rows []Row) error {
 				strPtr(row, "deleted_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("units", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -147,6 +169,11 @@ func (im *Importer) importEmotions(ctx context.Context, rows []Row) error {
 				floatVal(row, "social"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("emotions", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -212,6 +239,11 @@ func (im *Importer) importGoals(ctx context.Context, rows []Row) error {
 				strPtr(row, "deleted_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("goals", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -276,6 +308,11 @@ func (im *Importer) importActivities(ctx context.Context, rows []Row) error {
 				strPtr(row, "deleted_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("activities", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -365,6 +402,11 @@ func (im *Importer) importTasks(ctx context.Context, rows []Row) error {
 				strPtr(row, "deleted_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("tasks", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -412,6 +454,11 @@ func (im *Importer) importRetrospectives(ctx context.Context, rows []Row) error 
 				strPtr(row, "deleted_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("retrospectives", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -458,6 +505,11 @@ func (im *Importer) importTimerSessions(ctx context.Context, rows []Row) error {
 				str(row, "updated_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("timer_sessions", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -494,8 +546,31 @@ func (im *Importer) applyInCategory(ctx context.Context, rows []Row) error {
 			sum.Inserted++
 			continue
 		}
+		// Skip gracefully when the target row isn't in the DB (e.g. it was
+		// excluded by --limit) — sampling runs shouldn't hard-fail on edges
+		// pointing at rows that were never imported.
+		var exists int
+		if err := im.db.SQL().QueryRowContext(ctx,
+			fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE id = ?", table), in).Scan(&exists); err != nil {
+			sum.Failed++
+			return fmt.Errorf("in_category -> %s: %w", table, err)
+		}
+		if exists == 0 {
+			im.warn("in_category", "edge %s -> %s: target row not found", in, out)
+			sum.Skipped++
+			continue
+		}
+		var catExists int
+		if err := im.db.SQL().QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM categories WHERE id = ?", out).Scan(&catExists); err != nil || catExists == 0 {
+			im.warn("in_category", "edge %s -> %s: category not found", in, out)
+			sum.Skipped++
+			continue
+		}
+		// Idempotent: only count as applied when the category actually
+		// changes; re-runs over an already-migrated DB count as skipped.
 		res, err := im.db.SQL().ExecContext(ctx,
-			fmt.Sprintf("UPDATE %s SET category_id = ? WHERE id = ?", table), out, in)
+			fmt.Sprintf("UPDATE %s SET category_id = ? WHERE id = ? AND (category_id IS NULL OR category_id != ?)", table), out, in, out)
 		if err != nil {
 			sum.Failed++
 			return fmt.Errorf("in_category -> %s: %w", table, err)
@@ -504,7 +579,6 @@ func (im *Importer) applyInCategory(ctx context.Context, rows []Row) error {
 		if n > 0 {
 			sum.Inserted++
 		} else {
-			im.warn("in_category", "edge %s -> %s: target row not found", in, out)
 			sum.Skipped++
 		}
 	}
@@ -524,6 +598,11 @@ func (im *Importer) importTaskEmotions(ctx context.Context, rows []Row) error {
 			[]string{"id", "task_id", "emotion_id", "type", "text", "created_at"},
 			[]any{id, in, out, str(row, "type"), strPtr(row, "text"), str(row, "created_at")})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("task_emotions", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -561,6 +640,11 @@ func (im *Importer) importTaskGoals(ctx context.Context, rows []Row) error {
 				str(row, "created_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("task_goals", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -582,6 +666,11 @@ func (im *Importer) importCreatedFromActivity(ctx context.Context, rows []Row) e
 			[]string{"task_id", "activity_id", "mode", "created_at"},
 			[]any{in, out, orDefault(str(row, "mode"), "instant"), str(row, "created_at")})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("created_from_activity", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -620,6 +709,11 @@ func (im *Importer) importActivityGoals(ctx context.Context, rows []Row) error {
 				str(row, "created_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("activity_goals", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -647,6 +741,11 @@ func (im *Importer) importGoalChildren(ctx context.Context, rows []Row) error {
 			[]string{"parent_goal_id", "child_goal_id", "sort_order", "required", "created_at"},
 			[]any{in, out, sortOrder, required, str(row, "created_at")})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("goal_children", "%s -> %s skipped (parent excluded by --limit)", in, out)
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -749,6 +848,11 @@ func (im *Importer) importGoalSnapshots(ctx context.Context, rows []Row) error {
 			[]string{"id", "goal_id", "created_by", "snapshot", "created_at"},
 			[]any{id, goalID, str(row, "created_by"), string(snapBytes), str(row, "created_at")})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("goal_snapshots", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -792,6 +896,11 @@ func (im *Importer) importGoalLogs(ctx context.Context, rows []Row) error {
 				str(row, "created_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("goal_logs", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -826,6 +935,11 @@ func (im *Importer) importGoalDailyStats(ctx context.Context, rows []Row) error 
 				str(row, "updated_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("goal_daily_stats", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -860,6 +974,11 @@ func (im *Importer) importGoalPeriodSnapshots(ctx context.Context, rows []Row) e
 				jsonTextOr(row, "snapshot", "{}"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("goal_period_snapshots", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -892,6 +1011,11 @@ func (im *Importer) importStreakHistory(ctx context.Context, rows []Row) error {
 				str(row, "created_at"),
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("streak_history", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
@@ -940,6 +1064,11 @@ func (im *Importer) importAggDaily(ctx context.Context, rows []Row) error {
 				metrics,
 			})
 		if err != nil {
+			if im.limit > 0 && isFKError(err) {
+				im.warn("agg_daily", "row skipped (parent excluded by --limit)")
+				sum.Skipped++
+				continue
+			}
 			sum.Failed++
 			return err
 		}
