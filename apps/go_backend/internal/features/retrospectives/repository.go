@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
@@ -100,12 +101,22 @@ func (r *retroDB) toRetrospective() *Retrospective {
 	// Parse auto_summary and user_content from any
 	// They're stored as JSON TEXT columns in SQLite
 	if r.AutoSummary != nil {
-		if summary, ok := r.AutoSummary.(map[string]interface{}); ok {
+		if raw, ok := r.AutoSummary.(string); ok && raw != "" {
+			var summary RetroAutoSummary
+			if err := json.Unmarshal([]byte(raw), &summary); err == nil {
+				retro.AutoSummary = summary
+			}
+		} else if summary, ok := r.AutoSummary.(map[string]interface{}); ok {
 			retro.AutoSummary = parseAutoSummary(summary)
 		}
 	}
 	if r.UserContent != nil {
-		if content, ok := r.UserContent.(map[string]interface{}); ok {
+		if raw, ok := r.UserContent.(string); ok && raw != "" {
+			var content UserReflection
+			if err := json.Unmarshal([]byte(raw), &content); err == nil {
+				retro.UserContent = content
+			}
+		} else if content, ok := r.UserContent.(map[string]interface{}); ok {
 			retro.UserContent = parseUserContent(content)
 		}
 	}
@@ -206,21 +217,32 @@ func (r *repository) Create(ctx context.Context, retro *Retrospective) (*Retrosp
 	retroID := generateRecordID()
 	now := time.Now().UTC()
 
+	autoSummaryJSON, err := json.Marshal(retro.AutoSummary)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("marshal auto_summary failed")
+		return nil, err
+	}
+	userContentJSON, err := json.Marshal(retro.UserContent)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("marshal user_content failed")
+		return nil, err
+	}
+
 	createData := map[string]any{
 		"id":           database.ToStringID(retroID),
 		"created_by":   retro.CreatedBy,
 		"retro_type":   retro.RetroType,
 		"start_date":   retro.StartDate,
 		"end_date":     retro.EndDate,
-		"auto_summary": retro.AutoSummary,
-		"user_content": retro.UserContent,
+		"auto_summary": string(autoSummaryJSON),
+		"user_content": string(userContentJSON),
 		"status":       retro.Status,
 		"generated_at": retro.GeneratedAt,
 		"created_at":   now,
 		"updated_at":   now,
 	}
 
-	_, err := database.Create[retroDB](ctx, r.db, Table, createData)
+	_, err = database.Create[retroDB](ctx, r.db, Table, createData)
 	if err != nil {
 		r.logger.Error().Err(err).Msg("create retrospective failed")
 		return nil, err
@@ -252,7 +274,12 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	}
 
 	if req.UserContent != nil {
-		updateData["user_content"] = req.UserContent
+		userContentJSON, err := json.Marshal(req.UserContent)
+		if err != nil {
+			r.logger.Error().Err(err).Msg("marshal user_content failed")
+			return nil, err
+		}
+		updateData["user_content"] = string(userContentJSON)
 	}
 	if req.Status != nil {
 		updateData["status"] = *req.Status
