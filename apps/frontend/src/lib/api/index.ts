@@ -200,6 +200,8 @@ export {
 // Analytics
 export {
 	getAnalyticsDashboard,
+	getAnalyticsStreaks,
+	getActivityHeatmap,
 	type DashboardResponse,
 	type TaskMetrics,
 	type EmotionMetrics,
@@ -210,4 +212,7 @@ export {
 	type DailyMood,
 	type GoalProgressItem,
 	type StreakInfo,
+	type StreaksResponse,
+	type ActivityHeatmapDay,
+	type ActivityHeatmapResponse,
 } from './analytics';

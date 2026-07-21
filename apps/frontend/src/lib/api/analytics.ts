@@ -20,6 +20,7 @@ export interface TaskMetrics {
 	avg_task_duration_minutes: number;
 	velocity: number;
 	peak_hours: number[];
+	focus_score: number;
 	by_category?: CategoryBreakdown[];
 }
 
@@ -108,9 +109,43 @@ export interface DashboardResponse {
 	categories: CategoryMetrics;
 }
 
+export interface StreaksResponse {
+	total_current_streak_days: number;
+	longest_streak_ever: number;
+	active_streaks: StreakInfo[];
+}
+
+export interface ActivityHeatmapDay {
+	date: string;
+	count: number;
+	minutes: number;
+	has_entry: boolean;
+	intensity: number;
+}
+
+export interface ActivityHeatmapResponse {
+	days: ActivityHeatmapDay[];
+	total_days: number;
+	days_logged: number;
+	current_streak: number;
+	longest_streak: number;
+}
+
 // ===== API FUNCTIONS =====
 
 export async function getAnalyticsDashboard(period?: string): Promise<DashboardResponse> {
 	const query = period ? `?period=${period}` : '';
 	return unwrap(api.get(`analytics/dashboard${query}`));
+}
+
+export async function getAnalyticsStreaks(): Promise<StreaksResponse> {
+	return unwrap(api.get('analytics/streaks'));
+}
+
+export async function getActivityHeatmap(params?: { start_date?: string; end_date?: string }): Promise<ActivityHeatmapResponse> {
+	const searchParams = new URLSearchParams();
+	if (params?.start_date) searchParams.set('start_date', params.start_date);
+	if (params?.end_date) searchParams.set('end_date', params.end_date);
+	const query = searchParams.toString();
+	return unwrap(api.get(`analytics/activity-heatmap${query ? `?${query}` : ''}`));
 }
