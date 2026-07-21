@@ -36,6 +36,9 @@ type Repository interface {
 	// Update updates a retrospective.
 	Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Retrospective, error)
 
+	// UpdateAutoSummary updates just the auto_summary JSON for a retrospective.
+	UpdateAutoSummary(ctx context.Context, id, userID string, summary RetroAutoSummary) (*Retrospective, error)
+
 	// Delete soft-deletes a retrospective.
 	Delete(ctx context.Context, id, userID string) error
 }
@@ -294,9 +297,32 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 	return r.FindByID(ctx, id, userID)
 }
 
-// =============================================================================
-// DELETE OPERATION
-// =============================================================================
+func (r *repository) UpdateAutoSummary(ctx context.Context, id, userID string, summary RetroAutoSummary) (*Retrospective, error) {
+	_, err := r.FindByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	retroID := database.MustRecordID(Table, id)
+	now := time.Now().UTC()
+
+	summaryJSON, err := json.Marshal(summary)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("marshal auto_summary failed")
+		return nil, err
+	}
+
+	_, err = database.Merge[retroDB](ctx, r.db, database.ToStringID(retroID), map[string]any{
+		"auto_summary": string(summaryJSON),
+		"updated_at":   now,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Str("retro_id", id).Msg("update auto_summary failed")
+		return nil, err
+	}
+
+	return r.FindByID(ctx, id, userID)
+}
 
 func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	_, err := r.FindByID(ctx, id, userID)

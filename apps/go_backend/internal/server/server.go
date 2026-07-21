@@ -200,7 +200,7 @@ func NewRouter(cfg Config) *gin.Engine {
 
 			// Retrospectives routes
 			retroRepo := retrospectives.NewRepository(cfg.DB)
-			retroService := retrospectives.NewService(retroRepo, analyticsRepo)
+			retroService := retrospectives.NewService(retroRepo, analyticsRepo, userRepo)
 			retrospectives.RegisterRoutes(protected.Group("/retrospectives"), retroService, cfg.Validator)
 		}
 	}

@@ -129,6 +129,13 @@ func (r *repository) UpdatePreferences(ctx context.Context, id string, req *Upda
 	if req.Timezone != nil {
 		prefs.Timezone = *req.Timezone
 	}
+	if req.AI != nil {
+		// Preserve existing API key if new key is empty (user didn't change it)
+		if req.AI.APIKey == "" && prefs.AI != nil && prefs.AI.APIKey != "" {
+			req.AI.APIKey = prefs.AI.APIKey
+		}
+		prefs.AI = req.AI
+	}
 	encoded, err := json.Marshal(prefs)
 	if err != nil {
 		return nil, errors.ErrInternal.Wrap(err)

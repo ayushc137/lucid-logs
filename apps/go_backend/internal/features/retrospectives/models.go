@@ -57,7 +57,8 @@ type RetroAutoSummary struct {
 	Tasks      TasksSummary      `json:"tasks"`
 	Goals      GoalsSummary      `json:"goals"`
 	Categories CategoriesSummary `json:"categories"`
-	Insights   []string          `json:"insights,omitempty"` // AI-generated insights (future)
+	Insights   []string          `json:"insights,omitempty"`         // AI-generated insights
+	AINarrative string           `json:"ai_narrative,omitempty"`     // AI-generated narrative paragraph
 }
 
 // MoodSummary contains emotion analysis for the period.

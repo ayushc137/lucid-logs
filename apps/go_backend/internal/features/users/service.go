@@ -14,6 +14,7 @@ import (
 type Service interface {
 	Get(ctx context.Context, requesterID, targetID string) (*User, error)
 	Update(ctx context.Context, requesterID, targetID string, req *UpdateRequest) (*User, error)
+	UpdatePreferences(ctx context.Context, requesterID, targetID string, req *UpdatePreferencesRequest) (*User, error)
 	Delete(ctx context.Context, requesterID, targetID string) error
 }
 
@@ -88,6 +89,31 @@ func (s *service) Update(ctx context.Context, requesterID, targetID string, req 
 	}
 
 	return target, nil
+}
+
+func (s *service) UpdatePreferences(ctx context.Context, requesterID, targetID string, req *UpdatePreferencesRequest) (*User, error) {
+	requester, target, err := s.fetchAndAuthorize(ctx, requesterID, targetID)
+	if err != nil {
+		return nil, err
+	}
+
+	if requester.ID != target.ID && !requester.IsAdmin {
+		return nil, errors.ErrForbidden.WithMessage("Only the user themselves can update their preferences")
+	}
+
+	updated, err := s.repo.UpdatePreferences(ctx, target.ID, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Strip API key before returning
+	updated.Preferences.AI = SafeAISettings(updated.Preferences.AI)
+
+	s.logger.Info().
+		Str("user_id", target.ID).
+		Msg("preferences updated")
+
+	return updated, nil
 }
 
 func (s *service) Delete(ctx context.Context, requesterID, targetID string) error {

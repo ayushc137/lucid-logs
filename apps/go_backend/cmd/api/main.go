@@ -131,7 +131,7 @@ func main() {
 	userRepo := users.NewRepository(db)
 	retroRepo := retrospectives.NewRepository(db)
 	analyticsRepo := analytics.NewRepository(db)
-	retroService := retrospectives.NewService(retroRepo, analyticsRepo)
+	retroService := retrospectives.NewService(retroRepo, analyticsRepo, userRepo)
 
 	sched, err := scheduler.New(scheduler.Config{
 		RetroService: retroService,

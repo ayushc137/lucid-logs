@@ -24,6 +24,7 @@ func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validatorpkg
 	h := NewHandler(service, validator)
 
 	r.GET("/me", h.Me)
+	r.PUT("/me/preferences", h.UpdatePreferences)
 	r.GET("/:id", h.Get)
 	r.PATCH("/:id", h.Update)
 	r.DELETE("/:id", h.Delete)
@@ -42,6 +43,9 @@ func (h *Handler) Me(c *gin.Context) {
 		response.ErrorFromErr(c, err)
 		return
 	}
+
+	// Strip API key from AI settings
+	user.Preferences.AI = SafeAISettings(user.Preferences.AI)
 
 	response.OK(c, user)
 }
@@ -62,6 +66,32 @@ func (h *Handler) Get(c *gin.Context) {
 
 	user, err := h.service.Get(c.Request.Context(), authUser.UserID, id)
 	// service enforces permissions
+	if err != nil {
+		response.ErrorFromErr(c, err)
+		return
+	}
+
+	// Strip API key from AI settings
+	user.Preferences.AI = SafeAISettings(user.Preferences.AI)
+
+	response.OK(c, user)
+}
+
+// UpdatePreferences handles PUT /users/me/preferences
+func (h *Handler) UpdatePreferences(c *gin.Context) {
+	authUser, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	var req UpdatePreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid JSON body")
+		return
+	}
+
+	user, err := h.service.UpdatePreferences(c.Request.Context(), authUser.UserID, authUser.UserID, &req)
 	if err != nil {
 		response.ErrorFromErr(c, err)
 		return

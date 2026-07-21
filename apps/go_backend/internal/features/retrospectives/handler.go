@@ -48,6 +48,7 @@ func RegisterRoutes(rg *gin.RouterGroup, service Service, validator *validator.V
 	rg.GET("", h.List)
 	rg.GET("/:id", h.Get)
 	rg.POST("/generate", h.Generate)
+	rg.POST("/:id/regenerate-insights", h.RegenerateInsights)
 	rg.PUT("/:id", h.Update)
 	rg.DELETE("/:id", h.Delete)
 }
@@ -222,6 +223,35 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	response.Message(c, http.StatusOK, "Retrospective deleted")
+}
+
+// RegenerateInsights godoc
+// @Summary Regenerate AI insights
+// @Description Re-runs AI insight generation for an existing retrospective
+// @Tags Retrospectives
+// @Produce json
+// @Param id path string true "Retrospective ID"
+// @Success 200 {object} Retrospective
+// @Failure 401 {object} response.APIResponse
+// @Failure 404 {object} response.APIResponse
+// @Security BearerAuth
+// @Router /api/v1/retrospectives/{id}/regenerate-insights [post]
+func (h *Handler) RegenerateInsights(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	id := c.Param("id")
+
+	retro, err := h.service.RegenerateInsights(c.Request.Context(), id, user.UserID)
+	if err != nil {
+		handleRetroError(c, err)
+		return
+	}
+
+	response.OK(c, retro)
 }
 
 // =============================================================================

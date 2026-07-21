@@ -25,6 +25,30 @@ type UserPreferences struct {
 	WeeklyRetroDay  string              `json:"weekly_retro_day,omitempty"`  // "sunday", "monday", etc.
 	MonthlyRetroDay int                 `json:"monthly_retro_day,omitempty"` // 1-31
 	Timezone        string              `json:"timezone,omitempty"`          // Default timezone
+	AI              *AISettings         `json:"ai,omitempty"`
+}
+
+// AISettings contains per-user LLM configuration for retro insights.
+type AISettings struct {
+	Enabled  bool   `json:"enabled"`
+	Provider string `json:"provider"`            // preset key or "custom"
+	BaseURL  string `json:"base_url,omitempty"`  // custom only
+	APIKey   string `json:"api_key,omitempty"`   // write-only — never serialized on GET paths
+	Model    string `json:"model"`
+	// HasKey is set when constructing GET responses; not stored in DB.
+	HasKey bool `json:"has_key,omitempty"`
+}
+
+// SafeAISettings returns a copy of the settings suitable for API GET responses:
+// the API key is stripped and HasKey is set.
+func SafeAISettings(ai *AISettings) *AISettings {
+	if ai == nil {
+		return nil
+	}
+	clone := *ai
+	clone.HasKey = ai.APIKey != ""
+	clone.APIKey = ""
+	return &clone
 }
 
 // DailyRetroSettings controls automatic daily retro generation.
@@ -55,6 +79,7 @@ type preferencesDB struct {
 	WeeklyRetroDay  string              `json:"weekly_retro_day,omitempty"`
 	MonthlyRetroDay int                 `json:"monthly_retro_day,omitempty"`
 	Timezone        string              `json:"timezone,omitempty"`
+	AI              *AISettings         `json:"ai,omitempty"`
 }
 
 // toUser converts the database model to the domain model.
@@ -76,6 +101,7 @@ func (u *userDB) toUser() *User {
 			WeeklyRetroDay:  u.Preferences.WeeklyRetroDay,
 			MonthlyRetroDay: u.Preferences.MonthlyRetroDay,
 			Timezone:        u.Preferences.Timezone,
+			AI:              u.Preferences.AI,
 		}
 	}
 
@@ -96,4 +122,5 @@ type UpdatePreferencesRequest struct {
 	WeeklyRetroDay  *string             `json:"weekly_retro_day,omitempty"`
 	MonthlyRetroDay *int                `json:"monthly_retro_day,omitempty" validate:"omitempty,min=1,max=31"`
 	Timezone        *string             `json:"timezone,omitempty"`
+	AI              *AISettings         `json:"ai,omitempty"`
 }

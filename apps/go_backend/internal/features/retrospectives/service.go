@@ -2,13 +2,18 @@ package retrospectives
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/lucid-logs/go-backend/internal/features/analytics"
+	"github.com/lucid-logs/go-backend/internal/features/users"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
+	"github.com/lucid-logs/go-backend/internal/shared/llm"
 	"github.com/lucid-logs/go-backend/internal/shared/pagination"
 )
 
@@ -38,6 +43,9 @@ type Service interface {
 
 	// ExistsForToday checks if a retro exists for today.
 	ExistsForToday(ctx context.Context, userID string) (bool, error)
+
+	// RegenerateInsights re-runs just the AI insight generation for an existing retro.
+	RegenerateInsights(ctx context.Context, id, userID string) (*Retrospective, error)
 }
 
 // =============================================================================
@@ -47,14 +55,16 @@ type Service interface {
 type service struct {
 	repo          Repository
 	analyticsRepo analytics.Repository
+	userRepo      users.Repository
 	logger        zerolog.Logger
 }
 
 // NewService creates a new retrospectives Service.
-func NewService(repo Repository, analyticsRepo analytics.Repository) Service {
+func NewService(repo Repository, analyticsRepo analytics.Repository, userRepo users.Repository) Service {
 	return &service{
 		repo:          repo,
 		analyticsRepo: analyticsRepo,
+		userRepo:      userRepo,
 		logger:        log.With().Str("service", "retrospectives").Logger(),
 	}
 }
@@ -118,6 +128,9 @@ func (s *service) Generate(ctx context.Context, userID string, req *GenerateRequ
 		// Continue with empty summary rather than failing
 		autoSummary = RetroAutoSummary{}
 	}
+
+	// Enhance with AI insights if enabled
+	s.enhanceWithAI(ctx, userID, &autoSummary)
 
 	retro := &Retrospective{
 		CreatedBy:   userID,
@@ -340,4 +353,186 @@ func (s *service) resolveDateRange(req *GenerateRequest) (start, end time.Time) 
 		end := start.Add(24 * time.Hour).Add(-time.Second)
 		return start, end
 	}
+}
+
+// =============================================================================
+// AI INSIGHT GENERATION
+// =============================================================================
+
+// enhanceWithAI enriches the auto summary with AI-generated insights and narrative
+// if the user has AI enabled with a valid API key. No-op otherwise (no error).
+func (s *service) enhanceWithAI(ctx context.Context, userID string, summary *RetroAutoSummary) {
+	aiSettings, err := s.getAIConfig(ctx, userID)
+	if err != nil || aiSettings == nil {
+		return // AI not configured — silently skip
+	}
+
+	insights, narrative, err := s.generateAIInsights(ctx, aiSettings, summary)
+	if err != nil {
+		s.logger.Warn().Err(err).Msg("AI insight generation failed, continuing without AI")
+		return
+	}
+
+	summary.Insights = insights
+	summary.AINarrative = narrative
+}
+
+// getAIConfig fetches and validates the user's AI settings, returning a ready-to-use LLM client.
+func (s *service) getAIConfig(ctx context.Context, userID string) (*llm.Client, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	ai := user.Preferences.AI
+	if ai == nil || !ai.Enabled || ai.APIKey == "" {
+		return nil, nil
+	}
+
+	baseURL := llm.ResolveBaseURL(ai.Provider, ai.BaseURL)
+	if baseURL == "" {
+		return nil, fmt.Errorf("no base URL configured for provider %s", ai.Provider)
+	}
+
+	model := ai.Model
+	if model == "" {
+		model = llm.DefaultModelFor(ai.Provider)
+	}
+
+	return llm.NewClient(baseURL, ai.APIKey, model), nil
+}
+
+// generateAIInsights calls the LLM with structured retro data and returns insights + narrative.
+func (s *service) generateAIInsights(ctx context.Context, client *llm.Client, summary *RetroAutoSummary) ([]string, string, error) {
+	// Build a compact JSON representation of the summary stats
+	summaryData := buildPromptData(summary)
+	summaryJSON, _ := json.Marshal(summaryData)
+
+	systemPrompt := `You are a thoughtful retrospective assistant for a personal journaling app.
+Analyze the user's period summary data and provide actionable, specific insights.
+Return your response as a JSON object with this exact structure:
+{"insights": ["insight 1", "insight 2", ...], "narrative": "a short 2-3 sentence narrative paragraph"}
+Provide 3-6 concrete, specific insights. Each insight should reference specific data points.
+The narrative should be a warm, honest reflection on the period.
+Return ONLY valid JSON, no markdown fences or extra text.`
+
+	userPrompt := fmt.Sprintf("Here is my period summary data:\n\n%s\n\nAnalyze this and provide insights and a narrative.", string(summaryJSON))
+
+	messages := []llm.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userPrompt},
+	}
+
+	result, err := client.Complete(ctx, messages)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Parse JSON response
+	type aiResponse struct {
+		Insights  []string `json:"insights"`
+		Narrative string   `json:"narrative"`
+	}
+
+	// Strip markdown fences if present
+	cleaned := strings.TrimSpace(result)
+	cleaned = strings.TrimPrefix(cleaned, "```json")
+	cleaned = strings.TrimPrefix(cleaned, "```")
+	cleaned = strings.TrimSuffix(cleaned, "```")
+	cleaned = strings.TrimSpace(cleaned)
+
+	var resp aiResponse
+	if err := json.Unmarshal([]byte(cleaned), &resp); err != nil {
+		// If JSON parse fails, use the raw text as narrative and skip insights
+		s.logger.Warn().Err(err).Msg("failed to parse AI response as JSON, using raw text")
+		return nil, cleaned, nil
+	}
+
+	return resp.Insights, resp.Narrative, nil
+}
+
+// buildPromptData creates a compact data structure for the LLM prompt.
+func buildPromptData(summary *RetroAutoSummary) map[string]any {
+	data := map[string]any{}
+
+	// Mood stats
+	data["mood"] = map[string]any{
+		"average_valence":    summary.Mood.AverageValence,
+		"average_arousal":    summary.Mood.AverageArousal,
+		"dominant_quadrant":  summary.Mood.DominantQuadrant,
+		"quadrant_dist":      summary.Mood.QuadrantDistribution,
+		"notable_spikes":     summary.Mood.NotableSpikes,
+		"notable_dips":       summary.Mood.NotableDips,
+	}
+
+	// Task stats
+	data["tasks"] = map[string]any{
+		"completed":           summary.Tasks.Completed,
+		"postponed":           summary.Tasks.Postponed,
+		"canceled":            summary.Tasks.Canceled,
+		"total_duration_hours": summary.Tasks.TotalDurationHours,
+		"by_category":         summary.Tasks.ByCategory,
+	}
+
+	// Categories
+	cats := []map[string]any{}
+	for _, c := range summary.Categories.TimeDistribution {
+		cats = append(cats, map[string]any{
+			"category":  c.Category,
+			"hours":     c.Hours,
+			"percentage": c.Percentage,
+		})
+	}
+	data["categories"] = cats
+
+	// Habits
+	data["habits"] = map[string]any{
+		"met":           summary.Habits.Met,
+		"partially_met": summary.Habits.PartiallyMet,
+		"missed":        summary.Habits.Missed,
+		"streaks":       summary.Habits.Streaks,
+	}
+
+	// Goals
+	data["goals"] = map[string]any{
+		"net_impact":             summary.Goals.NetImpact,
+		"significantly_advanced": summary.Goals.SignificantlyAdvanced,
+		"negatively_impacted":    summary.Goals.NegativelyImpacted,
+	}
+
+	return data
+}
+
+// RegenerateInsights re-runs AI insight generation for an existing retrospective.
+func (s *service) RegenerateInsights(ctx context.Context, id, userID string) (*Retrospective, error) {
+	retro, err := s.repo.FindByID(ctx, id, userID)
+	if err != nil {
+		if errors.Is(err, errors.ErrNotFound) {
+			return nil, errors.ErrNotFound
+		}
+		return nil, err
+	}
+
+	client, err := s.getAIConfig(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if client == nil {
+		// AI not configured — return the retro as-is (no error)
+		return retro, nil
+	}
+
+	// Clear existing AI content
+	retro.AutoSummary.Insights = nil
+	retro.AutoSummary.AINarrative = ""
+
+	insights, narrative, err := s.generateAIInsights(ctx, client, &retro.AutoSummary)
+	if err != nil {
+		s.logger.Warn().Err(err).Msg("regenerate insights failed")
+		return nil, errors.ErrInternal.WithMessage("Failed to generate AI insights: " + err.Error())
+	}
+
+	retro.AutoSummary.Insights = insights
+	retro.AutoSummary.AINarrative = narrative
+
+	return s.repo.UpdateAutoSummary(ctx, id, userID, retro.AutoSummary)
 }
