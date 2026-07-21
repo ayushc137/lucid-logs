@@ -81,12 +81,11 @@ func main() {
 
 	ctx := context.Background()
 	db, err := database.New(ctx, database.Config{
-		URL:        cfg.Database.WebSocketURL(),
-		Namespace:  cfg.Database.Namespace,
-		Database:   cfg.Database.Database,
-		Username:   cfg.Database.User,
-		Password:   cfg.Database.Password,
-		LogQueries: cfg.IsDev(),
+		URL:            cfg.Database.Path,
+		RemoteURL:      cfg.Database.URL,
+		AuthToken:      cfg.Database.AuthToken,
+		MigrationsPath: cfg.Database.MigrationsPath,
+		LogQueries:     cfg.IsDev(),
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")

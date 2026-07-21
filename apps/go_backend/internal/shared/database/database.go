@@ -18,7 +18,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/surrealdb/surrealdb.go/pkg/models"
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 	turso "turso.tech/database/tursogo"
 )
 
@@ -45,6 +45,11 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	path := cfg.URL
 	if path == "" {
 		path = "./data/lucid-logs.db"
+	}
+	// The old tests and callers used SQLite's file::memory: URI. Turso's local
+	// driver expects :memory: and otherwise treats the URI as a literal filename.
+	if strings.HasPrefix(path, "file::memory:") {
+		path = ":memory:"
 	}
 	if path != ":memory:" && !strings.HasPrefix(path, "file:") {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -217,6 +222,7 @@ func QueryAll[T any](ctx context.Context, db *DB, query string, vars map[string]
 		return nil, err
 	}
 	result := make([]T, 0)
+	boolColumns := booleanJSONFields[T]()
 	for rows.Next() {
 		values := make([]any, len(columns))
 		pointers := make([]any, len(columns))
@@ -232,6 +238,20 @@ func QueryAll[T any](ctx context.Context, db *DB, query string, vars map[string]
 			if b, ok := value.([]byte); ok {
 				value = string(b)
 			}
+			if text, ok := value.(string); ok && json.Valid([]byte(text)) {
+				var decoded any
+				if err := json.Unmarshal([]byte(text), &decoded); err == nil {
+					value = decoded
+				}
+			}
+			if boolColumns[column] {
+				switch number := value.(type) {
+				case int64:
+					value = number != 0
+				case float64:
+					value = number != 0
+				}
+			}
 			mapped[column] = value
 		}
 		encoded, err := json.Marshal(mapped)
@@ -245,6 +265,35 @@ func QueryAll[T any](ctx context.Context, db *DB, query string, vars map[string]
 		result = append(result, item)
 	}
 	return result, rows.Err()
+}
+
+func booleanJSONFields[T any]() map[string]bool {
+	result := map[string]bool{}
+	typ := reflect.TypeOf((*T)(nil)).Elem()
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return result
+	}
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fieldType := field.Type
+		for fieldType.Kind() == reflect.Pointer {
+			fieldType = fieldType.Elem()
+		}
+		if fieldType.Kind() != reflect.Bool {
+			continue
+		}
+		name := strings.Split(field.Tag.Get("json"), ",")[0]
+		if name == "" {
+			name = field.Name
+		}
+		if name != "-" {
+			result[name] = true
+		}
+	}
+	return result
 }
 
 func QueryFirst[T any](ctx context.Context, db *DB, query string, vars map[string]any) (*T, error) {
@@ -279,6 +328,79 @@ func QueryScalar[T any](ctx context.Context, db *DB, query string, vars map[stri
 	return out, nil
 }
 
+// Select retrieves a record by its table:value primary key.
+func Select[T any](ctx context.Context, db *DB, recordID string) (*T, error) {
+	table, _ := ParseRecordID(recordID)
+	if !identifier.MatchString(table) {
+		return nil, fmt.Errorf("invalid table %q", table)
+	}
+	return QueryFirst[T](ctx, db, "SELECT * FROM "+table+" WHERE id = :record_id", map[string]any{"record_id": recordID})
+}
+
+// Delete deletes a record by primary key. Entity repositories should prefer soft deletes.
+func Delete[T any](ctx context.Context, db *DB, recordID string) (*T, error) {
+	item, err := Select[T](ctx, db, recordID)
+	if err != nil || item == nil {
+		return item, err
+	}
+	table, _ := ParseRecordID(recordID)
+	if _, err := db.sql.ExecContext(ctx, "DELETE FROM "+table+" WHERE id = ?", recordID); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+// Merge updates allowlisted column names and returns the resulting record.
+func Merge[T any](ctx context.Context, db *DB, recordID string, values map[string]any) (*T, error) {
+	table, _ := ParseRecordID(recordID)
+	if !identifier.MatchString(table) {
+		return nil, fmt.Errorf("invalid table %q", table)
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		if !identifier.MatchString(key) {
+			return nil, fmt.Errorf("invalid column %q", key)
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	assignments := make([]string, 0, len(keys))
+	args := make([]any, 0, len(keys)+1)
+	for _, key := range keys {
+		value := values[key]
+		switch value.(type) {
+		case nil, string, []byte, bool, int, int64, float64, time.Time:
+		default:
+			encoded, err := json.Marshal(value)
+			if err != nil {
+				return nil, err
+			}
+			value = string(encoded)
+		}
+		if timestamp, ok := value.(time.Time); ok {
+			value = timestamp.UTC().Format(time.RFC3339Nano)
+		}
+		assignments = append(assignments, key+" = ?")
+		args = append(args, value)
+	}
+	if len(assignments) == 0 {
+		return Select[T](ctx, db, recordID)
+	}
+	args = append(args, recordID)
+	if _, err := db.sql.ExecContext(ctx, "UPDATE "+table+" SET "+strings.Join(assignments, ", ")+" WHERE id = ?", args...); err != nil {
+		return nil, err
+	}
+	return Select[T](ctx, db, recordID)
+}
+
+var identifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// ExtractID strips the optional table prefix from an API record ID.
+func ExtractID(value string) string {
+	_, id := ParseRecordID(value)
+	return id
+}
+
 // Record ID helpers remain during the repository migration to preserve table:value API IDs.
 func ToStringID(rid models.RecordID) string { return rid.String() }
 func MustRecordID(table, raw string) models.RecordID {
@@ -302,4 +424,42 @@ func RecordID(table, raw string) string {
 		return raw
 	}
 	return table + ":" + raw
+}
+
+// ParseRecordID separates the optional table prefix from an API record ID.
+func ParseRecordID(value string) (table, id string) {
+	parts := strings.SplitN(value, ":", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return "", value
+}
+
+// Create inserts a row using validated identifiers and returns it by its id.
+func Create[T any](ctx context.Context, db *DB, table string, data map[string]any) (*T, error) {
+	if !identifier.MatchString(table) {
+		return nil, fmt.Errorf("invalid table %q", table)
+	}
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		if !identifier.MatchString(key) {
+			return nil, fmt.Errorf("invalid column %q", key)
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	placeholders := make([]string, len(keys))
+	args := make([]any, len(keys))
+	for i, key := range keys {
+		placeholders[i] = "?"
+		args[i] = data[key]
+	}
+	if _, err := db.sql.ExecContext(ctx, "INSERT INTO "+table+"("+strings.Join(keys, ",")+") VALUES("+strings.Join(placeholders, ",")+")", args...); err != nil {
+		return nil, err
+	}
+	id, ok := data["id"]
+	if !ok {
+		return nil, fmt.Errorf("create %s requires an id", table)
+	}
+	return Select[T](ctx, db, fmt.Sprint(id))
 }

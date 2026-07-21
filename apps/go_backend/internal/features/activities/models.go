@@ -80,10 +80,10 @@ type Activity struct {
 // @Description Link configuration for activity-goal relationship
 type ActivityGoalLink struct {
 	GoalID             string   `json:"goal_id"`
-	AutoLinkTasks      bool     `json:"auto_link_tasks"`                // Auto-link tasks to this goal
-	QuantityMultiplier float64  `json:"quantity_multiplier"`            // Multiply quantity when linking
-	DefaultQuantity    *float64 `json:"default_quantity,omitempty"`     // Default quantity for this goal (unit from goal's target)
-	DefaultImpact      string   `json:"default_impact"`                 // Override impact type
+	AutoLinkTasks      bool     `json:"auto_link_tasks"`            // Auto-link tasks to this goal
+	QuantityMultiplier float64  `json:"quantity_multiplier"`        // Multiply quantity when linking
+	DefaultQuantity    *float64 `json:"default_quantity,omitempty"` // Default quantity for this goal (unit from goal's target)
+	DefaultImpact      string   `json:"default_impact"`             // Override impact type
 
 	// Populated goal details (for display)
 	Goal *goals.Goal `json:"goal,omitempty"`

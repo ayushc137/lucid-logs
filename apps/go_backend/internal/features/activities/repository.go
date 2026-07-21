@@ -8,7 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/surrealdb/surrealdb.go/pkg/models"
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/features/categories"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
@@ -98,8 +98,8 @@ type activityDB struct {
 	DeletedAt *database.SurrealTime `json:"deleted_at,omitempty"`
 
 	// Populated via subquery
-	Category *categoryDB     `json:"category,omitempty"`
-	Goals    []goalLinkDB    `json:"goals,omitempty"`
+	Category *categoryDB  `json:"category,omitempty"`
+	Goals    []goalLinkDB `json:"goals,omitempty"`
 }
 
 type categoryDB struct {

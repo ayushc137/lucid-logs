@@ -38,9 +38,7 @@ const (
 
 // AuthenticatedUser represents the authenticated user extracted from JWT.
 type AuthenticatedUser struct {
-	UserID    string // SurrealDB record ID (e.g., "user:abc123")
-	Namespace string // SurrealDB namespace
-	Database  string // SurrealDB database
+	UserID string // Record ID (e.g., "users:abc123")
 }
 
 // =============================================================================
@@ -50,8 +48,6 @@ type AuthenticatedUser struct {
 // AuthConfig holds configuration for the auth middleware.
 type AuthConfig struct {
 	JWTSecret string
-	Namespace string
-	Database  string
 }
 
 // Auth creates JWT authentication middleware.
@@ -146,9 +142,7 @@ func Auth(cfg AuthConfig) gin.HandlerFunc {
 
 		// Create authenticated user context
 		authUser := &AuthenticatedUser{
-			UserID:    userID,
-			Namespace: cfg.Namespace,
-			Database:  cfg.Database,
+			UserID: userID,
 		}
 
 		// Inject into request context (both Gin context and standard context)

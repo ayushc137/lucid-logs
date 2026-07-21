@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/surrealdb/surrealdb.go/pkg/models"
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/config"
 	"github.com/lucid-logs/go-backend/internal/shared/database"

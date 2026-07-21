@@ -61,15 +61,9 @@ type User struct {
 // JWT CLAIMS
 // =============================================================================
 
-// SurrealClaims represents the JWT claims from SurrealDB.
-//
-// SurrealDB issues JWTs with these custom claims:
-//   - ID: User record ID (e.g., "user:abc123")
-//   - NS: Namespace
-//   - DB: Database
-//   - AC: Access method (e.g., "account")
-type SurrealClaims struct {
-	ID        string `json:"ID"`  // User ID (SurrealDB record ID)
+// Claims represents the JWT claims issued by this service.
+type Claims struct {
+	ID        string `json:"ID"`  // User ID (record ID)
 	Namespace string `json:"NS"`  // Namespace
 	Database  string `json:"DB"`  // Database
 	Access    string `json:"AC"`  // Access method
@@ -77,3 +71,6 @@ type SurrealClaims struct {
 	NotBefore int64  `json:"nbf"` // Not before
 	ExpiresAt int64  `json:"exp"` // Expiration
 }
+
+// SurrealClaims is kept as an alias for backward compatibility during migration.
+type SurrealClaims = Claims

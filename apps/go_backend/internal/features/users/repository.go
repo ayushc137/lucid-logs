@@ -1,21 +1,16 @@
-// Package users provides user management functionality using SurrealDB SDK.
-//
-// RecordID Convention:
-//   - userDB uses models.RecordID for ID field
-//   - Conversion to string happens in toUser() at the repository boundary
-//   - This enables type-safe queries without SELECT type::string(id) casts
-//
-// See: https://surrealdb.com/docs/sdk/golang
+// Package users provides user management persistence on libSQL.
 package users
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/lucid-logs/go-backend/internal/features/auth"
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"
 )
@@ -37,43 +32,29 @@ type repository struct {
 	logger zerolog.Logger
 }
 
-// NewRepository creates a user repository.
 func NewRepository(db *database.DB) Repository {
-	return &repository{
-		db:     db,
-		logger: log.With().Str("repository", "users").Logger(),
-	}
+	return &repository{db: db, logger: log.With().Str("repository", "users").Logger()}
 }
 
-const userTable = "users"
+const userColumns = `id,email,is_admin,preferences,created_at,updated_at`
 
-// FindByID retrieves a user by ID using SDK's typed Select.
-//
-// No type::string(id) cast needed since userDB.ID is models.RecordID.
 func (r *repository) FindByID(ctx context.Context, id string) (*User, error) {
-	userID := database.RecordID(userTable, id) //nolint:staticcheck // deprecated but safe
-	result, err := database.Select[userDB](ctx, r.db, userID)
+	user, err := database.QueryFirst[userDB](ctx, r.db,
+		`SELECT `+userColumns+` FROM users WHERE id=$id`,
+		map[string]any{"id": database.RecordID("users", id)})
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
-	if result == nil {
+	if user == nil {
 		return nil, errors.ErrNotFound.WithMessage("User not found")
 	}
-	return result.toUser(), nil
+	return user.toUser(), nil
 }
 
-// FindByEmail retrieves a user by email using SDK's typed query.
-//
-// No type::string(id) cast needed since userDB.ID is models.RecordID.
 func (r *repository) FindByEmail(ctx context.Context, email string) (*User, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
-	user, err := database.QueryFirst[userDB](ctx, r.db, `
-		SELECT * FROM users
-		WHERE email = $email
-		LIMIT 1
-	`, map[string]any{
-		"email": email,
-	})
+	user, err := database.QueryFirst[userDB](ctx, r.db,
+		`SELECT `+userColumns+` FROM users WHERE email=$email LIMIT 1`,
+		map[string]any{"email": strings.ToLower(strings.TrimSpace(email))})
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
@@ -84,136 +65,105 @@ func (r *repository) FindByEmail(ctx context.Context, email string) (*User, erro
 }
 
 func (r *repository) CountAdmins(ctx context.Context) (int64, error) {
-	count, err := database.QueryScalar[float64](ctx, r.db, `
-		RETURN (SELECT count() FROM users WHERE is_admin = true)[0].count OR 0
-	`, nil)
+	count, err := database.QueryScalar[int64](ctx, r.db, `SELECT COUNT(*) FROM users WHERE is_admin=1`, nil)
 	if err != nil {
 		return 0, errors.ErrDatabase.Wrap(err)
 	}
-	return int64(count), nil
+	return count, nil
 }
 
 func (r *repository) Delete(ctx context.Context, id string) error {
-	userID := database.RecordID(userTable, id) //nolint:staticcheck // deprecated but safe
-	if _, err := database.Delete[userDB](ctx, r.db, userID); err != nil {
+	result, err := r.db.SQL().ExecContext(ctx, `DELETE FROM users WHERE id=?`, database.RecordID("users", id))
+	if err != nil {
 		return errors.ErrDatabase.Wrap(err)
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return errors.ErrNotFound
 	}
 	return nil
 }
 
 func (r *repository) UpdateEmail(ctx context.Context, id, email string) (*User, error) {
-	userID := database.RecordID(userTable, id) //nolint:staticcheck // deprecated but safe
-	updated, err := database.Merge[userDB](ctx, r.db, userID, map[string]any{
-		"email": strings.ToLower(strings.TrimSpace(email)),
-	})
+	result, err := r.db.SQL().ExecContext(ctx, `UPDATE users SET email=?,updated_at=? WHERE id=?`,
+		strings.ToLower(strings.TrimSpace(email)), time.Now().UTC().Format(time.RFC3339Nano), database.RecordID("users", id))
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
-	return updated.toUser(), nil
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return nil, errors.ErrNotFound
+	}
+	return r.FindByID(ctx, id)
 }
 
 func (r *repository) UpdatePassword(ctx context.Context, id, password string) error {
-	userID := database.MustRecordID(userTable, id)
-	_, err := database.QueryAll[userDB](ctx, r.db, `
-		UPDATE $id SET pass = crypto::argon2::generate($password)
-	`, map[string]any{
-		"id":       userID,
-		"password": password,
-	})
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return errors.ErrInternal.Wrap(err)
+	}
+	result, err := r.db.SQL().ExecContext(ctx, `UPDATE users SET pass=?,updated_at=? WHERE id=?`,
+		hash, time.Now().UTC().Format(time.RFC3339Nano), database.RecordID("users", id))
 	if err != nil {
 		return errors.ErrDatabase.Wrap(err)
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return errors.ErrNotFound
 	}
 	return nil
 }
 
 func (r *repository) UpdatePreferences(ctx context.Context, id string, req *UpdatePreferencesRequest) (*User, error) {
-	userID := database.MustRecordID(userTable, id)
-	now := time.Now().UTC()
-
-	updateData := map[string]any{
-		"updated_at": now,
+	current, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-
-	prefs := map[string]any{}
+	prefs := current.Preferences
 	if req.DailyRetro != nil {
-		prefs["daily_retro"] = req.DailyRetro
+		prefs.DailyRetro = req.DailyRetro
 	}
 	if req.WeeklyRetroDay != nil {
-		prefs["weekly_retro_day"] = *req.WeeklyRetroDay
+		prefs.WeeklyRetroDay = *req.WeeklyRetroDay
 	}
 	if req.MonthlyRetroDay != nil {
-		prefs["monthly_retro_day"] = *req.MonthlyRetroDay
+		prefs.MonthlyRetroDay = *req.MonthlyRetroDay
 	}
 	if req.Timezone != nil {
-		prefs["timezone"] = *req.Timezone
+		prefs.Timezone = *req.Timezone
 	}
-
-	if len(prefs) > 0 {
-		updateData["preferences"] = prefs
+	encoded, err := json.Marshal(prefs)
+	if err != nil {
+		return nil, errors.ErrInternal.Wrap(err)
 	}
-
-	_, err := database.QueryAll[userDB](ctx, r.db, `
-		UPDATE $id MERGE {
-			updated_at: $updated_at,
-			preferences: $preferences
-		}
-	`, map[string]any{
-		"id":          userID,
-		"updated_at":  now,
-		"preferences": prefs,
-	})
+	_, err = r.db.SQL().ExecContext(ctx, `UPDATE users SET preferences=?,updated_at=? WHERE id=?`,
+		string(encoded), time.Now().UTC().Format(time.RFC3339Nano), database.RecordID("users", id))
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
-
 	return r.FindByID(ctx, id)
 }
 
-// GetUsersForRetroGeneration returns users whose daily retro time matches now.
-// It checks each user's configured time and timezone to see if it's time.
 func (r *repository) GetUsersForRetroGeneration(ctx context.Context, now time.Time) ([]*User, error) {
-	// Get all users with retro enabled
-	results, err := database.QueryAll[userDB](ctx, r.db, `
-		SELECT * FROM users
-		WHERE preferences.daily_retro.enabled = true
-		  AND preferences.daily_retro.auto_generate = true
-	`, nil)
+	rows, err := database.QueryAll[userDB](ctx, r.db,
+		`SELECT `+userColumns+` FROM users WHERE json_extract(preferences,'$.daily_retro.enabled')=1 AND json_extract(preferences,'$.daily_retro.auto_generate')=1`, nil)
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
-
-	var eligible []*User
-	for _, u := range results {
-		user := u.toUser()
-		if user.Preferences.DailyRetro == nil {
-			continue
-		}
-
-		// Check if user's configured time matches now
-		if isRetroTime(user.Preferences.DailyRetro, now) {
+	eligible := make([]*User, 0, len(rows))
+	for i := range rows {
+		user := rows[i].toUser()
+		if user.Preferences.DailyRetro != nil && isRetroTime(user.Preferences.DailyRetro, now) {
 			eligible = append(eligible, user)
 		}
 	}
-
 	return eligible, nil
 }
 
-// isRetroTime checks if the current time matches the user's configured retro time.
 func isRetroTime(settings *DailyRetroSettings, serverNow time.Time) bool {
 	if settings == nil || settings.Time == "" {
 		return false
 	}
-
-	// Load user's timezone
 	loc, err := time.LoadLocation(settings.Timezone)
 	if err != nil {
 		loc = time.UTC
 	}
-
-	// Convert server time to user's timezone
-	userNow := serverNow.In(loc)
-	userTimeStr := userNow.Format("15:04")
-
-	// Check if times match (within the same minute)
-	return userTimeStr == settings.Time
+	return serverNow.In(loc).Format("15:04") == settings.Time
 }

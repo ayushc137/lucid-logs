@@ -139,8 +139,6 @@ func NewRouter(cfg Config) *gin.Engine {
 		protected := v1.Group("")
 		protected.Use(middleware.Auth(middleware.AuthConfig{
 			JWTSecret: cfg.Cfg.JWT.Secret,
-			Namespace: cfg.Cfg.Database.Namespace,
-			Database:  cfg.Cfg.Database.Database,
 		}))
 		{
 			// Activity logs (unified activity logging)

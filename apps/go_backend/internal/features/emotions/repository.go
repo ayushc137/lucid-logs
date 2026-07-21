@@ -57,9 +57,9 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*Emotion, error) {
 	}
 
 	emotion, err := database.QueryFirst[emotionDB](ctx, r.db, `
-		SELECT * FROM $id
+		SELECT * FROM emotions WHERE id = $id
 	`, map[string]any{
-		"id": database.MustRecordID("emotions", cleanID),
+		"id": database.RecordID("emotions", cleanID),
 	})
 	if err != nil {
 		return nil, err

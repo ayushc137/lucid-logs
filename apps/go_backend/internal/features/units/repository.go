@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/surrealdb/surrealdb.go/pkg/models"
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/errors"

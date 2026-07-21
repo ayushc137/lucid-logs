@@ -3,7 +3,7 @@ package users
 import (
 	"time"
 
-	"github.com/surrealdb/surrealdb.go/pkg/models"
+	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
 
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 )

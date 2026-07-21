@@ -94,10 +94,10 @@ type TaskGoalWithTask struct {
 //
 // @Description Request payload for creating a task-goal link
 type LinkRequest struct {
-	GoalID          string   `json:"goal_id" validate:"required" example:"goals:abc123"`
-	ImpactType      string   `json:"impact_type" validate:"required,oneof=positive negative neutral" example:"positive"`
-	QuantityValue   *float64 `json:"quantity_value,omitempty" example:"5.0"`
-	UnitID          *string  `json:"unit_id,omitempty" example:"units:km"`
+	GoalID        string   `json:"goal_id" validate:"required" example:"goals:abc123"`
+	ImpactType    string   `json:"impact_type" validate:"required,oneof=positive negative neutral" example:"positive"`
+	QuantityValue *float64 `json:"quantity_value,omitempty" example:"5.0"`
+	UnitID        *string  `json:"unit_id,omitempty" example:"units:km"`
 
 	// Milestone fields (for significant completions)
 	IsMilestone    bool   `json:"is_milestone,omitempty" example:"false"`
@@ -122,11 +122,11 @@ type BatchLinkRequest struct {
 type UpdateLinkRequest struct {
 	ImpactType     *string  `json:"impact_type,omitempty" validate:"omitempty,oneof=positive negative neutral" example:"positive"`
 	QuantityValue  *float64 `json:"quantity_value,omitempty" example:"8.0"`
-	UnitID          *string  `json:"unit_id,omitempty" example:"units:km"`
-	IsMilestone     *bool    `json:"is_milestone,omitempty" example:"true"`
-	MilestoneLabel  *string  `json:"milestone_label,omitempty" validate:"omitempty,max=200" example:"Updated milestone"`
-	MilestoneOrder  *int     `json:"milestone_order,omitempty" example:"2"`
-	Notes           *string  `json:"notes,omitempty" validate:"omitempty,max=1000" example:"Great progress on this workout"`
+	UnitID         *string  `json:"unit_id,omitempty" example:"units:km"`
+	IsMilestone    *bool    `json:"is_milestone,omitempty" example:"true"`
+	MilestoneLabel *string  `json:"milestone_label,omitempty" validate:"omitempty,max=200" example:"Updated milestone"`
+	MilestoneOrder *int     `json:"milestone_order,omitempty" example:"2"`
+	Notes          *string  `json:"notes,omitempty" validate:"omitempty,max=1000" example:"Great progress on this workout"`
 }
 
 // =============================================================================
