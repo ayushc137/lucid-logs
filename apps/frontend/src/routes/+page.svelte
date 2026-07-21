@@ -4,6 +4,7 @@ import { goto } from '$app/navigation';
 import { page } from '$app/stores';
 import { type Goal, type Task, getGoals, getTasks, updateTask } from '$lib/api';
 import { getCategories } from '$lib/api/categories';
+import QuickCapture from '$lib/components/tasks/QuickCapture.svelte';
 import { TimelineGantt, type TimelineGoal } from '$lib/components/timeline';
 import { ConfirmDialog } from '$lib/components/ui';
 import { emotionStore } from '$lib/stores/emotions.svelte';
@@ -462,9 +463,9 @@ function formatDate(): string {
 }
 
 function handleQuickLog(log: { emoji: string; label: string }) {
-	// TODO: Implement quick log creation
-	console.log('Quick log:', log);
+	// Navigate to activities page — quick log via activity instant-log
 	fabOpen = false;
+	goto('/activities');
 }
 
 function openTaskModal() {
@@ -633,6 +634,13 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 				</div>
 			</div>
 		</div>
+
+		<!-- Quick Capture — inline, only on today's view -->
+		{#if isSelectedDateToday()}
+			<QuickCapture onSaved={() => {
+				$tasksQuery.refetch();
+			}} />
+		{/if}
 	</div>
 
 	<!-- Timeline Section -->
