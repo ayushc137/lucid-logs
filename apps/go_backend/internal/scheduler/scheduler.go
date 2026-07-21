@@ -10,6 +10,7 @@ package scheduler
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -143,29 +144,117 @@ func (s *Scheduler) generateRetroForUser(ctx context.Context, userID, timezone s
 	// Convert to user's local time for the retro date
 	userNow := serverNow.In(loc)
 
-	// Check if retro already exists for today
-	exists, err := s.retroSvc.ExistsForToday(ctx, userID)
-	if err != nil {
-		s.logger.Error().Err(err).Str("user_id", userID).Msg("check retro exists failed")
-		return
+	// --- Daily retro ---
+	if err := s.maybeGenerateDaily(ctx, userID, userNow); err != nil {
+		// errors are already logged; continue to weekly/monthly
 	}
 
+	// --- Weekly retro ---
+	if err := s.maybeGenerateWeekly(ctx, userID, userNow); err != nil {
+		// logged inside
+	}
+
+	// --- Monthly retro ---
+	if err := s.maybeGenerateMonthly(ctx, userID, userNow); err != nil {
+		// logged inside
+	}
+}
+
+// maybeGenerateDaily generates the daily retro if it doesn't already exist.
+func (s *Scheduler) maybeGenerateDaily(ctx context.Context, userID string, userNow time.Time) error {
+	exists, err := s.retroSvc.ExistsForPeriod(ctx, userID, retrospectives.RetroTypeDaily)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("check daily retro exists failed")
+		return err
+	}
 	if exists {
-		s.logger.Debug().Str("user_id", userID).Msg("retro already exists for today")
-		return
+		s.logger.Debug().Str("user_id", userID).Msg("daily retro already exists")
+		return nil
 	}
 
-	// Generate the retro
-	_, err = s.retroSvc.GenerateDaily(ctx, userID, userNow)
-	if err != nil {
+	if _, err := s.retroSvc.GenerateDaily(ctx, userID, userNow); err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID).Msg("generate daily retro failed")
-		return
+		return err
 	}
 
-	s.logger.Info().
-		Str("user_id", userID).
-		Str("timezone", timezone).
-		Msg("daily retro generated")
+	s.logger.Info().Str("user_id", userID).Str("type", "daily").Msg("retro generated")
+	return nil
+}
+
+// maybeGenerateWeekly generates a weekly retro if today matches the user's
+// configured WeeklyRetroDay (in their timezone) and one doesn't already exist
+// for this week.
+func (s *Scheduler) maybeGenerateWeekly(ctx context.Context, userID string, userNow time.Time) error {
+	prefs, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("fetch user for weekly retro failed")
+		return err
+	}
+
+	weeklyDay := prefs.Preferences.WeeklyRetroDay
+	if weeklyDay == "" {
+		return nil // not configured
+	}
+
+	if !strings.EqualFold(userNow.Weekday().String(), weeklyDay) {
+		return nil // not today
+	}
+
+	exists, err := s.retroSvc.ExistsForPeriod(ctx, userID, retrospectives.RetroTypeWeekly)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("check weekly retro exists failed")
+		return err
+	}
+	if exists {
+		s.logger.Debug().Str("user_id", userID).Msg("weekly retro already exists")
+		return nil
+	}
+
+	if _, err := s.retroSvc.GenerateWeekly(ctx, userID, userNow); err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("generate weekly retro failed")
+		return err
+	}
+
+	s.logger.Info().Str("user_id", userID).Str("type", "weekly").Msg("retro generated")
+	return nil
+}
+
+// maybeGenerateMonthly generates a monthly retro if today's day-of-month
+// matches the user's configured MonthlyRetroDay and one doesn't already exist
+// for this month.
+func (s *Scheduler) maybeGenerateMonthly(ctx context.Context, userID string, userNow time.Time) error {
+	prefs, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("fetch user for monthly retro failed")
+		return err
+	}
+
+	monthlyDay := prefs.Preferences.MonthlyRetroDay
+	if monthlyDay <= 0 || monthlyDay > 31 {
+		return nil // not configured
+	}
+
+	if userNow.Day() != monthlyDay {
+		return nil // not today
+	}
+
+	exists, err := s.retroSvc.ExistsForPeriod(ctx, userID, retrospectives.RetroTypeMonthly)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("check monthly retro exists failed")
+		return err
+	}
+	if exists {
+		s.logger.Debug().Str("user_id", userID).Msg("monthly retro already exists")
+		return nil
+	}
+
+	if _, err := s.retroSvc.GenerateMonthly(ctx, userID, userNow); err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID).Msg("generate monthly retro failed")
+		return err
+	}
+
+	s.logger.Info().Str("user_id", userID).Str("type", "monthly").Msg("retro generated")
+	return nil
 }
 
 // =============================================================================

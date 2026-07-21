@@ -35,6 +35,12 @@ type Service interface {
 	// GenerateDaily generates a daily retrospective (called by scheduler).
 	GenerateDaily(ctx context.Context, userID string, date time.Time) (*Retrospective, error)
 
+	// GenerateWeekly generates a weekly retrospective (called by scheduler).
+	GenerateWeekly(ctx context.Context, userID string, date time.Time) (*Retrospective, error)
+
+	// GenerateMonthly generates a monthly retrospective (called by scheduler).
+	GenerateMonthly(ctx context.Context, userID string, date time.Time) (*Retrospective, error)
+
 	// Update updates user content on a retrospective.
 	Update(ctx context.Context, id string, req *UpdateRequest, userID string) (*Retrospective, error)
 
@@ -43,6 +49,9 @@ type Service interface {
 
 	// ExistsForToday checks if a retro exists for today.
 	ExistsForToday(ctx context.Context, userID string) (bool, error)
+
+	// ExistsForPeriod checks if a retro of the given type exists for the current period.
+	ExistsForPeriod(ctx context.Context, userID string, retroType string) (bool, error)
 
 	// RegenerateInsights re-runs just the AI insight generation for an existing retro.
 	RegenerateInsights(ctx context.Context, id, userID string) (*Retrospective, error)
@@ -167,6 +176,20 @@ func (s *service) GenerateDaily(ctx context.Context, userID string, date time.Ti
 	})
 }
 
+// GenerateWeekly is called by the scheduler for automatic weekly retros.
+func (s *service) GenerateWeekly(ctx context.Context, userID string, date time.Time) (*Retrospective, error) {
+	return s.Generate(ctx, userID, &GenerateRequest{
+		RetroType: RetroTypeWeekly,
+	})
+}
+
+// GenerateMonthly is called by the scheduler for automatic monthly retros.
+func (s *service) GenerateMonthly(ctx context.Context, userID string, date time.Time) (*Retrospective, error) {
+	return s.Generate(ctx, userID, &GenerateRequest{
+		RetroType: RetroTypeMonthly,
+	})
+}
+
 // =============================================================================
 // UPDATE
 // =============================================================================
@@ -218,6 +241,45 @@ func (s *service) ExistsForToday(ctx context.Context, userID string) (bool, erro
 	}
 
 	return existing != nil, nil
+}
+
+// =============================================================================
+// EXISTS CHECK (for scheduler) — per period
+// =============================================================================
+
+// ExistsForPeriod checks whether a non-deleted retrospective of the given type
+// already exists for the current period (today for daily, this week for weekly,
+// this month for monthly). This guards the scheduler from creating duplicates.
+func (s *service) ExistsForPeriod(ctx context.Context, userID string, retroType string) (bool, error) {
+	now := time.Now().UTC()
+	start, end := periodRange(retroType, now)
+
+	existing, err := s.repo.FindByDateRange(ctx, userID, retroType, start, end)
+	if err != nil {
+		return false, err
+	}
+	return existing != nil, nil
+}
+
+// periodRange returns the [start, end] time range for the current period of the
+// given retro type. Falls back to today for unknown types.
+func periodRange(retroType string, now time.Time) (start, end time.Time) {
+	switch retroType {
+	case RetroTypeWeekly:
+		weekday := int(now.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		start = time.Date(now.Year(), now.Month(), now.Day()-weekday+1, 0, 0, 0, 0, time.UTC)
+		end = start.Add(7 * 24 * time.Hour).Add(-time.Second)
+	case RetroTypeMonthly:
+		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		end = start.AddDate(0, 1, 0).Add(-time.Second)
+	default: // daily
+		start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		end = start.Add(24 * time.Hour).Add(-time.Second)
+	}
+	return start, end
 }
 
 // =============================================================================
