@@ -3,6 +3,8 @@ package units
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
@@ -112,9 +114,9 @@ func (r *repository) FindByID(ctx context.Context, id string) (*Unit, error) {
 	unitID := database.MustRecordID(Table, id)
 
 	unit, err := database.QueryFirst[unitDB](ctx, r.db, `
-		SELECT * FROM $id
+		SELECT * FROM units WHERE id = $id
 	`, map[string]any{
-		"id": unitID,
+		"id": database.ToStringID(unitID),
 	})
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
@@ -154,22 +156,15 @@ func (r *repository) Create(ctx context.Context, req *CreateRequest, userID stri
 		unitType = TypeCustom
 	}
 
-	result, err := database.QueryFirst[unitDB](ctx, r.db, `
-		CREATE units CONTENT {
-			name: $name,
-			symbol: $symbol,
-			type: $type,
-			is_system: false,
-			created_by: $user,
-			created_at: $now,
-			updated_at: $now
-		}
-	`, map[string]any{
-		"name":   req.Name,
-		"symbol": req.Symbol,
-		"type":   unitType,
-		"user":   userID,
-		"now":    now,
+	result, err := database.Create[unitDB](ctx, r.db, Table, map[string]any{
+		"id":         database.ToStringID(generateRecordID()),
+		"name":       req.Name,
+		"symbol":     req.Symbol,
+		"type":       unitType,
+		"is_system":  false,
+		"created_by": userID,
+		"created_at": now,
+		"updated_at": now,
 	})
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
@@ -208,12 +203,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		updateData["symbol"] = *req.Symbol
 	}
 
-	result, err := database.QueryFirst[unitDB](ctx, r.db, `
-		UPDATE $id MERGE $data RETURN AFTER
-	`, map[string]any{
-		"id":   unitID,
-		"data": updateData,
-	})
+	result, err := database.Merge[unitDB](ctx, r.db, database.ToStringID(unitID), updateData)
 	if err != nil {
 		return nil, errors.ErrDatabase.Wrap(err)
 	}
@@ -240,11 +230,7 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 
 	unitID := database.MustRecordID(Table, id)
 
-	_, err = database.QueryAll[any](ctx, r.db, `
-		DELETE $id
-	`, map[string]any{
-		"id": unitID,
-	})
+	_, err = database.Delete[unitDB](ctx, r.db, database.ToStringID(unitID))
 	if err != nil {
 		return errors.ErrDatabase.Wrap(err)
 	}
@@ -284,4 +270,13 @@ func (r *repository) SeedSystemUnits(ctx context.Context) error {
 
 	r.logger.Info().Int("count", len(SystemUnits)).Msg("System units seeded")
 	return nil
+}
+
+// generateRecordID creates a new table:value record identifier.
+func generateRecordID() models.RecordID {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		panic(err)
+	}
+	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }

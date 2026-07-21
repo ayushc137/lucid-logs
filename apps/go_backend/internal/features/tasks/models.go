@@ -2,18 +2,18 @@
 //
 // This package implements:
 //   - CRUD operations for tasks
-//   - Category linking via in_category relation
+//   - Category linking via tasks.category_id foreign key
 //   - Emotion tracking (emotion_id on task, structured positives/negatives)
 //   - Inferred emotion calculation (computed on write using emotion default intensities)
-//   - Goal linking via task_goals relation
-//   - Activity tracking via created_from_activity relation
+//   - Goal linking via task_goals join table
+//   - Activity tracking via created_from_activity join table
 //   - Soft delete support
 //
 // Database Architecture:
-//   - in_category: RELATE table for category assignment
-//   - task_goals: RELATE table for goal-task links with impact metadata
-//   - created_from_activity: RELATE table tracking task origin from activity
-//   - task_emotions: RELATE table for emotion analytics
+//   - tasks.category_id: FK to categories(id)
+//   - task_goals: join table for goal-task links with impact metadata
+//   - created_from_activity: join table tracking task origin from activity
+//   - task_emotions: join table for emotion analytics
 package tasks
 
 import (

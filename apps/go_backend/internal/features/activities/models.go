@@ -6,9 +6,9 @@
 //   - Timer: Flowmodoro-style time tracking with break management
 //
 // Database Architecture:
-//   - activity_goals: RELATE table linking activities to multiple goals
-//   - in_category: RELATE table for category assignment
-//   - created_from_activity: RELATE table tracking task origin
+//   - activity_goals: join table linking activities to multiple goals
+//   - activities.category_id: FK to categories(id)
+//   - created_from_activity: join table tracking task origin
 //   - timer_sessions: Table for active Flowmodoro sessions
 package activities
 

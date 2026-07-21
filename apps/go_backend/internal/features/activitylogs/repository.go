@@ -3,6 +3,8 @@ package activitylogs
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	models "github.com/lucid-logs/go-backend/internal/shared/recordid"
@@ -55,7 +57,7 @@ type activityLogDB struct {
 	ID          models.RecordID   `json:"id,omitempty"`
 	EntityType  string            `json:"entity_type"`
 	EntityID    string            `json:"entity_id"`
-	Event       string            `json:"event"`
+	Event       string            `json:"event_type"`
 	Changes     map[string]any    `json:"changes,omitempty"`
 	EntityTitle string            `json:"entity_title,omitempty"`
 	EntityIcon  string            `json:"entity_icon,omitempty"`
@@ -84,26 +86,21 @@ func (l *activityLogDB) toActivityLog() *ActivityLog {
 func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID string) (*ActivityLog, error) {
 	now := time.Now().UTC()
 
-	result, err := database.QueryFirst[activityLogDB](ctx, r.db, `
-		CREATE activity_logs CONTENT {
-			entity_type: $entity_type,
-			entity_id: $entity_id,
-			event: $event,
-			changes: $changes,
-			entity_title: $entity_title,
-			entity_icon: $entity_icon,
-			created_by: $user,
-			created_at: $now
-		}
-	`, map[string]any{
+	changes := req.Changes
+	if changes == nil {
+		changes = map[string]any{}
+	}
+
+	result, err := database.Create[activityLogDB](ctx, r.db, "activity_logs", map[string]any{
+		"id":           database.ToStringID(generateRecordID()),
 		"entity_type":  req.EntityType,
 		"entity_id":    req.EntityID,
-		"event":        req.Event,
-		"changes":      req.Changes,
+		"event_type":   req.Event,
+		"changes":      changes,
 		"entity_title": req.EntityTitle,
 		"entity_icon":  req.EntityIcon,
-		"user":         userID,
-		"now":          now,
+		"created_by":   userID,
+		"created_at":   now,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).
@@ -129,12 +126,10 @@ func (r *repository) LogEvent(ctx context.Context, req *LogEventRequest, userID 
 
 func (r *repository) FindByEntity(ctx context.Context, entityType, entityID, userID string, params pagination.Params) ([]*ActivityLog, int64, error) {
 	// Count total
-	countResult, err := database.QueryFirst[struct {
-		Count int64 `json:"count"`
-	}](ctx, r.db, `
-		SELECT count() as count FROM activity_logs 
-		WHERE entity_type = $entity_type 
-		  AND entity_id = $entity_id 
+	total, err := database.QueryScalar[int64](ctx, r.db, `
+		SELECT COUNT(*) FROM activity_logs
+		WHERE entity_type = $entity_type
+		  AND entity_id = $entity_id
 		  AND created_by = $user
 	`, map[string]any{
 		"entity_type": entityType,
@@ -145,19 +140,14 @@ func (r *repository) FindByEntity(ctx context.Context, entityType, entityID, use
 		return nil, 0, errors.ErrDatabase.Wrap(err)
 	}
 
-	total := int64(0)
-	if countResult != nil {
-		total = countResult.Count
-	}
-
 	// Fetch logs
 	logsDB, err := database.QueryAll[activityLogDB](ctx, r.db, `
-		SELECT * FROM activity_logs 
-		WHERE entity_type = $entity_type 
-		  AND entity_id = $entity_id 
+		SELECT * FROM activity_logs
+		WHERE entity_type = $entity_type
+		  AND entity_id = $entity_id
 		  AND created_by = $user
 		ORDER BY created_at DESC
-		LIMIT $limit START $offset
+		LIMIT $limit OFFSET $offset
 	`, map[string]any{
 		"entity_type": entityType,
 		"entity_id":   entityID,
@@ -192,25 +182,18 @@ func (r *repository) FindByUser(ctx context.Context, userID string, params pagin
 	}
 
 	// Count total
-	countResult, err := database.QueryFirst[struct {
-		Count int64 `json:"count"`
-	}](ctx, r.db, `
-		SELECT count() as count FROM activity_logs WHERE `+whereClause, queryVars)
+	total, err := database.QueryScalar[int64](ctx, r.db, `
+		SELECT COUNT(*) FROM activity_logs WHERE `+whereClause, queryVars)
 	if err != nil {
 		return nil, 0, errors.ErrDatabase.Wrap(err)
 	}
 
-	total := int64(0)
-	if countResult != nil {
-		total = countResult.Count
-	}
-
 	// Fetch logs
 	logsDB, err := database.QueryAll[activityLogDB](ctx, r.db, `
-		SELECT * FROM activity_logs 
+		SELECT * FROM activity_logs
 		WHERE `+whereClause+`
 		ORDER BY created_at DESC
-		LIMIT $limit START $offset
+		LIMIT $limit OFFSET $offset
 	`, queryVars)
 	if err != nil {
 		return nil, 0, errors.ErrDatabase.Wrap(err)
@@ -249,4 +232,13 @@ func (l *ActivityLogger) Log(ctx context.Context, entityType, entityID, entityTi
 		Changes:     changes,
 	}, userID)
 	return err
+}
+
+// generateRecordID creates a new table:value record identifier.
+func generateRecordID() models.RecordID {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		panic(err)
+	}
+	return database.NewRecordID(Table, hex.EncodeToString(bytes))
 }

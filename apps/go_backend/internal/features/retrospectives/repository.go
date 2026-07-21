@@ -121,9 +121,9 @@ func (r *repository) FindByID(ctx context.Context, id, userID string) (*Retrospe
 	retroID := database.MustRecordID(Table, id)
 
 	result, err := database.QueryFirst[retroDB](ctx, r.db, `
-		SELECT * FROM $id
+		SELECT * FROM retrospectives WHERE id = $id
 	`, map[string]any{
-		"id": retroID,
+		"id": database.ToStringID(retroID),
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("retro_id", id).Msg("query failed")
@@ -207,6 +207,7 @@ func (r *repository) Create(ctx context.Context, retro *Retrospective) (*Retrosp
 	now := time.Now().UTC()
 
 	createData := map[string]any{
+		"id":           database.ToStringID(retroID),
 		"created_by":   retro.CreatedBy,
 		"retro_type":   retro.RetroType,
 		"start_date":   retro.StartDate,
@@ -219,12 +220,7 @@ func (r *repository) Create(ctx context.Context, retro *Retrospective) (*Retrosp
 		"updated_at":   now,
 	}
 
-	_, err := database.QueryAll[retroDB](ctx, r.db, `
-		CREATE $id CONTENT $data
-	`, map[string]any{
-		"id":   retroID,
-		"data": createData,
-	})
+	_, err := database.Create[retroDB](ctx, r.db, Table, createData)
 	if err != nil {
 		r.logger.Error().Err(err).Msg("create retrospective failed")
 		return nil, err
@@ -262,12 +258,7 @@ func (r *repository) Update(ctx context.Context, id string, req *UpdateRequest, 
 		updateData["status"] = *req.Status
 	}
 
-	_, err = database.QueryAll[retroDB](ctx, r.db, `
-		UPDATE $id MERGE $data
-	`, map[string]any{
-		"id":   retroID,
-		"data": updateData,
-	})
+	_, err = database.Merge[retroDB](ctx, r.db, database.ToStringID(retroID), updateData)
 	if err != nil {
 		r.logger.Error().Err(err).Str("retro_id", id).Msg("update failed")
 		return nil, err
@@ -289,14 +280,9 @@ func (r *repository) Delete(ctx context.Context, id, userID string) error {
 	retroID := database.MustRecordID(Table, id)
 	now := time.Now().UTC()
 
-	_, err = database.QueryAll[retroDB](ctx, r.db, `
-		UPDATE $id MERGE {
-			deleted_at: $now,
-			updated_at: $now
-		}
-	`, map[string]any{
-		"id":  retroID,
-		"now": now,
+	_, err = database.Merge[retroDB](ctx, r.db, database.ToStringID(retroID), map[string]any{
+		"deleted_at": now,
+		"updated_at": now,
 	})
 	if err != nil {
 		r.logger.Error().Err(err).Str("retro_id", id).Msg("delete failed")
