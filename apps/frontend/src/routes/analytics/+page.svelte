@@ -68,7 +68,7 @@ const streaks = $derived($streaksQuery.data);
 const isLoading = $derived($dashboardQuery.isPending);
 
 function pct(value: number): string {
-	return `${Math.round(value * 100)}%`;
+	return `${Math.round(value)}%`;
 }
 
 function hours(value: number): string {
