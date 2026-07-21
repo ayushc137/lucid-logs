@@ -38,6 +38,12 @@ type Repository interface {
 
 	// GetProductivityHeatmap retrieves activity heatmap data.
 	GetProductivityHeatmap(ctx context.Context, userID string, start, end time.Time) (*HeatmapData, error)
+
+	// GetStreaks retrieves the dashboard streak summary.
+	GetStreaks(ctx context.Context, userID string) (*StreaksResponse, error)
+
+	// GetActivityHeatmap retrieves the GitHub-style logged-days heatmap.
+	GetActivityHeatmap(ctx context.Context, userID string, start, end time.Time) (*ActivityHeatmapResponse, error)
 }
 
 // =============================================================================
@@ -724,4 +730,215 @@ func (r *repository) GetProductivityHeatmap(ctx context.Context, userID string, 
 		Min:     0,
 		Max:     maxVal,
 	}, nil
+}
+
+// =============================================================================
+// STREAKS (DASHBOARD WIDGET)
+// =============================================================================
+
+type streakRow struct {
+	GoalID        string `json:"goal_id"`
+	GoalTitle     string `json:"goal_title"`
+	CurrentStreak int    `json:"current_streak"`
+	LongestStreak int    `json:"longest_streak"`
+}
+
+// GetStreaks computes a dashboard streak summary from the goals table.
+// TotalCurrentStreakDays is the sum of every active goal's current_streak.
+// LongestStreakEver is the max longest_streak across all goals.
+// ActiveStreaks lists goals with a non-zero current streak.
+func (r *repository) GetStreaks(ctx context.Context, userID string) (*StreaksResponse, error) {
+	rows, err := database.QueryAll[streakRow](ctx, r.db, `
+		SELECT
+			id as goal_id,
+			title as goal_title,
+			COALESCE(current_streak, 0) as current_streak,
+			COALESCE(longest_streak, 0) as longest_streak
+		FROM goals
+		WHERE created_by = $user
+		  AND deleted_at IS NULL
+		  AND status = 'active'
+	`, map[string]any{
+		"user": userID,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Msg("get streaks failed")
+		return nil, err
+	}
+
+	resp := &StreaksResponse{
+		ActiveStreaks: make([]StreakInfo, 0, len(rows)),
+	}
+	for _, row := range rows {
+		resp.TotalCurrentStreakDays += row.CurrentStreak
+		if row.LongestStreak > resp.LongestStreakEver {
+			resp.LongestStreakEver = row.LongestStreak
+		}
+		if row.CurrentStreak > 0 {
+			resp.ActiveStreaks = append(resp.ActiveStreaks, StreakInfo{
+				GoalID:        row.GoalID,
+				GoalTitle:     row.GoalTitle,
+				CurrentStreak: row.CurrentStreak,
+				LongestStreak: row.LongestStreak,
+			})
+		}
+	}
+	return resp, nil
+}
+
+// =============================================================================
+// ACTIVITY HEATMAP (GitHub-style logged-days)
+// =============================================================================
+
+type activityDayRow struct {
+	Date    string  `json:"date"`
+	Count   int     `json:"count"`
+	Seconds float64 `json:"seconds"`
+}
+
+// GetActivityHeatmap returns a per-day activity map for the requested range,
+// including consecutive-day streaks computed across the user's full history
+// (not just the window) so "current streak" is accurate.
+func (r *repository) GetActivityHeatmap(ctx context.Context, userID string, start, end time.Time) (*ActivityHeatmapResponse, error) {
+	// Per-day counts in the requested window.
+	rows, err := database.QueryAll[activityDayRow](ctx, r.db, `
+		SELECT
+			date(start_date) as date,
+			COUNT(*) as count,
+			COALESCE(SUM(CAST(strftime('%s', end_date) AS REAL) - CAST(strftime('%s', start_date) AS REAL)), 0) as seconds
+		FROM tasks
+		WHERE created_by = $user
+		  AND start_date >= $start
+		  AND start_date <= $end
+		  AND deleted_at IS NULL
+		GROUP BY date(start_date)
+		ORDER BY date
+	`, map[string]any{
+		"user":  userID,
+		"start": start,
+		"end":   end,
+	})
+	if err != nil {
+		r.logger.Error().Err(err).Msg("get activity heatmap failed")
+		return nil, err
+	}
+
+	byDate := make(map[string]activityDayRow, len(rows))
+	maxCount := 0
+	for _, row := range rows {
+		byDate[row.Date] = row
+		if row.Count > maxCount {
+			maxCount = row.Count
+		}
+	}
+
+	// Build every day in the range.
+	days := []ActivityHeatmapDay{}
+	daysLogged := 0
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		key := d.Format("2006-01-02")
+		row, ok := byDate[key]
+		day := ActivityHeatmapDay{Date: key}
+		if ok {
+			day.Count = row.Count
+			day.Minutes = row.Seconds / 60
+			day.HasEntry = row.Count > 0
+			if day.HasEntry {
+				daysLogged++
+			}
+			// Intensity 0-4 scale based on count relative to max.
+			switch {
+			case row.Count == 0:
+				day.Intensity = 0
+			case maxCount <= 1:
+				day.Intensity = 4
+			default:
+				ratio := float64(row.Count) / float64(maxCount)
+				switch {
+				case ratio >= 0.75:
+					day.Intensity = 4
+				case ratio >= 0.5:
+					day.Intensity = 3
+				case ratio >= 0.25:
+					day.Intensity = 2
+				default:
+					day.Intensity = 1
+				}
+			}
+		}
+		days = append(days, day)
+	}
+
+	// Compute streaks across the user's entire logged history, not just the window,
+	// so current/longest streaks reflect reality.
+	allDates, err := database.QueryAll[activityDayRow](ctx, r.db, `
+		SELECT DISTINCT date(start_date) as date, 1 as count, 0 as seconds
+		FROM tasks
+		WHERE created_by = $user
+		  AND deleted_at IS NULL
+		ORDER BY date
+	`, map[string]any{
+		"user": userID,
+	})
+	if err != nil {
+		r.logger.Warn().Err(err).Msg("get all activity dates for streak computation failed")
+	}
+
+	currentStreak, longestStreak := computeConsecutiveDayStreaks(allDates)
+
+	totalDays := int(end.Sub(start).Hours()/24) + 1
+	return &ActivityHeatmapResponse{
+		Days:          days,
+		TotalDays:     totalDays,
+		DaysLogged:    daysLogged,
+		CurrentStreak: currentStreak,
+		LongestStreak: longestStreak,
+	}, nil
+}
+
+// computeConsecutiveDayStreaks returns (currentStreak, longestStreak) given a
+// chronological list of distinct days on which the user logged anything.
+// Current streak counts back from today (UTC); if today has no entry but
+// yesterday does, the streak is still alive (the day isn't over).
+func computeConsecutiveDayStreaks(rows []activityDayRow) (current, longest int) {
+	if len(rows) == 0 {
+		return 0, 0
+	}
+
+	dateSet := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		dateSet[r.Date] = true
+	}
+
+	// Longest streak: walk the sorted list and count runs.
+	longest = 0
+	run := 0
+	var prev time.Time
+	for i, r := range rows {
+		d, err := time.Parse("2006-01-02", r.Date)
+		if err != nil {
+			continue
+		}
+		if i == 0 || d.Sub(prev) > 24*time.Hour {
+			run = 1
+		} else {
+			run++
+		}
+		if run > longest {
+			longest = run
+		}
+		prev = d
+	}
+
+	// Current streak: count back from today (or yesterday if today is empty).
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	cursor := today
+	if !dateSet[cursor.Format("2006-01-02")] {
+		cursor = cursor.AddDate(0, 0, -1)
+	}
+	for dateSet[cursor.Format("2006-01-02")] {
+		current++
+		cursor = cursor.AddDate(0, 0, -1)
+	}
+	return current, longest
 }

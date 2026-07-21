@@ -46,6 +46,8 @@ func RegisterRoutes(rg *gin.RouterGroup, service Service, validator *validator.V
 
 	rg.POST("/charts", h.GenerateChart)
 	rg.GET("/dashboard", h.GetDashboard)
+	rg.GET("/streaks", h.GetStreaks)
+	rg.GET("/activity-heatmap", h.GetActivityHeatmap)
 	rg.GET("/metrics/tasks", h.GetTaskMetrics)
 	rg.GET("/metrics/emotions", h.GetEmotionMetrics)
 	rg.GET("/metrics/goals", h.GetGoalMetrics)
@@ -239,6 +241,66 @@ func (h *Handler) GetCategoryMetrics(c *gin.Context) {
 	}
 
 	response.OK(c, metrics)
+}
+
+// =============================================================================
+// STREAKS + ACTIVITY HEATMAP (dashboard widgets)
+// =============================================================================
+
+// GetStreaks godoc
+// @Summary Get streak summary
+// @Description Returns total current streak days, longest streak ever, and per-goal active streaks
+// @Tags Analytics
+// @Produce json
+// @Success 200 {object} StreaksResponse
+// @Failure 401 {object} response.APIResponse
+// @Security BearerAuth
+// @Router /api/v1/analytics/streaks [get]
+func (h *Handler) GetStreaks(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	resp, err := h.service.GetStreaks(c.Request.Context(), user.UserID)
+	if err != nil {
+		response.ErrorFromErr(c, err)
+		return
+	}
+
+	response.OK(c, resp)
+}
+
+// GetActivityHeatmap godoc
+// @Summary Get logged-days activity heatmap
+// @Description GitHub-style daily activity heatmap with consecutive-day streaks
+// @Tags Analytics
+// @Produce json
+// @Param period query string false "Time period (day, week, month, quarter, year)" default(week)
+// @Param start_date query string false "Start date for custom period (RFC3339)"
+// @Param end_date query string false "End date for custom period (RFC3339)"
+// @Success 200 {object} ActivityHeatmapResponse
+// @Failure 401 {object} response.APIResponse
+// @Security BearerAuth
+// @Router /api/v1/analytics/activity-heatmap [get]
+func (h *Handler) GetActivityHeatmap(c *gin.Context) {
+	user, appErr := middleware.MustGetAuthenticatedUser(c.Request.Context())
+	if appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	period := c.DefaultQuery("period", PeriodWeek)
+	start, end := h.parseDateRange(c)
+
+	resp, err := h.service.GetActivityHeatmap(c.Request.Context(), user.UserID, period, start, end)
+	if err != nil {
+		response.ErrorFromErr(c, err)
+		return
+	}
+
+	response.OK(c, resp)
 }
 
 // =============================================================================

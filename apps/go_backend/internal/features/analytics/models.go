@@ -329,3 +329,38 @@ const (
 	// Table name
 	Table = "agg_daily"
 )
+
+// =============================================================================
+// STREAKS + ACTIVITY HEATMAP (P0 dashboard widgets)
+// =============================================================================
+
+// StreaksResponse is the dedicated streaks endpoint payload.
+//
+// @Description Streak summary for dashboard widget
+type StreaksResponse struct {
+	TotalCurrentStreakDays int          `json:"total_current_streak_days"`
+	LongestStreakEver      int          `json:"longest_streak_ever"`
+	ActiveStreaks          []StreakInfo `json:"active_streaks"`
+}
+
+// ActivityHeatmapDay represents one day of activity for the logged-days heatmap.
+//
+// @Description Single day cell in the activity heatmap
+type ActivityHeatmapDay struct {
+	Date      string  `json:"date"`       // YYYY-MM-DD
+	Count     int     `json:"count"`      // Number of tasks logged
+	Minutes   float64 `json:"minutes"`    // Total minutes logged
+	HasEntry  bool    `json:"has_entry"`  // Whether the day has any entry
+	Intensity int     `json:"intensity"`  // 0-4 intensity bucket for color scaling
+}
+
+// ActivityHeatmapResponse is the logged-days heatmap payload (GitHub-style).
+//
+// @Description Daily activity heatmap for a date range
+type ActivityHeatmapResponse struct {
+	Days         []ActivityHeatmapDay `json:"days"`
+	TotalDays    int                  `json:"total_days"`    // Days in range
+	DaysLogged   int                  `json:"days_logged"`   // Days with at least one entry
+	CurrentStreak int                 `json:"current_streak"` // Consecutive logged days ending today
+	LongestStreak int                 `json:"longest_streak"` // Longest run of consecutive logged days
+}

@@ -31,6 +31,12 @@ type Service interface {
 
 	// GetDashboard retrieves combined dashboard metrics.
 	GetDashboard(ctx context.Context, userID string, period string) (*DashboardResponse, error)
+
+	// GetStreaks retrieves the dashboard streak summary.
+	GetStreaks(ctx context.Context, userID string) (*StreaksResponse, error)
+
+	// GetActivityHeatmap retrieves the GitHub-style logged-days heatmap.
+	GetActivityHeatmap(ctx context.Context, userID string, period string, start, end *time.Time) (*ActivityHeatmapResponse, error)
 }
 
 // =============================================================================
@@ -195,6 +201,19 @@ func (s *service) GetDashboard(ctx context.Context, userID, period string) (*Das
 		Goals:      *goals,
 		Categories: *categories,
 	}, nil
+}
+
+// =============================================================================
+// STREAKS + ACTIVITY HEATMAP
+// =============================================================================
+
+func (s *service) GetStreaks(ctx context.Context, userID string) (*StreaksResponse, error) {
+	return s.repo.GetStreaks(ctx, userID)
+}
+
+func (s *service) GetActivityHeatmap(ctx context.Context, userID, period string, start, end *time.Time) (*ActivityHeatmapResponse, error) {
+	startTime, endTime := s.resolvePeriod(period, start, end)
+	return s.repo.GetActivityHeatmap(ctx, userID, startTime, endTime)
 }
 
 // =============================================================================
