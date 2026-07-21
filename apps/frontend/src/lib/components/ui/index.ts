@@ -36,6 +36,11 @@ export { default as Modal } from './Modal.svelte';
 export { default as ConfirmDialog } from './ConfirmDialog.svelte';
 
 // -----------------------------------------------------------------------------
+// Actions
+// -----------------------------------------------------------------------------
+export { default as Fab } from './Fab.svelte';
+
+// -----------------------------------------------------------------------------
 // Tables
 // -----------------------------------------------------------------------------
 export { default as DataTable } from './DataTable.svelte';

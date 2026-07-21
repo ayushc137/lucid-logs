@@ -329,7 +329,7 @@
 
 <!-- Modal -->
 <dialog class="modal modal-bottom sm:modal-middle" class:modal-open={open}>
-	<div class="modal-box max-w-4xl p-0 flex flex-col bg-base-100 max-h-[90vh] rounded-3xl shadow-2xl">
+	<div class="modal-box max-w-4xl p-0 flex flex-col bg-base-100 max-h-[90vh] rounded-b-none sm:rounded-3xl shadow-2xl">
 		<!-- Header -->
 		<div class="flex items-center gap-4 px-6 py-5 border-b border-base-200/50 bg-gradient-to-r from-primary/5 via-base-100 to-secondary/5">
 			<!-- Icon Picker -->

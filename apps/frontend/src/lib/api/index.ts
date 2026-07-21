@@ -196,3 +196,18 @@ export {
 	type UpdateRetroRequest,
 	type RetroListResponse,
 } from './retrospectives';
+
+// Analytics
+export {
+	getAnalyticsDashboard,
+	type DashboardResponse,
+	type TaskMetrics,
+	type EmotionMetrics,
+	type GoalMetrics,
+	type CategoryMetrics,
+	type CategoryBreakdown,
+	type EmotionCount,
+	type DailyMood,
+	type GoalProgressItem,
+	type StreakInfo,
+} from './analytics';

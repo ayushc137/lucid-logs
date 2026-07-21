@@ -6,6 +6,7 @@ import {
 	deleteRetrospective,
 	getRetrospective,
 	updateRetrospective,
+	type UpdateRetroRequest,
 	type UserReflection,
 } from '$lib/api';
 import {
@@ -202,6 +203,6 @@ function formatDate(s: string): string {
 	confirmText="Delete"
 	destructive={true}
 	loading={$deleteMutation.isPending}
-	onConfirm={() => deleteMutation.mutate()}
+	onConfirm={() => $deleteMutation.mutate()}
 	onCancel={() => (showDeleteConfirm = false)}
 />

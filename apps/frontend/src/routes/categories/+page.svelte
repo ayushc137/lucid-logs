@@ -7,7 +7,7 @@ import {
 	getCategories,
 	updateCategory,
 } from '$lib/api/categories';
-import { ColorPicker, ConfirmDialog, ErrorAlert } from '$lib/components/ui';
+import { ColorPicker, ConfirmDialog, ErrorAlert, Fab } from '$lib/components/ui';
 import { COLOR_PRESETS, DEFAULT_COLOR, getContrastColor } from '$lib/constants';
 import { cn } from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
@@ -231,7 +231,7 @@ function highlightText(text: string, query: string): string {
             </p>
         </div>
         <button
-            class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+            class="hidden lg:inline-flex btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
             onclick={() => (isCreating = true)}
         >
             <Plus class="w-4 h-4" />
@@ -435,8 +435,9 @@ function highlightText(text: string, query: string): string {
             </div>
         </div>
     {:else}
+        <!-- Desktop: table -->
         <div
-            class="card bg-base-100 shadow-lg border border-base-200 overflow-hidden"
+            class="hidden lg:block card bg-base-100 shadow-lg border border-base-200 overflow-hidden"
         >
             <div class="overflow-x-auto">
                 <table class="table table-lg">
@@ -644,8 +645,134 @@ function highlightText(text: string, query: string): string {
                 {/if}
             </div>
         </div>
+
+        <!-- Mobile: card list -->
+        <div class="lg:hidden space-y-2">
+            {#each categories as category (category.id)}
+                {#if editingId === category.id}
+                    <!-- Inline edit card -->
+                    <div class="card bg-base-100 border border-primary/30 shadow-sm">
+                        <div class="card-body p-3 gap-3">
+                            <div class="form-control">
+                                <label class="label py-0" for="m-edit-name">
+                                    <span class="label-text text-xs font-medium">Name</span>
+                                </label>
+                                <input
+                                    id="m-edit-name"
+                                    type="text"
+                                    class="input input-bordered input-sm"
+                                    maxlength={40}
+                                    bind:value={editName}
+                                />
+                            </div>
+                            <div class="form-control">
+                                <label class="label py-0">
+                                    <span class="label-text text-xs font-medium">Color</span>
+                                    <button
+                                        type="button"
+                                        class={cn(
+                                            "btn btn-xs gap-1",
+                                            editUseCustomColor ? "btn-primary" : "btn-ghost",
+                                        )}
+                                        onclick={() => (editUseCustomColor = !editUseCustomColor)}
+                                    >
+                                        <Pipette class="w-3 h-3" />
+                                        Custom
+                                    </button>
+                                </label>
+                                <ColorPicker
+                                    bind:value={editColor}
+                                    customMode={editUseCustomColor}
+                                    size="sm"
+                                />
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <button
+                                    class="btn btn-ghost btn-sm text-error gap-1"
+                                    onclick={(e) => confirmDelete(category.id, e)}
+                                >
+                                    <Trash2 class="w-4 h-4" />
+                                    Delete
+                                </button>
+                                <div class="flex gap-2">
+                                    <button
+                                        class="btn btn-ghost btn-sm"
+                                        onclick={() => (editingId = null)}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        class="btn btn-primary btn-sm gap-1"
+                                        onclick={saveEdit}
+                                        disabled={$updateMut.isPending}
+                                    >
+                                        {#if $updateMut.isPending}
+                                            <span class="loading loading-spinner loading-xs"></span>
+                                        {:else}
+                                            <Check class="w-4 h-4" />
+                                        {/if}
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {:else}
+                    <!-- View card -->
+                    <article
+                        class="card bg-base-100 border border-base-200 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
+                        onclick={() => startEdit(category)}
+                        role="link"
+                        tabindex="0"
+                        onkeydown={(e) => e.key === "Enter" && startEdit(category)}
+                    >
+                        <div class="card-body p-3">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-9 h-9 rounded-lg shadow-sm shrink-0"
+                                    style="background-color: {category.color};"
+                                ></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-semibold text-[15px]">
+                                        {#if debouncedSearch}
+                                            {@html highlightText(category.name, debouncedSearch)}
+                                        {:else}
+                                            {category.name}
+                                        {/if}
+                                    </p>
+                                    <p class="text-xs text-base-content/50 mt-0.5">
+                                        {new Date(category.created_at).toLocaleDateString([], {
+                                            month: "short",
+                                            day: "numeric",
+                                            year: "numeric",
+                                        })}
+                                    </p>
+                                </div>
+                                <span
+                                    class="badge badge-sm shrink-0"
+                                    style="background-color: {category.color}20; color: {category.color};"
+                                >
+                                    {category.color}
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+                {/if}
+            {/each}
+
+            <!-- Mobile footer -->
+            <div class="flex items-center justify-between px-1 pt-1 text-sm text-base-content/60">
+                <span>{categories.length} categories</span>
+                {#if $query.isFetching}
+                    <LoaderCircle class="w-4 h-4 animate-spin text-primary" />
+                {/if}
+            </div>
+        </div>
     {/if}
 </div>
+
+<!-- FAB -->
+<Fab onclick={() => (isCreating = true)} label="New Category" />
 
 <!-- Delete Confirmation Modal -->
 <ConfirmDialog

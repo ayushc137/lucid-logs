@@ -1014,9 +1014,9 @@
 
 	<!-- Sticky Footer Actions -->
 	<div
-		class="sticky bottom-0 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mt-auto bg-base-100/95 backdrop-blur-md border-t border-base-300 shadow-lg z-30"
+		class="sticky bottom-0 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mt-auto bg-base-100/95 backdrop-blur-md border-t border-base-300 shadow-lg z-30 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
 	>
-		<div class="flex items-center justify-between gap-4">
+		<div class="flex items-center justify-between gap-2 sm:gap-4">
 			<div class="flex items-center gap-3">
 				{#if isEditing}
 					<button

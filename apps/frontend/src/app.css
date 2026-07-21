@@ -28,10 +28,11 @@
 	--color-base-300: #eceef2;
 	--color-base-content: #16181d;
 
-	/* single accent: calm indigo */
+	/* single accent: calm indigo; secondary + accent as warm neutrals so
+	   "active" badges don't read as AI-purple */
 	--color-primary: #4f46e5;
 	--color-primary-content: #ffffff;
-	--color-secondary: #7c3aed;
+	--color-secondary: #0d9488;
 	--color-secondary-content: #ffffff;
 	--color-accent: #0d9488;
 	--color-accent-content: #ffffff;
@@ -219,4 +220,39 @@
 	.has-mobile-nav {
 		padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0));
 	}
+}
+
+/* ─── FAB: lifted above the mobile tab bar, hugging the corner on desktop ── */
+.fab {
+	position: fixed;
+	right: 1rem;
+	bottom: calc(4.75rem + env(safe-area-inset-bottom, 0));
+	z-index: 40;
+}
+@media (min-width: 1024px) {
+	.fab {
+		right: 1.5rem;
+		bottom: 1.5rem;
+	}
+}
+
+/* ─── Mobile list rows: the card-based replacement for tables on phones ── */
+.mobile-row {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.75rem 1rem;
+	min-height: 3.5rem;
+}
+
+/* Thin "toolbar strip" that scrolls horizontally on mobile instead of wrapping */
+.scroll-x-strip {
+	display: flex;
+	gap: 0.5rem;
+	overflow-x: auto;
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
+}
+.scroll-x-strip::-webkit-scrollbar {
+	display: none;
 }

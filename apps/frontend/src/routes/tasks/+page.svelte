@@ -21,6 +21,7 @@
     ConfirmDialog,
     DataTable,
     ErrorAlert,
+    Fab,
     OpenMoji,
     PriorityDropdown,
     SortableHeader,
@@ -481,7 +482,7 @@ ${isInferred ? "(Inferred)" : ""}`}
       </p>
     </div>
     <button
-      class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+      class="hidden lg:inline-flex btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
       onclick={openCreateModal}
     >
       <Plus class="w-4 h-4" />
@@ -491,8 +492,8 @@ ${isInferred ? "(Inferred)" : ""}`}
 
   <!-- Search and Filters Bar -->
   <div class="card bg-base-100 shadow-lg border border-base-200">
-    <div class="card-body p-4">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
+    <div class="card-body p-3 sm:p-4">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
         <!-- Search Input -->
         <div class="relative flex-1">
           {#if isSearching || $tasksQuery.isFetching}
@@ -526,9 +527,11 @@ ${isInferred ? "(Inferred)" : ""}`}
         </div>
 
         <!-- Today Only Toggle -->
-        <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2">
-          <CalendarDays class="w-4 h-4 opacity-60" />
-          <span class="text-sm font-medium">Today</span>
+        <div class="flex items-center justify-between gap-2 bg-base-200 rounded-lg px-3 py-2">
+          <div class="flex items-center gap-2">
+            <CalendarDays class="w-4 h-4 opacity-60" />
+            <span class="text-sm font-medium">Today</span>
+          </div>
           <input
             type="checkbox"
             class="toggle toggle-primary toggle-sm"
@@ -686,7 +689,9 @@ ${isInferred ? "(Inferred)" : ""}`}
       </div>
     </div>
   {:else}
-    <DataTable variant="lg">
+    <!-- Desktop: sortable table -->
+    <div class="hidden lg:block">
+      <DataTable variant="lg">
       <!-- Table Header with Sortable Columns -->
       <thead class="bg-base-100 border-b border-base-300">
         <tr>
@@ -879,9 +884,124 @@ ${isInferred ? "(Inferred)" : ""}`}
           </div>
         </div>
       {/snippet}
-    </DataTable>
+      </DataTable>
+    </div>
+
+    <!-- Mobile: card list -->
+    <div class="lg:hidden space-y-2">
+      {#each tasks as task (task.id)}
+        <article
+          class={cn(
+            "card bg-base-100 border border-base-200 shadow-sm active:scale-[0.99] transition-all cursor-pointer",
+            task.completed && "opacity-70",
+          )}
+          onclick={() => openEditModal(task)}
+          role="link"
+          tabindex="0"
+          onkeydown={(e) => e.key === "Enter" && openEditModal(task)}
+        >
+          <div class="card-body p-3 gap-2">
+            <div class="flex items-start gap-3">
+              <!-- Complete toggle -->
+              <button
+                class="mt-0.5 shrink-0"
+                onclick={(e) => toggleComplete(task, e)}
+                disabled={$toggleCompleteMut.isPending}
+                aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
+              >
+                <div
+                  class={cn(
+                    "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                    task.completed
+                      ? "bg-success border-success text-success-content"
+                      : "border-base-content/25",
+                  )}
+                >
+                  {#if task.completed}
+                    <Check class="w-4 h-4" />
+                  {/if}
+                </div>
+              </button>
+
+              <!-- Title + meta -->
+              <div class="flex-1 min-w-0">
+                <p
+                  class={cn(
+                    "font-semibold text-[15px] leading-snug",
+                    task.completed && "line-through opacity-50",
+                  )}
+                >
+                  {#if debouncedSearch}
+                    {@html highlightText(task.title, debouncedSearch)}
+                  {:else}
+                    {task.title}
+                  {/if}
+                </p>
+                {#if task.journal}
+                  <p class="text-xs text-base-content/55 line-clamp-1 mt-0.5">
+                    {task.journal.replace(/<[^>]*>/g, "").slice(0, 80)}
+                  </p>
+                {/if}
+                <div class="flex items-center gap-2 flex-wrap mt-2">
+                  <span class="text-xs text-base-content/50 flex items-center gap-1">
+                    <Clock class="w-3 h-3" />
+                    {formatShortDate(task.start_date)}
+                    · {formatTime(task.start_date)} - {formatTime(task.end_date)}
+                  </span>
+                  {#if task.category}
+                    <span
+                      class="badge badge-sm"
+                      style="background-color: {task.category
+                        .color}20; color: {task.category.color};"
+                    >
+                      {task.category.name}
+                    </span>
+                  {/if}
+                  <span
+                    class={cn("badge badge-sm", getPriorityColor(task.priority))}
+                  >
+                    {getPriorityLabel(task.priority)}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Emotion + delete -->
+              <div class="flex flex-col items-end gap-2 shrink-0">
+                {@render taskEmotion(task)}
+                <button
+                  class="btn btn-ghost btn-xs btn-square text-error/70"
+                  onclick={(e) => confirmDelete(task.id, e)}
+                  aria-label="Delete task"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+      {/each}
+
+      <!-- Mobile footer -->
+      <div
+        class="flex items-center justify-between px-1 pt-1 text-sm text-base-content/60"
+      >
+        <span>{tasks.length} of {totalTasks} tasks</span>
+        <div class="flex items-center gap-2">
+          {#if $tasksQuery.isFetching}
+            <LoaderCircle class="w-4 h-4 animate-spin text-primary" />
+          {:else if hasMore}
+            <button class="btn btn-ghost btn-sm" onclick={loadMore}>
+              Load More
+            </button>
+          {/if}
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
+
+<!-- FAB (mobile-first: primary add action lives in thumb zone) -->
+<Fab onclick={openCreateModal} label="New Task" />
 
 <!-- Delete Dialog -->
 <ConfirmDialog
