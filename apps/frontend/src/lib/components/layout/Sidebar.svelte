@@ -49,38 +49,29 @@ function handleLogout() {
 
 <aside
   class={cn(
-    "flex flex-col h-screen transition-all duration-300 bg-base-200/95 backdrop-blur-sm border-r border-base-300 z-50 relative",
-    collapsed ? "w-20" : "w-64",
+    "flex flex-col h-dvh transition-[width] duration-200 ease-out bg-base-100 border-r border-base-300/70 z-50 relative",
+    collapsed ? "w-[76px]" : "w-64",
   )}
 >
   <!-- Logo -->
   <div
     class={cn(
-      "flex items-center h-16 flex-shrink-0",
-      collapsed ? "justify-center" : "px-4 gap-3",
+      "flex items-center h-16 flex-shrink-0 border-b border-base-300/60",
+      collapsed ? "justify-center" : "px-5 gap-3",
     )}
   >
-    <div class="relative group">
-      <div
-        class="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-200"
-      ></div>
-      <img
-        src="/icon.png"
-        alt="Lucid Logs"
-        class="relative w-10 h-10 rounded-xl shadow-sm"
-      />
-    </div>
+    <img
+      src="/icon.png"
+      alt="Lucid Logs"
+      class="w-8 h-8 rounded-lg ring-1 ring-base-300/60"
+    />
     {#if !collapsed}
       <div class="flex flex-col overflow-hidden">
-        <span
-          class="font-bold text-lg leading-tight bg-clip-text text-transparent bg-gradient-to-r from-base-content to-base-content/70"
-        >
+        <span class="font-semibold text-[15px] leading-tight tracking-tight">
           Lucid Logs
         </span>
-        <span
-          class="text-[11px] font-medium text-base-content/50 uppercase tracking-wider"
-        >
-          Daily Journey
+        <span class="text-[11px] font-medium text-base-content/45 tracking-wide">
+          Daily journey
         </span>
       </div>
     {/if}
@@ -89,10 +80,8 @@ function handleLogout() {
   <!-- Navigation -->
   <nav
     class={cn(
-      "flex-1 flex flex-col gap-2 py-4",
-      collapsed
-        ? "px-2 items-center"
-        : "px-3 overflow-y-auto overflow-x-hidden",
+      "flex-1 flex flex-col gap-1 py-4",
+      collapsed ? "px-3 items-center" : "px-3 overflow-y-auto overflow-x-hidden",
     )}
   >
     {#each navItems as item}
@@ -100,31 +89,26 @@ function handleLogout() {
       <a
         href={item.href}
         class={cn(
-          "flex items-center transition-all duration-200 ease-out group relative",
-          collapsed
-            ? "justify-center w-12 h-12 rounded-xl"
-            : "w-full px-3 py-2.5 rounded-xl gap-3",
+          "flex items-center rounded-lg transition-colors group relative",
+          collapsed ? "justify-center w-11 h-11" : "w-full px-3 py-2 gap-3",
           active
-            ? "bg-primary text-primary-content shadow-md shadow-primary/20"
+            ? "bg-primary/10 text-primary font-medium"
             : "text-base-content/60 hover:bg-base-200 hover:text-base-content",
         )}
         data-tip={collapsed ? item.label : undefined}
         class:tooltip={collapsed}
         class:tooltip-right={collapsed}
+        aria-current={active ? 'page' : undefined}
       >
+        {#if active && !collapsed}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary"></span>
+        {/if}
         <item.icon
-          class={cn(
-            "transition-transform duration-200 group-hover:scale-110",
-            collapsed ? "w-6 h-6" : "w-5 h-5",
-          )}
+          class={cn("shrink-0", collapsed ? "w-5 h-5" : "w-[18px] h-[18px]")}
+          strokeWidth={active ? 2.3 : 2}
         />
         {#if !collapsed}
-          <span class="font-medium text-sm">{item.label}</span>
-          {#if active}
-            <div
-              class="absolute right-2 w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse"
-            ></div>
-          {/if}
+          <span class="text-sm">{item.label}</span>
         {/if}
       </a>
     {/each}
@@ -133,67 +117,57 @@ function handleLogout() {
   <!-- Bottom -->
   <div
     class={cn(
-      "flex-shrink-0 flex flex-col gap-1 border-t border-base-200 bg-base-50/50",
-      collapsed ? "p-2 items-center" : "p-3",
+      "flex-shrink-0 flex flex-col gap-1 border-t border-base-300/60",
+      collapsed ? "p-3 items-center" : "p-3",
     )}
   >
     <!-- Theme Picker -->
     <div
       class={cn(
         "dropdown",
-        collapsed
-          ? "dropdown-right dropdown-end"
-          : "dropdown-top dropdown-end w-full",
+        collapsed ? "dropdown-right dropdown-end" : "dropdown-top dropdown-end w-full",
       )}
     >
       <button
         tabindex="0"
         class={cn(
-          "flex items-center transition-all duration-200",
-          collapsed
-            ? "justify-center w-12 h-12 rounded-xl hover:bg-base-200 text-base-content/70 hover:text-base-content"
-            : "w-full p-2 rounded-xl hover:bg-base-200 text-base-content/70 hover:text-base-content gap-3",
+          "flex items-center rounded-lg transition-colors text-base-content/60 hover:text-base-content hover:bg-base-200",
+          collapsed ? "justify-center w-11 h-11" : "w-full px-3 py-2 gap-3",
         )}
         data-tip={collapsed ? "Theme" : undefined}
         class:tooltip={collapsed}
         class:tooltip-right={collapsed}
       >
-        <Palette class={collapsed ? "w-5 h-5" : "w-4 h-4"} />
+        <Palette class={collapsed ? "w-5 h-5" : "w-[18px] h-[18px]"} />
         {#if !collapsed}
-          <span class="flex-1 text-left text-sm font-medium">Theme</span>
-          <div
-            class="flex items-center justify-center w-6 h-6 rounded-md bg-base-100 border border-base-200 shadow-sm text-sm"
-          >
-            {themeStore.currentTheme?.emoji}
-          </div>
+          <span class="flex-1 text-left text-sm">Theme</span>
+          <span class="text-base">{themeStore.currentTheme?.emoji}</span>
         {/if}
       </button>
 
       <ul
         class={cn(
-          "dropdown-content menu bg-base-100 rounded-2xl z-[100] w-60 p-2 shadow-2xl shadow-black/5 border border-base-200",
+          "dropdown-content menu bg-base-100 rounded-xl z-[100] w-60 p-1.5 shadow-xl border border-base-300/70",
           collapsed && "ml-2",
         )}
       >
-        <li
-          class="menu-title px-2 py-1 text-xs font-semibold text-base-content/40 uppercase tracking-wider"
-        >
-          Select Theme
+        <li class="menu-title px-2 py-1.5 text-[11px] font-semibold text-base-content/40 uppercase tracking-wider">
+          Theme
         </li>
-        <div class="h-64 overflow-y-auto">
+        <div class="max-h-64 overflow-y-auto">
           {#each THEMES as theme}
             <li>
               <button
                 onclick={() => themeStore.set(theme.id)}
                 class={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-xl my-0.5",
+                  "flex items-center gap-3 px-2.5 py-2 rounded-lg",
                   themeStore.current === theme.id
                     ? "bg-primary/10 text-primary"
                     : "hover:bg-base-200",
                 )}
               >
-                <span class="text-xl">{theme.emoji}</span>
-                <span class="flex-1 font-medium text-sm">{theme.label}</span>
+                <span class="text-lg">{theme.emoji}</span>
+                <span class="flex-1 text-sm font-medium">{theme.label}</span>
                 {#if themeStore.current === theme.id}
                   <Check class="w-4 h-4" />
                 {/if}
@@ -204,66 +178,57 @@ function handleLogout() {
       </ul>
     </div>
 
-    <!-- Settings & Logout Group -->
-    <div class="flex flex-col gap-0.5">
-      <a
-        href="/settings"
-        class={cn(
-          "flex items-center transition-all duration-200",
-          collapsed
-            ? "justify-center w-12 h-12 rounded-xl hover:bg-base-200 text-base-content/70 hover:text-base-content"
-            : "w-full p-2 rounded-xl hover:bg-base-200 text-base-content/70 hover:text-base-content gap-3",
-          $page.url.pathname === "/settings" && "bg-base-200 text-base-content",
-        )}
-        data-tip={collapsed ? "Settings" : undefined}
-        class:tooltip={collapsed}
-        class:tooltip-right={collapsed}
-      >
-        <Settings class={collapsed ? "w-5 h-5" : "w-4 h-4"} />
-        {#if !collapsed}
-          <span class="text-sm font-medium">Settings</span>
-        {/if}
-      </a>
+    <!-- Settings & Logout -->
+    <a
+      href="/settings"
+      class={cn(
+        "flex items-center rounded-lg transition-colors text-base-content/60 hover:text-base-content hover:bg-base-200",
+        collapsed ? "justify-center w-11 h-11" : "w-full px-3 py-2 gap-3",
+        $page.url.pathname === "/settings" && "bg-base-200 text-base-content",
+      )}
+      data-tip={collapsed ? "Settings" : undefined}
+      class:tooltip={collapsed}
+      class:tooltip-right={collapsed}
+    >
+      <Settings class={collapsed ? "w-5 h-5" : "w-[18px] h-[18px]"} />
+      {#if !collapsed}
+        <span class="text-sm">Settings</span>
+      {/if}
+    </a>
 
+    <button
+      class={cn(
+        "flex items-center rounded-lg transition-colors text-base-content/60 hover:text-error hover:bg-error/10",
+        collapsed ? "justify-center w-11 h-11" : "w-full px-3 py-2 gap-3",
+      )}
+      onclick={handleLogout}
+      data-tip={collapsed ? "Logout" : undefined}
+      class:tooltip={collapsed}
+      class:tooltip-right={collapsed}
+    >
+      <LogOut class={collapsed ? "w-5 h-5" : "w-[18px] h-[18px]"} />
+      {#if !collapsed}
+        <span class="text-sm">Logout</span>
+      {/if}
+    </button>
+
+    <!-- Collapse Toggle -->
+    <div class="border-t border-base-300/60 mt-1 pt-1 w-full">
       <button
         class={cn(
-          "flex items-center transition-all duration-200 text-error/80 hover:text-error",
-          collapsed
-            ? "justify-center w-12 h-12 rounded-xl hover:bg-error/10"
-            : "w-full p-2 rounded-xl hover:bg-error/10 gap-3",
+          "flex items-center justify-center rounded-lg transition-colors text-base-content/40 hover:text-base-content hover:bg-base-200",
+          collapsed ? "w-8 h-8 mx-auto" : "w-full py-1.5 gap-2",
         )}
-        onclick={handleLogout}
-        data-tip={collapsed ? "Logout" : undefined}
-        class:tooltip={collapsed}
-        class:tooltip-right={collapsed}
+        onclick={onToggle}
+        aria-label="Toggle sidebar"
       >
-        <LogOut class={collapsed ? "w-5 h-5" : "w-4 h-4"} />
-        {#if !collapsed}
-          <span class="text-sm font-medium">Logout</span>
+        {#if collapsed}
+          <ChevronRight class="w-4 h-4" />
+        {:else}
+          <ChevronLeft class="w-4 h-4" />
+          <span class="text-xs font-medium">Collapse</span>
         {/if}
       </button>
     </div>
-
-    <!-- Collapse Toggle -->
-    <div class="divider my-1 w-full opacity-50"></div>
-    <button
-      class={cn(
-        "flex items-center justify-center transition-all duration-200 text-base-content/40 hover:text-base-content hover:bg-base-200",
-        collapsed
-          ? "w-8 h-8 rounded-lg mx-auto"
-          : "w-full py-1.5 rounded-lg gap-2",
-      )}
-      onclick={onToggle}
-      aria-label="Toggle sidebar"
-    >
-      {#if collapsed}
-        <ChevronRight class="w-4 h-4" />
-      {:else}
-        <ChevronLeft class="w-4 h-4" />
-        <span class="text-xs font-medium uppercase tracking-wider"
-          >Collapse</span
-        >
-      {/if}
-    </button>
   </div>
 </aside>

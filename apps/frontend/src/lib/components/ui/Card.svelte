@@ -22,22 +22,30 @@ let {
 	children,
 }: Props = $props();
 
-const baseClass = 'card bg-base-100';
-const shadowClass = $derived(shadow ? 'shadow-lg' : 'shadow-sm');
+const shadowClass = $derived(
+	shadow ? 'shadow-sm hover:shadow-md transition-shadow' : '',
+);
 const variantClasses: Record<Variant, string> = {
-	default: '',
-	bordered: 'border border-base-200',
-	compact: '',
+	default: 'border border-base-300/60',
+	bordered: 'border border-base-300',
+	compact: 'border border-base-300/60',
 };
 const bodyClasses: Record<Variant, string> = {
-	default: 'p-4 lg:p-5',
-	bordered: 'p-4 lg:p-5',
+	default: 'p-4 sm:p-5',
+	bordered: 'p-4 sm:p-5',
 	compact: 'p-3',
 };
 </script>
 
-<div class={cn(baseClass, shadowClass, variantClasses[variant], className)}>
-    <div class="card-body {bodyClasses[variant]}">
+<div
+    class={cn(
+        "card bg-base-100 rounded-2xl",
+        shadowClass,
+        variantClasses[variant],
+        className
+    )}
+>
+    <div class="card-body {bodyClasses[variant]} gap-0">
         {@render children()}
     </div>
 </div>

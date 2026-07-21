@@ -5,14 +5,12 @@ import { page } from '$app/stores';
 import { authStore } from '$lib/stores/auth.svelte';
 import {
 	ArrowLeft,
-	Bell,
 	ChevronRight,
 	ClipboardList,
 	Edit3,
 	Home,
 	LogOut,
 	Menu,
-	Plus,
 	Search,
 	Settings,
 } from 'lucide-svelte';
@@ -26,12 +24,10 @@ interface Props {
 
 let { onMenuClick, showSearch = true, headerContent }: Props = $props();
 
-// Get first letter of email for avatar
 const avatarLetter = $derived(
 	authStore.userEmail?.charAt(0).toUpperCase() || 'U',
 );
 
-// Task Page Detection
 const isTaskCreatePage = $derived($page.url.pathname === '/tasks/create');
 const isTaskEditPage = $derived(
 	$page.url.pathname.startsWith('/tasks/') &&
@@ -40,7 +36,6 @@ const isTaskEditPage = $derived(
 );
 const isTaskPage = $derived(isTaskCreatePage || isTaskEditPage);
 
-// Back Navigation Logic
 let referrer = $state<string>('/tasks');
 
 $effect(() => {
@@ -55,134 +50,104 @@ $effect(() => {
 function handleBack() {
 	goto(referrer);
 }
+
+function handleLogout() {
+	authStore.logout();
+	goto('/login');
+}
 </script>
 
 <header
-  class="h-16 flex items-center justify-between px-6 bg-base-200/95 backdrop-blur-sm border-b border-base-300 z-40 sticky top-0"
+  class="h-14 sm:h-16 flex items-center justify-between gap-3 px-4 sm:px-6 bg-base-100/80 backdrop-blur-md border-b border-base-300/70 z-40 sticky top-0"
 >
   <!-- Left -->
-  <div class="flex items-center gap-4 flex-1">
+  <div class="flex items-center gap-2 flex-1 min-w-0">
     <button
-      class="btn btn-ghost btn-square lg:hidden shrink-0"
+      class="btn btn-ghost btn-square btn-sm lg:hidden shrink-0 -ml-1"
       onclick={onMenuClick}
-      aria-label="Menu"
+      aria-label="Open menu"
     >
-      <Menu class="w-6 h-6" />
+      <Menu class="w-5 h-5" />
     </button>
 
     {#if isTaskPage}
-      <!-- Task Page Breadcrumbs (Built-in) -->
-      <div class="flex items-center gap-3 flex-1">
-        <button class="btn btn-ghost btn-sm gap-2" onclick={handleBack}>
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <button class="btn btn-ghost btn-sm gap-1.5 -ml-1" onclick={handleBack}>
           <ArrowLeft class="w-4 h-4" />
           <span class="hidden sm:inline">Back</span>
         </button>
 
-        <div class="hidden sm:flex items-center gap-1.5 text-sm">
-          <a
-            href="/"
-            class="flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity"
-          >
+        <div class="hidden sm:flex items-center gap-1.5 text-sm text-base-content/50">
+          <a href="/" class="flex items-center gap-1 hover:text-base-content transition-colors">
             <Home class="w-3.5 h-3.5" />
           </a>
-          <ChevronRight class="w-3 h-3 opacity-30" />
-          <a
-            href="/tasks"
-            class="opacity-50 hover:opacity-100 transition-opacity">Tasks</a
-          >
-          <ChevronRight class="w-3 h-3 opacity-30" />
+          <ChevronRight class="w-3 h-3 opacity-40" />
+          <a href="/tasks" class="hover:text-base-content transition-colors">Tasks</a>
+          <ChevronRight class="w-3 h-3 opacity-40" />
           {#if isTaskEditPage}
-            <span class="font-medium flex items-center gap-1.5 text-primary">
-              <Edit3 class="w-3.5 h-3.5" />
+            <span class="font-medium flex items-center gap-1.5 text-base-content">
+              <Edit3 class="w-3.5 h-3.5 text-primary" />
               Edit Task
             </span>
           {:else}
-            <span class="font-medium flex items-center gap-1.5 text-primary">
-              <ClipboardList class="w-3.5 h-3.5" />
+            <span class="font-medium flex items-center gap-1.5 text-base-content">
+              <ClipboardList class="w-3.5 h-3.5 text-primary" />
               New Task
             </span>
           {/if}
         </div>
       </div>
     {:else if headerContent}
-      <!-- Custom header content (breadcrumbs, back button, etc) -->
       {@render headerContent()}
     {:else if showSearch}
-      <!-- Search Bar - only shown when showSearch is true -->
-      <div class="hidden sm:flex items-center gap-2">
+      <div class="hidden sm:flex items-center">
         <label
-          class="input input-bordered flex items-center gap-3 w-72 h-10 bg-base-200/50 hover:bg-base-200 transition-colors focus-within:bg-base-100 focus-within:border-primary/50"
+          class="input input-sm input-bordered flex items-center gap-2 w-64 lg:w-72 bg-base-200/60 border-transparent hover:border-base-300 focus-within:bg-base-100 focus-within:border-primary/40 transition-colors"
         >
-          <Search class="w-4 h-4 opacity-50" />
+          <Search class="w-4 h-4 opacity-40" />
           <input
             type="text"
-            placeholder="Search logs..."
-            class="grow bg-transparent placeholder:text-base-content/40"
+            placeholder="Search…"
+            class="grow bg-transparent placeholder:text-base-content/40 text-sm"
           />
-          <kbd
-            class="kbd kbd-sm h-6 min-h-0 bg-base-300 border-none text-[10px] font-bold opacity-60"
-            >⌘K</kbd
-          >
+          <kbd class="kbd kbd-xs bg-base-300/70 border-none text-[10px] opacity-60">⌘K</kbd>
         </label>
       </div>
     {/if}
   </div>
 
   <!-- Right -->
-  <div class="flex items-center gap-3">
-    <!-- Notifications -->
-    <button
-      class="btn btn-ghost btn-circle h-10 w-10 min-h-0 hover:bg-base-200"
-      aria-label="Notifications"
-    >
-      <div class="indicator">
-        <Bell class="w-5 h-5" />
-        <span
-          class="badge badge-error badge-xs indicator-item w-2 h-2 p-0 border-2 border-base-100"
-        ></span>
-      </div>
-    </button>
-
-    <!-- User Avatar with Dropdown -->
+  <div class="flex items-center gap-1.5">
+    <!-- User menu -->
     <div class="dropdown dropdown-end">
       <button
         tabindex="0"
-        class="btn btn-ghost btn-circle avatar h-10 w-10 min-h-0 hover:ring-2 hover:ring-primary/20 transition-all p-0"
+        class="flex items-center justify-center w-9 h-9 rounded-full bg-primary/10 text-primary font-semibold text-sm ring-1 ring-primary/20 hover:ring-primary/40 transition-shadow"
+        aria-label="Account"
       >
-        <div
-          class="w-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center shadow-lg shadow-primary/20"
-        >
-          <span class="text-sm font-bold">{avatarLetter}</span>
-        </div>
+        {avatarLetter}
       </button>
       <div
-        class="dropdown-content z-50 mt-2 w-52 rounded-xl bg-base-100 shadow-2xl border border-base-200 overflow-hidden"
+        class="dropdown-content z-50 mt-2 w-56 rounded-xl bg-base-100 shadow-xl border border-base-300/70 overflow-hidden"
         role="menu"
       >
-        <!-- User Info Header -->
-        <div class="px-4 py-3 bg-base-200/50 border-b border-base-200">
-          <p class="text-sm font-medium text-base-content truncate">
-            {authStore.userEmail || "User"}
-          </p>
+        <div class="px-4 py-3 border-b border-base-300/60">
+          <p class="text-sm font-medium truncate">{authStore.userEmail || "User"}</p>
         </div>
-
-        <!-- Menu Items -->
-        <div class="p-2 flex flex-col gap-1">
+        <div class="p-1.5">
           <a
             href="/settings"
-            class="btn btn-ghost btn-sm w-full justify-start gap-3"
+            class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm hover:bg-base-200 transition-colors"
           >
-            <Settings class="w-4 h-4" />
-            <span>Settings</span>
+            <Settings class="w-4 h-4 opacity-60" />
+            Settings
           </a>
-
-          <div class="divider my-1"></div>
-
           <button
-            class="btn btn-ghost btn-sm w-full justify-start gap-3 text-error hover:bg-error/10"
+            onclick={handleLogout}
+            class="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors"
           >
             <LogOut class="w-4 h-4" />
-            <span>Logout</span>
+            Logout
           </button>
         </div>
       </div>

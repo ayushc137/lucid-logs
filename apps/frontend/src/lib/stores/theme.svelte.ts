@@ -4,6 +4,8 @@
  */
 
 export type ThemeId =
+	| 'lucid-light'
+	| 'lucid-dark'
 	| 'light'
 	| 'dark'
 	| 'nord'
@@ -25,6 +27,20 @@ export interface Theme {
 
 // 10 curated themes - used by both sidebar and settings
 export const THEMES: Theme[] = [
+	{
+		id: 'lucid-light',
+		label: 'Lucid',
+		emoji: '✨',
+		description: 'Clean & Modern',
+		isDark: false,
+	},
+	{
+		id: 'lucid-dark',
+		label: 'Lucid Dark',
+		emoji: '🌌',
+		description: 'Calm & Focused',
+		isDark: true,
+	},
 	{
 		id: 'light',
 		label: 'Light',
@@ -99,7 +115,7 @@ export const THEMES: Theme[] = [
 
 // Use same key as sidebar was using for backward compatibility
 const STORAGE_KEY = 'theme';
-const DEFAULT_THEME: ThemeId = 'dark';
+const DEFAULT_THEME: ThemeId = 'lucid-light';
 
 function createThemeStore() {
 	// Determine initial theme before creating state to avoid state_referenced_locally warning

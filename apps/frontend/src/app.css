@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,450;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @import "./lib/components/rich-editor/rich-editor.css";
 
@@ -6,13 +6,217 @@
 
 /* biome-ignore css/noUnknownProperty: tailwind 4 syntax */
 @plugin "daisyui" {
-	themes: light --default, dark --prefersdark, nord, night, dim, lofi, winter,
-		corporate, retro, dracula;
+	themes:
+		lucid-light --default,
+		lucid-dark --prefersdark,
+		light, dark, nord, night, dim, lofi, winter, corporate, retro, dracula;
 }
 
-/* Base font */
+/* ─── Lucid Logs custom themes ───────────────────────────────────────────
+   Refined neutral surfaces, a single calm indigo accent, generous radius,
+   soft tinted shadows. Works in light + dark. */
 
-/* Base font */
-* {
-	font-family: "Inter", system-ui, -apple-system, sans-serif;
+@plugin "daisyui/theme" {
+	name: "lucid-light";
+	default: true;
+	prefersdark: false;
+	color-scheme: light;
+
+	/* surfaces */
+	--color-base-100: #ffffff;
+	--color-base-200: #f6f7f9;
+	--color-base-300: #eceef2;
+	--color-base-content: #16181d;
+
+	/* single accent: calm indigo */
+	--color-primary: #4f46e5;
+	--color-primary-content: #ffffff;
+	--color-secondary: #7c3aed;
+	--color-secondary-content: #ffffff;
+	--color-accent: #0d9488;
+	--color-accent-content: #ffffff;
+
+	--color-neutral: #2a2f3a;
+	--color-neutral-content: #f4f5f7;
+
+	--color-info: #0284c7;
+	--color-info-content: #ffffff;
+	--color-success: #16a34a;
+	--color-success-content: #ffffff;
+	--color-warning: #d97706;
+	--color-warning-content: #ffffff;
+	--color-error: #dc2626;
+	--color-error-content: #ffffff;
+
+	/* shape */
+	--radius-selector: 0.75rem;
+	--radius-field: 0.625rem;
+	--radius-box: 1rem;
+
+	/* sizing */
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+
+	/* borders + depth */
+	--border: 1px;
+	--depth: 1;
+	--noise: 0;
+}
+
+@plugin "daisyui/theme" {
+	name: "lucid-dark";
+	default: false;
+	prefersdark: true;
+	color-scheme: dark;
+
+	/* surfaces — deep, not pure black */
+	--color-base-100: #14161b;
+	--color-base-200: #0f1115;
+	--color-base-300: #1d2026;
+	--color-base-content: #e7e9ee;
+
+	--color-primary: #818cf8;
+	--color-primary-content: #14161b;
+	--color-secondary: #a78bfa;
+	--color-secondary-content: #14161b;
+	--color-accent: #2dd4bf;
+	--color-accent-content: #0b0d10;
+
+	--color-neutral: #23262e;
+	--color-neutral-content: #d4d7de;
+
+	--color-info: #38bdf8;
+	--color-info-content: #082f49;
+	--color-success: #4ade80;
+	--color-success-content: #052e16;
+	--color-warning: #fbbf24;
+	--color-warning-content: #451a03;
+	--color-error: #f87171;
+	--color-error-content: #450a0a;
+
+	--radius-selector: 0.75rem;
+	--radius-field: 0.625rem;
+	--radius-box: 1rem;
+
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+
+	--border: 1px;
+	--depth: 1;
+	--noise: 0;
+}
+
+/* ─── Base typography ─────────────────────────────────────────────────── */
+
+@layer base {
+	* {
+		font-family:
+			"Inter",
+			system-ui,
+			-apple-system,
+			"Segoe UI",
+			sans-serif;
+		font-feature-settings:
+			"cv11", "ss01", "ss03";
+	}
+
+	html {
+		scroll-behavior: smooth;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	body {
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	/* Numeric data should align */
+	.tnum,
+	table,
+	.stat-value {
+		font-variant-numeric: tabular-nums;
+	}
+
+	code,
+	pre,
+	kbd,
+	.font-mono {
+		font-family: "JetBrains Mono", ui-monospace, monospace;
+	}
+
+	/* Headings get presence + balanced wrapping */
+	h1, h2, h3, h4 {
+		letter-spacing: -0.02em;
+		text-wrap: balance;
+	}
+
+	/* Visible, calm focus rings everywhere */
+	:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
+		border-radius: var(--radius-field);
+	}
+
+	/* Scrollbars that don't fight the design */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: color-mix(in oklab, var(--color-base-content) 18%, transparent) transparent;
+	}
+	*::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+	*::-webkit-scrollbar-thumb {
+		background: color-mix(in oklab, var(--color-base-content) 16%, transparent);
+		border-radius: 999px;
+	}
+	*::-webkit-scrollbar-track {
+		background: transparent;
+	}
+}
+
+/* ─── Motion: gentle, consistent, respects reduced-motion ────────────── */
+
+@layer base {
+	@media (prefers-reduced-motion: no-preference) {
+		.transition-ui {
+			transition:
+				color 160ms ease,
+				background-color 160ms ease,
+				border-color 160ms ease,
+				box-shadow 200ms ease,
+				transform 160ms ease,
+				opacity 160ms ease;
+		}
+	}
+}
+
+/* ─── Mobile ergonomics ───────────────────────────────────────────────── */
+
+@layer base {
+	/* Don't let iOS zoom on input focus */
+	input, select, textarea {
+		font-size: 16px;
+	}
+	@media (min-width: 768px) {
+		input, select, textarea {
+			font-size: 0.875rem;
+		}
+	}
+}
+
+/* Safe-area helpers for the bottom mobile nav */
+.pb-safe {
+	padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.pt-safe {
+	padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Content offset so pages don't sit under the mobile tab bar */
+@media (max-width: 1023px) {
+	.has-mobile-nav {
+		padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0));
+	}
 }

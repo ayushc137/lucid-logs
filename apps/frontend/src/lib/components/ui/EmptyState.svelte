@@ -30,25 +30,27 @@ let {
 }: Props = $props();
 </script>
 
-<div class="card bg-base-100 shadow-lg border border-base-200 {className}">
-    <div class="card-body py-12 text-center">
+<div
+    class="rounded-2xl border-2 border-dashed border-base-300 bg-base-100/50 {className}"
+>
+    <div class="py-14 px-6 text-center max-w-sm mx-auto">
         {#if icon}
             <div
-                class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4"
+                class="w-14 h-14 rounded-2xl bg-base-200 text-base-content/40 flex items-center justify-center mx-auto mb-4"
             >
                 {@render icon()}
             </div>
         {/if}
-        <h2 class="text-2xl font-bold">{title}</h2>
-        <p class="opacity-60 mt-2 max-w-md mx-auto">
+        <h2 class="text-lg font-semibold tracking-tight">{title}</h2>
+        <p class="text-sm text-base-content/55 mt-1.5 leading-relaxed">
             {description}
         </p>
         {#if showButton}
             <button
-                class="btn btn-primary mt-6 gap-2 shadow-lg shadow-primary/20"
+                class="btn btn-primary btn-sm mt-5 gap-1.5 rounded-lg"
                 onclick={onButtonClick}
             >
-                <Plus class="w-4 h-4" />
+                <Plus class="w-4 h-4" strokeWidth={2.5} />
                 {buttonLabel}
             </button>
         {/if}

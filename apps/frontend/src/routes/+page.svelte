@@ -522,158 +522,111 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 	<!-- Top Section: Welcome + Stats + Quick Logs -->
 	<div class="flex-shrink-0">
 		<!-- Welcome Header -->
-		<div class="flex items-center justify-between mb-4">
-			<div>
-				<p class="text-xs uppercase font-medium opacity-50">
+		<div class="flex items-end justify-between gap-3 mb-5">
+			<div class="min-w-0">
+				<p class="text-[13px] font-medium text-base-content/50">
 					{formatDate()}
 				</p>
-				<h1 class="text-2xl sm:text-3xl font-bold mt-1">
-					{getGreeting()}! 👋
+				<h1 class="text-[1.65rem] sm:text-3xl font-bold tracking-tight mt-0.5 leading-tight">
+					{getGreeting()}
 				</h1>
 			</div>
 			<button
-				class="btn btn-primary gap-2 h-10"
+				class="btn btn-primary gap-1.5 rounded-xl shadow-sm shrink-0"
 				onclick={openTaskModal}
 			>
-				<Plus class="w-4 h-4" />
+				<Plus class="w-4 h-4" strokeWidth={2.5} />
 				<span class="hidden sm:inline">New Task</span>
+				<span class="sm:hidden">New</span>
 			</button>
 		</div>
 
 		<!-- Stats & Quick Log Card -->
 		<div
-			class="card bg-base-100 shadow-md border border-base-200/50 rounded-2xl overflow-hidden"
+			class="card bg-base-100 border border-base-300/60 rounded-2xl shadow-sm overflow-hidden"
 		>
-			<div class="card-body p-5">
+			<div class="card-body p-4 sm:p-5 gap-0">
 				<!-- Stats Row -->
-				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+				<div class="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-4">
 					<!-- Streak -->
-					<div
-						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
-					>
+					<div class="flex items-center gap-3">
 						<div
-							class="w-11 h-11 rounded-xl bg-gradient-to-br from-warning to-warning/70 flex items-center justify-center text-warning-content shadow-md transition-transform duration-300 group-hover:scale-110"
+							class="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0"
 						>
 							<Flame class="w-5 h-5" />
 						</div>
-						<div>
-							<p
-								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
-							>
-								Streak
-							</p>
-							<p
-								class="text-2xl font-bold text-warning leading-tight"
-							>
-								7<span
-									class="text-xs font-medium opacity-60 ml-0.5"
-									>d</span
-								>
+						<div class="min-w-0">
+							<p class="text-xs font-medium text-base-content/50 leading-tight">Streak</p>
+							<p class="text-2xl font-bold tracking-tight leading-tight stat-value mt-0.5">
+								7<span class="text-sm font-medium text-base-content/50 ml-0.5">d</span>
 							</p>
 						</div>
 					</div>
 
 					<!-- Tasks -->
-					<div
-						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
-					>
+					<div class="flex items-center gap-3">
 						<div
-							class="w-11 h-11 rounded-xl bg-gradient-to-br from-info to-info/70 flex items-center justify-center text-info-content shadow-md transition-transform duration-300 group-hover:scale-110"
+							class="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center shrink-0"
 						>
 							<ListTodo class="w-5 h-5" />
 						</div>
-						<div>
-							<p
-								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
-							>
-								Tasks
-							</p>
-							<p
-								class="text-2xl font-bold text-info leading-tight"
-							>
-								{completedCount}<span
-									class="text-xs font-medium opacity-60 ml-0.5"
-									>/{totalCount}</span
-								>
+						<div class="min-w-0">
+							<p class="text-xs font-medium text-base-content/50 leading-tight">Tasks</p>
+							<p class="text-2xl font-bold tracking-tight leading-tight stat-value mt-0.5">
+								{completedCount}<span class="text-sm font-medium text-base-content/50 ml-0.5">/{totalCount}</span>
 							</p>
 						</div>
 					</div>
 
 					<!-- Goals -->
-					<div
-						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
-					>
+					<div class="flex items-center gap-3">
 						<div
-							class="w-11 h-11 rounded-xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center text-accent-content shadow-md transition-transform duration-300 group-hover:scale-110"
+							class="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0"
 						>
 							<Target class="w-5 h-5" />
 						</div>
-						<div>
-							<p
-								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
-							>
-								Goals
-							</p>
-							<p
-								class="text-2xl font-bold text-accent leading-tight"
-							>
-								3<span
-									class="text-xs font-medium opacity-60 ml-0.5"
-									>active</span
-								>
+						<div class="min-w-0">
+							<p class="text-xs font-medium text-base-content/50 leading-tight">Goals</p>
+							<p class="text-2xl font-bold tracking-tight leading-tight stat-value mt-0.5">
+								3<span class="text-sm font-medium text-base-content/50 ml-0.5">active</span>
 							</p>
 						</div>
 					</div>
 
 					<!-- Mood -->
-					<div
-						class="group flex items-center gap-3 p-2.5 rounded-xl bg-base-100 hover:bg-base-200/30 transition-all duration-300 cursor-pointer hover:shadow-[0_4px_20px_rgb(0,0,0,0.06)] hover:-translate-y-0.5"
-					>
+					<div class="flex items-center gap-3">
 						<div
-							class="w-11 h-11 rounded-xl bg-gradient-to-br from-success to-success/70 flex items-center justify-center text-success-content shadow-md transition-transform duration-300 group-hover:scale-110"
+							class="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0"
 						>
 							<Smile class="w-5 h-5" />
 						</div>
-						<div>
-							<p
-								class="text-[10px] font-semibold uppercase tracking-wide opacity-50"
-							>
-								Mood
-							</p>
-							<div class="flex items-center gap-1.5">
-								<span class="text-lg">😊</span>
-								<span class="text-sm font-bold text-success"
-									>Great</span
-								>
+						<div class="min-w-0">
+							<p class="text-xs font-medium text-base-content/50 leading-tight">Mood</p>
+							<div class="flex items-center gap-1.5 mt-0.5">
+								<span class="text-xl leading-none">😊</span>
+								<span class="text-sm font-semibold">Great</span>
 							</div>
 						</div>
 					</div>
 				</div>
 
-				<div class="divider my-3 opacity-50"></div>
+				<div class="border-t border-base-300/60 my-4"></div>
 
 				<!-- Quick Log Row -->
-				<div class="flex items-center justify-between gap-4">
-					<div class="flex items-center gap-2.5">
-						<div
-							class="w-9 h-9 rounded-lg bg-gradient-to-br from-secondary to-secondary/70 flex items-center justify-center text-secondary-content shadow-md"
-						>
-							<Zap class="w-4 h-4" />
-						</div>
-						<span class="font-bold text-sm">Quick Log</span>
+				<div class="flex flex-col gap-3">
+					<div class="flex items-center gap-2">
+						<Zap class="w-4 h-4 text-primary" />
+						<span class="font-semibold text-sm">Quick log</span>
 					</div>
 					<div class="flex items-center gap-1.5 flex-wrap">
 						{#each quickLogs as log}
 							<button
-								class="btn btn-ghost btn-sm gap-1.5 px-2.5 hover:bg-base-200/50 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 rounded-lg"
+								class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-base-300/70 bg-base-100 hover:bg-base-200 hover:border-base-300 transition-colors"
 								onclick={() => handleQuickLog(log)}
 								title={log.label}
 							>
-								<span class="text-base">{log.emoji}</span>
-								<span
-									class="text-xs font-medium hidden sm:inline"
-									>{log.label}</span
-								>
+								<span class="text-base leading-none">{log.emoji}</span>
+								<span class="text-xs font-medium hidden sm:inline">{log.label}</span>
 							</button>
 						{/each}
 					</div>
@@ -685,11 +638,9 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 	<!-- Timeline Section -->
 	<div class="flex-1 min-h-0 flex flex-col">
 		<div
-			class="card bg-base-100 shadow-md border border-base-200/50 rounded-2xl h-full flex flex-col overflow-hidden"
+			class="card bg-base-100 border border-base-300/60 rounded-2xl shadow-sm h-full flex flex-col overflow-hidden"
 		>
 			<div class="card-body p-3 lg:p-4 flex flex-col h-full gap-3">
-				<!-- Timeline -->
-
 				<!-- Timeline -->
 				<div class="flex-1 min-h-0">
 					{#if $tasksQuery.isLoading}
@@ -699,7 +650,7 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 							<span
 								class="loading loading-spinner loading-lg text-primary"
 							></span>
-							<p class="text-sm opacity-50">
+							<p class="text-sm text-base-content/50">
 								Loading your day...
 							</p>
 						</div>
@@ -723,8 +674,8 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 		</div>
 	</div>
 
-	<!-- Floating Action Button -->
-	<div class="fixed bottom-6 right-6 z-50">
+	<!-- Floating Action Button (lifted above mobile tab bar) -->
+	<div class="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40">
 		<!-- FAB Menu -->
 		{#if fabOpen}
 			<!-- Backdrop -->
@@ -735,47 +686,43 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 			></button>
 
 			<!-- Menu -->
-			<div class="absolute bottom-16 right-0 z-50 animate-fade-in">
+			<div class="absolute bottom-16 right-0 z-50">
 				<div
-					class="card bg-base-100 shadow-2xl border border-base-200/50 rounded-2xl min-w-[280px] overflow-hidden"
+					class="card bg-base-100 shadow-xl border border-base-300/70 rounded-2xl min-w-[270px] overflow-hidden"
 				>
-					<div class="card-body p-3">
+					<div class="card-body p-2.5">
 						<!-- Create Task Option -->
 						<button
-							class="btn btn-ghost justify-start gap-3 h-auto py-3"
+							class="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-base-200 transition-colors text-left"
 							onclick={openTaskModal}
 						>
 							<div
-								class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"
+								class="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"
 							>
-								<ClipboardList class="w-5 h-5 text-primary" />
+								<ClipboardList class="w-5 h-5" />
 							</div>
 							<div class="text-left">
 								<p class="font-semibold text-sm">New Task</p>
-								<p class="text-xs opacity-50">
+								<p class="text-xs text-base-content/50">
 									Create a detailed task
 								</p>
 							</div>
 						</button>
 
-						<div
-							class="divider my-1 text-[10px] uppercase opacity-50"
-						>
-							Quick Logs
-						</div>
+						<div class="border-t border-base-300/60 my-1.5"></div>
+						<p class="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/40">
+							Quick logs
+						</p>
 
 						<!-- Quick Logs Grid -->
-						<div class="grid grid-cols-4 gap-2">
+						<div class="grid grid-cols-4 gap-1.5">
 							{#each quickLogs as log}
 								<button
-									class="btn btn-ghost btn-sm flex-col h-auto py-2 gap-1 hover:bg-base-200"
+									class="flex flex-col items-center py-2 rounded-lg hover:bg-base-200 transition-colors gap-1"
 									onclick={() => handleQuickLog(log)}
 								>
-									<span class="text-xl">{log.emoji}</span>
-									<span
-										class="text-[9px] font-medium opacity-60"
-										>{log.label}</span
-									>
+									<span class="text-xl leading-none">{log.emoji}</span>
+									<span class="text-[9px] font-medium text-base-content/60">{log.label}</span>
 								</button>
 							{/each}
 						</div>
@@ -787,8 +734,8 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 		<!-- FAB Button -->
 		<button
 			class={cn(
-				"btn btn-circle btn-lg shadow-2xl transition-all duration-300",
-				fabOpen ? "btn-error rotate-45" : "btn-primary hover:scale-110",
+				"btn btn-circle btn-lg shadow-xl transition-all duration-200",
+				fabOpen ? "btn-neutral rotate-45" : "btn-primary hover:scale-105 active:scale-95",
 			)}
 			onclick={() => (fabOpen = !fabOpen)}
 			aria-label={fabOpen ? "Close menu" : "Open menu"}

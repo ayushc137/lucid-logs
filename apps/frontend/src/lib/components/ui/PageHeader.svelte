@@ -31,22 +31,22 @@ let {
 </script>
 
 <div
-    class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between {className}"
+    class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between {className}"
 >
-    <div class="flex items-start gap-4">
+    <div class="flex items-center gap-3.5 min-w-0">
         {#if Icon}
-            <div class="p-3 rounded-2xl bg-base-200/50 text-primary">
-                <Icon class="w-8 h-8" />
+            <div
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+            >
+                <Icon class="w-5.5 h-5.5" />
             </div>
         {/if}
-        <div class="flex flex-col gap-1">
-            <h1 class="text-3xl font-bold tracking-tight text-base-content">
+        <div class="flex flex-col gap-0.5 min-w-0">
+            <h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight text-base-content leading-tight">
                 {title}
             </h1>
             {#if subtitle}
-                <p
-                    class="text-base font-medium text-base-content/60 max-w-2xl leading-relaxed"
-                >
+                <p class="text-sm text-base-content/55 max-w-2xl">
                     {subtitle}
                 </p>
             {/if}
@@ -55,12 +55,10 @@ let {
 
     {#if showAddButton}
         <button
-            class="group relative inline-flex items-center justify-center gap-2 px-6 py-2.5 font-medium text-primary-content bg-primary rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+            class="btn btn-primary gap-1.5 rounded-xl shadow-sm hover:shadow transition-all self-start sm:self-auto"
             onclick={onAdd}
         >
-            <Plus
-                class="w-5 h-5 transition-transform duration-200 group-hover:rotate-90"
-            />
+            <Plus class="w-4 h-4" strokeWidth={2.5} />
             <span>{addButtonLabel}</span>
         </button>
     {/if}

@@ -34,16 +34,16 @@ let {
 }: Props = $props();
 </script>
 
-<div class="flex items-center gap-3 {className}">
+<div class="flex items-center gap-3.5 {className}">
     {#if icon}
-        <IconBox size="md" variant="solid" {color}>
+        <IconBox size="md" variant="subtle" {color}>
             {@render icon()}
         </IconBox>
     {/if}
-    <div>
-        <p class="text-xs font-medium uppercase opacity-50">{label}</p>
-        <p class="text-xl font-bold text-{color}">
-            {value}{#if unit}<span class="text-sm font-medium opacity-60 ml-0.5"
+    <div class="min-w-0">
+        <p class="text-xs font-medium text-base-content/50 leading-tight">{label}</p>
+        <p class="text-2xl font-bold tracking-tight leading-tight stat-value mt-0.5">
+            {value}{#if unit}<span class="text-sm font-medium text-base-content/50 ml-0.5"
                     >{unit}</span
                 >{/if}
         </p>
