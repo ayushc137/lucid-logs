@@ -105,22 +105,25 @@ onMount(() => {
 });
 </script>
 
-<Card variant="bordered" class="border-primary/20 bg-primary/5">
+<Card>
 	<div class="flex items-center gap-2 mb-3">
 		<Zap class="w-4 h-4 text-primary" />
-		<span class="text-xs font-semibold uppercase text-primary/70">Quick Capture</span>
+		<span class="text-sm font-semibold">Quick Capture</span>
 	</div>
 
 	<div class="space-y-3">
 		<!-- Title -->
-		<input
-			bind:this={titleInput}
-			type="text"
-			bind:value={title}
-			placeholder="What did you just do?"
-			class="input input-bordered w-full text-lg font-medium bg-base-100 focus:border-primary focus:outline-none"
-			onkeydown={handleKeydown}
-		/>
+		<label class="form-control">
+			<span class="text-xs font-medium text-base-content/60 mb-1">Task</span>
+			<input
+				bind:this={titleInput}
+				type="text"
+				bind:value={title}
+				placeholder="What did you just do?"
+				class="input input-bordered w-full"
+				onkeydown={handleKeydown}
+			/>
+		</label>
 
 		<!-- Category (optional, collapsible) -->
 		<details class="group">
@@ -143,7 +146,7 @@ onMount(() => {
 				<kbd class="kbd kbd-xs">⌘</kbd> + <kbd class="kbd kbd-xs">Enter</kbd>
 			</span>
 			<button
-				class="btn btn-primary btn-sm gap-1.5 min-w-[100px]"
+				class="btn btn-primary btn-sm gap-1.5"
 				onclick={handleSubmit}
 				disabled={$createMut.isPending || !title.trim()}
 			>
