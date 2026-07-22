@@ -10,6 +10,7 @@ import {
 } from '$lib/api';
 import {
 	ConfirmDialog,
+	DataTable,
 	EmptyState,
 	ErrorAlert,
 	LoadingCard,
@@ -20,13 +21,9 @@ import { quadrantColor } from '$lib/utils/chart-colors';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 import {
 	BookOpen,
-	CalendarDays,
 	CheckCircle2,
-	ChevronRight,
 	CircleDashed,
-	Clock,
 	Funnel,
-	ListTodo,
 	LoaderCircle,
 	Plus,
 	Search,
@@ -123,6 +120,20 @@ function fmtRange(retro: Retrospective): string {
 	const startStr = start.toLocaleDateString(undefined, opts);
 	const endStr = end.toLocaleDateString(undefined, { ...opts, year: 'numeric' });
 	return retro.retro_type === 'daily' ? endStr : `${startStr} – ${endStr}`;
+}
+
+function fmtGenerated(date: string): string {
+	return new Date(date).toLocaleDateString(undefined, {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
+}
+
+function taskCount(retro: Retrospective): number {
+	const tasks = retro.auto_summary?.tasks;
+	if (!tasks) return 0;
+	return tasks.completed + tasks.postponed + tasks.canceled + (tasks.not_started ?? 0);
 }
 
 const typeLabels: Record<string, string> = {
@@ -305,74 +316,84 @@ const isSearching = $derived(searchQuery.trim().toLowerCase() !== debouncedSearc
 			</div>
 		</div>
 	{:else}
-		<div class="flex flex-col gap-3">
-			{#each filteredRetros as retro (retro.id)}
-				{@const tasks = retro.auto_summary?.tasks}
-				{@const mood = retro.auto_summary?.mood}
-				<article
-					class="card bg-base-100 shadow-lg border border-base-200 active:scale-[0.99] transition-all cursor-pointer hover:border-primary/30"
-					onclick={() => goto(`/retrospectives/${retro.id}`)}
-					role="link"
-					tabindex="0"
-					onkeydown={(event) => event.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
-				>
-					<div class="card-body p-4 gap-2">
-						<div class="flex items-center gap-3">
-							<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
-								<CalendarDays class="w-5 h-5" />
-							</div>
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2 flex-wrap">
-									<span class="badge badge-sm badge-outline">{typeLabels[retro.retro_type] ?? retro.retro_type}</span>
+		<DataTable hover zebra>
+			<thead>
+				<tr>
+					<th>Type</th>
+					<th>Period</th>
+					<th>Status</th>
+					<th class="text-right">Tasks</th>
+					<th class="text-right">Hours</th>
+					<th>Mood</th>
+					<th>Generated</th>
+					<th class="w-16 text-right">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each filteredRetros as retro (retro.id)}
+					{@const tasks = retro.auto_summary?.tasks}
+					{@const mood = retro.auto_summary?.mood}
+					<tr
+						class="cursor-pointer transition-colors hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+						onclick={() => goto(`/retrospectives/${retro.id}`)}
+						role="link"
+						tabindex="0"
+						onkeydown={(event) => event.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
+					>
+						<td>
+							<span class="badge badge-sm badge-outline whitespace-nowrap">
+								{typeLabels[retro.retro_type] ?? retro.retro_type}
+							</span>
+						</td>
+						<td class="whitespace-nowrap font-medium">{fmtRange(retro)}</td>
+						<td>
+							<span
+								class={cn(
+									'badge badge-sm gap-1 whitespace-nowrap',
+									retro.status === 'completed' ? 'badge-success' : 'badge-ghost',
+								)}
+							>
+								{#if retro.status === 'completed'}
+									<CheckCircle2 class="h-3 w-3" /> Completed
+								{:else}
+									<CircleDashed class="h-3 w-3" /> Draft
+								{/if}
+							</span>
+						</td>
+						<td class="text-right font-mono tabular-nums">{taskCount(retro)}</td>
+						<td class="text-right font-mono tabular-nums">
+							{(tasks?.total_duration_hours ?? 0).toFixed(1)}h
+						</td>
+						<td>
+							{#if mood?.dominant_quadrant}
+								<span class="flex items-center gap-2 whitespace-nowrap">
 									<span
-										class={cn(
-											'badge badge-sm gap-1',
-											retro.status === 'completed' ? 'badge-success' : 'badge-ghost',
-										)}
-									>
-										{#if retro.status === 'completed'}
-											<CheckCircle2 class="w-3 h-3" /> Completed
-										{:else}
-											<CircleDashed class="w-3 h-3" /> Draft
-										{/if}
-									</span>
-								</div>
-								<p class="font-semibold text-[15px] mt-1">{fmtRange(retro)}</p>
-								<div class="flex items-center gap-3 text-xs text-base-content/60 mt-0.5">
-									{#if tasks}
-										<span class="flex items-center gap-1">
-											<ListTodo class="w-3 h-3" />
-											{tasks.completed ?? 0}
-										</span>
-										<span class="flex items-center gap-1">
-											<Clock class="w-3 h-3" />
-											{(tasks.total_duration_hours ?? 0).toFixed(1)}h
-										</span>
-									{/if}
-									{#if mood?.dominant_quadrant}
-										<span class="flex items-center gap-1">
-											<span class="w-2 h-2 rounded-full" style="background: {quadrantColor(mood.dominant_quadrant)}"></span>
-											<span class="capitalize">{mood.dominant_quadrant}</span>
-										</span>
-									{/if}
-								</div>
-							</div>
+										class="h-2 w-2 rounded-full"
+										style="background: {quadrantColor(mood.dominant_quadrant)}"
+									></span>
+									<span class="capitalize">{mood.dominant_quadrant}</span>
+								</span>
+							{:else}
+								<span class="text-base-content/40">—</span>
+							{/if}
+						</td>
+						<td class="whitespace-nowrap text-base-content/60">{fmtGenerated(retro.generated_at)}</td>
+						<td class="text-right">
 							<button
-								class="btn btn-ghost btn-xs btn-square text-error/70 shrink-0"
+								class="btn btn-ghost btn-xs btn-square text-error/70"
 								aria-label="Delete retrospective"
 								onclick={(event) => {
 									event.stopPropagation();
 									deleteTarget = retro;
 								}}
 							>
-								<Trash2 class="w-4 h-4" />
+								<Trash2 class="h-4 w-4" />
 							</button>
-							<ChevronRight class="w-4 h-4 text-base-content/30 shrink-0" />
-						</div>
-					</div>
-				</article>
-			{/each}
-		</div>
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</DataTable>
 	{/if}
 </div>
 
