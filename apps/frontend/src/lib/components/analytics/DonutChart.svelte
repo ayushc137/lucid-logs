@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { CategoryBreakdown } from '$lib/api';
+import { CHART_COLORS } from '$lib/utils/chart-colors';
 
 interface Props {
 	distribution: CategoryBreakdown[];
@@ -18,18 +19,8 @@ const segments = $derived(
 			.reduce((a, c) => a + (c.percentage / 100) * 360, -90);
 		const endAngle = startAngle + angle;
 
-		// Colors: cycle through a palette
-		const colors = [
-			'oklch(var(--p))',
-			'oklch(var(--s))',
-			'oklch(var(--a))',
-			'oklch(var(--wa))',
-			'oklch(var(--in))',
-			'oklch(var(--er))',
-			'oklch(var(--su))',
-			'oklch(var(--nc))',
-		];
-		const color = colors[i % colors.length];
+		// Cycle through the hardcoded hex palette (only hex values in chart-colors.ts)
+		const color = CHART_COLORS[i % CHART_COLORS.length];
 
 		// Donut path
 		const largeArc = angle > 180 ? 1 : 0;

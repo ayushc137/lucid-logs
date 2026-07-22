@@ -6,6 +6,7 @@ import { type Goal, type Task, getGoals, getTasks, updateTask } from '$lib/api';
 import { getCategories } from '$lib/api/categories';
 import QuickCapture from '$lib/components/tasks/QuickCapture.svelte';
 import { TimelineGantt, type TimelineGoal } from '$lib/components/timeline';
+import AgendaRow from '$lib/components/timeline/AgendaRow.svelte';
 import { ConfirmDialog, EmptyState } from '$lib/components/ui';
 import { emotionStore } from '$lib/stores/emotions.svelte';
 import { cn, FALLBACK_CATEGORY_COLOR, FALLBACK_GOAL_COLOR } from '$lib/utils';
@@ -394,6 +395,22 @@ const timelineTasks = $derived(
 		: allTasks(),
 );
 
+// Group tasks by time-of-day for the agenda view
+const agendaGroups = $derived.by(() => {
+	const groups = [
+		{ key: 'morning', label: 'Morning', tasks: [] as typeof timelineTasks },
+		{ key: 'afternoon', label: 'Afternoon', tasks: [] as typeof timelineTasks },
+		{ key: 'evening', label: 'Evening', tasks: [] as typeof timelineTasks },
+	];
+	for (const task of timelineTasks) {
+		const h = task.startTime.getHours();
+		if (h < 12) groups[0].tasks.push(task);
+		else if (h < 17) groups[1].tasks.push(task);
+		else groups[2].tasks.push(task);
+	}
+	return groups;
+});
+
 const categories = $derived($categoriesQuery.data?.items || []);
 const completedCount = $derived(allTasks().filter((t) => t.completed).length);
 const totalCount = $derived(allTasks().length);
@@ -767,65 +784,43 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 							</p>
 						</div>
 					{:else if viewMode === 'list'}
-						<!-- Agenda/List View -->
-						<div class="flex-1 overflow-y-auto space-y-2 p-1 max-h-full">
-							{#if timelineTasks.length === 0}
-								<EmptyState
-									title="No tasks yet"
-									description="Capture what you just did or plan your day."
-									buttonLabel="New Task"
-									onButtonClick={openTaskModal}
-								/>
-							{:else}
-								{#each timelineTasks as task (task.id)}
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<!-- svelte-ignore a11y_interactive_supports_focus -->
-									<button
-										class="w-full text-left card bg-base-100 border border-base-200 p-3 flex items-center gap-3 active:bg-base-200 transition-colors rounded-xl"
-										onclick={() => handleTaskClick(task.id)}
-									>
-										<div
-											class="w-1 self-stretch rounded-full shrink-0"
-											style:background-color={task.categoryColor || FALLBACK_CATEGORY_COLOR}
-										></div>
-										<div class="flex-1 min-w-0">
-											<p
-												class="font-medium text-sm truncate"
-												class:line-through={task.completed}
-											>
-												{task.title}
-											</p>
-											<p class="text-xs text-base-content/60 mt-0.5">
-												{formatTimeCompact(task.startTime)} – {formatTimeCompact(task.endTime)} · {formatDuration(task.startTime, task.endTime)}
-											</p>
-										</div>
-										{#if task.categoryName}
-											<span
-												class="badge badge-sm shrink-0"
-												style:background-color={task.categoryColor || FALLBACK_CATEGORY_COLOR}
-												style:color={task.categoryColor || FALLBACK_CATEGORY_COLOR}
-												style:opacity="0.15"
-											>
-												<span style:color={task.categoryColor || FALLBACK_CATEGORY_COLOR}>
-													{task.categoryName}
-												</span>
-											</span>
-										{/if}
-										<!-- svelte-ignore a11y_click_events_have_key_events -->
-										<!-- svelte-ignore a11y_interactive_supports_focus -->
-										<input
-											type="checkbox"
-											class="checkbox checkbox-sm shrink-0"
-											checked={task.completed}
-											onclick={(e) => {
-												e.stopPropagation();
-												handleToggleComplete(task.id, !task.completed);
-											}}
+							<!-- Agenda/List View: dense day-agenda grouped by time-of-day -->
+							<div class="flex-1 overflow-y-auto px-1 pb-2 max-h-full">
+								{#if timelineTasks.length === 0}
+									<div class="py-12">
+										<EmptyState
+											title="No tasks yet"
+											description="Capture what you just did or plan your day."
+											buttonLabel="New Task"
+											onButtonClick={openTaskModal}
 										/>
-									</button>
-								{/each}
-							{/if}
-						</div>
+									</div>
+								{:else}
+									{#each agendaGroups as group (group.key)}
+										{#if group.tasks.length > 0}
+											<div class="px-3 pt-3 pb-1">
+												<span class="text-[11px] font-semibold uppercase tracking-wide text-base-content/40">
+													{group.label}
+												</span>
+											</div>
+											<div class="divide-y divide-base-200/60">
+												{#each group.tasks as task (task.id)}
+													<AgendaRow
+														title={task.title}
+														startTime={task.startTime}
+														endTime={task.endTime}
+														categoryColor={task.categoryColor}
+														categoryName={task.categoryName}
+														completed={task.completed}
+														onclick={() => handleTaskClick(task.id)}
+														ontoggle={(completed) => handleToggleComplete(task.id, completed)}
+													/>
+												{/each}
+											</div>
+										{/if}
+									{/each}
+								{/if}
+							</div>
 					{:else}
 						<TimelineGantt
 							tasks={timelineTasks}

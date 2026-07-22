@@ -18,6 +18,7 @@ import {
 } from '$lib/components/ui';
 import { CHART_COLORS, QUADRANT_COLORS, quadrantColor } from '$lib/utils/chart-colors';
 import { createQuery } from '@tanstack/svelte-query';
+import { writable } from 'svelte/store';
 import {
 	Activity,
 	BarChart3,
@@ -44,12 +45,22 @@ const periodOptions: { value: PeriodOption; label: string; days: number }[] = [
 	{ value: 'quarter', label: '90d', days: 90 },
 ];
 
-const dashboardQuery = createQuery({
-	get queryKey() {
-		return ['analytics', 'dashboard', period];
-	},
-	queryFn: () => getAnalyticsDashboard(period),
+const dashboardOptions$ = writable<ReturnType<typeof makeOptions>>(makeOptions());
+
+function makeOptions() {
+	return {
+		queryKey: ['analytics', 'dashboard', period] as const,
+		queryFn: () => getAnalyticsDashboard(period),
+	};
+}
+
+// Re-emit when `period` changes so queryKey + queryFn capture the new value.
+$effect(() => {
+	period; // track rune
+	dashboardOptions$.set(makeOptions());
 });
+
+const dashboardQuery = createQuery(dashboardOptions$);
 
 const streaksQuery = createQuery({
 	queryKey: ['analytics', 'streaks'],
