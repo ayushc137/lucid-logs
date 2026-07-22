@@ -1,25 +1,62 @@
 <script lang="ts">
 import { type ActivityHeatmapDay, getActivityHeatmap } from '$lib/api';
 import { createQuery } from '@tanstack/svelte-query';
+import { writable } from 'svelte/store';
 import { Flame } from 'lucide-svelte';
+
+interface Props {
+	startDate?: string;
+	endDate?: string;
+}
+
+let { startDate, endDate }: Props = $props();
 
 const CELL = 24;
 const GAP = 3;
 
-const heatmapQuery = createQuery({
-	queryKey: ['activity-heatmap'],
-	queryFn: () =>
+function makeQueryFn() {
+	// If props are provided, use them; otherwise default to 365 days
+	if (startDate && endDate) {
+		return () => getActivityHeatmap({ start_date: startDate, end_date: endDate });
+	}
+	return () =>
 		getActivityHeatmap({
 			start_date: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
 			end_date: new Date().toISOString(),
-		}),
+		});
+}
+
+function makeOptions() {
+	return {
+		queryKey: ['activity-heatmap', startDate ?? 'default', endDate ?? 'default'] as const,
+		queryFn: makeQueryFn(),
+	};
+}
+
+const heatmapOptions$ = writable(makeOptions());
+
+// Re-emit when props change so the query refetches
+$effect(() => {
+	startDate;
+	endDate;
+	heatmapOptions$.set(makeOptions());
 });
+
+const heatmapQuery = createQuery(heatmapOptions$);
 
 const data = $derived($heatmapQuery.data);
 
 const days = $derived(data?.days ?? []);
 const currentStreak = $derived(data?.current_streak ?? 0);
 const longestStreak = $derived(data?.longest_streak ?? 0);
+
+// Compute total active days + total hours from the days array
+const rangeStats = $derived.by(() => {
+	const activeDays = days.filter((d) => d.count > 0).length;
+	const totalMinutes = days.reduce((sum, d) => sum + d.minutes, 0);
+	const totalHours = totalMinutes / 60;
+	return { activeDays, totalHours };
+});
 
 // Today's date string for highlight
 const todayStr = $derived(new Date().toISOString().slice(0, 10));
@@ -122,12 +159,14 @@ $effect(() => {
 {:else if days.length > 0}
 	<div class="space-y-3">
 		<!-- Streak summary -->
-		<div class="flex items-center gap-4 text-sm">
+		<div class="flex items-center gap-4 text-sm flex-wrap">
 			<div class="flex items-center gap-1.5 text-warning font-semibold">
 				<Flame class="w-4 h-4" />
 				<span>{currentStreak}d current</span>
 			</div>
 			<span class="text-base-content/40">best {longestStreak}d</span>
+			<span class="text-base-content/40">·</span>
+			<span class="text-base-content/60">{rangeStats.activeDays} active days · {rangeStats.totalHours.toFixed(0)}h tracked</span>
 		</div>
 
 		<!-- Heatmap grid (scrollable, auto-scrolls to most recent) -->

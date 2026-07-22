@@ -35,28 +35,116 @@ import {
 } from 'lucide-svelte';
 import { cn } from '$lib/utils';
 
-type PeriodOption = 'week' | 'month' | 'quarter';
+type PeriodOption = 'week' | 'month' | 'quarter' | 'custom';
 
 let period = $state<PeriodOption>('week');
+
+// Custom date range state (date input format: YYYY-MM-DD)
+let customStart = $state('');
+let customEnd = $state('');
 
 const periodOptions: { value: PeriodOption; label: string; days: number }[] = [
 	{ value: 'week', label: '7d', days: 7 },
 	{ value: 'month', label: '30d', days: 30 },
 	{ value: 'quarter', label: '90d', days: 90 },
+	{ value: 'custom', label: 'Custom', days: 0 },
 ];
 
-const dashboardOptions$ = writable<ReturnType<typeof makeOptions>>(makeOptions());
+// ── Custom date range helpers ──────────────────────────────────
+
+function toLocalDateInput(d: Date): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+function initCustomDates() {
+	const end = new Date();
+	const start = new Date();
+	start.setDate(start.getDate() - 30);
+	customStart = toLocalDateInput(start);
+	customEnd = toLocalDateInput(end);
+}
+
+// Initialize on first select of custom
+let customInitialized = false;
+$effect(() => {
+	if (period === 'custom' && !customInitialized) {
+		initCustomDates();
+		customInitialized = true;
+	}
+});
+
+// Build RFC3339 start/end for API from custom date inputs
+const customRangeParams = $derived.by(() => {
+	if (!customStart || !customEnd) return null;
+	// Parse as local time
+	const [sy, sm, sd] = customStart.split('-').map(Number);
+	const [ey, em, ed] = customEnd.split('-').map(Number);
+	if (!sy || !ey) return null;
+	const startD = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+	const endD = new Date(ey, em - 1, ed, 23, 59, 59, 0);
+	if (startD > endD) return null;
+	return {
+		start_date: startD.toISOString(),
+		end_date: endD.toISOString(),
+	};
+});
+
+// The period string sent to the API
+const apiPeriod = $derived(period === 'custom' ? 'custom' : period);
+
+// ── Heatmap range ──────────────────────────────────────────────
+
+const heatmapRange = $derived.by(() => {
+	if (period === 'custom') {
+		if (!customRangeParams) return null;
+		return { startDate: customRangeParams.start_date, endDate: customRangeParams.end_date };
+	}
+	const days = periodOptions.find((o) => o.value === period)?.days ?? 7;
+	const end = new Date();
+	const start = new Date();
+	start.setDate(start.getDate() - days);
+	return { startDate: start.toISOString(), endDate: end.toISOString() };
+});
+
+// ── Dashboard query (writable-store bridge for reactivity) ─────
 
 function makeOptions() {
+	// For preset periods, call with just the period string.
+	// For custom, call with start_date/end_date params.
+	// Use explicit string types to avoid TypeScript literal-type union issues.
+	const p: string = period;
+	const s: string = period === 'custom' ? customStart : '';
+	const e: string = period === 'custom' ? customEnd : '';
+	if (period === 'custom') {
+		const range = customRangeParams;
+		return {
+			queryKey: ['analytics', 'dashboard', p, s, e] as const,
+			queryFn: () => {
+				if (!range) return Promise.reject(new Error('Invalid date range'));
+				return getAnalyticsDashboard('custom', {
+					start_date: range.start_date,
+					end_date: range.end_date,
+				});
+			},
+			enabled: !!range,
+		};
+	}
 	return {
-		queryKey: ['analytics', 'dashboard', period] as const,
+		queryKey: ['analytics', 'dashboard', p, s, e] as const,
 		queryFn: () => getAnalyticsDashboard(period),
 	};
 }
 
-// Re-emit when `period` changes so queryKey + queryFn capture the new value.
+const dashboardOptions$ = writable(makeOptions());
+
+// Re-emit when period or custom dates change so queryKey + queryFn capture the new value.
 $effect(() => {
-	period; // track rune
+	period;
+	customStart;
+	customEnd;
 	dashboardOptions$.set(makeOptions());
 });
 
@@ -94,6 +182,21 @@ const quadrantSegments = $derived.by(() => {
 });
 
 const hasData = $derived(!!data && (data.tasks.total_tasks > 0 || data.goals.active_goals > 0));
+
+// ── Productivity proportions (completed/postponed/canceled) ────
+
+const taskProportions = $derived.by(() => {
+	const t = data?.tasks;
+	if (!t) return null;
+	const total = t.completed_tasks + t.postponed_tasks + t.abandoned_tasks;
+	if (total === 0) return null;
+	return {
+		completed: (t.completed_tasks / total) * 100,
+		postponed: (t.postponed_tasks / total) * 100,
+		canceled: (t.abandoned_tasks / total) * 100,
+		total,
+	};
+});
 
 // ── Mood quadrant human-readable info ──────────────────────────
 interface QuadrantInfo {
@@ -152,7 +255,7 @@ const QUADRANT_INFO: Record<string, QuadrantInfo> = {
 };
 
 // Period label for mood summary
-const periodLabel = $derived(period === 'week' ? 'week' : period === 'month' ? 'month' : '3 months');
+const periodLabel = $derived(period === 'week' ? 'week' : period === 'month' ? 'month' : period === 'quarter' ? '3 months' : 'period');
 
 // Dominant quadrant info object
 const dominantInfo = $derived.by(() => {
@@ -243,7 +346,7 @@ const quadrantBreakdown = $derived.by(() => {
 <div class="flex flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 max-w-5xl mx-auto w-full">
 	<!-- Sticky Top Bar -->
 	<div class="sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-base-200/95 backdrop-blur-sm border-b border-base-content/5">
-		<div class="flex items-center justify-between gap-3">
+		<div class="flex items-center justify-between gap-3 flex-wrap">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
 					<BarChart3 class="w-5 h-5" />
@@ -267,6 +370,29 @@ const quadrantBreakdown = $derived.by(() => {
 				{/each}
 			</div>
 		</div>
+		<!-- Custom date range pickers -->
+		{#if period === 'custom'}
+			<div class="flex items-center gap-2 mt-3 flex-wrap">
+				<div class="flex items-center gap-1.5">
+					<label for="custom-start" class="text-xs text-base-content/60 font-medium">From</label>
+					<input
+						id="custom-start"
+						type="date"
+						class="input input-sm input-bordered"
+						bind:value={customStart}
+					/>
+				</div>
+				<div class="flex items-center gap-1.5">
+					<label for="custom-end" class="text-xs text-base-content/60 font-medium">To</label>
+					<input
+						id="custom-end"
+						type="date"
+						class="input input-sm input-bordered"
+						bind:value={customEnd}
+					/>
+				</div>
+			</div>
+		{/if}
 	</div>
 
 	{#if isLoading}
@@ -308,81 +434,107 @@ const quadrantBreakdown = $derived.by(() => {
 			</Card>
 		</div>
 
-		<!-- Productivity Section -->
-		<Card>
-			<div class="flex flex-col gap-4">
-				<SectionHeader title="Productivity" color="primary" subtitle="Task completion over time">
-					{#snippet icon()}<TrendingUp class="w-4 h-4 text-primary" />{/snippet}
-				</SectionHeader>
-
-				<!-- Task counts row -->
-				<div class="grid grid-cols-3 gap-3">
-					<div class="bg-base-200/40 rounded-box p-3 text-center">
-						<div class="flex items-center justify-center gap-1 text-success mb-1">
-							<CheckCircle2 class="w-3.5 h-3.5" />
-							<span class="text-xs font-medium">Completed</span>
-						</div>
-						<p class="text-xl font-bold font-mono">{data.tasks.completed_tasks}</p>
-					</div>
-					<div class="bg-base-200/40 rounded-box p-3 text-center">
-						<div class="flex items-center justify-center gap-1 text-warning mb-1">
-							<Clock class="w-3.5 h-3.5" />
-							<span class="text-xs font-medium">Postponed</span>
-						</div>
-						<p class="text-xl font-bold font-mono">{data.tasks.postponed_tasks}</p>
-					</div>
-					<div class="bg-base-200/40 rounded-box p-3 text-center">
-						<div class="flex items-center justify-center gap-1 text-error mb-1">
-							<ListTodo class="w-3.5 h-3.5" />
-							<span class="text-xs font-medium">Canceled</span>
-						</div>
-						<p class="text-xl font-bold font-mono">{data.tasks.abandoned_tasks}</p>
-					</div>
-				</div>
-
-				<!-- Focus Score -->
-				<div class="flex items-center gap-3">
-					<div class="flex-1">
-						<div class="flex items-center justify-between text-xs mb-1">
-							<span class="text-base-content/60">Focus Score</span>
-							<span class="font-mono font-bold">{Math.round(data.tasks.focus_score)}/100</span>
-						</div>
-						<div class="h-2 bg-base-200 rounded-full overflow-hidden">
-							<div class="h-full rounded-full bg-primary transition-all" style="width: {data.tasks.focus_score}%"></div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</Card>
-
-		<!-- Time Distribution -->
-		{#if data.categories.distribution.length > 0}
+		<!-- Productivity + Time (2-col on desktop) -->
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<!-- Productivity Section -->
 			<Card>
 				<div class="flex flex-col gap-4">
-					<SectionHeader title="Time" color="secondary" subtitle="Where your hours went">
-						{#snippet icon()}<PieChart class="w-4 h-4 text-secondary" />{/snippet}
+					<SectionHeader title="Productivity" color="primary" subtitle="Task completion over time">
+						{#snippet icon()}<TrendingUp class="w-4 h-4 text-primary" />{/snippet}
 					</SectionHeader>
-					<DonutChart distribution={data.categories.distribution} totalHours={data.categories.total_hours} />
-					<!-- Per-category bars -->
-					<div class="space-y-2">
-						{#each data.categories.distribution.slice(0, 8) as cat, i}
-							<div class="flex items-center gap-2">
-								<span class="text-sm font-medium w-24 truncate">{cat.category_name}</span>
-								<div class="flex-1 h-2.5 bg-base-200 rounded-full overflow-hidden">
-									<div
-										class="h-full rounded-full transition-all"
-										style="width: {cat.percentage}%; background: {CHART_COLORS[i % CHART_COLORS.length]};"
-									></div>
-								</div>
-								<span class="text-xs text-base-content/50 font-mono shrink-0 w-16 text-right">{cat.hours.toFixed(1)}h · {Math.round(cat.percentage)}%</span>
+
+					<!-- Proportions bar (completed vs postponed vs canceled) -->
+					{#if taskProportions}
+						<div class="space-y-1.5">
+							<div class="flex h-3 rounded-full overflow-hidden bg-base-200">
+								<div
+									class="bg-success transition-all"
+									style="width: {taskProportions.completed}%"
+									title="Completed: {data.tasks.completed_tasks} ({Math.round(taskProportions.completed)}%)"
+								></div>
+								<div
+									class="bg-warning transition-all"
+									style="width: {taskProportions.postponed}%"
+									title="Postponed: {data.tasks.postponed_tasks} ({Math.round(taskProportions.postponed)}%)"
+								></div>
+								<div
+									class="bg-error transition-all"
+									style="width: {taskProportions.canceled}%"
+									title="Canceled: {data.tasks.abandoned_tasks} ({Math.round(taskProportions.canceled)}%)"
+								></div>
 							</div>
-						{/each}
+						</div>
+					{/if}
+
+					<!-- Task counts row -->
+					<div class="grid grid-cols-3 gap-3">
+						<div class="bg-base-200/40 rounded-box p-3 text-center">
+							<div class="flex items-center justify-center gap-1 text-success mb-1">
+								<CheckCircle2 class="w-3.5 h-3.5" />
+								<span class="text-xs font-medium">Completed</span>
+							</div>
+							<p class="text-xl font-bold font-mono">{data.tasks.completed_tasks}</p>
+						</div>
+						<div class="bg-base-200/40 rounded-box p-3 text-center">
+							<div class="flex items-center justify-center gap-1 text-warning mb-1">
+								<Clock class="w-3.5 h-3.5" />
+								<span class="text-xs font-medium">Postponed</span>
+							</div>
+							<p class="text-xl font-bold font-mono">{data.tasks.postponed_tasks}</p>
+						</div>
+						<div class="bg-base-200/40 rounded-box p-3 text-center">
+							<div class="flex items-center justify-center gap-1 text-error mb-1">
+								<ListTodo class="w-3.5 h-3.5" />
+								<span class="text-xs font-medium">Canceled</span>
+							</div>
+							<p class="text-xl font-bold font-mono">{data.tasks.abandoned_tasks}</p>
+						</div>
+					</div>
+
+					<!-- Focus Score -->
+					<div class="flex items-center gap-3">
+						<div class="flex-1">
+							<div class="flex items-center justify-between text-xs mb-1">
+								<span class="text-base-content/60">Focus Score</span>
+								<span class="font-mono font-bold">{Math.round(data.tasks.focus_score)}/100</span>
+							</div>
+							<div class="h-2 bg-base-200 rounded-full overflow-hidden">
+								<div class="h-full rounded-full bg-primary transition-all" style="width: {data.tasks.focus_score}%"></div>
+							</div>
+						</div>
 					</div>
 				</div>
 			</Card>
-		{/if}
 
-		<!-- Mood Section -->
+			<!-- Time Distribution -->
+			{#if data.categories.distribution.length > 0}
+				<Card>
+					<div class="flex flex-col gap-4">
+						<SectionHeader title="Time" color="secondary" subtitle="Where your hours went">
+							{#snippet icon()}<PieChart class="w-4 h-4 text-secondary" />{/snippet}
+						</SectionHeader>
+						<DonutChart distribution={data.categories.distribution} totalHours={data.categories.total_hours} />
+						<!-- Per-category bars -->
+						<div class="space-y-2">
+							{#each data.categories.distribution.slice(0, 8) as cat, i}
+								<div class="flex items-center gap-2">
+									<span class="text-sm font-medium w-24 truncate">{cat.category_name}</span>
+									<div class="flex-1 h-2.5 bg-base-200 rounded-full overflow-hidden">
+										<div
+											class="h-full rounded-full transition-all"
+											style="width: {cat.percentage}%; background: {CHART_COLORS[i % CHART_COLORS.length]};"
+										></div>
+									</div>
+									<span class="text-xs text-base-content/50 font-mono shrink-0 w-16 text-right">{cat.hours.toFixed(1)}h · {Math.round(cat.percentage)}%</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</Card>
+			{/if}
+		</div>
+
+		<!-- Mood Section (full width) -->
 		{#if data.emotions.average_valence !== 0 || data.emotions.average_arousal !== 0}
 			<Card>
 				<div class="flex flex-col gap-4">
@@ -476,32 +628,65 @@ const quadrantBreakdown = $derived.by(() => {
 			</Card>
 		{/if}
 
-		<!-- Goals Section -->
-		{#if data.goals.goal_progress.length > 0}
-			<Card>
-				<div class="flex flex-col gap-4">
-					<SectionHeader title="Goals" color="secondary" subtitle="Progress toward your goals">
-						{#snippet icon()}<Target class="w-4 h-4 text-secondary" />{/snippet}
-					</SectionHeader>
-					<div class="space-y-3">
-						{#each data.goals.goal_progress as goal}
-							<div class="space-y-1.5">
-								<div class="flex items-center justify-between text-sm">
-									<span class="font-medium truncate">{goal.goal_title}</span>
-									<span class="text-base-content/50 shrink-0 ml-2 font-mono">{Math.round(goal.progress)}%</span>
+		<!-- Goals + Streak Leaders (2-col on desktop) -->
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			{#if data.goals.goal_progress.length > 0}
+				<Card>
+					<div class="flex flex-col gap-4">
+						<SectionHeader title="Goals" color="secondary" subtitle="Progress toward your goals">
+							{#snippet icon()}<Target class="w-4 h-4 text-secondary" />{/snippet}
+						</SectionHeader>
+						<div class="space-y-3">
+							{#each data.goals.goal_progress as goal}
+								<div class="space-y-1.5">
+									<div class="flex items-center justify-between text-sm">
+										<span class="font-medium truncate">{goal.goal_title}</span>
+										<span class="text-base-content/50 shrink-0 ml-2 font-mono">{Math.round(goal.progress)}%</span>
+									</div>
+									<div class="h-2 bg-base-200 rounded-full overflow-hidden">
+										<div
+											class="h-full rounded-full transition-all"
+											style="width: {goal.progress}%; background: {CHART_COLORS[0]};"
+										></div>
+									</div>
 								</div>
-								<div class="h-2 bg-base-200 rounded-full overflow-hidden">
-									<div
-										class="h-full rounded-full transition-all"
-										style="width: {goal.progress}%; background: {CHART_COLORS[0]};"
-									></div>
-								</div>
-							</div>
-						{/each}
+							{/each}
+						</div>
 					</div>
-				</div>
-			</Card>
-		{/if}
+				</Card>
+			{/if}
+
+			{#if data.goals.streak_leaders.length > 0}
+				<Card>
+					<div class="flex flex-col gap-4">
+						<SectionHeader title="Streak Leaders" color="warning" subtitle="Longest active streaks">
+							{#snippet icon()}<Zap class="w-4 h-4 text-warning" />{/snippet}
+						</SectionHeader>
+						<div class="space-y-2">
+							{#each data.goals.streak_leaders as streak, i}
+								<div class="flex items-center justify-between py-2 border-b border-base-content/5 last:border-0">
+									<div class="flex items-center gap-3">
+										{#if i === 0}
+											<span class="w-6 h-6 rounded-full bg-warning/20 flex items-center justify-center text-xs font-bold text-warning">1</span>
+										{:else}
+											<span class="w-6 h-6 rounded-full bg-base-200 flex items-center justify-center text-xs font-medium text-base-content/50">{i + 1}</span>
+										{/if}
+										<span class="font-medium text-sm truncate">{streak.goal_title}</span>
+									</div>
+									<div class="flex items-center gap-3 text-sm shrink-0">
+										<span class="text-warning font-bold flex items-center gap-1">
+											<Flame class="w-3.5 h-3.5" />
+											{streak.current_streak}d
+										</span>
+										<span class="text-base-content/40 text-xs">best {streak.longest_streak}d</span>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</Card>
+			{/if}
+		</div>
 
 		<!-- Activity Heatmap (full width) -->
 		<Card>
@@ -509,40 +694,8 @@ const quadrantBreakdown = $derived.by(() => {
 				<SectionHeader title="Activity" color="primary" subtitle="Daily activity over time">
 					{#snippet icon()}<Activity class="w-4 h-4 text-primary" />{/snippet}
 				</SectionHeader>
-				<ActivityHeatmap />
+				<ActivityHeatmap startDate={heatmapRange?.startDate} endDate={heatmapRange?.endDate} />
 			</div>
 		</Card>
-
-		<!-- Streaks Leaderboard -->
-		{#if data.goals.streak_leaders.length > 0}
-			<Card>
-				<div class="flex flex-col gap-4">
-					<SectionHeader title="Streak Leaders" color="warning" subtitle="Longest active streaks">
-						{#snippet icon()}<Zap class="w-4 h-4 text-warning" />{/snippet}
-					</SectionHeader>
-					<div class="space-y-2">
-						{#each data.goals.streak_leaders as streak, i}
-							<div class="flex items-center justify-between py-2 border-b border-base-content/5 last:border-0">
-								<div class="flex items-center gap-3">
-									{#if i === 0}
-										<span class="w-6 h-6 rounded-full bg-warning/20 flex items-center justify-center text-xs font-bold text-warning">1</span>
-									{:else}
-										<span class="w-6 h-6 rounded-full bg-base-200 flex items-center justify-center text-xs font-medium text-base-content/50">{i + 1}</span>
-									{/if}
-									<span class="font-medium text-sm truncate">{streak.goal_title}</span>
-								</div>
-								<div class="flex items-center gap-3 text-sm shrink-0">
-									<span class="text-warning font-bold flex items-center gap-1">
-										<Flame class="w-3.5 h-3.5" />
-										{streak.current_streak}d
-									</span>
-									<span class="text-base-content/40 text-xs">best {streak.longest_streak}d</span>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-			</Card>
-		{/if}
 	{/if}
 </div>

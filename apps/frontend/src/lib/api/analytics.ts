@@ -135,9 +135,14 @@ export interface ActivityHeatmapResponse {
 
 export async function getAnalyticsDashboard(
 	period?: string,
+	params?: { start_date?: string; end_date?: string },
 ): Promise<DashboardResponse> {
-	const query = period ? `?period=${period}` : '';
-	return unwrap(api.get(`analytics/dashboard${query}`));
+	const searchParams = new URLSearchParams();
+	if (period) searchParams.set('period', period);
+	if (params?.start_date) searchParams.set('start_date', params.start_date);
+	if (params?.end_date) searchParams.set('end_date', params.end_date);
+	const query = searchParams.toString();
+	return unwrap(api.get(`analytics/dashboard${query ? `?${query}` : ''}`));
 }
 
 export async function getAnalyticsStreaks(): Promise<StreaksResponse> {
