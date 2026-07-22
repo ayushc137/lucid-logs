@@ -2,7 +2,6 @@
 import {
 	getAnalyticsDashboard,
 	getAnalyticsStreaks,
-	getActivityHeatmap,
 	type DashboardResponse,
 	type StreaksResponse,
 } from '$lib/api';
@@ -54,13 +53,6 @@ const dashboardQuery = createQuery({
 const streaksQuery = createQuery({
 	queryKey: ['analytics', 'streaks'],
 	queryFn: () => getAnalyticsStreaks(),
-});
-
-const heatmapQuery = createQuery({
-	get queryKey() {
-		return ['analytics', 'heatmap', period];
-	},
-	queryFn: () => getActivityHeatmap(),
 });
 
 const data = $derived($dashboardQuery.data);

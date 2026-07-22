@@ -5,7 +5,11 @@ import { Flame } from 'lucide-svelte';
 
 const heatmapQuery = createQuery({
 	queryKey: ['activity-heatmap'],
-	queryFn: () => getActivityHeatmap(),
+	queryFn: () =>
+		getActivityHeatmap({
+			start_date: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+			end_date: new Date().toISOString(),
+		}),
 });
 
 const data = $derived($heatmapQuery.data);
