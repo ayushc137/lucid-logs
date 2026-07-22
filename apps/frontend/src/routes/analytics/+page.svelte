@@ -7,6 +7,7 @@ import {
 } from '$lib/api';
 import ActivityHeatmap from '$lib/components/analytics/ActivityHeatmap.svelte';
 import DonutChart from '$lib/components/analytics/DonutChart.svelte';
+import MoodTrend from '$lib/components/analytics/MoodTrend.svelte';
 import {
 	Card,
 	EmptyState,
@@ -82,6 +83,146 @@ const quadrantSegments = $derived.by(() => {
 });
 
 const hasData = $derived(!!data && (data.tasks.total_tasks > 0 || data.goals.active_goals > 0));
+
+// ── Mood quadrant human-readable info ──────────────────────────
+interface QuadrantInfo {
+	label: string;
+	emoji: string;
+	description: string;
+	words: string;
+	tips: string[];
+}
+
+const QUADRANT_INFO: Record<string, QuadrantInfo> = {
+	yellow: {
+		label: 'Energized',
+		emoji: '⚡',
+		description: 'Positive and high-energy — you\'ve been feeling motivated and engaged.',
+		words: 'excited, motivated, joyful',
+		tips: [
+			'Channel this energy into your hardest goals',
+			'High-energy periods are great for starting new habits',
+			'Use this momentum to tackle creative or challenging work',
+		],
+	},
+	green: {
+		label: 'Calm',
+		emoji: '🌿',
+		description: 'Positive and relaxed — a peaceful, content state.',
+		words: 'relaxed, content, at peace',
+		tips: [
+			'Great balance — keep the rhythm going',
+			'This is a good state for planning and reflection',
+			'Enjoy it! Consistent calm states build resilience',
+		],
+	},
+	red: {
+		label: 'Stressed',
+		emoji: '🔥',
+		description: 'High-energy but negative — tension, frustration, or anxiety.',
+		words: 'anxious, frustrated, tense',
+		tips: [
+			'Try shorter work blocks with frequent breaks',
+			'Consider a walk between intense tasks',
+			'Notice which task categories correlate with stress',
+		],
+	},
+	blue: {
+		label: 'Low',
+		emoji: '💧',
+		description: 'Low energy and low mood — tired, drained, or down.',
+		words: 'tired, sad, drained',
+		tips: [
+			'Small wins matter — try breaking tasks into smaller pieces',
+			'A short walk or some sunlight can help lift your energy',
+			'Be gentle with yourself — low periods are temporary',
+		],
+	},
+};
+
+// Period label for mood summary
+const periodLabel = $derived(period === 'week' ? 'week' : period === 'month' ? 'month' : '3 months');
+
+// Dominant quadrant info object
+const dominantInfo = $derived.by(() => {
+	const dq = data?.emotions?.dominant_quadrant;
+	if (!dq) return null;
+	return QUADRANT_INFO[dq] ?? null;
+});
+
+// Mood stability in words
+const stabilityWord = $derived.by(() => {
+	const s = data?.emotions?.mood_stability;
+	if (s === undefined || s === null) return '';
+	if (s > 0.7) return 'very stable';
+	if (s >= 0.4) return 'fairly steady';
+	return 'swinging between states';
+});
+
+// Valence in words
+const valenceWord = $derived.by(() => {
+	const v = data?.emotions?.average_valence ?? 0;
+	if (v > 0.2) return 'positive';
+	if (v < -0.2) return 'negative';
+	return 'neutral';
+});
+
+// Arousal in words
+const arousalWord = $derived.by(() => {
+	const a = data?.emotions?.average_arousal ?? 0;
+	if (a > 0.2) return 'high';
+	if (a < -0.2) return 'low';
+	return 'moderate';
+});
+
+// Trend direction from trend data
+const trendWord = $derived.by(() => {
+	const trend = data?.emotions?.trend;
+	if (!trend || trend.length < 4) return '';
+	const mid = Math.floor(trend.length / 2);
+	const firstAvg = trend.slice(0, mid).reduce((s, d) => s + d.valence, 0) / mid;
+	const secondAvg = trend.slice(mid).reduce((s, d) => s + d.valence, 0) / (trend.length - mid);
+	const diff = secondAvg - firstAvg;
+	if (diff > 0.1) return 'improving';
+	if (diff < -0.1) return 'declining';
+	return 'steady';
+});
+
+// Mood summary sentence
+const moodSummary = $derived.by(() => {
+	if (!dominantInfo) return '';
+	const parts: string[] = [];
+	parts.push(`This ${periodLabel} you've mostly felt **${dominantInfo.label}** ${dominantInfo.emoji} — ${dominantInfo.description}`);
+	if (trendWord) {
+		const trendClause = trendWord === 'steady' ? 'holding steady' : trendWord === 'improving' ? 'improving' : 'declining';
+		parts.push(`Your mood has been ${stabilityWord} and ${trendClause}.`);
+	} else {
+		parts.push(`Your mood has been ${stabilityWord}.`);
+	}
+	return parts.join(' ');
+});
+
+// Quadrant segments enriched with info
+const quadrantBreakdown = $derived.by(() => {
+	const qd = data?.emotions?.quadrant_distribution;
+	if (!qd) return [];
+	const total = qd.yellow + qd.green + qd.red + qd.blue;
+	if (total === 0) return [];
+	const order = ['yellow', 'green', 'red', 'blue'] as const;
+	return order
+		.map((key) => {
+			const value = qd[key];
+			const info = QUADRANT_INFO[key];
+			return {
+				key,
+				value,
+				pct: (value / total) * 100,
+				info,
+			};
+		})
+		.filter((s) => s.value > 0)
+		.sort((a, b) => b.value - a.value);
+});
 </script>
 
 <svelte:head>
@@ -238,57 +379,87 @@ const hasData = $derived(!!data && (data.tasks.total_tasks > 0 || data.goals.act
 						{#snippet icon()}<Heart class="w-4 h-4 text-error" />{/snippet}
 					</SectionHeader>
 
-					<!-- Valence/Arousal -->
-					<div class="grid grid-cols-2 gap-3 text-sm">
-						<div class="bg-base-200/40 rounded-box px-3 py-2">
-							<p class="text-xs text-base-content/50">Avg Valence</p>
-							<p class="font-mono text-lg font-bold">{data.emotions.average_valence.toFixed(2)}</p>
-						</div>
-						<div class="bg-base-200/40 rounded-box px-3 py-2">
-							<p class="text-xs text-base-content/50">Avg Arousal</p>
-							<p class="font-mono text-lg font-bold">{data.emotions.average_arousal.toFixed(2)}</p>
-						</div>
-					</div>
+					<!-- Mood summary sentence -->
+					{#if moodSummary}
+						<p class="text-sm leading-relaxed text-base-content/80">
+							{#each moodSummary.split('**') as part, i}
+								{#if i % 2 === 1}<strong>{part}</strong>{:else}{part}{/if}
+							{/each}
+						</p>
+					{/if}
 
-					<!-- Quadrant distribution bar -->
+					<!-- Quadrant distribution bar (above the detailed breakdown) -->
 					{#if quadrantSegments.length > 0}
 						<div class="space-y-2">
 							<div class="flex h-3 rounded-full overflow-hidden bg-base-200">
 								{#each quadrantSegments as seg (seg.key)}
+									{@const qi = QUADRANT_INFO[seg.key]}
 									<div
 										style="width: {seg.pct}%; background: {seg.color};"
 										class="transition-all"
-										title="{seg.key}: {seg.value}"
+										title={qi ? `{qi.label}: ${Math.round(seg.pct)}% (${seg.value} entries)` : `${seg.key}: ${seg.value}`}
 									></div>
 								{/each}
 							</div>
-							<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
-								{#each quadrantSegments as seg (seg.key)}
-									<span class="flex items-center gap-1.5 capitalize">
-										<span class="w-2 h-2 rounded-full" style="background: {seg.color}"></span>
-										{seg.key} ({Math.round(seg.pct)}%)
-									</span>
-								{/each}
-							</div>
 						</div>
 					{/if}
 
-					{#if data.emotions.dominant_quadrant}
-						<p class="text-sm">
-							<span class="text-base-content/50">Dominant:</span>
-							<span class="font-medium capitalize ml-1" style="color: {quadrantColor(data.emotions.dominant_quadrant)}">{data.emotions.dominant_quadrant}</span>
-						</p>
-					{/if}
-
-					{#if data.emotions.top_emotions && data.emotions.top_emotions.length > 0}
-						<div class="flex flex-wrap gap-2">
-							{#each data.emotions.top_emotions.slice(0, 5) as emotion}
-								<span class="badge badge-sm gap-1 bg-base-200/60">
-									{emotion.emotion_name}
-									<span class="text-xs opacity-60">×{emotion.count}</span>
-								</span>
+					<!-- Quadrant breakdown with meanings -->
+					{#if quadrantBreakdown.length > 0}
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+							{#each quadrantBreakdown as item (item.key)}
+								<div class="flex items-start gap-2.5 p-2.5 rounded-lg bg-base-200/40">
+									<span class="w-3 h-3 rounded-full mt-0.5 shrink-0" style="background: {QUADRANT_COLORS[item.key]}"></span>
+									<div class="min-w-0">
+										<div class="flex items-baseline gap-1.5 flex-wrap">
+											<span class="text-sm font-semibold">{item.info.emoji} {item.info.label}</span>
+											<span class="text-xs text-base-content/50 font-mono">{Math.round(item.pct)}%</span>
+										</div>
+										<p class="text-xs text-base-content/50 mt-0.5">{item.info.words}</p>
+									</div>
+								</div>
 							{/each}
 						</div>
+					{/if}
+
+					<!-- Dominant mood analysis paragraph -->
+					{#if dominantInfo}
+						<div class="space-y-2 text-sm">
+							<p class="leading-relaxed">
+								Your dominant mood this {periodLabel} was <strong style="color: {quadrantColor(data.emotions.dominant_quadrant)}">{dominantInfo.label}</strong> {dominantInfo.emoji}. {dominantInfo.description}
+							</p>
+							{#if data.emotions.top_emotions && data.emotions.top_emotions.length > 0}
+								<p class="text-base-content/60">
+									Most frequent feelings:
+									{#each data.emotions.top_emotions.slice(0, 3) as emo, i}
+										{#if i > 0}, {/if}{emo.emotion_name}
+									{/each}
+								</p>
+							{/if}
+							<p class="text-base-content/60 text-xs">
+								Overall positivity: <span class="font-medium">{valenceWord}</span> · Energy level: <span class="font-medium">{arousalWord}</span>
+							</p>
+						</div>
+					{/if}
+
+					<!-- Friendly suggestions callout -->
+					{#if dominantInfo && dominantInfo.tips.length > 0}
+						<div class="bg-primary/5 border border-primary/10 rounded-box p-3 space-y-2">
+							<p class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Suggestions</p>
+							<ul class="space-y-1.5">
+								{#each dominantInfo.tips as tip}
+									<li class="text-sm text-base-content/70 flex items-start gap-2">
+										<span class="text-primary mt-0.5">•</span>
+										<span>{tip}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+
+					<!-- Mood trend chart -->
+					{#if data.emotions.trend && data.emotions.trend.length > 1}
+						<MoodTrend trend={data.emotions.trend} />
 					{/if}
 				</div>
 			</Card>

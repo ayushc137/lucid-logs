@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { DailyMood } from '$lib/api';
+import { QUADRANT_COLORS } from '$lib/utils/chart-colors';
 
 interface Props {
 	trend: DailyMood[];
@@ -86,12 +87,14 @@ const dateLabels = $derived(
 		{/each}
 	</svg>
 
-	<!-- Mood quadrant legend -->
-	<div class="flex items-center justify-between text-xs text-base-content/50">
-		<span>valence over time</span>
-		<div class="flex items-center gap-3">
-			<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-warning inline-block"></span>positive</span>
-			<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-info inline-block"></span>negative</span>
+	<!-- Mood legend: 4 quadrant colors with labels -->
+	<div class="flex items-center justify-between gap-2 flex-wrap text-xs text-base-content/50">
+		<span>mood over time</span>
+		<div class="flex items-center gap-2.5 flex-wrap">
+			<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full inline-block" style="background: {QUADRANT_COLORS.yellow}"></span>⚡ Energized</span>
+			<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full inline-block" style="background: {QUADRANT_COLORS.green}"></span>🌿 Calm</span>
+			<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full inline-block" style="background: {QUADRANT_COLORS.red}"></span>🔥 Stressed</span>
+			<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full inline-block" style="background: {QUADRANT_COLORS.blue}"></span>💧 Low</span>
 		</div>
 	</div>
 </div>

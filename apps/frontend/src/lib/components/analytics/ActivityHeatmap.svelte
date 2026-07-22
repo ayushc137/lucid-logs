@@ -3,6 +3,9 @@ import { type ActivityHeatmapDay, getActivityHeatmap } from '$lib/api';
 import { createQuery } from '@tanstack/svelte-query';
 import { Flame } from 'lucide-svelte';
 
+const CELL = 24;
+const GAP = 3;
+
 const heatmapQuery = createQuery({
 	queryKey: ['activity-heatmap'],
 	queryFn: () =>
@@ -17,6 +20,9 @@ const data = $derived($heatmapQuery.data);
 const days = $derived(data?.days ?? []);
 const currentStreak = $derived(data?.current_streak ?? 0);
 const longestStreak = $derived(data?.longest_streak ?? 0);
+
+// Today's date string for highlight
+const todayStr = $derived(new Date().toISOString().slice(0, 10));
 
 // Group days by week for the grid
 const weeks = $derived.by(() => {
@@ -75,6 +81,36 @@ function intensityClass(intensity: number): string {
 			return 'bg-base-300/50';
 	}
 }
+
+// Human-readable tooltip for a day
+function dayTooltip(day: ActivityHeatmapDay): string {
+	const d = new Date(day.date);
+	const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+	const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	const h = Math.floor(day.minutes / 60);
+	const m = Math.round(day.minutes % 60);
+	const timeStr = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`;
+	return `${dayName}, ${dateStr}: ${day.count} task${day.count !== 1 ? 's' : ''}, ${timeStr}`;
+}
+
+// Format minutes for legend/summary
+function fmtMinutes(min: number): string {
+	const h = Math.floor(min / 60);
+	const m = Math.round(min % 60);
+	if (h > 0) return `${h}h${m > 0 ? ` ${m}min` : ''}`;
+	return `${m}min`;
+}
+
+// Scroll container ref for auto-scroll to most recent
+let scrollEl: HTMLDivElement | undefined = $state();
+
+// Auto-scroll to end (most recent) on mount / when data loads
+$effect(() => {
+	if (scrollEl && weeks.length > 0) {
+		// Scroll to the right end to show the most recent days
+		scrollEl.scrollLeft = scrollEl.scrollWidth;
+	}
+});
 </script>
 
 {#if $heatmapQuery.isPending}
@@ -94,36 +130,47 @@ function intensityClass(intensity: number): string {
 			<span class="text-base-content/40">best {longestStreak}d</span>
 		</div>
 
-		<!-- Heatmap grid -->
-		<div class="overflow-x-auto">
-			<div class="inline-flex flex-col gap-1 min-w-fit">
+		<!-- Heatmap grid (scrollable, auto-scrolls to most recent) -->
+		<div class="overflow-x-auto pb-2" bind:this={scrollEl}>
+			<div class="inline-flex flex-col gap-1 min-w-fit pr-2">
 				<!-- Month labels -->
-				<div class="flex gap-1 text-[10px] text-base-content/40 pl-6">
+				<div class="flex gap-1 text-[10px] text-base-content/40 mb-0.5 relative" style="padding-left: {CELL + GAP + 4}px; height: 16px;">
 					{#each monthLabels as m}
-						<span style="width: calc(12px * 4 + 4px * 3);">{m.label}</span>
+						<span
+							class="absolute whitespace-nowrap"
+							style="left: {m.weekIndex * (CELL + GAP) + CELL + GAP + 4}px;"
+						>
+							{m.label}
+						</span>
 					{/each}
 				</div>
 
 				<div class="flex gap-1">
 					<!-- Day-of-week labels -->
-					<div class="flex flex-col gap-1 text-[10px] text-base-content/40 pr-1">
+					<div class="flex flex-col gap-1 text-[10px] text-base-content/40 pr-1 shrink-0" style="width: {CELL}px;">
 						{#each weekDays as d}
-							<span class="h-3 leading-3">{d}</span>
+							<div class="flex items-center justify-end" style="height: {CELL}px; line-height: {CELL}px;">{d}</div>
 						{/each}
 					</div>
 
 					<!-- Weeks -->
 					{#each weeks as week}
-						<div class="flex flex-col gap-1">
+						<div class="flex flex-col gap-1 shrink-0">
 							{#each weekDays as _, dayIndex}
 								{@const day = week.find(d => new Date(d.date).getDay() === dayIndex)}
 								{#if day}
+									{@const isToday = day.date.slice(0, 10) === todayStr}
 									<div
-										class="w-3 h-3 rounded-sm {intensityClass(day.intensity)}"
-										title="{day.date}: {day.count} tasks, {Math.round(day.minutes)}min"
-									></div>
+										class="rounded flex items-center justify-center shrink-0 {intensityClass(day.intensity)} {isToday ? 'ring-2 ring-primary ring-offset-1 ring-offset-base-100' : ''}"
+										style="width: {CELL}px; height: {CELL}px;"
+										title={dayTooltip(day)}
+									>
+										<span class="font-medium {day.intensity >= 2 ? 'text-primary-content' : 'text-base-content/40'}" style="font-size: 9px;">
+											{new Date(day.date).getDate()}
+										</span>
+									</div>
 								{:else}
-									<div class="w-3 h-3 rounded-sm bg-transparent"></div>
+									<div class="shrink-0" style="width: {CELL}px; height: {CELL}px;"></div>
 								{/if}
 							{/each}
 						</div>
@@ -131,15 +178,26 @@ function intensityClass(intensity: number): string {
 				</div>
 
 				<!-- Legend -->
-				<div class="flex items-center gap-1.5 text-[10px] text-base-content/40 pl-6 pt-1">
+				<div class="flex items-center gap-1.5 text-[10px] text-base-content/40 pt-2" style="padding-left: {CELL + GAP + 4}px;">
 					<span>Less</span>
 					{#each [0, 1, 2, 3, 4] as level}
-						<div class="w-2.5 h-2.5 rounded-sm {intensityClass(level)}"></div>
+						<div class="rounded {intensityClass(level)}" style="width: 12px; height: 12px;"></div>
 					{/each}
 					<span>More</span>
 				</div>
 			</div>
 		</div>
+
+		<!-- Recent activity summary -->
+		{#if days.length > 0}
+			{@const recent = days.slice(-7)}
+			{@const recentActive = recent.filter(d => d.count > 0)}
+			{@const recentTotal = recent.reduce((sum, d) => sum + d.count, 0)}
+			{@const recentMin = recent.reduce((sum, d) => sum + d.minutes, 0)}
+			<p class="text-xs text-base-content/40">
+				Last 7 days: {recentActive.length} active · {recentTotal} tasks · {fmtMinutes(recentMin)}
+			</p>
+		{/if}
 	</div>
 {:else}
 	<p class="text-sm text-base-content/50 py-4">No activity data yet.</p>
