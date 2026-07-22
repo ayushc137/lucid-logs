@@ -102,7 +102,9 @@ func (h *Handler) GenerateChart(c *gin.Context) {
 // @Description Retrieves combined dashboard metrics for tasks, emotions, goals, categories
 // @Tags Analytics
 // @Produce json
-// @Param period query string false "Time period (day, week, month, quarter, year)" default(week)
+// @Param period query string false "Time period (day, week, month, quarter, year, custom)" default(week)
+// @Param start_date query string false "Start date for custom period (RFC3339)"
+// @Param end_date query string false "End date for custom period (RFC3339)"
 // @Success 200 {object} DashboardResponse
 // @Failure 401 {object} response.APIResponse
 // @Security BearerAuth
@@ -115,8 +117,9 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	}
 
 	period := c.DefaultQuery("period", PeriodWeek)
+	start, end := h.parseDateRange(c)
 
-	dashboard, err := h.service.GetDashboard(c.Request.Context(), user.UserID, period)
+	dashboard, err := h.service.GetDashboard(c.Request.Context(), user.UserID, period, start, end)
 	if err != nil {
 		response.ErrorFromErr(c, err)
 		return

@@ -30,7 +30,7 @@ type Service interface {
 	GetCategoryMetrics(ctx context.Context, userID string, period string, start, end *time.Time) (*CategoryMetrics, error)
 
 	// GetDashboard retrieves combined dashboard metrics.
-	GetDashboard(ctx context.Context, userID string, period string) (*DashboardResponse, error)
+	GetDashboard(ctx context.Context, userID string, period string, start, end *time.Time) (*DashboardResponse, error)
 
 	// GetStreaks retrieves the dashboard streak summary.
 	GetStreaks(ctx context.Context, userID string) (*StreaksResponse, error)
@@ -171,15 +171,15 @@ func (s *service) GetCategoryMetrics(ctx context.Context, userID, period string,
 // DASHBOARD
 // =============================================================================
 
-func (s *service) GetDashboard(ctx context.Context, userID, period string) (*DashboardResponse, error) {
-	start, end := s.resolvePeriod(period, nil, nil)
+func (s *service) GetDashboard(ctx context.Context, userID, period string, start, end *time.Time) (*DashboardResponse, error) {
+	startTime, endTime := s.resolvePeriod(period, start, end)
 
-	tasks, err := s.repo.GetTaskMetrics(ctx, userID, start, end)
+	tasks, err := s.repo.GetTaskMetrics(ctx, userID, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}
 
-	emotions, err := s.repo.GetEmotionMetrics(ctx, userID, start, end)
+	emotions, err := s.repo.GetEmotionMetrics(ctx, userID, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (s *service) GetDashboard(ctx context.Context, userID, period string) (*Das
 		return nil, err
 	}
 
-	categories, err := s.repo.GetCategoryMetrics(ctx, userID, start, end)
+	categories, err := s.repo.GetCategoryMetrics(ctx, userID, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}
