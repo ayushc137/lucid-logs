@@ -713,16 +713,17 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 						{/each}
 					</div>
 				</div>
-			</div>
-		</div>
 
-		<!-- Quick Capture — inline, only on today's view -->
-		{#if isSelectedDateToday()}
-			<QuickCapture onSaved={() => {
-				$tasksQuery.refetch();
-			}} />
-		{/if}
-	</div>
+				<!-- Quick Capture — inline inside top card, only on today's view -->
+				{#if isSelectedDateToday()}
+					<div class="border-t border-base-300/60 my-4"></div>
+					<QuickCapture onSaved={() => {
+						$tasksQuery.refetch();
+					}} />
+				{/if}
+				</div>
+				</div>
+				</div>
 
 	<!-- Timeline Section -->
 	<div class="flex-1 min-h-0 flex flex-col">
@@ -732,23 +733,6 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 			<div class="card-body p-3 lg:p-4 flex flex-col h-full gap-3">
 				<!-- View Mode Toggle -->
 				<div class="flex items-center justify-between gap-2">
-					<!-- Goals pills (compact, horizontal scroll on mobile) -->
-					{#if timelineGoals.length > 0}
-						<div class="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
-							<div class="flex items-center gap-1.5">
-								{#each timelineGoals as goal}
-									<button
-										class="btn btn-xs gap-1 shrink-0 rounded-full border border-base-200 bg-base-100 hover:bg-base-200"
-										onclick={() => handleGoalClick(goal.id)}
-									>
-										<span class="text-sm leading-none">{goal.icon}</span>
-										<span class="text-xs font-medium truncate max-w-[80px]">{goal.title}</span>
-									</button>
-								{/each}
-							</div>
-						</div>
-					{/if}
-
 					<!-- Segmented Toggle -->
 					<div class="join bg-base-200 rounded-lg p-0.5 shrink-0">
 						<button
@@ -769,6 +753,29 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 						</button>
 					</div>
 				</div>
+
+				<!-- Goals strip — informative chips, own row -->
+				{#if timelineGoals.length > 0}
+					<div class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-1 px-1">
+						<span class="text-[10px] uppercase tracking-wide text-base-content/40 font-semibold shrink-0 mr-0.5">Goals</span>
+						{#each timelineGoals as goal}
+							<button
+								class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-base-200/60 hover:bg-base-200 text-xs font-medium shrink-0 transition-colors"
+								onclick={() => handleGoalClick(goal.id)}
+							>
+								<span class="text-sm leading-none">{goal.icon}</span>
+								<span class="truncate max-w-[140px]">{goal.title}</span>
+								{#if goal.target}
+									<span class="text-[10px] text-base-content/50 tabular-nums">
+										{goal.target.currentValue}/{goal.target.value}
+									</span>
+								{:else if goal.progress > 0}
+									<span class="text-[10px] text-base-content/50 tabular-nums">{goal.progress}%</span>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
 
 				<!-- Content -->
 				<div class="flex-1 min-h-0">
