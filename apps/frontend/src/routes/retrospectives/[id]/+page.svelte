@@ -17,6 +17,7 @@ import {
 	LoadingCard,
 	SectionHeader,
 	StatCard,
+	StickyFooter,
 } from '$lib/components/ui';
 import DonutChart from '$lib/components/analytics/DonutChart.svelte';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -652,7 +653,7 @@ const reflectionPrompts = [
 								{prompt.label}
 							</label>
 							<textarea
-								class="textarea textarea-bordered bg-base-100 text-sm"
+								class="textarea textarea-bordered w-full bg-base-100 text-sm"
 								rows="2"
 								value={prompt.key === 'what_went_well' ? whatWentWell
 									: prompt.key === 'what_didnt_go_well' ? whatDidntGoWell
@@ -685,8 +686,8 @@ const reflectionPrompts = [
 
 <!-- Sticky Bottom Action Bar -->
 {#if retro}
-	<div class="fixed bottom-0 left-0 right-0 z-30 border-t border-base-300 bg-base-100/95 px-4 py-3 shadow-lg backdrop-blur-md sm:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
-		<div class="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+	<StickyFooter>
+		{#snippet left()}
 			<button
 				class="btn btn-ghost btn-sm gap-2 text-error hover:bg-error/10"
 				disabled={$deleteMutation.isPending}
@@ -695,8 +696,8 @@ const reflectionPrompts = [
 				<Trash2 class="h-4 w-4" />
 				<span class="hidden sm:inline">Delete</span>
 			</button>
-
-			<div class="flex items-center gap-2">
+		{/snippet}
+		{#snippet right()}
 				<button
 					class="btn btn-ghost btn-sm"
 					disabled={$updateMutation.isPending}
@@ -728,9 +729,8 @@ const reflectionPrompts = [
 					{/if}
 					{retro.status === 'completed' ? 'Unpublish' : 'Publish'}
 				</button>
-			</div>
-		</div>
-	</div>
+		{/snippet}
+	</StickyFooter>
 {/if}
 
 <ConfirmDialog
