@@ -105,52 +105,42 @@ onMount(() => {
 });
 </script>
 
-<section class="rounded-box bg-base-200/30 p-4" aria-labelledby="quick-capture-label">
-	<div class="mb-3 flex items-center justify-between gap-3">
-		<div
-			id="quick-capture-label"
-			class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-base-content/50"
-		>
-			<Zap class="h-3.5 w-3.5 text-primary" />
-			Quick Capture
-		</div>
-		<span class="hidden text-[10px] text-base-content/40 sm:inline">
+<section aria-label="Quick capture">
+	<div class="flex items-center gap-2 mb-2">
+		<Zap class="h-3.5 w-3.5 text-primary" />
+		<span class="text-xs font-medium uppercase tracking-wide text-base-content/50">Quick Capture</span>
+		<span class="hidden text-[10px] text-base-content/40 sm:inline ml-auto">
 			<kbd class="kbd kbd-xs">⌘</kbd> + <kbd class="kbd kbd-xs">Enter</kbd>
 		</span>
 	</div>
 
-	<div class="flex flex-col gap-3 md:flex-row md:items-center">
-		<div class="min-w-0 flex-1">
-			<input
-				bind:this={titleInput}
-				type="text"
-				bind:value={title}
-				placeholder="What did you just do?"
-				class="input input-bordered w-full"
-				onkeydown={handleKeydown}
-			/>
-		</div>
-
-		<div class="w-full md:w-64 md:shrink-0">
-			<CategoryDropdown
-				{categories}
-				bind:value={categoryId}
-				placeholder="Category (optional)"
-				showCreateButton={false}
-			/>
-		</div>
-
+	<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+		<input
+			bind:this={titleInput}
+			type="text"
+			bind:value={title}
+			placeholder="What did you just do?"
+			class="input input-sm input-bordered flex-1 min-w-0"
+			onkeydown={handleKeydown}
+		/>
+		<CategoryDropdown
+			{categories}
+			bind:value={categoryId}
+			placeholder="Category"
+			showCreateButton={false}
+			class="w-full sm:w-40"
+		/>
 		<button
-			class="btn btn-primary gap-1.5 md:shrink-0"
+			class="btn btn-sm btn-primary gap-1 shrink-0"
 			onclick={handleSubmit}
 			disabled={$createMut.isPending || !title.trim()}
 		>
 			{#if $createMut.isPending}
 				<span class="loading loading-spinner loading-xs"></span>
 			{:else if showSuccess}
-				<Check class="w-4 h-4" />
+				<Check class="w-3.5 h-3.5" />
 			{:else}
-				<Zap class="w-4 h-4" />
+				<Zap class="w-3.5 h-3.5" />
 			{/if}
 			{showSuccess ? 'Saved!' : 'Log it'}
 		</button>

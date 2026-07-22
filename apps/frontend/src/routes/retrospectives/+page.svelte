@@ -10,7 +10,6 @@ import {
 } from '$lib/api';
 import {
 	ConfirmDialog,
-	DataTable,
 	EmptyState,
 	ErrorAlert,
 	LoadingCard,
@@ -316,84 +315,143 @@ const isSearching = $derived(searchQuery.trim().toLowerCase() !== debouncedSearc
 			</div>
 		</div>
 	{:else}
-		<DataTable hover zebra>
-			<thead>
-				<tr>
-					<th>Type</th>
-					<th>Period</th>
-					<th>Status</th>
-					<th class="text-right">Tasks</th>
-					<th class="text-right">Hours</th>
-					<th>Mood</th>
-					<th>Generated</th>
-					<th class="w-16 text-right">Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each filteredRetros as retro (retro.id)}
-					{@const tasks = retro.auto_summary?.tasks}
-					{@const mood = retro.auto_summary?.mood}
-					<tr
-						class="cursor-pointer transition-colors hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-						onclick={() => goto(`/retrospectives/${retro.id}`)}
-						role="link"
-						tabindex="0"
-						onkeydown={(event) => event.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
-					>
-						<td>
-							<span class="badge badge-sm badge-outline whitespace-nowrap">
-								{typeLabels[retro.retro_type] ?? retro.retro_type}
-							</span>
-						</td>
-						<td class="whitespace-nowrap font-medium">{fmtRange(retro)}</td>
-						<td>
+		<div class="hidden lg:block card bg-base-100 shadow-lg border border-base-200 overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="table table-lg">
+					<thead class="bg-base-100 border-b border-base-300">
+						<tr>
+							<th>Type</th>
+							<th>Period</th>
+							<th>Status</th>
+							<th class="text-right">Tasks</th>
+							<th class="text-right">Hours</th>
+							<th>Mood</th>
+							<th>Generated</th>
+							<th class="w-24 text-right">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each filteredRetros as retro (retro.id)}
+							{@const tasks = retro.auto_summary?.tasks}
+							{@const mood = retro.auto_summary?.mood}
+							<tr
+								class="hover:bg-base-200/50 transition-colors group cursor-pointer"
+								onclick={() => goto(`/retrospectives/${retro.id}`)}
+								role="link"
+								tabindex="0"
+								onkeydown={(event) => event.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
+							>
+								<td>
+									<span class="badge badge-sm badge-outline whitespace-nowrap">
+										{typeLabels[retro.retro_type] ?? retro.retro_type}
+									</span>
+								</td>
+								<td class="whitespace-nowrap font-semibold">{fmtRange(retro)}</td>
+								<td>
+									<span
+										class={cn(
+											'badge badge-sm gap-1 whitespace-nowrap',
+											retro.status === 'completed' ? 'badge-success' : 'badge-ghost',
+										)}
+									>
+										{#if retro.status === 'completed'}
+											<CheckCircle2 class="h-3 w-3" /> Completed
+										{:else}
+											<CircleDashed class="h-3 w-3" /> Draft
+										{/if}
+									</span>
+								</td>
+								<td class="text-right font-mono tabular-nums">{taskCount(retro)}</td>
+								<td class="text-right font-mono tabular-nums">
+									{(tasks?.total_duration_hours ?? 0).toFixed(1)}h
+								</td>
+								<td>
+									{#if mood?.dominant_quadrant}
+										<span class="flex items-center gap-2 whitespace-nowrap">
+											<span
+												class="h-2 w-2 rounded-full"
+												style="background: {quadrantColor(mood.dominant_quadrant)}"
+											></span>
+											<span class="capitalize">{mood.dominant_quadrant}</span>
+										</span>
+									{:else}
+										<span class="text-base-content/40">—</span>
+									{/if}
+								</td>
+								<td class="whitespace-nowrap text-sm text-base-content/60">{fmtGenerated(retro.generated_at)}</td>
+								<td>
+									<div class="flex gap-1 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+										<button
+											class="btn btn-ghost btn-sm btn-square text-error"
+											aria-label="Delete retrospective"
+											onclick={(event) => {
+												event.stopPropagation();
+												deleteTarget = retro;
+											}}
+										>
+											<Trash2 class="w-4 h-4" />
+										</button>
+									</div>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			<div class="px-4 py-3 bg-base-200/50 border-t border-base-200 text-sm opacity-60 flex items-center justify-between">
+				<span>{filteredRetros.length} retrospectives</span>
+				{#if $retrosQuery.isFetching}
+					<span class="flex items-center gap-2 text-primary"><LoaderCircle class="w-4 h-4 animate-spin" /> Loading...</span>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Mobile card view -->
+		<div class="lg:hidden space-y-2">
+			{#each filteredRetros as retro (retro.id)}
+				{@const tasks = retro.auto_summary?.tasks}
+				{@const mood = retro.auto_summary?.mood}
+				<article
+					class="card bg-base-100 border border-base-200 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
+					onclick={() => goto(`/retrospectives/${retro.id}`)}
+					role="button"
+					tabindex="0"
+					onkeydown={(event) => event.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
+				>
+					<div class="card-body p-3">
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex items-center gap-2 min-w-0">
+								<span class="badge badge-sm badge-outline shrink-0">{typeLabels[retro.retro_type] ?? retro.retro_type}</span>
+								<span class="font-semibold text-[15px] truncate">{fmtRange(retro)}</span>
+							</div>
 							<span
 								class={cn(
-									'badge badge-sm gap-1 whitespace-nowrap',
+									'badge badge-sm gap-1 shrink-0',
 									retro.status === 'completed' ? 'badge-success' : 'badge-ghost',
 								)}
 							>
 								{#if retro.status === 'completed'}
-									<CheckCircle2 class="h-3 w-3" /> Completed
+									<CheckCircle2 class="h-3 w-3" /> Done
 								{:else}
 									<CircleDashed class="h-3 w-3" /> Draft
 								{/if}
 							</span>
-						</td>
-						<td class="text-right font-mono tabular-nums">{taskCount(retro)}</td>
-						<td class="text-right font-mono tabular-nums">
-							{(tasks?.total_duration_hours ?? 0).toFixed(1)}h
-						</td>
-						<td>
+						</div>
+						<div class="flex items-center gap-4 mt-1 text-xs text-base-content/60">
+							<span>{taskCount(retro)} tasks</span>
+							<span>{(tasks?.total_duration_hours ?? 0).toFixed(1)}h</span>
 							{#if mood?.dominant_quadrant}
-								<span class="flex items-center gap-2 whitespace-nowrap">
-									<span
-										class="h-2 w-2 rounded-full"
-										style="background: {quadrantColor(mood.dominant_quadrant)}"
-									></span>
+								<span class="flex items-center gap-1.5">
+									<span class="h-1.5 w-1.5 rounded-full" style="background: {quadrantColor(mood.dominant_quadrant)}"></span>
 									<span class="capitalize">{mood.dominant_quadrant}</span>
 								</span>
-							{:else}
-								<span class="text-base-content/40">—</span>
 							{/if}
-						</td>
-						<td class="whitespace-nowrap text-base-content/60">{fmtGenerated(retro.generated_at)}</td>
-						<td class="text-right">
-							<button
-								class="btn btn-ghost btn-xs btn-square text-error/70"
-								aria-label="Delete retrospective"
-								onclick={(event) => {
-									event.stopPropagation();
-									deleteTarget = retro;
-								}}
-							>
-								<Trash2 class="h-4 w-4" />
-							</button>
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</DataTable>
+							<span class="ml-auto">{fmtGenerated(retro.generated_at)}</span>
+						</div>
+					</div>
+				</article>
+			{/each}
+		</div>
 	{/if}
 </div>
 

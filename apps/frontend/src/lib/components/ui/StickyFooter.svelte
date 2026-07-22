@@ -14,7 +14,7 @@ let { maxWidth = 'max-w-6xl', left, right }: Props = $props();
 </script>
 
 <div
-	class="fixed bottom-0 left-0 right-0 z-30 border-t border-base-300 bg-base-100/95 px-4 py-3 shadow-lg backdrop-blur-md sm:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+	class="fixed bottom-0 right-0 z-30 border-t border-base-300 bg-base-100/95 px-4 py-3 shadow-lg backdrop-blur-md sm:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-0 lg:left-64"
 >
 	<div class="{maxWidth} mx-auto flex items-center justify-between gap-2 sm:gap-4">
 		<div class="flex items-center gap-3">
