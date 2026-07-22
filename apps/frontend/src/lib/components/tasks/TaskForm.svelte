@@ -41,6 +41,7 @@ import { DEFAULT_CATEGORY_COLOR } from '$lib/utils';
 		ColorPicker,
 		ConfirmDialog,
 		SectionHeader,
+		StickyFooter,
 	} from "$lib/components/ui";
 	import OpenMoji from "$lib/components/ui/OpenMoji.svelte";
 	import { emotionStore } from "$lib/stores/emotions.svelte";
@@ -1014,11 +1015,8 @@ import { DEFAULT_CATEGORY_COLOR } from '$lib/utils';
 	</div>
 
 	<!-- Sticky Footer Actions -->
-	<div
-		class="sticky bottom-0 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mt-auto bg-base-100/95 backdrop-blur-md border-t border-base-300 shadow-lg z-30 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
-	>
-		<div class="flex items-center justify-between gap-2 sm:gap-4">
-			<div class="flex items-center gap-3">
+	<StickyFooter>
+		{#snippet left()}
 				{#if isEditing}
 					<button
 						class="btn btn-ghost btn-sm text-error hover:bg-error/10 gap-2 transition-all duration-200"
@@ -1033,8 +1031,8 @@ import { DEFAULT_CATEGORY_COLOR } from '$lib/utils';
 					<kbd class="kbd kbd-xs">⌘</kbd> +
 					<kbd class="kbd kbd-xs">Enter</kbd> to save
 				</span>
-			</div>
-			<div class="flex items-center gap-2">
+		{/snippet}
+		{#snippet right()}
 				<button
 					class="btn btn-ghost btn-sm hover:bg-base-200 transition-all duration-200"
 					onclick={navigateBack}
@@ -1055,9 +1053,8 @@ import { DEFAULT_CATEGORY_COLOR } from '$lib/utils';
 						{isEditing ? "Save Changes" : "Create Task"}
 					{/if}
 				</button>
-			</div>
-		</div>
-	</div>
+		{/snippet}
+	</StickyFooter>
 </div>
 
 <!-- Emotion Modal -->
