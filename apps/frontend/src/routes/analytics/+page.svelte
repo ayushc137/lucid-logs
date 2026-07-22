@@ -435,7 +435,7 @@ const quadrantBreakdown = $derived.by(() => {
 		</div>
 
 		<!-- Productivity + Time (2-col on desktop) -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 			<!-- Productivity Section -->
 			<Card>
 				<div class="flex flex-col gap-4">
@@ -629,29 +629,37 @@ const quadrantBreakdown = $derived.by(() => {
 		{/if}
 
 		<!-- Goals + Streak Leaders (2-col on desktop) -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 			{#if data.goals.goal_progress.length > 0}
 				<Card>
-					<div class="flex flex-col gap-4">
+					<div class="flex flex-col gap-3">
 						<SectionHeader title="Goals" color="secondary" subtitle="Progress toward your goals">
 							{#snippet icon()}<Target class="w-4 h-4 text-secondary" />{/snippet}
 						</SectionHeader>
-						<div class="space-y-3">
-							{#each data.goals.goal_progress as goal}
-								<div class="space-y-1.5">
-									<div class="flex items-center justify-between text-sm">
-										<span class="font-medium truncate">{goal.goal_title}</span>
-										<span class="text-base-content/50 shrink-0 ml-2 font-mono">{Math.round(goal.progress)}%</span>
+						<div class="space-y-2">
+							{#each data.goals.goal_progress.slice(0, 5) as goal, i}
+								<div class="flex items-center gap-2.5">
+									<div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+										<Target class="w-3.5 h-3.5" />
 									</div>
-									<div class="h-2 bg-base-200 rounded-full overflow-hidden">
-										<div
-											class="h-full rounded-full transition-all"
-											style="width: {goal.progress}%; background: {CHART_COLORS[0]};"
-										></div>
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center justify-between gap-2 mb-1">
+											<span class="text-sm font-medium truncate">{goal.goal_title}</span>
+											<span class="text-xs text-base-content/50 shrink-0 font-mono">{Math.round(goal.progress)}%</span>
+										</div>
+										<div class="h-1.5 bg-base-200 rounded-full overflow-hidden">
+											<div
+												class="h-full rounded-full transition-all"
+												style="width: {goal.progress}%; background: {CHART_COLORS[i % CHART_COLORS.length]};"
+											></div>
+										</div>
 									</div>
 								</div>
 							{/each}
 						</div>
+						{#if data.goals.goal_progress.length > 5}
+							<a href="/goals" class="text-xs text-secondary font-medium hover:underline mt-1">View all goals →</a>
+						{/if}
 					</div>
 				</Card>
 			{/if}
