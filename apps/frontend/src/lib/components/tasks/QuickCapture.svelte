@@ -25,14 +25,15 @@ let { onSaved, autoFocus = true }: Props = $props();
 
 const queryClient = useQueryClient();
 
-function getCurrentTimeString(): string {
-	const now = new Date();
+function getCurrentTimeString(offsetMs = 0): string {
+	const now = new Date(Date.now() + offsetMs);
 	return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
 let title = $state('');
 let categoryId = $state<string | undefined>(undefined);
 let timeValue = $state(getCurrentTimeString());
+let endTimeValue = $state(getCurrentTimeString(30 * 60000));
 let titleInput = $state<HTMLInputElement | null>(null);
 let showSuccess = $state(false);
 
@@ -58,6 +59,7 @@ const createMut = createMutation({
 		}, 2000);
 		title = '';
 		timeValue = getCurrentTimeString();
+		endTimeValue = getCurrentTimeString(30 * 60000);
 		categoryId = undefined;
 		onSaved?.();
 		// Re-focus for rapid entry
@@ -72,7 +74,12 @@ function handleSubmit() {
 	const [hours, minutes] = timeValue.split(':').map(Number);
 	const startTime = new Date(now);
 	startTime.setHours(hours, minutes, 0, 0);
-	const endTime = new Date(startTime.getTime() + 30 * 60000); // +30min
+	const [endHours, endMinutes] = endTimeValue.split(':').map(Number);
+	let endTime = new Date(now);
+	endTime.setHours(endHours, endMinutes, 0, 0);
+	if (endTime <= startTime) {
+		endTime = new Date(startTime.getTime() + 30 * 60000);
+	}
 
 	$createMut.mutate({
 		title: title.trim(),
@@ -121,6 +128,13 @@ onMount(() => {
 					bind:value={timeValue}
 					class="input input-sm input-bordered w-24 shrink-0"
 					aria-label="Start time"
+				/>
+				<span class="text-base-content/30 text-xs">→</span>
+				<input
+					type="time"
+					bind:value={endTimeValue}
+					class="input input-sm input-bordered w-24 shrink-0"
+					aria-label="End time"
 				/>
 				<CategoryDropdown
 					{categories}
