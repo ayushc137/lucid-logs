@@ -6,7 +6,7 @@ import {
 	updateTask,
 } from '$lib/api';
 import { getCategories } from '$lib/api/categories';
-import { Card, CategoryDropdown, SectionHeader } from '$lib/components/ui';
+import { CategoryDropdown } from '$lib/components/ui';
 import {
 	createMutation,
 	createQuery,
@@ -105,51 +105,54 @@ onMount(() => {
 });
 </script>
 
-<Card>
-	<SectionHeader title="Quick Capture">
-		{#snippet icon()}
-			<Zap class="w-5 h-5" />
-		{/snippet}
-	</SectionHeader>
-
-	<div class="space-y-3">
-		<!-- Title -->
-		<input
-			bind:this={titleInput}
-			type="text"
-			bind:value={title}
-			placeholder="What did you just do?"
-			class="input input-bordered w-full"
-			onkeydown={handleKeydown}
-		/>
-
-		<!-- Category (optional) -->
-		<CategoryDropdown
-			{categories}
-			bind:value={categoryId}
-			placeholder="Select category (optional)..."
-			showCreateButton={false}
-		/>
-
-		<!-- Actions -->
-		<div class="flex items-center justify-between pt-1">
-			<span class="text-[10px] text-base-content/40">
-				<kbd class="kbd kbd-xs">⌘</kbd> + <kbd class="kbd kbd-xs">Enter</kbd>
-			</span>
-			<button
-				class="btn btn-primary btn-sm gap-1.5"
-				onclick={handleSubmit}
-				disabled={$createMut.isPending || !title.trim()}
-			>
-				{#if $createMut.isPending}
-					<span class="loading loading-spinner loading-xs"></span>
-				{:else if showSuccess}
-					<Check class="w-4 h-4" />
-				{:else}
-					<Zap class="w-4 h-4" />
-				{/if}
-				{showSuccess ? 'Saved!' : 'Log it'}
-			</button>
+<section class="rounded-box bg-base-200/30 p-4" aria-labelledby="quick-capture-label">
+	<div class="mb-3 flex items-center justify-between gap-3">
+		<div
+			id="quick-capture-label"
+			class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-base-content/50"
+		>
+			<Zap class="h-3.5 w-3.5 text-primary" />
+			Quick Capture
 		</div>
+		<span class="hidden text-[10px] text-base-content/40 sm:inline">
+			<kbd class="kbd kbd-xs">⌘</kbd> + <kbd class="kbd kbd-xs">Enter</kbd>
+		</span>
 	</div>
-</Card>
+
+	<div class="flex flex-col gap-3 md:flex-row md:items-center">
+		<div class="min-w-0 flex-1">
+			<input
+				bind:this={titleInput}
+				type="text"
+				bind:value={title}
+				placeholder="What did you just do?"
+				class="input input-bordered w-full"
+				onkeydown={handleKeydown}
+			/>
+		</div>
+
+		<div class="w-full md:w-64 md:shrink-0">
+			<CategoryDropdown
+				{categories}
+				bind:value={categoryId}
+				placeholder="Category (optional)"
+				showCreateButton={false}
+			/>
+		</div>
+
+		<button
+			class="btn btn-primary gap-1.5 md:shrink-0"
+			onclick={handleSubmit}
+			disabled={$createMut.isPending || !title.trim()}
+		>
+			{#if $createMut.isPending}
+				<span class="loading loading-spinner loading-xs"></span>
+			{:else if showSuccess}
+				<Check class="w-4 h-4" />
+			{:else}
+				<Zap class="w-4 h-4" />
+			{/if}
+			{showSuccess ? 'Saved!' : 'Log it'}
+		</button>
+	</div>
+</section>
