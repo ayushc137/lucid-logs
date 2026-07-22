@@ -11,9 +11,6 @@ interface Props {
 
 let { startDate, endDate }: Props = $props();
 
-const CELL = 24;
-const GAP = 3;
-
 function makeQueryFn() {
 	// If props are provided, use them; otherwise default to 365 days
 	if (startDate && endDate) {
@@ -47,6 +44,18 @@ const heatmapQuery = createQuery(heatmapOptions$);
 const data = $derived($heatmapQuery.data);
 
 const days = $derived(data?.days ?? []);
+
+// Adaptive sizing based on the number of days in range
+const rangeDays = $derived(days.length);
+const isShortRange = $derived(rangeDays <= 14);
+const isMediumRange = $derived(rangeDays > 14 && rangeDays <= 62);
+
+const CELL = $derived(isShortRange ? 36 : isMediumRange ? 20 : 24);
+const GAP = $derived(isShortRange ? 6 : isMediumRange ? 4 : 3);
+const cellRoundClass = $derived(isShortRange ? 'rounded-md' : 'rounded');
+const showMonthLabels = $derived(rangeDays > 62);
+const weeksJustifyClass = $derived(isShortRange ? 'justify-center' : '');
+
 const currentStreak = $derived(data?.current_streak ?? 0);
 const longestStreak = $derived(data?.longest_streak ?? 0);
 
@@ -141,10 +150,9 @@ function fmtMinutes(min: number): string {
 // Scroll container ref for auto-scroll to most recent
 let scrollEl: HTMLDivElement | undefined = $state();
 
-// Auto-scroll to end (most recent) on mount / when data loads
+// Auto-scroll to end (most recent) on mount / when data loads — only if content overflows
 $effect(() => {
-	if (scrollEl && weeks.length > 0) {
-		// Scroll to the right end to show the most recent days
+	if (scrollEl && weeks.length > 0 && scrollEl.scrollWidth > scrollEl.clientWidth) {
 		scrollEl.scrollLeft = scrollEl.scrollWidth;
 	}
 });
@@ -171,22 +179,24 @@ $effect(() => {
 
 		<!-- Heatmap grid (scrollable, auto-scrolls to most recent) -->
 		<div class="overflow-x-auto pb-2" bind:this={scrollEl}>
-			<div class="inline-flex flex-col gap-1 min-w-fit pr-2">
-				<!-- Month labels -->
-				<div class="flex gap-1 text-[10px] text-base-content/40 mb-0.5 relative" style="padding-left: {CELL + GAP + 4}px; height: 16px;">
-					{#each monthLabels as m}
-						<span
-							class="absolute whitespace-nowrap"
-							style="left: {m.weekIndex * (CELL + GAP) + CELL + GAP + 4}px;"
-						>
-							{m.label}
-						</span>
-					{/each}
-				</div>
+			<div class="inline-flex flex-col gap-1 min-w-fit pr-2 w-full">
+				<!-- Month labels (hidden for short/medium ranges) -->
+				{#if showMonthLabels}
+					<div class="flex gap-1 text-[10px] text-base-content/40 mb-0.5 relative" style="padding-left: {CELL + GAP + 4}px; height: 16px;">
+						{#each monthLabels as m}
+							<span
+								class="absolute whitespace-nowrap"
+								style="left: {m.weekIndex * (CELL + GAP) + CELL + GAP + 4}px;"
+							>
+								{m.label}
+							</span>
+						{/each}
+					</div>
+				{/if}
 
-				<div class="flex gap-1">
+				<div class="flex gap-1 {weeksJustifyClass}">
 					<!-- Day-of-week labels -->
-					<div class="flex flex-col gap-1 text-[10px] text-base-content/40 pr-1 shrink-0" style="width: {CELL}px;">
+					<div class="flex flex-col gap-1 text-[10px] text-base-content/40 pr-1 shrink-0" style="width: {CELL}px; gap: {GAP}px;">
 						{#each weekDays as d}
 							<div class="flex items-center justify-end" style="height: {CELL}px; line-height: {CELL}px;">{d}</div>
 						{/each}
@@ -194,17 +204,17 @@ $effect(() => {
 
 					<!-- Weeks -->
 					{#each weeks as week}
-						<div class="flex flex-col gap-1 shrink-0">
+						<div class="flex flex-col shrink-0" style="gap: {GAP}px;">
 							{#each weekDays as _, dayIndex}
 								{@const day = week.find(d => new Date(d.date).getDay() === dayIndex)}
 								{#if day}
 									{@const isToday = day.date.slice(0, 10) === todayStr}
 									<div
-										class="rounded flex items-center justify-center shrink-0 {intensityClass(day.intensity)} {isToday ? 'ring-2 ring-primary ring-offset-1 ring-offset-base-100' : ''}"
+										class="{cellRoundClass} flex items-center justify-center shrink-0 {intensityClass(day.intensity)} {isToday ? 'ring-2 ring-primary ring-offset-1 ring-offset-base-100' : ''}"
 										style="width: {CELL}px; height: {CELL}px;"
 										title={dayTooltip(day)}
 									>
-										<span class="font-medium {day.intensity >= 2 ? 'text-primary-content' : 'text-base-content/40'}" style="font-size: 9px;">
+										<span class="font-medium {day.intensity >= 2 ? 'text-primary-content' : 'text-base-content/40'}" style="font-size: {isShortRange ? 12 : 9}px;">
 											{new Date(day.date).getDate()}
 										</span>
 									</div>
