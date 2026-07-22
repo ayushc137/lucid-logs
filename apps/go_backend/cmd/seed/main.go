@@ -72,19 +72,25 @@ func main() {
 
 	log.Info().Msg("🌱 Starting data seeder (new data model)...")
 
-	// Connect to database for direct operations (reset, lookup)
+	// Connect to database for direct operations (reset, lookup).
+	// Optional: when the backend already holds the libSQL file lock (single-writer
+	// architecture), set SEED_SKIP_DB=1 to run API-only seeding against a running backend.
 	ctx := context.Background()
-	db, err := database.New(ctx, database.Config{
-		URL:            cfg.Database.Path,
-		RemoteURL:      cfg.Database.URL,
-		AuthToken:      cfg.Database.AuthToken,
-		MigrationsPath: cfg.Database.MigrationsPath,
-		LogQueries:     false,
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to database")
+	var db *database.DB
+	skipDB := os.Getenv("SEED_SKIP_DB") == "1"
+	if !skipDB {
+		db, err = database.New(ctx, database.Config{
+			URL:            cfg.Database.Path,
+			RemoteURL:      cfg.Database.URL,
+			AuthToken:      cfg.Database.AuthToken,
+			MigrationsPath: cfg.Database.MigrationsPath,
+			LogQueries:     false,
+		})
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to connect to database")
+		}
+		defer db.Close(ctx)
 	}
-	defer db.Close(ctx)
 
 	// Setup API client
 	apiBaseURL = fmt.Sprintf("http://127.0.0.1:%d/api/v1", cfg.Server.Port)
@@ -93,30 +99,57 @@ func main() {
 	// Authenticate and get token
 	authToken, err = authenticate(ctx, cfg.Admin.Username, cfg.Admin.Password)
 	if err != nil {
-		db.Close(ctx) //nolint:errcheck // cleanup before exit
+		if db != nil {
+			db.Close(ctx) //nolint:errcheck // cleanup before exit
+		}
 		//nolint:gocritic // exitAfterDefer: we explicitly close db above
 		log.Fatal().Err(err).Msg("Failed to authenticate - make sure backend is running")
 	}
 	log.Info().Str("email", cfg.Admin.Username).Msg("✅ Authenticated as admin user")
 
 	// Find admin user ID
-	userID, err := findAdminUser(ctx, db, cfg.Admin.Username)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to find admin user")
+	var userID string
+	if skipDB {
+		// API-only mode: fetch own profile for the user ID
+		me, err := apiRequest("GET", "/users/me", nil)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to fetch current user (API-only mode)")
+		}
+		if id, ok := me["id"].(string); ok && id != "" {
+			userID = id
+		} else if data, ok := me["data"].(map[string]any); ok {
+			if id, ok := data["id"].(string); ok {
+				userID = id
+			}
+		}
+		if userID == "" {
+			log.Fatal().Msg("Could not determine user ID from /users/me response")
+		}
+	} else {
+		userID, err = findAdminUser(ctx, db, cfg.Admin.Username)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to find admin user")
+		}
 	}
 
 	// Reset existing data if flag is set
 	if *resetFlag {
-		log.Info().Msg("🗑️ Resetting existing seeded data...")
-		if err := resetSeededData(ctx, db, userID); err != nil {
-			log.Fatal().Err(err).Msg("Failed to reset data")
+		if skipDB {
+			log.Warn().Msg("⚠️ --reset ignored in API-only mode (SEED_SKIP_DB=1)")
+		} else {
+			log.Info().Msg("🗑️ Resetting existing seeded data...")
+			if err := resetSeededData(ctx, db, userID); err != nil {
+				log.Fatal().Err(err).Msg("Failed to reset data")
+			}
+			log.Info().Msg("✅ Existing data deleted")
 		}
-		log.Info().Msg("✅ Existing data deleted")
 	}
 
 	// Seed system units first
-	if err := seedUnits(ctx, db); err != nil {
-		log.Warn().Err(err).Msg("Failed to seed units")
+	if !skipDB {
+		if err := seedUnits(ctx, db); err != nil {
+			log.Warn().Err(err).Msg("Failed to seed units")
+		}
 	}
 
 	// Create comprehensive seed data
@@ -323,9 +356,14 @@ func seedAll(ctx context.Context, db *database.DB, userID string) error {
 	totalTasks, totalLinks := seedTasksMultiDay(ctx, db, categories, goals, userID)
 	log.Info().Int("tasks", totalTasks).Int("links", totalLinks).Msg("✅ Tasks and goal links created")
 
-	// 5. Update goal streaks and create goal history
-	streakUpdates := seedGoalStreaksAndHistory(ctx, db, goals, userID)
-	log.Info().Int("updated", streakUpdates).Msg("✅ Goal streaks and history updated")
+	// 5. Update goal streaks and create goal history (direct-DB only;
+	// goal progress from task goal_links is computed by the service layer)
+	if db != nil {
+		streakUpdates := seedGoalStreaksAndHistory(ctx, db, goals, userID)
+		log.Info().Int("updated", streakUpdates).Msg("✅ Goal streaks and history updated")
+	} else {
+		log.Info().Msg("ℹ️ Skipping streak backfill (API-only mode); streaks derive from seeded goal_links")
+	}
 
 	return nil
 }
@@ -2621,7 +2659,11 @@ func randomElement(items []string) string {
 }
 
 // createGoalLog creates a goal snapshot and a log entry linked to it.
+// No-op when db is nil (API-only seeding mode).
 func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, changes map[string]any, createdAt time.Time, userID string) error {
+	if db == nil {
+		return nil
+	}
 	goalRecordID := database.RecordID("goals", goalID)
 	userRecordID := database.RecordID("users", userID)
 
@@ -2645,8 +2687,12 @@ func createGoalLog(ctx context.Context, db *database.DB, goalID, event string, c
 	return err
 }
 
-// updateGoalStreak updates the goal stats in DB
+// updateGoalStreak updates the goal stats in DB.
+// No-op when db is nil (API-only seeding mode).
 func updateGoalStreak(ctx context.Context, db *database.DB, goalID string, streak int, lastCompleted time.Time) error {
+	if db == nil {
+		return nil
+	}
 	goalRecordID := database.RecordID("goals", goalID)
 	dateStr := lastCompleted.UTC().Format(time.RFC3339Nano)
 	_, err := db.SQL().ExecContext(ctx,

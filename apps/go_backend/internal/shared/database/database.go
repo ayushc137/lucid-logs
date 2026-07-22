@@ -94,7 +94,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 
 func (db *DB) configure(ctx context.Context) error {
 	db.sql.SetMaxOpenConns(1)
-	for _, statement := range []string{"PRAGMA foreign_keys = ON", "PRAGMA busy_timeout = 5000"} {
+	for _, statement := range []string{"PRAGMA journal_mode = WAL", "PRAGMA foreign_keys = ON", "PRAGMA busy_timeout = 5000"} {
 		if _, err := db.sql.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("configure database (%s): %w", statement, err)
 		}
