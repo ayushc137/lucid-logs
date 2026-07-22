@@ -21,6 +21,7 @@ export { default as UnitDropdown } from './UnitDropdown.svelte';
 export { default as Card } from './Card.svelte';
 export { default as PageHeader } from './PageHeader.svelte';
 export { default as SectionHeader } from './SectionHeader.svelte';
+export { default as StickyFooter } from './StickyFooter.svelte';
 
 // -----------------------------------------------------------------------------
 // State Display
