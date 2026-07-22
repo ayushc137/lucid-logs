@@ -179,3 +179,55 @@ func (c *Client) Complete(ctx context.Context, messages []Message) (string, erro
 
 	return result.Choices[0].Message.Content, nil
 }
+
+// =============================================================================
+// MODELS LISTING
+// =============================================================================
+
+// ModelInfo represents a single model from the provider.
+type ModelInfo struct {
+	ID string `json:"id"`
+}
+
+// modelsResponse is the OpenAI-compatible /models response.
+type modelsResponse struct {
+	Data []ModelInfo `json:"data"`
+}
+
+// ListModels fetches available model IDs from the provider.
+func (c *Client) ListModels(ctx context.Context) ([]string, error) {
+	url := c.baseURL + "/models"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list models request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("models endpoint returned status %d: %s", resp.StatusCode, string(raw))
+	}
+
+	var result modelsResponse
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal models response: %w", err)
+	}
+
+	ids := make([]string, 0, len(result.Data))
+	for _, m := range result.Data {
+		ids = append(ids, m.ID)
+	}
+	return ids, nil
+}

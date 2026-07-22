@@ -33,6 +33,16 @@ type Config struct {
 	JWT      JWTConfig
 	Admin    AdminConfig
 	CORS     CORSConfig
+	LLM      LLMConfig
+}
+
+// LLMConfig contains default LLM settings from environment variables.
+// These are optional env overrides used to pre-fill AI settings for new users.
+type LLMConfig struct {
+	Provider string // Default AI provider (e.g., "ollama", "openrouter")
+	BaseURL  string // Default base URL for custom provider
+	Model    string // Default model name
+	APIKey   string // Default API key
 }
 
 // AppConfig contains application-level settings.
@@ -155,6 +165,12 @@ func Load() (*Config, error) {
 	}
 	cfg.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 	cfg.CORS.AllowedHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept", "X-Requested-With"}
+
+	// LLM defaults (optional env overrides for pre-filling AI settings)
+	cfg.LLM.Provider = v.GetString("LLM_PROVIDER")
+	cfg.LLM.BaseURL = v.GetString("LLM_BASE_URL")
+	cfg.LLM.Model = v.GetString("LLM_MODEL")
+	cfg.LLM.APIKey = v.GetString("LLM_API_KEY")
 
 	// Validate and apply security defaults
 	if err := validateAndSecure(cfg); err != nil {

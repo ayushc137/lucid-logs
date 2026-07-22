@@ -162,7 +162,7 @@ func NewRouter(cfg Config) *gin.Engine {
 			// User routes
 			userRepo := users.NewRepository(cfg.DB)
 			userService := users.NewService(userRepo)
-			users.RegisterRoutes(protected.Group("/users"), userService, cfg.Validator)
+			users.RegisterRoutes(protected.Group("/users"), userService, cfg.Validator, cfg.Cfg.LLM)
 
 			// Activity routes
 			activitiesRepo := activities.NewRepository(cfg.DB)

@@ -59,3 +59,26 @@ export async function updateUserPreferences(
 ): Promise<UserWithPreferences> {
 	return unwrap(api.put('users/me/preferences', { json: data }));
 }
+
+// =============================================================================
+// AI MODELS & DEFAULTS
+// =============================================================================
+
+export interface AIModelsResponse {
+	models: string[];
+}
+
+export interface AIDefaultsResponse {
+	provider: string;
+	base_url: string;
+	model: string;
+	has_key: boolean;
+}
+
+export async function getAIModels(): Promise<AIModelsResponse> {
+	return unwrap(api.get('users/me/ai/models'));
+}
+
+export async function getAIDefaults(): Promise<AIDefaultsResponse> {
+	return unwrap(api.get('users/me/ai/defaults'));
+}

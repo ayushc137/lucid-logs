@@ -202,7 +202,11 @@ export {
 export {
 	getUserPreferences,
 	updateUserPreferences,
+	getAIModels,
+	getAIDefaults,
 	type AISettings,
+	type AIModelsResponse,
+	type AIDefaultsResponse,
 	type DailyRetroSettings,
 	type UserPreferences,
 	type UserWithPreferences,

@@ -1,5 +1,11 @@
 <script lang="ts">
-import { getUserPreferences, updateUserPreferences, type AISettings } from '$lib/api';
+import {
+	getUserPreferences,
+	updateUserPreferences,
+	getAIModels,
+	getAIDefaults,
+	type AISettings,
+} from '$lib/api';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 import { Bot, Check, Save } from 'lucide-svelte';
 
@@ -18,6 +24,13 @@ let apiKey = $state('');
 let enabled = $state(false);
 let loaded = $state(false);
 
+// Model auto-fetch state
+let availableModels = $state<string[]>([]);
+let loadingModels = $state(false);
+let modelsError = $state('');
+let lastFetchedProvider = $state('');
+let lastFetchedBaseUrl = $state<string | undefined>(undefined);
+
 // Populate from fetched data
 $effect(() => {
 	const data = $prefsQuery.data;
@@ -28,10 +41,54 @@ $effect(() => {
 			baseUrl = ai.base_url || '';
 			model = ai.model || '';
 			enabled = ai.enabled ?? false;
+		} else {
+			// No AI config — try env defaults
+			fetchEnvDefaults();
 		}
 		loaded = true;
 	}
 });
+
+// Fetch models when provider or baseUrl changes
+$effect(() => {
+	// Read reactive deps so the effect re-tracks them
+	const p = provider;
+	const b = provider === 'custom' ? baseUrl : undefined;
+	if (!loaded) return;
+	// Only refetch if something actually changed
+	if (p === lastFetchedProvider && b === lastFetchedBaseUrl) return;
+	fetchModels();
+});
+
+async function fetchModels() {
+	loadingModels = true;
+	modelsError = '';
+	try {
+		const res = await getAIModels();
+		availableModels = res.models;
+		lastFetchedProvider = provider;
+		lastFetchedBaseUrl = provider === 'custom' ? baseUrl : undefined;
+	} catch (e) {
+		modelsError = 'Could not fetch models';
+		availableModels = [];
+	} finally {
+		loadingModels = false;
+	}
+}
+
+async function fetchEnvDefaults() {
+	try {
+		const res = await getAIDefaults();
+		if (res.provider) {
+			provider = res.provider;
+			if (res.base_url) baseUrl = res.base_url;
+			if (res.model) model = res.model;
+			enabled = true;
+		}
+	} catch {
+		// Env defaults not configured — silently ignore
+	}
+}
 
 const saveMutation = createMutation({
 	mutationFn: (ai: AISettings) => updateUserPreferences({ ai }),
@@ -125,12 +182,29 @@ const hasKey = $derived($prefsQuery.data?.preferences?.ai?.has_key ?? false);
 			<!-- Model -->
 			<label class="form-control">
 				<span class="label-text font-medium text-xs text-base-content/60 mb-1">Model</span>
-				<input
-					type="text"
-					class="input input-bordered input-sm"
-					placeholder={currentPreset.modelPlaceholder}
-					bind:value={model}
-				/>
+				{#if availableModels.length > 0}
+					<select class="select select-bordered select-sm" bind:value={model}>
+						<option value="" disabled>Select a model</option>
+						{#each availableModels as m}
+							<option value={m}>{m}</option>
+						{/each}
+					</select>
+				{:else}
+					<input
+						type="text"
+						class="input input-bordered input-sm"
+						placeholder={currentPreset.modelPlaceholder}
+						bind:value={model}
+					/>
+				{/if}
+				{#if loadingModels}
+					<span class="text-xs text-base-content/40 mt-1 flex items-center gap-1">
+						<span class="loading loading-spinner loading-xs"></span>
+						Fetching available models…
+					</span>
+				{:else if modelsError}
+					<span class="text-xs text-base-content/40 mt-1">{modelsError}</span>
+				{/if}
 			</label>
 
 			<!-- API Key -->
