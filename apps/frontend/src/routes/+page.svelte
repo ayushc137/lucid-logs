@@ -6,9 +6,9 @@ import { type Goal, type Task, getGoals, getTasks, updateTask } from '$lib/api';
 import { getCategories } from '$lib/api/categories';
 import QuickCapture from '$lib/components/tasks/QuickCapture.svelte';
 import { TimelineGantt, type TimelineGoal } from '$lib/components/timeline';
-import { ConfirmDialog } from '$lib/components/ui';
+import { ConfirmDialog, EmptyState } from '$lib/components/ui';
 import { emotionStore } from '$lib/stores/emotions.svelte';
-import { cn, FALLBACK_GOAL_COLOR } from '$lib/utils';
+import { cn, FALLBACK_CATEGORY_COLOR, FALLBACK_GOAL_COLOR } from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
 import {
 	createMutation,
@@ -18,6 +18,8 @@ import {
 import {
 	ClipboardList,
 	Flame,
+	GanttChart,
+	List,
 	ListTodo,
 	Plus,
 	Smile,
@@ -25,6 +27,7 @@ import {
 	X,
 	Zap,
 } from 'lucide-svelte';
+import { onMount } from 'svelte';
 
 // Selected date state initialized from URL
 const initialParams = getUrlParams<{ date: Date }>({
@@ -32,6 +35,47 @@ const initialParams = getUrlParams<{ date: Date }>({
 });
 
 let selectedDate = $state<Date>(initialParams.date);
+
+// Mobile detection and view mode toggle
+let isMobile = $state(false);
+let viewMode = $state<'timeline' | 'list'>('timeline');
+
+function detectMobile() {
+	if (typeof window === 'undefined') return false;
+	return window.innerWidth < 768;
+}
+
+function initMobileState() {
+	const mobile = detectMobile();
+	isMobile = mobile;
+	if (browser) {
+		const stored = localStorage.getItem('dashboard-view-mode');
+		if (stored === 'timeline' || stored === 'list') {
+			viewMode = stored;
+		} else {
+			// Default based on viewport
+			viewMode = mobile ? 'list' : 'timeline';
+		}
+	}
+}
+
+function setViewMode(mode: 'timeline' | 'list') {
+	viewMode = mode;
+	if (browser) {
+		localStorage.setItem('dashboard-view-mode', mode);
+	}
+}
+
+// Handle window resize for mobile detection
+function handleResize() {
+	isMobile = detectMobile();
+}
+
+onMount(() => {
+	initMobileState();
+	window.addEventListener('resize', handleResize);
+	return () => window.removeEventListener('resize', handleResize);
+});
 
 // Sync state to URL
 $effect(() => {
@@ -462,6 +506,26 @@ function formatDate(): string {
 	});
 }
 
+// Helpers for agenda view
+function formatTimeCompact(d: Date): string {
+	if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '--:--';
+	const hours = d.getHours();
+	const mins = d.getMinutes();
+	const period = hours < 12 ? 'AM' : 'PM';
+	const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+	return `${displayHour}:${String(mins).padStart(2, '0')} ${period}`;
+}
+
+function formatDuration(s: Date, e: Date): string {
+	if (!(s instanceof Date) || !(e instanceof Date)) return '';
+	const mins = Math.round((e.getTime() - s.getTime()) / 60000);
+	if (mins < 1) return `${Math.round((e.getTime() - s.getTime()) / 1000)}s`;
+	if (mins < 60) return `${mins}m`;
+	const h = Math.floor(mins / 60);
+	const m = mins % 60;
+	return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 function handleQuickLog(log: { emoji: string; label: string }) {
 	// Navigate to activities page — quick log via activity instant-log
 	fabOpen = false;
@@ -649,7 +713,47 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 			class="card bg-base-100 border border-base-300/60 rounded-2xl shadow-sm h-full flex flex-col overflow-hidden"
 		>
 			<div class="card-body p-3 lg:p-4 flex flex-col h-full gap-3">
-				<!-- Timeline -->
+				<!-- View Mode Toggle -->
+				<div class="flex items-center justify-between gap-2">
+					<!-- Goals pills (compact, horizontal scroll on mobile) -->
+					{#if timelineGoals.length > 0}
+						<div class="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+							<div class="flex items-center gap-1.5">
+								{#each timelineGoals as goal}
+									<button
+										class="btn btn-xs gap-1 shrink-0 rounded-full border border-base-200 bg-base-100 hover:bg-base-200"
+										onclick={() => handleGoalClick(goal.id)}
+									>
+										<span class="text-sm leading-none">{goal.icon}</span>
+										<span class="text-xs font-medium truncate max-w-[80px]">{goal.title}</span>
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Segmented Toggle -->
+					<div class="join bg-base-200 rounded-lg p-0.5 shrink-0">
+						<button
+							class="join-item btn btn-xs {viewMode === 'timeline' ? 'btn-primary' : 'btn-ghost'}"
+							onclick={() => setViewMode('timeline')}
+							aria-label="Timeline view"
+						>
+							<GanttChart class="w-3.5 h-3.5" />
+							<span class="hidden sm:inline">Timeline</span>
+						</button>
+						<button
+							class="join-item btn btn-xs {viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}"
+							onclick={() => setViewMode('list')}
+							aria-label="Agenda view"
+						>
+							<List class="w-3.5 h-3.5" />
+							<span class="hidden sm:inline">Agenda</span>
+						</button>
+					</div>
+				</div>
+
+				<!-- Content -->
 				<div class="flex-1 min-h-0">
 					{#if $tasksQuery.isLoading}
 						<div
@@ -662,12 +766,72 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 								Loading your day...
 							</p>
 						</div>
+					{:else if viewMode === 'list'}
+						<!-- Agenda/List View -->
+						<div class="flex-1 overflow-y-auto space-y-2 p-1 max-h-full">
+							{#if timelineTasks.length === 0}
+								<EmptyState
+									title="No tasks yet"
+									description="Capture what you just did or plan your day."
+									buttonLabel="New Task"
+									onButtonClick={openTaskModal}
+								/>
+							{:else}
+								{#each timelineTasks as task (task.id)}
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_interactive_supports_focus -->
+									<button
+										class="w-full text-left card bg-base-100 border border-base-200 p-3 flex items-center gap-3 active:bg-base-200 transition-colors rounded-xl"
+										onclick={() => handleTaskClick(task.id)}
+									>
+										<div
+											class="w-1 self-stretch rounded-full shrink-0"
+											style:background-color={task.categoryColor || FALLBACK_CATEGORY_COLOR}
+										></div>
+										<div class="flex-1 min-w-0">
+											<p
+												class="font-medium text-sm truncate"
+												class:line-through={task.completed}
+											>
+												{task.title}
+											</p>
+											<p class="text-xs text-base-content/60 mt-0.5">
+												{formatTimeCompact(task.startTime)} – {formatTimeCompact(task.endTime)} · {formatDuration(task.startTime, task.endTime)}
+											</p>
+										</div>
+										{#if task.categoryName}
+											<span
+												class="badge badge-sm shrink-0"
+												style:background-color={task.categoryColor || FALLBACK_CATEGORY_COLOR}
+												style:color={task.categoryColor || FALLBACK_CATEGORY_COLOR}
+												style:opacity="0.15"
+											>
+												<span style:color={task.categoryColor || FALLBACK_CATEGORY_COLOR}>
+													{task.categoryName}
+												</span>
+											</span>
+										{/if}
+										<!-- svelte-ignore a11y_click_events_have_key_events -->
+										<!-- svelte-ignore a11y_interactive_supports_focus -->
+										<input
+											type="checkbox"
+											class="checkbox checkbox-sm shrink-0"
+											checked={task.completed}
+											onclick={(e) => {
+												e.stopPropagation();
+												handleToggleComplete(task.id, !task.completed);
+											}}
+										/>
+									</button>
+								{/each}
+							{/if}
+						</div>
 					{:else}
 						<TimelineGantt
 							tasks={timelineTasks}
 							goals={timelineGoals}
 							{selectedDate}
-							showGoals={true}
+							showGoals={false}
 							onTaskClick={handleTaskClick}
 							onCategoryClick={handleCategoryClick}
 							onToggleComplete={handleToggleComplete}

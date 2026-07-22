@@ -154,6 +154,62 @@ import { FALLBACK_CATEGORY_COLOR } from '$lib/utils';
 	// Track if we're currently in a drag operation (to prevent click)
 	let hasDragged = $state(false);
 
+	// Touch gesture state for mobile pinch-zoom and pan
+	let touchStartDist = $state(0);
+	let touchStartX = $state(0);
+	let touchStartScrollOffset = $state(0);
+	let isPinching = $state(false);
+	let isPanning = $state(false);
+
+	function handleTouchStart(e: TouchEvent) {
+		if (e.touches.length === 2) {
+			isPinching = true;
+			isPanning = false;
+			const dx = e.touches[0].clientX - e.touches[1].clientX;
+			const dy = e.touches[0].clientY - e.touches[1].clientY;
+			touchStartDist = Math.sqrt(dx * dx + dy * dy);
+			e.preventDefault();
+		} else if (e.touches.length === 1 && isZoomed) {
+			isPanning = true;
+			isPinching = false;
+			touchStartX = e.touches[0].clientX;
+			touchStartScrollOffset = scrollOffsetHours;
+		}
+	}
+
+	function handleTouchMove(e: TouchEvent) {
+		if (isPinching && e.touches.length === 2) {
+			const dx = e.touches[0].clientX - e.touches[1].clientX;
+			const dy = e.touches[0].clientY - e.touches[1].clientY;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			if (touchStartDist > 0) {
+				const ratio = dist / touchStartDist;
+				if (ratio > 1.15) {
+					zoomIn();
+					touchStartDist = dist;
+				} else if (ratio < 0.87) {
+					zoomOut();
+					touchStartDist = dist;
+				}
+			}
+			e.preventDefault();
+		} else if (isPanning && e.touches.length === 1) {
+			const deltaX = e.touches[0].clientX - touchStartX;
+			const gridWidth = gridRef?.clientWidth ?? 300;
+			const hoursDelta = -(deltaX / gridWidth) * hoursInView;
+			scrollOffsetHours = Math.max(
+				0,
+				Math.min(maxScrollOffset, touchStartScrollOffset + hoursDelta),
+			);
+			e.preventDefault();
+		}
+	}
+
+	function handleTouchEnd(e: TouchEvent) {
+		if (e.touches.length < 2) isPinching = false;
+		if (e.touches.length < 1) isPanning = false;
+	}
+
 	// Track mouse position and task position during drag for the fixed popover
 	let dragMouseX = $state(0);
 	let dragTaskTop = $state(0);
@@ -931,7 +987,11 @@ import { FALLBACK_CATEGORY_COLOR } from '$lib/utils';
 <div
 	class="timeline-gantt h-full flex flex-col bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden select-none"
 	class:edit-active={isEditMode}
+	style:touch-action={isPinching ? 'none' : undefined}
 	onwheel={handleWheel}
+	ontouchstart={handleTouchStart}
+	ontouchmove={handleTouchMove}
+	ontouchend={handleTouchEnd}
 >
 	{#snippet controls()}
 		<div class="flex items-center gap-2 sm:gap-3">

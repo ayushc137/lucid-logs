@@ -2,7 +2,6 @@
 import {
 	type CreateTaskRequest,
 	createTask,
-	getLastTaskEndTime,
 	updateTask,
 } from '$lib/api';
 import { getCategories } from '$lib/api/categories';
@@ -26,8 +25,14 @@ let { onSaved, autoFocus = true }: Props = $props();
 
 const queryClient = useQueryClient();
 
+function getCurrentTimeString(): string {
+	const now = new Date();
+	return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
 let title = $state('');
 let categoryId = $state<string | undefined>(undefined);
+let timeValue = $state(getCurrentTimeString());
 let titleInput = $state<HTMLInputElement | null>(null);
 let showSuccess = $state(false);
 
@@ -38,13 +43,6 @@ const categoriesQuery = createQuery({
 });
 
 const categories = $derived($categoriesQuery.data?.items || []);
-
-// Get last task end time to pre-fill start/end
-const lastTaskEndQuery = createQuery({
-	queryKey: ['tasks', 'last-end-time'],
-	queryFn: getLastTaskEndTime,
-	retry: false,
-});
 
 const createMut = createMutation({
 	mutationFn: async (data: CreateTaskRequest) => {
@@ -59,6 +57,7 @@ const createMut = createMutation({
 			showSuccess = false;
 		}, 2000);
 		title = '';
+		timeValue = getCurrentTimeString();
 		categoryId = undefined;
 		onSaved?.();
 		// Re-focus for rapid entry
@@ -70,23 +69,15 @@ function handleSubmit() {
 	if (!title.trim()) return;
 
 	const now = new Date();
-	const startDate = new Date(now);
-	const endDate = new Date(now);
-
-	// If we have a last task end time, chain from it
-	const lastEnd = $lastTaskEndQuery.data?.end_time;
-	if (lastEnd) {
-		const lastEndDate = new Date(lastEnd);
-		// Only chain if it was within the last 4 hours (same session)
-		if (now.getTime() - lastEndDate.getTime() < 4 * 60 * 60 * 1000) {
-			startDate.setTime(lastEndDate.getTime());
-		}
-	}
+	const [hours, minutes] = timeValue.split(':').map(Number);
+	const startTime = new Date(now);
+	startTime.setHours(hours, minutes, 0, 0);
+	const endTime = new Date(startTime.getTime() + 30 * 60000); // +30min
 
 	$createMut.mutate({
 		title: title.trim(),
-		start_date: startDate.toISOString(),
-		end_date: endDate.toISOString(),
+		start_date: startTime.toISOString(),
+		end_date: endTime.toISOString(),
 		category_id: categoryId || undefined,
 	});
 }
@@ -106,43 +97,53 @@ onMount(() => {
 </script>
 
 <section aria-label="Quick capture">
-	<div class="flex items-center gap-2 mb-2">
-		<Zap class="h-3.5 w-3.5 text-primary" />
-		<span class="text-xs font-medium uppercase tracking-wide text-base-content/50">Quick Capture</span>
-		<span class="hidden text-[10px] text-base-content/40 sm:inline ml-auto">
-			<kbd class="kbd kbd-xs">⌘</kbd> + <kbd class="kbd kbd-xs">Enter</kbd>
-		</span>
-	</div>
+	<div class="bg-base-100 border border-base-200 rounded-xl p-3 shadow-sm">
+		<div class="flex items-center gap-2 mb-2.5">
+			<Zap class="h-3.5 w-3.5 text-primary" />
+			<span class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Quick Capture</span>
+			<span class="hidden text-[10px] text-base-content/40 sm:inline ml-auto">
+				<kbd class="kbd kbd-xs">⌘</kbd> + <kbd class="kbd kbd-xs">Enter</kbd>
+			</span>
+		</div>
 
-	<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-		<input
-			bind:this={titleInput}
-			type="text"
-			bind:value={title}
-			placeholder="What did you just do?"
-			class="input input-sm input-bordered flex-1 min-w-0"
-			onkeydown={handleKeydown}
-		/>
-		<CategoryDropdown
-			{categories}
-			bind:value={categoryId}
-			placeholder="Category"
-			showCreateButton={false}
-			class="w-full sm:w-40"
-		/>
-		<button
-			class="btn btn-sm btn-primary gap-1 shrink-0"
-			onclick={handleSubmit}
-			disabled={$createMut.isPending || !title.trim()}
-		>
-			{#if $createMut.isPending}
-				<span class="loading loading-spinner loading-xs"></span>
-			{:else if showSuccess}
-				<Check class="w-3.5 h-3.5" />
-			{:else}
-				<Zap class="w-3.5 h-3.5" />
-			{/if}
-			{showSuccess ? 'Saved!' : 'Log it'}
-		</button>
+		<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+			<input
+				bind:this={titleInput}
+				type="text"
+				bind:value={title}
+				placeholder="What did you just do?"
+				class="input input-sm input-bordered flex-1 min-w-0"
+				onkeydown={handleKeydown}
+			/>
+			<div class="flex items-center gap-2">
+				<input
+					type="time"
+					bind:value={timeValue}
+					class="input input-sm input-bordered w-24 shrink-0"
+					aria-label="Start time"
+				/>
+				<CategoryDropdown
+					{categories}
+					bind:value={categoryId}
+					placeholder="Category"
+					showCreateButton={false}
+					class="flex-1 sm:w-40"
+				/>
+				<button
+					class="btn btn-sm btn-primary gap-1 shrink-0"
+					onclick={handleSubmit}
+					disabled={$createMut.isPending || !title.trim()}
+				>
+					{#if $createMut.isPending}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else if showSuccess}
+						<Check class="w-3.5 h-3.5" />
+					{:else}
+						<Zap class="w-3.5 h-3.5" />
+					{/if}
+					{showSuccess ? 'Saved!' : 'Log it'}
+				</button>
+			</div>
+		</div>
 	</div>
 </section>
