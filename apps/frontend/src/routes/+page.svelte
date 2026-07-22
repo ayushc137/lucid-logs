@@ -9,7 +9,7 @@ import { TimelineGantt, type TimelineGoal } from '$lib/components/timeline';
 import AgendaRow from '$lib/components/timeline/AgendaRow.svelte';
 import { ConfirmDialog, EmptyState } from '$lib/components/ui';
 import { emotionStore } from '$lib/stores/emotions.svelte';
-import { cn, FALLBACK_CATEGORY_COLOR, FALLBACK_GOAL_COLOR } from '$lib/utils';
+import { cn, FALLBACK_GOAL_COLOR } from '$lib/utils';
 import { getUrlParams, parsers, updateUrlParams } from '$lib/utils/navigation';
 import {
 	createMutation,
@@ -806,12 +806,7 @@ function handleTaskTimeUpdate(taskId: string, start: Date, end: Date) {
 											<div class="divide-y divide-base-200/60">
 												{#each group.tasks as task (task.id)}
 													<AgendaRow
-														title={task.title}
-														startTime={task.startTime}
-														endTime={task.endTime}
-														categoryColor={task.categoryColor}
-														categoryName={task.categoryName}
-														completed={task.completed}
+														{task}
 														onclick={() => handleTaskClick(task.id)}
 														ontoggle={(completed) => handleToggleComplete(task.id, completed)}
 													/>
