@@ -41,7 +41,7 @@ import {
 	ThumbsUp,
 	Award,
 } from 'lucide-svelte';
-import { QUADRANT_COLORS, quadrantColor, CHART_COLORS } from '$lib/utils/chart-colors';
+import { quadrantColor, CHART_COLORS } from '$lib/utils/chart-colors';
 
 const queryClient = useQueryClient();
 
@@ -124,6 +124,14 @@ function handleSave(markComplete: boolean) {
 	});
 }
 
+function saveEdits() {
+	handleSave(retro?.status === 'completed');
+}
+
+function togglePublished() {
+	handleSave(retro?.status !== 'completed');
+}
+
 function formatDate(s: string): string {
 	return new Date(s).toLocaleDateString(undefined, {
 		month: 'short',
@@ -135,6 +143,13 @@ function formatDate(s: string): string {
 function fmtDateShort(s: string): string {
 	return new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+const quadrantMoodMeta: Record<string, { label: string; emoji: string }> = {
+	yellow: { label: 'Energized', emoji: '😊' },
+	green: { label: 'Content', emoji: '😌' },
+	red: { label: 'Tense', emoji: '😤' },
+	blue: { label: 'Low energy', emoji: '😔' },
+};
 
 // Derived data — non-null asserted where guarded by has* checks in template
 const retro = $derived($retroQuery.data);
@@ -153,10 +168,10 @@ const quadrantSegments = $derived.by(() => {
 	const total = qd.yellow + qd.green + qd.red + qd.blue;
 	if (total === 0) return [];
 	return [
-		{ key: 'yellow', value: qd.yellow, color: QUADRANT_COLORS.yellow, pct: (qd.yellow / total) * 100 },
-		{ key: 'green', value: qd.green, color: QUADRANT_COLORS.green, pct: (qd.green / total) * 100 },
-		{ key: 'red', value: qd.red, color: QUADRANT_COLORS.red, pct: (qd.red / total) * 100 },
-		{ key: 'blue', value: qd.blue, color: QUADRANT_COLORS.blue, pct: (qd.blue / total) * 100 },
+		{ key: 'yellow', value: qd.yellow, color: quadrantColor('yellow'), pct: (qd.yellow / total) * 100 },
+		{ key: 'green', value: qd.green, color: quadrantColor('green'), pct: (qd.green / total) * 100 },
+		{ key: 'red', value: qd.red, color: quadrantColor('red'), pct: (qd.red / total) * 100 },
+		{ key: 'blue', value: qd.blue, color: quadrantColor('blue'), pct: (qd.blue / total) * 100 },
 	].filter((s) => s.value > 0);
 });
 
@@ -207,72 +222,131 @@ const reflectionPrompts = [
 	<title>Retrospective - Lucid Logs</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 max-w-3xl mx-auto w-full pb-24">
-	<button class="btn btn-ghost btn-sm gap-2 self-start" onclick={() => goto('/retrospectives')}>
-		<ArrowLeft class="h-4 w-4" />
-		Back
-	</button>
-
+<div class="flex flex-col gap-6 max-w-6xl mx-auto w-full pb-28">
 	{#if $retroQuery.isLoading}
-		<LoadingCard />
+		<LoadingCard message="Loading retrospective..." />
 	{:else if $retroQuery.isError}
 		<ErrorAlert
 			message="Failed to load retrospective"
 			onRetry={() => $retroQuery.refetch()}
 		/>
 	{:else if retro}
-		<!-- Hero -->
-		<div class="flex items-center gap-3.5">
-			<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-				<BookOpen class="w-5.5 h-5.5" />
-			</div>
-			<div class="flex-1 min-w-0">
-				<div class="flex items-center gap-2 flex-wrap">
-					<h1 class="text-2xl font-semibold tracking-tight capitalize">{retro.retro_type} Retrospective</h1>
+		<!-- Detail header: back action, title, and metadata -->
+		<div class="flex items-start gap-3">
+			<button
+				class="btn btn-ghost btn-square btn-sm mt-0.5 shrink-0"
+				onclick={() => goto('/retrospectives')}
+				aria-label="Back to retrospectives"
+			>
+				<ArrowLeft class="h-4 w-4" />
+			</button>
+			<div class="min-w-0 flex-1">
+				<h1 class="text-2xl font-semibold tracking-tight capitalize">
+					{retro.retro_type} Retrospective
+				</h1>
+				<div class="mt-2 flex flex-wrap items-center gap-2">
 					<span class="badge badge-sm badge-outline capitalize">{retro.retro_type}</span>
-					<span class="badge badge-sm gap-1" class:badge-success={retro.status === 'completed'} class:badge-ghost={retro.status !== 'completed'}>
+					<span
+						class="badge badge-sm gap-1"
+						class:badge-success={retro.status === 'completed'}
+						class:badge-ghost={retro.status !== 'completed'}
+					>
 						{#if retro.status === 'completed'}
-							<CheckCircle2 class="w-3 h-3" /> Completed
+							<CheckCircle2 class="w-3 h-3" /> Published
 						{:else}
 							<CircleDashed class="w-3 h-3" /> Draft
 						{/if}
 					</span>
+					<span class="badge badge-sm badge-ghost">
+						{fmtDateShort(retro.start_date)} – {formatDate(retro.end_date)}
+					</span>
+					<span class="text-xs text-base-content/50">Generated {formatDate(retro.generated_at)}</span>
 				</div>
-				<p class="text-sm text-base-content/55 mt-0.5">{fmtDateShort(retro.start_date)} – {formatDate(retro.end_date)}</p>
 			</div>
 		</div>
 
-		<!-- Stat Strip -->
-		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-			<div class="card bg-base-100 border border-base-content/5 shadow-sm">
-				<div class="card-body p-3 gap-0.5">
-					<StatCard value={tasks?.completed ?? 0} label="Tasks Done" color="primary">
-						{#snippet icon()}<ListTodo class="w-4 h-4" />{/snippet}
-					</StatCard>
+		<!-- Prominent period and emotion summary -->
+		<Card variant="bordered">
+			<div class="flex flex-col gap-5">
+				<SectionHeader title="Mood & period summary" subtitle="Your emotional pattern and key outcomes">
+					{#snippet icon()}<Heart class="w-4 h-4 text-error" />{/snippet}
+				</SectionHeader>
+
+				<div class="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+					<div class="rounded-box bg-base-content/5 p-4">
+						{#if hasMoodData && mood?.dominant_quadrant}
+							{@const dominantMood = quadrantMoodMeta[mood.dominant_quadrant] ?? {
+								label: mood.dominant_quadrant,
+								emoji: '🙂',
+							}}
+							<div class="flex items-center gap-3">
+								<div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-box bg-base-100 text-3xl shadow-sm">
+									<span aria-hidden="true">{dominantMood.emoji}</span>
+								</div>
+								<div>
+									<p class="text-xs font-medium uppercase tracking-wide text-base-content/50">Dominant mood</p>
+									<p class="text-lg font-semibold">{dominantMood.label}</p>
+									<p class="flex items-center gap-1.5 text-xs text-base-content/60 capitalize">
+										<span
+											class="h-2.5 w-2.5 rounded-full"
+											style="background: {quadrantColor(mood.dominant_quadrant)}"
+										></span>
+										{mood.dominant_quadrant} quadrant
+									</p>
+								</div>
+							</div>
+						{:else}
+							<div class="flex items-center gap-3 text-base-content/50">
+								<div class="flex h-12 w-12 items-center justify-center rounded-full bg-base-200">
+									<Heart class="h-5 w-5" />
+								</div>
+								<p class="text-sm">No mood data was recorded for this period.</p>
+							</div>
+						{/if}
+
+						{#if quadrantSegments.length > 0}
+							<div class="mt-4 space-y-2">
+								<p class="text-xs font-medium text-base-content/60">Quadrant distribution</p>
+								<div class="flex h-3 overflow-hidden rounded-full bg-base-200" aria-label="Mood quadrant distribution">
+									{#each quadrantSegments as segment (segment.key)}
+										<div
+											style="width: {segment.pct}%; background: {segment.color};"
+											title="{segment.key}: {Math.round(segment.pct)}%"
+										></div>
+									{/each}
+								</div>
+								<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+									{#each quadrantSegments as segment (segment.key)}
+										<span class="flex items-center gap-1.5 capitalize">
+											<span class="h-2 w-2 rounded-full" style="background: {segment.color}"></span>
+											{segment.key} {Math.round(segment.pct)}%
+										</span>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					<div class="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
+						<div class="rounded-box bg-base-content/5 p-3">
+							<StatCard value={tasks?.completed ?? 0} label="Tasks completed" color="primary">
+								{#snippet icon()}<ListTodo class="w-4 h-4" />{/snippet}
+							</StatCard>
+						</div>
+						<div class="rounded-box bg-base-content/5 p-3">
+							<StatCard value={`${(tasks?.total_duration_hours ?? 0).toFixed(1)}h`} label="Hours logged" color="info">
+								{#snippet icon()}<Clock class="w-4 h-4" />{/snippet}
+							</StatCard>
+						</div>
+						<div class="rounded-box bg-base-content/5 p-3">
+							<StatCard value={activeStreaks} label="Current streaks" color="warning">
+								{#snippet icon()}<Flame class="w-4 h-4" />{/snippet}
+							</StatCard>
+						</div>
+					</div>
 				</div>
 			</div>
-			<div class="card bg-base-100 border border-base-content/5 shadow-sm">
-				<div class="card-body p-3 gap-0.5">
-					<StatCard value={`${(tasks?.total_duration_hours ?? 0).toFixed(1)}h`} label="Tracked" color="info">
-						{#snippet icon()}<Clock class="w-4 h-4" />{/snippet}
-					</StatCard>
-				</div>
-			</div>
-			<div class="card bg-base-100 border border-base-content/5 shadow-sm">
-				<div class="card-body p-3 gap-0.5">
-					<StatCard value={(mood?.average_valence ?? 0).toFixed(2)} label="Avg Mood" color="error">
-						{#snippet icon()}<Heart class="w-4 h-4" />{/snippet}
-					</StatCard>
-				</div>
-			</div>
-			<div class="card bg-base-100 border border-base-content/5 shadow-sm">
-				<div class="card-body p-3 gap-0.5">
-					<StatCard value={activeStreaks} label="Active Streaks" color="warning">
-						{#snippet icon()}<Flame class="w-4 h-4" />{/snippet}
-					</StatCard>
-				</div>
-			</div>
-		</div>
+		</Card>
 
 		<!-- AI Insights Card -->
 		<Card>
@@ -323,82 +397,6 @@ const reflectionPrompts = [
 				{/if}
 			</div>
 		</Card>
-
-		<!-- Mood Section -->
-		{#if hasMoodData && mood}
-			<Card>
-				<div class="flex flex-col gap-4">
-					<SectionHeader title="Mood" color="error" subtitle="Emotional patterns this period">
-						{#snippet icon()}<Heart class="w-4 h-4 text-error" />{/snippet}
-					</SectionHeader>
-
-					{#if quadrantSegments.length > 0}
-						<div class="space-y-2">
-							<div class="flex h-3 rounded-full overflow-hidden bg-base-200">
-								{#each quadrantSegments as seg (seg.key)}
-									<div
-										style="width: {seg.pct}%; background: {seg.color};"
-										class="transition-all"
-										title="{seg.key}: {seg.value}"
-									></div>
-								{/each}
-							</div>
-							<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
-								{#each quadrantSegments as seg (seg.key)}
-									<span class="flex items-center gap-1.5 capitalize">
-										<span class="w-2 h-2 rounded-full" style="background: {seg.color}"></span>
-										{seg.key} ({Math.round(seg.pct)}%)
-									</span>
-								{/each}
-							</div>
-						</div>
-					{/if}
-
-					<div class="grid grid-cols-2 gap-3 text-sm">
-						<div class="bg-base-200/40 rounded-box px-3 py-2">
-							<p class="text-xs text-base-content/50">Avg Valence</p>
-							<p class="font-mono text-lg font-bold">{mood.average_valence.toFixed(2)}</p>
-						</div>
-						<div class="bg-base-200/40 rounded-box px-3 py-2">
-							<p class="text-xs text-base-content/50">Avg Arousal</p>
-							<p class="font-mono text-lg font-bold">{mood.average_arousal.toFixed(2)}</p>
-						</div>
-					</div>
-
-					{#if mood.dominant_quadrant}
-						<p class="text-sm">
-							<span class="text-base-content/50">Dominant:</span>
-							<span class="font-medium capitalize ml-1" style="color: {quadrantColor(mood.dominant_quadrant)}">{mood.dominant_quadrant}</span>
-						</p>
-					{/if}
-
-					{#if mood.notable_spikes && mood.notable_spikes.length > 0}
-						<div class="space-y-1">
-							<p class="text-xs font-medium text-base-content/60">Notable Spikes</p>
-							{#each mood.notable_spikes as spike}
-								<div class="flex items-center gap-2 text-sm">
-									<TrendingUp class="w-3.5 h-3.5 text-success shrink-0" />
-									<span>{spike.emotion}</span>
-									<span class="text-xs text-base-content/40">{fmtDateShort(spike.date)}</span>
-								</div>
-							{/each}
-						</div>
-					{/if}
-					{#if mood.notable_dips && mood.notable_dips.length > 0}
-						<div class="space-y-1">
-							<p class="text-xs font-medium text-base-content/60">Notable Dips</p>
-							{#each mood.notable_dips as dip}
-								<div class="flex items-center gap-2 text-sm">
-									<TrendingDown class="w-3.5 h-3.5 text-error shrink-0" />
-									<span>{dip.emotion}</span>
-									<span class="text-xs text-base-content/40">{fmtDateShort(dip.date)}</span>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			</Card>
-		{/if}
 
 		<!-- Time Section -->
 		{#if hasTimeData && categoryDonutData}
@@ -639,8 +637,9 @@ const reflectionPrompts = [
 		{/if}
 
 		<!-- Reflection Section -->
-		<Card>
-			<div class="flex flex-col gap-4">
+		<div id="reflection" class="scroll-mt-6">
+			<Card>
+				<div class="flex flex-col gap-4">
 				<SectionHeader title="Your Reflection" color="secondary" subtitle="Guided prompts for honest self-review">
 					{#snippet icon()}<BookOpen class="w-4 h-4 text-secondary" />{/snippet}
 				</SectionHeader>
@@ -675,9 +674,10 @@ const reflectionPrompts = [
 					{/each}
 				</div>
 			</div>
-		</Card>
+			</Card>
+			</div>
 
-		{#if $updateMutation.isError}
+			{#if $updateMutation.isError}
 			<ErrorAlert message="Failed to save retrospective" />
 		{/if}
 	{/if}
@@ -685,35 +685,50 @@ const reflectionPrompts = [
 
 <!-- Sticky Bottom Action Bar -->
 {#if retro}
-	<div class="fixed bottom-0 left-0 right-0 z-50 bg-base-100/95 backdrop-blur-sm border-t border-base-content/5 px-4 py-3 sm:px-6">
-		<div class="max-w-3xl mx-auto flex items-center gap-2">
+	<div class="fixed bottom-0 left-0 right-0 z-30 border-t border-base-300 bg-base-100/95 px-4 py-3 shadow-lg backdrop-blur-md sm:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+		<div class="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
 			<button
-				class="btn btn-outline btn-sm gap-2 flex-1 sm:flex-none"
-				disabled={$updateMutation.isPending}
-				onclick={() => handleSave(false)}
-			>
-				<Save class="h-4 w-4" />
-				Save Draft
-			</button>
-			<button
-				class="btn btn-primary btn-sm gap-2 flex-1 sm:flex-none"
-				disabled={$updateMutation.isPending}
-				onclick={() => handleSave(true)}
-			>
-				{#if $updateMutation.isPending}
-					<span class="loading loading-spinner loading-xs"></span>
-				{:else}
-					<CheckCircle2 class="h-4 w-4" />
-				{/if}
-				Mark Complete
-			</button>
-			<button
-				class="btn btn-ghost btn-sm gap-2 text-error sm:ml-auto"
+				class="btn btn-ghost btn-sm gap-2 text-error hover:bg-error/10"
+				disabled={$deleteMutation.isPending}
 				onclick={() => (showDeleteConfirm = true)}
 			>
 				<Trash2 class="h-4 w-4" />
 				<span class="hidden sm:inline">Delete</span>
 			</button>
+
+			<div class="flex items-center gap-2">
+				<button
+					class="btn btn-ghost btn-sm"
+					disabled={$updateMutation.isPending}
+					onclick={() => goto('/retrospectives')}
+				>
+					Back
+				</button>
+				<button
+					class="btn btn-outline btn-sm gap-2"
+					disabled={$updateMutation.isPending}
+					onclick={saveEdits}
+				>
+					<Save class="h-4 w-4" />
+					<span class="hidden sm:inline">Save edits</span>
+				</button>
+				<button
+					class={retro.status === 'completed'
+						? 'btn btn-outline btn-sm gap-2 min-w-[7.5rem]'
+						: 'btn btn-primary btn-sm gap-2 min-w-[7.5rem] shadow-md shadow-primary/20'}
+					disabled={$updateMutation.isPending}
+					onclick={togglePublished}
+				>
+					{#if $updateMutation.isPending}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else if retro.status === 'completed'}
+						<CircleDashed class="h-4 w-4" />
+					{:else}
+						<CheckCircle2 class="h-4 w-4" />
+					{/if}
+					{retro.status === 'completed' ? 'Unpublish' : 'Publish'}
+				</button>
+			</div>
 		</div>
 	</div>
 {/if}

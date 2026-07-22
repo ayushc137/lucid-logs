@@ -9,11 +9,17 @@ export type { Category };
 export interface CreateCategoryRequest {
 	name: string;
 	color: string;
+	icon?: string;
+	parent_id?: string;
+	description?: string;
 }
 
 export interface UpdateCategoryRequest {
 	name?: string;
 	color?: string;
+	icon?: string;
+	parent_id?: string;
+	description?: string;
 }
 
 export interface CategoryPageResponse {

@@ -5,8 +5,8 @@ import {
 	generateRetrospective,
 	getRetrospectives,
 	getUserPreferences,
-	type Retrospective,
 	type GenerateRetroRequest,
+	type Retrospective,
 } from '$lib/api';
 import {
 	ConfirmDialog,
@@ -25,35 +25,42 @@ import {
 	ChevronRight,
 	CircleDashed,
 	Clock,
-	Heart,
+	Funnel,
 	ListTodo,
+	LoaderCircle,
 	Plus,
+	Search,
 	Sparkles,
 	Trash2,
+	X,
 } from 'lucide-svelte';
 
 const queryClient = useQueryClient();
 
+let searchQuery = $state('');
+let debouncedSearch = $state('');
+let statusFilter = $state<'all' | 'draft' | 'completed'>('all');
+let periodFilter = $state<'all' | 'daily' | 'weekly' | 'monthly'>('all');
+let showFilters = $state(false);
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 const retrosQuery = createQuery({
 	queryKey: ['retrospectives'],
-	queryFn: () => getRetrospectives({ limit: 50 }),
+	queryFn: () => getRetrospectives({ limit: 200 }),
 });
 
-// Fetch preferences to check if AI is configured
 const prefsQuery = createQuery({
 	queryKey: ['user-preferences'],
 	queryFn: () => getUserPreferences(),
 });
 const aiHasKey = $derived($prefsQuery.data?.preferences?.ai?.has_key ?? false);
 
-// Modal state
 let showCreateModal = $state(false);
 let selectedType = $state<'daily' | 'weekly' | 'monthly'>('daily');
 let customStart = $state('');
 let customEnd = $state('');
 let useAIRange = $state(true);
 let generateError = $state<string | null>(null);
-
 let deleteTarget = $state<Retrospective | null>(null);
 
 const generateMutation = createMutation({
@@ -79,7 +86,7 @@ function handleGenerate() {
 	const req: GenerateRetroRequest = { retro_type: selectedType };
 	if (selectedType !== 'daily' && customStart && customEnd) {
 		req.start_date = new Date(customStart).toISOString();
-		req.end_date = new Date(customEnd + 'T23:59:59').toISOString();
+		req.end_date = new Date(`${customEnd}T23:59:59`).toISOString();
 	}
 	$generateMutation.mutate(req);
 }
@@ -87,6 +94,26 @@ function handleGenerate() {
 function openCreateModal() {
 	generateError = null;
 	showCreateModal = true;
+}
+
+function handleSearchInput(value: string) {
+	searchQuery = value;
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchTimeout = setTimeout(() => {
+		debouncedSearch = value.trim().toLowerCase();
+	}, 300);
+}
+
+function clearSearch() {
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchQuery = '';
+	debouncedSearch = '';
+}
+
+function clearFilters() {
+	clearSearch();
+	statusFilter = 'all';
+	periodFilter = 'all';
 }
 
 function fmtRange(retro: Retrospective): string {
@@ -113,36 +140,147 @@ const typeOptions = [
 	{ type: 'monthly' as const, label: 'This Month', desc: 'A month-level look back' },
 ];
 
+function searchBlob(retro: Retrospective): string {
+	const summary = retro.auto_summary;
+	return [
+		fmtRange(retro),
+		typeLabels[retro.retro_type] ?? retro.retro_type,
+		retro.status,
+		summary?.ai_narrative ?? '',
+		...(summary?.insights ?? []),
+		summary?.mood?.dominant_quadrant ?? '',
+		retro.user_content?.what_went_well ?? '',
+		retro.user_content?.what_didnt_go_well ?? '',
+		retro.user_content?.what_learned ?? '',
+		retro.user_content?.proud_of ?? '',
+		retro.user_content?.change_tomorrow ?? '',
+		retro.user_content?.additional_notes ?? '',
+		...(retro.user_content?.gratitude ?? []),
+	]
+		.join(' ')
+		.toLowerCase();
+}
+
 const retros = $derived($retrosQuery.data?.retrospectives ?? []);
+const filteredRetros = $derived(
+	retros.filter((retro) => {
+		const matchesStatus = statusFilter === 'all' || retro.status === statusFilter;
+		const matchesPeriod = periodFilter === 'all' || retro.retro_type === periodFilter;
+		const matchesSearch = !debouncedSearch || searchBlob(retro).includes(debouncedSearch);
+		return matchesStatus && matchesPeriod && matchesSearch;
+	}),
+);
+const hasActiveFilters = $derived(
+	debouncedSearch !== '' || statusFilter !== 'all' || periodFilter !== 'all',
+);
+const isSearching = $derived(searchQuery.trim().toLowerCase() !== debouncedSearch);
 </script>
 
 <svelte:head>
 	<title>Retrospectives - Lucid Logs</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 max-w-3xl mx-auto w-full">
+<div class="max-w-6xl mx-auto space-y-6 w-full">
 	<!-- Header -->
-	<div class="flex items-center justify-between gap-3.5">
-		<div class="flex items-center gap-3.5 min-w-0">
-			<div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-				<BookOpen class="w-5.5 h-5.5" />
-			</div>
-			<div class="min-w-0">
-				<h1 class="text-2xl font-semibold tracking-tight">Retrospectives</h1>
-				<p class="text-sm text-base-content/55">Auto-generated reflections on your days and weeks</p>
-			</div>
+	<div class="flex items-center justify-between gap-4">
+		<div>
+			<h1 class="text-2xl font-semibold tracking-tight">Retrospectives</h1>
+			<p class="text-sm text-base-content/60 mt-1">
+				{hasActiveFilters
+					? `${filteredRetros.length} of ${retros.length} retrospectives`
+					: `${retros.length} retrospectives`}
+			</p>
 		</div>
-		<button class="btn btn-primary btn-sm gap-2 shrink-0" onclick={openCreateModal}>
+		<button
+			class="btn btn-primary gap-2 shadow-lg shadow-primary/20 transition-all hover:shadow-primary/40"
+			onclick={openCreateModal}
+		>
 			<Plus class="w-4 h-4" />
-			<span class="hidden sm:inline">New</span>
+			New
 		</button>
+	</div>
+
+	<!-- Search and Filters -->
+	<div class="card bg-base-100 shadow-lg border border-base-200">
+		<div class="card-body p-3 sm:p-4">
+			<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+				<div class="relative flex-1">
+					{#if isSearching || $retrosQuery.isFetching}
+						<LoaderCircle class="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 animate-spin text-base-content/50" />
+					{:else}
+						<Search class="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-base-content/50" />
+					{/if}
+					<input
+						type="search"
+						placeholder="Search retrospectives..."
+						class="input input-bordered w-full pl-10 pr-10"
+						value={searchQuery}
+						oninput={(event) => handleSearchInput(event.currentTarget.value)}
+					/>
+					{#if searchQuery}
+						<button
+							class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+							onclick={clearSearch}
+							aria-label="Clear search"
+						>
+							<X class="w-3 h-3" />
+						</button>
+					{/if}
+				</div>
+
+				<div class="flex items-center gap-2">
+					<button
+						class={cn(
+							'btn gap-2',
+							showFilters ? 'btn-primary' : 'btn-ghost border border-base-300',
+						)}
+						onclick={() => (showFilters = !showFilters)}
+						aria-expanded={showFilters}
+					>
+						<Funnel class="w-4 h-4" />
+						Filters
+						{#if hasActiveFilters}
+							<span class="badge badge-sm badge-secondary">Active</span>
+						{/if}
+					</button>
+					{#if hasActiveFilters}
+						<button class="btn btn-ghost btn-sm gap-1" onclick={clearFilters}>
+							<X class="w-4 h-4" />
+							Clear
+						</button>
+					{/if}
+				</div>
+			</div>
+
+			{#if showFilters}
+				<div class="grid gap-3 pt-4 mt-4 border-t border-base-200 sm:grid-cols-2">
+					<label class="form-control">
+						<span class="label-text text-xs font-medium text-base-content/60 mb-1">Status</span>
+						<select class="select select-bordered w-full" bind:value={statusFilter}>
+							<option value="all">All</option>
+							<option value="draft">Draft</option>
+							<option value="completed">Completed</option>
+						</select>
+					</label>
+					<label class="form-control">
+						<span class="label-text text-xs font-medium text-base-content/60 mb-1">Period</span>
+						<select class="select select-bordered w-full" bind:value={periodFilter}>
+							<option value="all">All</option>
+							<option value="daily">Daily</option>
+							<option value="weekly">Weekly</option>
+							<option value="monthly">Monthly</option>
+						</select>
+					</label>
+				</div>
+			{/if}
+		</div>
 	</div>
 
 	<!-- List -->
 	{#if $retrosQuery.isPending}
-		<LoadingCard />
+		<LoadingCard message="Loading retrospectives..." />
 	{:else if $retrosQuery.isError}
-		<ErrorAlert message="Failed to load retrospectives" />
+		<ErrorAlert message="Failed to load retrospectives" onRetry={() => $retrosQuery.refetch()} />
 	{:else if retros.length === 0}
 		<EmptyState
 			title="No retrospectives yet"
@@ -155,17 +293,28 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 				<BookOpen class="w-7 h-7" />
 			{/snippet}
 		</EmptyState>
+	{:else if filteredRetros.length === 0}
+		<div class="card bg-base-100 shadow-lg border border-base-200">
+			<div class="card-body py-12 text-center">
+				<Search class="w-12 h-12 text-base-content/30 mx-auto mb-4" />
+				<h2 class="text-lg font-semibold">No matching retrospectives</h2>
+				<p class="text-sm text-base-content/60 mt-1">Try another search or adjust your filters.</p>
+				<div class="mt-4">
+					<button class="btn btn-ghost btn-sm" onclick={clearFilters}>Clear filters</button>
+				</div>
+			</div>
+		</div>
 	{:else}
-		<div class="flex flex-col gap-2.5">
-			{#each retros as retro (retro.id)}
+		<div class="flex flex-col gap-3">
+			{#each filteredRetros as retro (retro.id)}
 				{@const tasks = retro.auto_summary?.tasks}
 				{@const mood = retro.auto_summary?.mood}
 				<article
-					class="card bg-base-100 border border-base-content/5 shadow-sm active:scale-[0.99] transition-all cursor-pointer hover:border-primary/30"
+					class="card bg-base-100 shadow-lg border border-base-200 active:scale-[0.99] transition-all cursor-pointer hover:border-primary/30"
 					onclick={() => goto(`/retrospectives/${retro.id}`)}
-					role="button"
+					role="link"
 					tabindex="0"
-					onkeydown={(e) => e.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
+					onkeydown={(event) => event.key === 'Enter' && goto(`/retrospectives/${retro.id}`)}
 				>
 					<div class="card-body p-4 gap-2">
 						<div class="flex items-center gap-3">
@@ -189,8 +338,7 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 									</span>
 								</div>
 								<p class="font-semibold text-[15px] mt-1">{fmtRange(retro)}</p>
-								<!-- Inline mini-stats -->
-								<div class="flex items-center gap-3 text-xs text-base-content/55 mt-0.5">
+								<div class="flex items-center gap-3 text-xs text-base-content/60 mt-0.5">
 									{#if tasks}
 										<span class="flex items-center gap-1">
 											<ListTodo class="w-3 h-3" />
@@ -201,7 +349,7 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 											{(tasks.total_duration_hours ?? 0).toFixed(1)}h
 										</span>
 									{/if}
-									{#if mood && mood.dominant_quadrant}
+									{#if mood?.dominant_quadrant}
 										<span class="flex items-center gap-1">
 											<span class="w-2 h-2 rounded-full" style="background: {quadrantColor(mood.dominant_quadrant)}"></span>
 											<span class="capitalize">{mood.dominant_quadrant}</span>
@@ -212,8 +360,8 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 							<button
 								class="btn btn-ghost btn-xs btn-square text-error/70 shrink-0"
 								aria-label="Delete retrospective"
-								onclick={(e) => {
-									e.stopPropagation();
+								onclick={(event) => {
+									event.stopPropagation();
 									deleteTarget = retro;
 								}}
 							>
@@ -228,12 +376,10 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 	{/if}
 </div>
 
-<!-- Create Modal -->
 <Modal bind:open={showCreateModal} title="New Retrospective" subtitle="Choose a period to analyze" size="md">
 	{#snippet icon()}<Sparkles class="w-5 h-5 text-primary" />{/snippet}
 
 	<div class="flex flex-col gap-4">
-		<!-- Period type picker -->
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
 			{#each typeOptions as opt (opt.type)}
 				<button
@@ -246,12 +392,11 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 					onclick={() => (selectedType = opt.type)}
 				>
 					<span class="font-semibold text-sm">{opt.label}</span>
-					<span class="text-xs text-base-content/55">{opt.desc}</span>
+					<span class="text-xs text-base-content/60">{opt.desc}</span>
 				</button>
 			{/each}
 		</div>
 
-		<!-- Custom date range (weekly/monthly only) -->
 		{#if selectedType !== 'daily'}
 			<div class="grid grid-cols-2 gap-3">
 				<label class="form-control">
@@ -266,7 +411,6 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 			<p class="text-xs text-base-content/40">Leave blank to auto-detect this period's range.</p>
 		{/if}
 
-		<!-- AI insights toggle -->
 		{#if aiHasKey}
 			<label class="flex items-center gap-3 cursor-pointer">
 				<input type="checkbox" class="toggle toggle-primary toggle-sm" bind:checked={useAIRange} />
@@ -304,6 +448,8 @@ const retros = $derived($retrosQuery.data?.retrospectives ?? []);
 	title="Delete retrospective?"
 	message="This will permanently remove this retrospective and its reflection."
 	confirmText="Delete"
+	destructive={true}
+	loading={$deleteMutation.isPending}
 	onConfirm={() => {
 		if (deleteTarget?.id) $deleteMutation.mutate(deleteTarget.id);
 		deleteTarget = null;

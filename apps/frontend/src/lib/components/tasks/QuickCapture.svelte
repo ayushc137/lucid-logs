@@ -6,7 +6,7 @@ import {
 	updateTask,
 } from '$lib/api';
 import { getCategories } from '$lib/api/categories';
-import { Card, CategoryDropdown } from '$lib/components/ui';
+import { Card, CategoryDropdown, SectionHeader } from '$lib/components/ui';
 import {
 	createMutation,
 	createQuery,
@@ -106,39 +106,30 @@ onMount(() => {
 </script>
 
 <Card>
-	<div class="flex items-center gap-2 mb-3">
-		<Zap class="w-4 h-4 text-primary" />
-		<span class="text-sm font-semibold">Quick Capture</span>
-	</div>
+	<SectionHeader title="Quick Capture">
+		{#snippet icon()}
+			<Zap class="w-5 h-5" />
+		{/snippet}
+	</SectionHeader>
 
 	<div class="space-y-3">
 		<!-- Title -->
-		<label class="form-control">
-			<span class="text-xs font-medium text-base-content/60 mb-1">Task</span>
-			<input
-				bind:this={titleInput}
-				type="text"
-				bind:value={title}
-				placeholder="What did you just do?"
-				class="input input-bordered w-full"
-				onkeydown={handleKeydown}
-			/>
-		</label>
+		<input
+			bind:this={titleInput}
+			type="text"
+			bind:value={title}
+			placeholder="What did you just do?"
+			class="input input-bordered w-full"
+			onkeydown={handleKeydown}
+		/>
 
-		<!-- Category (optional, collapsible) -->
-		<details class="group">
-			<summary class="text-xs text-base-content/50 cursor-pointer select-none hover:text-base-content/70 transition-colors">
-				Add category <span class="group-open:hidden">▸</span><span class="hidden group-open:inline">▾</span>
-			</summary>
-			<div class="mt-2">
-				<CategoryDropdown
-					{categories}
-					bind:value={categoryId}
-					placeholder="Select category..."
-					showCreateButton={false}
-				/>
-			</div>
-		</details>
+		<!-- Category (optional) -->
+		<CategoryDropdown
+			{categories}
+			bind:value={categoryId}
+			placeholder="Select category (optional)..."
+			showCreateButton={false}
+		/>
 
 		<!-- Actions -->
 		<div class="flex items-center justify-between pt-1">
@@ -157,7 +148,7 @@ onMount(() => {
 				{:else}
 					<Zap class="w-4 h-4" />
 				{/if}
-				{showSuccess ? "Saved!" : "Log it"}
+				{showSuccess ? 'Saved!' : 'Log it'}
 			</button>
 		</div>
 	</div>

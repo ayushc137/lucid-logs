@@ -1,14 +1,17 @@
 <script lang="ts">
 import { Plus } from 'lucide-svelte';
-import type { Component } from 'svelte';
 
 interface Props {
 	/** Page title */
 	title: string;
 	/** Subtitle/description */
 	subtitle?: string;
-	/** Icon component from lucide-svelte */
-	icon?: Component<{ class?: string }>;
+	/** Icon component from lucide-svelte.
+	 *  Loose structural type: lucide-svelte 0.561 ships Svelte-4 class component
+	 *  types (SvelteComponentTyped) which don't satisfy Svelte 5's `Component`
+	 *  interface, so we accept any component constructor/function instead. */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	icon?: any;
 	/** Show add button */
 	showAddButton?: boolean;
 	/** Add button label */
