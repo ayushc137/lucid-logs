@@ -172,7 +172,13 @@ func (s *service) GetCategoryMetrics(ctx context.Context, userID, period string,
 // =============================================================================
 
 func (s *service) GetDashboard(ctx context.Context, userID, period string, start, end *time.Time) (*DashboardResponse, error) {
-	startTime, endTime := s.resolvePeriod(period, start, end)
+	// Explicit dates always win when both are provided, regardless of period.
+	var startTime, endTime time.Time
+	if start != nil && end != nil {
+		startTime, endTime = *start, *end
+	} else {
+		startTime, endTime = s.resolvePeriod(period, start, end)
+	}
 
 	tasks, err := s.repo.GetTaskMetrics(ctx, userID, startTime, endTime)
 	if err != nil {
@@ -212,7 +218,13 @@ func (s *service) GetStreaks(ctx context.Context, userID string) (*StreaksRespon
 }
 
 func (s *service) GetActivityHeatmap(ctx context.Context, userID, period string, start, end *time.Time) (*ActivityHeatmapResponse, error) {
-	startTime, endTime := s.resolvePeriod(period, start, end)
+	// Explicit dates always win when both are provided, regardless of period.
+	var startTime, endTime time.Time
+	if start != nil && end != nil {
+		startTime, endTime = *start, *end
+	} else {
+		startTime, endTime = s.resolvePeriod(period, start, end)
+	}
 	return s.repo.GetActivityHeatmap(ctx, userID, startTime, endTime)
 }
 
