@@ -5,6 +5,10 @@ import { authStore, isDevAuthBypassEnabled } from '$lib/stores/auth.svelte';
 import { ArrowRight, CircleAlert, Lock, Mail, Sparkles } from 'lucide-svelte';
 import { onMount } from 'svelte';
 
+// Registration UI is hidden unless explicitly enabled at build time
+// (self-hosted single-user deployments leave signup off).
+const registrationEnabled = import.meta.env.VITE_REGISTRATION_ENABLED === 'true';
+
 let email = $state('');
 let password = $state('');
 let loading = $state(false);
@@ -179,10 +183,12 @@ async function handleLogin() {
       </div>
 
       <!-- Footer -->
-      <p class="text-center text-sm opacity-60 mt-4">
-        Don't have an account?
-        <a href="/register" class="link link-primary font-medium">Create one</a>
-      </p>
+      {#if registrationEnabled}
+        <p class="text-center text-sm opacity-60 mt-4">
+          Don't have an account?
+          <a href="/register" class="link link-primary font-medium">Create one</a>
+        </p>
+      {/if}
     </div>
   </div>
 </div>

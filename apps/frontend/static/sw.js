@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'lucid-logs-v1';
+// Bump this version on every deploy that changes cached behaviour — it forces
+// the browser to install the new SW and drop stale caches (fixes "Network
+// error" from a previously cached shell intercepting API calls).
+const CACHE_NAME = 'lucid-logs-v2';
 const STATIC_ASSETS = [
   '/',
   '/icon.png',

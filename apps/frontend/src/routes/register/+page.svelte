@@ -4,6 +4,14 @@ import { register } from '$lib/api';
 import { authStore } from '$lib/stores/auth.svelte';
 import { cn } from '$lib/utils';
 import { ArrowRight, CircleAlert, Lock, Mail, UserPlus } from 'lucide-svelte';
+import { browser } from '$app/environment';
+
+// Registration is hidden/disabled unless explicitly enabled at build time.
+const registrationEnabled = import.meta.env.VITE_REGISTRATION_ENABLED === 'true';
+
+if (browser && !registrationEnabled) {
+	goto('/login', { replaceState: true });
+}
 
 let email = $state('');
 let password = $state('');
