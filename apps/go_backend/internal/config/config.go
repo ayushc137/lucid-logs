@@ -32,9 +32,18 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Admin    AdminConfig
+	Auth     AuthConfig
 	CORS     CORSConfig
 	LLM      LLMConfig
 	Static   StaticConfig
+}
+
+// AuthConfig controls authentication-related behaviour.
+type AuthConfig struct {
+	// RegistrationEnabled gates the public /auth/register endpoint.
+	// Default: enabled in development, disabled in production unless
+	// AUTH_REGISTRATION_ENABLED=true is explicitly set.
+	RegistrationEnabled bool
 }
 
 // StaticConfig controls serving of the embedded frontend (all-in-one mode).
@@ -165,6 +174,14 @@ func Load() (*Config, error) {
 	cfg.Admin.Username = v.GetString("ADMIN_USERNAME")
 	cfg.Admin.Password = v.GetString("ADMIN_PASSWORD")
 	cfg.Admin.Seed = v.GetBool("ADMIN_SEED")
+
+	// Auth settings: registration defaults to enabled in development and
+	// disabled in production. AUTH_REGISTRATION_ENABLED overrides explicitly.
+	if v.IsSet("AUTH_REGISTRATION_ENABLED") {
+		cfg.Auth.RegistrationEnabled = v.GetBool("AUTH_REGISTRATION_ENABLED")
+	} else {
+		cfg.Auth.RegistrationEnabled = cfg.App.Env != "production"
+	}
 
 	// CORS settings
 	corsOrigins := v.GetString("CORS_ALLOWED_ORIGINS")

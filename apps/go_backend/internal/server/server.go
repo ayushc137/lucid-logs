@@ -134,7 +134,7 @@ func NewRouter(cfg Config) *gin.Engine {
 
 		// Auth routes (public)
 		authService := auth.NewService(cfg.DB, cfg.Cfg)
-		auth.RegisterRoutes(v1.Group("/auth"), authService, cfg.Validator)
+		auth.RegisterRoutes(v1.Group("/auth"), authService, cfg.Validator, cfg.Cfg.Auth.RegistrationEnabled)
 
 		// Protected routes (require authentication)
 		protected := v1.Group("")

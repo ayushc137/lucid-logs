@@ -17,15 +17,16 @@ import (
 
 // Handler handles authentication HTTP endpoints.
 type Handler struct {
-	service   Service
-	validator *validator.Validator
+	service             Service
+	validator           *validator.Validator
+	registrationEnabled bool
 }
 
-// NewHandler creates a new auth Handler.
-func NewHandler(service Service, validator *validator.Validator) *Handler {
+func NewHandler(service Service, validator *validator.Validator, registrationEnabled bool) *Handler {
 	return &Handler{
-		service:   service,
-		validator: validator,
+		service:             service,
+		validator:           validator,
+		registrationEnabled: registrationEnabled,
 	}
 }
 
@@ -38,8 +39,8 @@ func NewHandler(service Service, validator *validator.Validator) *Handler {
 // Routes registered:
 //   - POST /login    : User login
 //   - POST /register : User registration
-func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator) {
-	h := NewHandler(service, validator)
+func RegisterRoutes(r *gin.RouterGroup, service Service, validator *validator.Validator, registrationEnabled bool) {
+	h := NewHandler(service, validator, registrationEnabled)
 
 	r.POST("/login", h.Login)
 	r.POST("/register", h.Register)
@@ -103,6 +104,12 @@ func (h *Handler) Login(c *gin.Context) {
 // @Failure      409 {object} response.APIResponse "User already exists"
 // @Router       /api/v1/auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
+	// Registration is disabled (e.g. production single-user deployments).
+	if !h.registrationEnabled {
+		response.Forbidden(c, "Registration is disabled")
+		return
+	}
+
 	// Parse request body
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
