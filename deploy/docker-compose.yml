@@ -1,56 +1,44 @@
+# Lucid Logs — all-in-one Docker Compose
+# ========================================
+# A single container: SvelteKit SPA + Go API + embedded libSQL (SQLite).
+# No external database, no reverse proxy needed.
+#
+#   cp .env.example .env        # then edit values
+#   docker compose up -d
+#
+# The app is then reachable on http://localhost:8080 (or your host/domain).
+
 services:
-  # Database: SurrealDB (Multi-model, Real-time)
-  surrealdb:
-    image: surrealdb/surrealdb:latest
-    container_name: daily_journal_db
-    user: "0:0"  # Run as root to ensure write access to data volume
-    ports:
-      - "${HOST_DB_PORT:-8000}:8000"
-    command: start --log debug --user ${DB_USER:-root} --pass ${DB_PASS:-root} surrealkv:///data/database.db
-    volumes:
-      - ../db:/schema:ro
-      - surrealdb_data:/data
-    healthcheck:
-      test: ["CMD", "/surreal", "is-ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - journal_net
-
-  # Backend: Go (Gin)
-  backend:
+  lucid-logs:
     build:
-      context: ../apps/backend
+      context: ..          # repo root — the all-in-one Dockerfile lives there
       dockerfile: Dockerfile
-      target: dev
-    container_name: daily_journal_backend
+    image: lucid-logs:latest
+    container_name: lucid-logs
     restart: unless-stopped
-    volumes:
-      - ../apps/backend:/app
-      - go_mod_cache:/go/pkg/mod
-      - ../db:/schema:ro
     ports:
-      - "${HOST_APP_PORT:-8080}:8080"
-    env_file:
-      - ../.env
+      - "${HTTP_PORT:-8080}:8080"
     environment:
-      # Server
-      HTTP_PORT: 8080
-      # Database (override host for container networking)
-      DB_HOST: surrealdb
-      DB_PORT: 8000
-      DB_SCHEMA_PATH: /schema/schema.surql
-    depends_on:
-      surrealdb:
-        condition: service_healthy
-    networks:
-      - journal_net
-
-networks:
-  journal_net:
-    driver: bridge
+      APP_ENV: production
+      # REQUIRED: openssl rand -hex 32
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (openssl rand -hex 32)}
+      # First-run admin account (created only if no users exist yet).
+      ADMIN_SEED: ${ADMIN_SEED:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      # Optional: pre-fill the AI settings screen (bring-your-own-key).
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    volumes:
+      - lucid-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
 
 volumes:
-  go_mod_cache:
-  surrealdb_data:
+  lucid-data:

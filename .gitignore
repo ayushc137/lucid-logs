@@ -62,6 +62,11 @@ apps/frontend/.vercel/
 # Vite
 apps/frontend/dist/
 
+# Embedded frontend bundle (populated only during the all-in-one Docker build;
+# the placeholder .gitkeep is committed, the real build output is not)
+apps/go_backend/internal/web/dist/*
+!apps/go_backend/internal/web/dist/.gitkeep
+
 # =========================
 # Docker
 # =========================

@@ -34,6 +34,12 @@ type Config struct {
 	Admin    AdminConfig
 	CORS     CORSConfig
 	LLM      LLMConfig
+	Static   StaticConfig
+}
+
+// StaticConfig controls serving of the embedded frontend (all-in-one mode).
+type StaticConfig struct {
+	Enabled bool // Serve the embedded SPA alongside the API on the same origin
 }
 
 // LLMConfig contains default LLM settings from environment variables.
@@ -84,6 +90,7 @@ type JWTConfig struct {
 type AdminConfig struct {
 	Username string // Admin email
 	Password string // Admin password
+	Seed     bool   // Opt-in: seed the admin account in any environment (first-run)
 }
 
 // CORSConfig contains CORS settings.
@@ -157,6 +164,7 @@ func Load() (*Config, error) {
 	// Admin settings
 	cfg.Admin.Username = v.GetString("ADMIN_USERNAME")
 	cfg.Admin.Password = v.GetString("ADMIN_PASSWORD")
+	cfg.Admin.Seed = v.GetBool("ADMIN_SEED")
 
 	// CORS settings
 	corsOrigins := v.GetString("CORS_ALLOWED_ORIGINS")
@@ -171,6 +179,9 @@ func Load() (*Config, error) {
 	cfg.LLM.BaseURL = v.GetString("LLM_BASE_URL")
 	cfg.LLM.Model = v.GetString("LLM_MODEL")
 	cfg.LLM.APIKey = v.GetString("LLM_API_KEY")
+
+	// Static SPA serving (all-in-one mode)
+	cfg.Static.Enabled = v.GetBool("STATIC_ENABLED")
 
 	// Validate and apply security defaults
 	if err := validateAndSecure(cfg); err != nil {
@@ -197,6 +208,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("DATABASE_PATH", "./data/lucid-logs.db")
 	v.SetDefault("DATABASE_MIGRATIONS_PATH", "../../db/migrations")
 
+	// Static SPA serving defaults (enabled; no-op unless a frontend is embedded)
+	v.SetDefault("STATIC_ENABLED", true)
+
 	// JWT defaults
 	v.SetDefault("JWT_EXPIRATION_HOURS", 24)
 	v.SetDefault("JWT_ISSUER", "lucid-logs")
@@ -204,6 +218,7 @@ func setDefaults(v *viper.Viper) {
 	// Admin defaults (only for development)
 	v.SetDefault("ADMIN_USERNAME", "admin@example.com")
 	v.SetDefault("ADMIN_PASSWORD", "adminadmin")
+	v.SetDefault("ADMIN_SEED", false)
 }
 
 // validateAndSecure validates security-critical settings.
@@ -231,13 +246,18 @@ func validateAndSecure(cfg *Config) error {
 		log.Warn().Msg("[SECURITY] JWT_SECRET not set; using ephemeral secret")
 	}
 
-	// Handle admin credentials
+	// Handle admin credentials.
+	// In production without the explicit ADMIN_SEED opt-in, clear any defaults so
+	// no well-known admin account can be created implicitly.
 	if cfg.Admin.Username == "" || cfg.Admin.Password == "" {
 		if isProd {
 			log.Warn().Msg("[SECURITY] Admin credentials not set in production")
 			cfg.Admin.Username = ""
 			cfg.Admin.Password = ""
 		}
+	}
+	if isProd && cfg.Admin.Seed && (cfg.Admin.Username == "" || cfg.Admin.Password == "") {
+		return fmt.Errorf("ADMIN_SEED=true requires ADMIN_USERNAME and ADMIN_PASSWORD")
 	}
 
 	// Warn about permissive CORS in production

@@ -1,0 +1,48 @@
+# Git / VCS
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Node / frontend build artifacts (rebuilt inside the image)
+node_modules
+**/node_modules
+apps/frontend/build
+apps/frontend/dist
+apps/frontend/.svelte-kit
+apps/frontend/.vercel
+**/*.tsbuildinfo
+
+# Embedded frontend bundle — injected fresh from the frontend build stage.
+# Exclude whatever is in the working tree so the stage COPY is authoritative.
+apps/go_backend/internal/web/dist
+
+# Databases / local data
+**/*.db
+**/*.db-shm
+**/*.db-wal
+surreal.db
+data/
+
+# Go build artifacts
+apps/go_backend/bin
+apps/go_backend/api
+**/coverage.out
+
+# Env / secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Docs / CI / misc not needed in the image
+docs/
+*.md
+!README.md
+LICENSE
+Dockerfile
+docker-compose*.yml
+.dockerignore
+deploy/
+scripts/
+.idea/
+.vscode/

@@ -100,6 +100,10 @@ func main() {
 		log.Warn().Err(err).Msg("failed to seed development admin user")
 	}
 
+	if err := bootstrap.EnsureInitialAdmin(ctx, db, cfg); err != nil {
+		log.Warn().Err(err).Msg("failed to seed initial admin user")
+	}
+
 	// =========================================================================
 	// INITIALIZE EMOTION CACHE
 	// =========================================================================
