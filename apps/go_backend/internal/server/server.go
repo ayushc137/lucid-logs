@@ -32,6 +32,7 @@ import (
 	"github.com/lucid-logs/go-backend/internal/shared/database"
 	"github.com/lucid-logs/go-backend/internal/shared/middleware"
 	"github.com/lucid-logs/go-backend/internal/shared/validator"
+	"github.com/lucid-logs/go-backend/internal/web"
 )
 
 // =============================================================================
@@ -203,6 +204,16 @@ func NewRouter(cfg Config) *gin.Engine {
 			retroService := retrospectives.NewService(retroRepo, analyticsRepo, userRepo)
 			retrospectives.RegisterRoutes(protected.Group("/retrospectives"), retroService, cfg.Validator)
 		}
+	}
+
+	// ==========================================================================
+	// STATIC SPA (all-in-one mode)
+	// ==========================================================================
+	// When the frontend is embedded (all-in-one binary/image) and STATIC_ENABLED
+	// is not explicitly false, serve the UI from the same origin as the API.
+	// Registered last so it only catches routes the API didn't handle.
+	if cfg.Cfg.Static.Enabled {
+		web.RegisterSPA(r)
 	}
 
 	return r

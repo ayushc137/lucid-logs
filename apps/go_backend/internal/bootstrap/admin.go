@@ -20,10 +20,30 @@ func EnsureDevAdmin(ctx context.Context, db *database.DB, cfg *config.Config) er
 	if cfg == nil || !cfg.IsDev() {
 		return nil
 	}
+	return ensureAdmin(ctx, db, cfg.Admin.Username, cfg.Admin.Password, "development")
+}
 
-	username := strings.ToLower(strings.TrimSpace(cfg.Admin.Username))
-	password := strings.TrimSpace(cfg.Admin.Password)
+// EnsureInitialAdmin seeds the first admin account in any environment when
+// ADMIN_SEED=true and both ADMIN_USERNAME and ADMIN_PASSWORD are set.
+//
+// This is the first-run mechanism for self-hosted production deployments: the
+// container starts with no users, so an explicit opt-in env flag creates the
+// initial login. If the user already exists it is a no-op, and if the flag is
+// unset it does nothing (safe to leave configured; only runs when requested).
+func EnsureInitialAdmin(ctx context.Context, db *database.DB, cfg *config.Config) error {
+	if cfg == nil || !cfg.Admin.Seed {
+		return nil
+	}
+	return ensureAdmin(ctx, db, cfg.Admin.Username, cfg.Admin.Password, "initial")
+}
+
+// ensureAdmin creates an admin user if one with the given email does not exist.
+func ensureAdmin(ctx context.Context, db *database.DB, rawUsername, rawPassword, label string) error {
+	username := strings.ToLower(strings.TrimSpace(rawUsername))
+	password := strings.TrimSpace(rawPassword)
 	if username == "" || password == "" {
+		log.Warn().Str("component", "bootstrap").
+			Msgf("%s admin seed requested but ADMIN_USERNAME/ADMIN_PASSWORD are empty; skipping", label)
 		return nil
 	}
 
@@ -36,6 +56,7 @@ func EnsureDevAdmin(ctx context.Context, db *database.DB, cfg *config.Config) er
 		return errors.ErrDatabase.Wrap(err)
 	}
 	if exists != 0 {
+		logger.Info().Str("admin_user", username).Msgf("%s admin account already exists; skipping seed", label)
 		return nil
 	}
 
@@ -50,13 +71,13 @@ func EnsureDevAdmin(ctx context.Context, db *database.DB, cfg *config.Config) er
 		`INSERT INTO users(id,email,pass,is_admin,preferences,created_at,updated_at) VALUES(?,?,?,1,'{}',?,?)`,
 		userID, username, hash, now, now)
 	if err != nil {
-		logger.Error().Err(err).Str("admin_user", username).Msg("failed to create admin user")
+		logger.Error().Err(err).Str("admin_user", username).Msgf("failed to create %s admin user", label)
 		return errors.ErrDatabase.Wrap(err)
 	}
 
 	logger.Info().
 		Str("admin_user", username).
-		Msg("seeded development admin account")
+		Msgf("seeded %s admin account", label)
 
 	return nil
 }
